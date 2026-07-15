@@ -70,7 +70,7 @@ export const requestNotificationPermission = async () => {
       console.log("User denied notification permission");
       return;
     }
-
+console.log("VAPID KEY =", VAPID_KEY);
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
     });

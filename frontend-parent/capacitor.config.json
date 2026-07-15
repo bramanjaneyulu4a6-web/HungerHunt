@@ -1,5 +1,9 @@
 {
   "appId": "com.hungerhunt.parent",
   "appName": "Hunger Hunt Parent",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://hunger-hunt-parent.vercel.app",
+    "cleartext": true
+  }
 }

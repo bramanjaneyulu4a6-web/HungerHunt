@@ -118,14 +118,39 @@
 
 
 
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import fs from "fs";
+// import { initializeApp, cert, getApps } from "firebase-admin/app";
+// import fs from "fs";
 
-const serviceAccount = JSON.parse(
-  fs.readFileSync(
-    new URL("../firebase-service-account.json", import.meta.url)
-  )
-);
+// const serviceAccount = JSON.parse(
+//   fs.readFileSync(
+//     new URL("../firebase-service-account.json", import.meta.url)
+//   )
+// );
+
+// if (getApps().length === 0) {
+//   initializeApp({
+//     credential: cert(serviceAccount),
+//   });
+// }
+
+// console.log("✅ Firebase initialized");
+
+
+
+
+// 21-07-2026
+
+
+
+
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+
+const serviceAccount = {
+  type: "service_account",
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+};
 
 if (getApps().length === 0) {
   initializeApp({

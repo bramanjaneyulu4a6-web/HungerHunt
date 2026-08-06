@@ -32,6 +32,14 @@ const SHARED = [
     file: 'src/pages/KioskBilling.jsx',
     apps: ['frontend-admin', 'hungerhunt-kiosk'],
   },
+  {
+    file: 'src/components/ui/index.jsx',
+    apps: ['frontend-parent', 'frontend-admin'],
+  },
+  {
+    file: 'src/utils/format.js',
+    apps: ['frontend-parent', 'frontend-admin'],
+  },
 ];
 
 const digest = (path) =>

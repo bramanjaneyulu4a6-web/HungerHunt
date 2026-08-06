@@ -416,20 +416,6 @@ if (showWelcome) {
     gap: "0px", // No gap between text and button
   }}
 >
-  {/* <p
-    style={{
-      fontSize: "28px",
-      fontWeight: "500",
-      color: "#FFF7ED",
-      margin: 0,
-      lineHeight: 1.4,
-      textAlign: "center",
-    }}
-  >
-   • Fresh • Fast • Delicious
-  
-  </p> */}
-
   <button className="kiosk-start" onClick={() => setShowWelcome(false)}>
     START ORDER
   </button>
@@ -580,12 +566,12 @@ if (showWelcome) {
         background:
           selectedCategory === category
             ? "var(--primary)"
-            : "#E5E7EB",
+            : "var(--border)",
 
         color:
           selectedCategory === category
             ? "var(--surface)"
-            : "#111827",
+            : "var(--ink)",
       }}
     >
       {category}
@@ -667,7 +653,7 @@ if (showWelcome) {
   style={{
     fontSize: "18px",
     fontWeight: "700",
-    color: "#374151",
+    color: "var(--ink-soft)",
     marginBottom: "8px",
     textAlign: "left",
   }}
@@ -688,7 +674,7 @@ if (showWelcome) {
       style={{
         fontSize: "18px",
         fontWeight: "700",
-        color: "#111827",
+        color: "var(--ink)",
       }}
     >
       ₹{p.price}
@@ -699,7 +685,7 @@ if (showWelcome) {
     style={{
       fontSize: "15px",
       fontWeight: "500",
-      color: "#374151",
+      color: "var(--ink-soft)",
     }}
   >
     {p.stock} Stock
@@ -891,7 +877,7 @@ if (showWelcome) {
       gap: 18,
       padding: "16px 20px",
       margin: "18px 0",
-      border: "1px solid #E5E7EB",
+      border: "1px solid var(--border)",
       borderRadius: 12,
       background: "var(--bg)",
     }}
@@ -988,7 +974,7 @@ if (showWelcome) {
             height: 70,
             objectFit: "cover",
             borderRadius: 8,
-            border: "1px solid #ddd",
+            border: "1px solid var(--border-strong)",
           }}
         />
       </td>
@@ -1179,7 +1165,7 @@ if (showWelcome) {
         style={{
           width: "100%",
           padding: 14,
-          border: "1px solid #ddd",
+          border: "1px solid var(--border-strong)",
           borderRadius: 8,
           marginBottom: 20
         }}
@@ -1205,7 +1191,7 @@ if (showWelcome) {
         style={{
           width: "100%",
           padding: 14,
-          border: "1px solid #ddd",
+          border: "1px solid var(--border-strong)",
           borderRadius: 8
         }}
       />
@@ -1222,7 +1208,7 @@ if (showWelcome) {
             flex: 1,
             padding: 14,
             borderRadius: 10,
-            border: "1px solid #ccc",
+            border: "1px solid var(--border-strong)",
             cursor: "pointer"
           }}
           onClick={() => {

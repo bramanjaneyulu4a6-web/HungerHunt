@@ -35,7 +35,7 @@ const styles = {
     fontSize: "28px",
     fontWeight: "900",
     fontFamily: "'Poppins', sans-serif",
-    color: "#033d6c",
+    color: "var(--brand-navy)",
     letterSpacing: "1px",
     textShadow: "2px 2px 6px rgba(66, 55, 10, 0.25)",
     marginTop: 0,

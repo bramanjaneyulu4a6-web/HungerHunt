@@ -116,6 +116,8 @@
   --brand: #ff6b35;
   --brand-amber: #facc15;
   --brand-deep: #ea580c;
+  /* Navy the kiosk uses for its headings, against the warm gradient. */
+  --brand-navy: #033d6c;
 
   /* ---- shape --------------------------------------------------------- */
   --radius-sm: 8px;

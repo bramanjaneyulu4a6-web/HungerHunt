@@ -13,6 +13,7 @@ import Billing from './pages/Billing';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { authBypassEnabled } from './utils/authBypass';
 import RechargeHistory from './pages/RechargeHistory';
 import Purchase from "./pages/Purchase";
 import Purchased from "./pages/Purchased";
@@ -23,7 +24,10 @@ function App() {
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route
+          path="/"
+          element={<Navigate to={authBypassEnabled ? "/dashboard" : "/login"} replace />}
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />

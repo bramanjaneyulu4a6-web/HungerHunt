@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import { authBypassEnabled } from "./authBypass";
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
@@ -17,7 +19,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // With the bypass on there is no token to clear and no login to return to,
+    // so a stray 401 must not eject the kiosk.
+    if (error.response?.status === 401 && !authBypassEnabled) {
       localStorage.removeItem("adminToken");
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";

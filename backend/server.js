@@ -17,8 +17,16 @@ import purchaseRoutes from './routes/purchaseRoutes.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
+import { authBypassEnabled } from './middleware/devBypass.js';
 
 const app = express();
+
+if (authBypassEnabled) {
+  console.warn(
+    '\n*** AUTH_BYPASS IS ON — every admin and parent route is unauthenticated. ***' +
+    '\n*** Local development only. Unset AUTH_BYPASS before deploying. ***\n'
+  );
+}
 
 app.use(helmet());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));

@@ -1,5 +1,7 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 
+import { authBypassEnabled, bypassParent } from '../utils/authBypass';
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -7,6 +9,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+  if (authBypassEnabled) {
+    setParent(bypassParent);
+    setLoading(false);
+    return;
+  }
+
   const token = localStorage.getItem('parentToken');
   const savedParent = localStorage.getItem('parentData');
 

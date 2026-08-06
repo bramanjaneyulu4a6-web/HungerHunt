@@ -1,6 +1,10 @@
 import { Navigate } from "react-router-dom";
 
+import { authBypassEnabled } from "../utils/authBypass";
+
 const ProtectedRoute = ({ children }) => {
+  if (authBypassEnabled) return children;
+
   const token = localStorage.getItem("adminToken");
 
   if (!token) {

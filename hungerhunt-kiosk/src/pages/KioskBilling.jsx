@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { ShoppingCart, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import hungerLogo from "../assets/Logo.png";
 
-const KioskBilling = () => {
-  const navigate = useNavigate();
+const KioskBilling = ({ onLogout }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -30,10 +28,6 @@ const [showCart, setShowCart] = useState(false);
 const [purchasePassword, setPurchasePassword] = useState("");
 const [inventoryError, setInventoryError] = useState("");
 
-const handleLogout = () => {
-  localStorage.removeItem("adminToken");
-  navigate("/login", { replace: true });
-};
 const refreshPage = async () => {
   try {
     setLoadingProducts(true);
@@ -621,7 +615,7 @@ const categories = [
     },
     addBtn: {
       padding: "8px 14px",
-      background: "#0d4d82",
+      background: "var(--primary)",
       color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
@@ -998,8 +992,9 @@ if (showWelcome) {
       )}
     </button>
 
+    {onLogout && (
     <button
-      onClick={handleLogout}
+      onClick={onLogout}
       style={{
         padding: "10px 18px",
         background: "var(--danger)",
@@ -1013,6 +1008,7 @@ if (showWelcome) {
     >
       Logout
     </button>
+    )}
   </div>
 </div>
             <div
@@ -1039,7 +1035,7 @@ if (showWelcome) {
 
         background:
           selectedCategory === category
-            ? "#0d4d82"
+            ? "var(--primary)"
             : "#E5E7EB",
 
         color:

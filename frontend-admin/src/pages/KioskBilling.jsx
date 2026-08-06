@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { ShoppingCart, X } from "lucide-react";
+import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import hungerLogo from "../assets/Logo.png";
 
-const KioskBilling = () => {
+const KioskBilling = ({ onLogout }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -25,25 +26,31 @@ const [showCart, setShowCart] = useState(false);
  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
 const [purchasePassword, setPurchasePassword] = useState("");
+const [inventoryError, setInventoryError] = useState("");
+
 const refreshPage = async () => {
   try {
     setLoadingProducts(true);
 
-    const res = await api.get("/inventory");
+   const res = await api.get("/inventory");
 
-   const inventoryProducts = res.data
-  .filter(item => item.stock > 0)
+const data = Array.isArray(res.data) ? res.data : [];
+
+const inventoryProducts = data
+  .filter(item => item.stock > 0 && item.productId)
   .map(item => ({
-    _id: item.productId._id,
-    name: item.productId.name,
-    price: item.productId.price,
-    image: item.productId.image,   // ✅ ADD THIS
+    _id: item.productId?._id,
+    name: item.productId?.name,
+    price: item.productId?.price,
+    image: item.productId?.image,
     stock: item.stock,
-    stockGroup: item.productId.stockGroup,
-  }));
+    stockGroup: item.productId?.stockGroup,
+  }))
+  .filter(item => item._id);
 
     // Refresh product list
     setProducts(inventoryProducts);
+    setInventoryError("");
 
     // Reset staged quantities
     const initialQuantities = {};
@@ -81,7 +88,7 @@ setIsSearched(false);
 setCart([]);
   } catch (err) {
     console.error(err);
-    alert("Failed to refresh products.");
+    toast.error("Failed to refresh products.");
   } finally {
     setLoadingProducts(false);
   }
@@ -106,30 +113,30 @@ const fetchCatalog = async () => {
 
     const res = await api.get("/inventory");
 
+    if (!Array.isArray(res.data)) {
+      setInventoryError("Inventory data could not be loaded. Please try refreshing.");
+      setProducts([]);
+      return;
+    }
+
     const inventoryProducts = res.data
-  .filter(item => item.stock > 0)
-  .map(item => ({
-    _id: item.productId._id,
-    name: item.productId.name,
-    price: item.productId.price,
-    image: item.productId.image,     // <-- ADD THIS
-    stock: item.stock,
-    stockGroup: item.productId.stockGroup,
-  }));
+      .filter(item => item.stock > 0 && item.productId)
+      .map(item => ({
+        _id: item.productId?._id,
+        name: item.productId?.name,
+        price: item.productId?.price,
+        image: item.productId?.image,
+        stock: item.stock,
+        stockGroup: item.productId?.stockGroup,
+      }))
+      .filter(item => item._id);
 
     setProducts(inventoryProducts);
+    setInventoryError("");
 
-    const initialQuantities = {};
-
-    inventoryProducts.forEach(product => {
-      initialQuantities[product._id] = 1;
-    });
-
-    setStagedQuantities(initialQuantities);
-
-  } catch (error) {
-    console.error(error);
-    alert("Failed to fetch inventory");
+  } catch (err) {
+    console.error(err);
+    setInventoryError("Failed to load inventory. Please try refreshing.");
   } finally {
     setLoadingProducts(false);
   }
@@ -139,21 +146,19 @@ const fetchCatalog = async () => {
 
   const handleStudentSearch = async () => {
     if (!searchQuery.trim()) {
-      alert("Please enter student name or hostel number");
+      toast.error("Please enter student name or hostel number");
       return;
     }
 
     if (searchQuery.trim().length < 2) {
-      setSelectedStudent(null);
-      setSearchResults([]);
-      setIsSearched(false);
+      toast.error("Please enter at least 2 characters to search");
       return;
     }
 
     try {
-      const res = await api.get(
-        `/students/search?q=${encodeURIComponent(searchQuery)}`
-      );
+     const res = await api.get(
+  `/students/search?q=${encodeURIComponent(searchQuery)}`
+);
 
       setIsSearched(true);
 
@@ -162,7 +167,7 @@ const fetchCatalog = async () => {
         setSearchResults([]);
         // setProducts([]);
         setCart([]);
-        alert("No student found matching that name or hostel number");
+        toast.error("No student found matching that name or hostel number");
         return;
       }
 
@@ -179,7 +184,7 @@ const fetchCatalog = async () => {
       setCart([]);
     } catch (error) {
       console.error(error);
-      alert("Student search failed");
+      toast.error("Student search failed");
     }
   };
 
@@ -189,7 +194,7 @@ const fetchCatalog = async () => {
       const updated = current + amount;
       if (updated < 1) return prev;
       if (updated > maxStock) {
-        alert(`Only ${maxStock} items available in stock!`);
+        toast.error(`Only ${maxStock} items available in stock!`);
         return prev;
       }
       return { ...prev, [productId]: updated };
@@ -210,7 +215,7 @@ const fetchCatalog = async () => {
       return;
     }
     if (parsed > maxStock) {
-      alert(`Only ${maxStock} items available in stock!`);
+      toast.error(`Only ${maxStock} items available in stock!`);
       setStagedQuantities(prev => ({ ...prev, [productId]: maxStock }));
       return;
     }
@@ -223,7 +228,7 @@ const fetchCatalog = async () => {
     const currentCartQty = exists ? parseInt(exists.quantity, 10) || 0 : 0;
 
     if (currentCartQty + qtyToAdd > product.stock) {
-      return alert(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
+      return toast.error(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
     }
 
     if (exists) {
@@ -257,7 +262,7 @@ const fetchCatalog = async () => {
           const updatedQty = currentQty + amount;
           
           if (updatedQty > maxStock) {
-            alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
+            toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
             return item;
           }
           
@@ -293,7 +298,7 @@ const fetchCatalog = async () => {
             return { ...item, quantity: 1 };
           }
           if (parsed > maxStock) {
-            alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
+            toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
             return { ...item, quantity: maxStock };
           }
           return { ...item, quantity: parsed };
@@ -320,7 +325,7 @@ const fetchCatalog = async () => {
 
   const handleCheckout = async () => {
    if (!selectedStudent) {
-  alert("Please search and select a student first.");
+  toast.error("Please search and select a student first.");
   return;
 }
 
@@ -330,7 +335,7 @@ const fetchCatalog = async () => {
     }));
 
     if (invoiceTotal > selectedStudent.pocketMoney) {
-      return alert("Insufficient wallet balance!");
+      return toast.error("Insufficient wallet balance!");
     }
 
     try {
@@ -343,7 +348,7 @@ const fetchCatalog = async () => {
         totalAmount: invoiceTotal,
       });
 
-      alert("Payment successful!");
+      toast.success("Payment successful!");
 
 await fetchCatalog();
 
@@ -352,9 +357,18 @@ setSelectedStudent(null);
 setSearchQuery("");
 setProductSearchQuery("");
 setIsSearched(false);
-    } catch {
-      alert("Checkout failed");
-    }
+setShowCart(false);
+setShowWelcome(true);
+    } catch (err) {
+
+  console.error("Checkout Error:", err);
+
+  toast.error(
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    "Checkout failed"
+  );
+}
   };
   const filteredProducts = products.filter((p) => {
 
@@ -407,11 +421,11 @@ const categories = [
    panelTitle: {
   fontSize: "42px",
   fontWeight: "900",
-  fontFamily: "'Arial Black', 'Montserrat', 'Poppins', sans-serif",
-  color: "var(--primary)",
+  fontFamily: "'Poppins', sans-serif",
+  color: "#033d6c",
   letterSpacing: "2px",
-  textTransform: "uppercase",
-  textShadow: "2px 2px 6px rgba(37,99,235,0.25)",
+  // textTransform: "uppercase",
+  textShadow: "2px 2px 6px rgba(66, 55, 10, 0.25)",
   marginTop: 0,
   marginBottom: "16px",
 },
@@ -442,7 +456,7 @@ const categories = [
     },
     primaryBtn: {
       padding: "12px 24px",
-      background: "var(--primary)",
+      background: "orange",
       color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
@@ -610,6 +624,7 @@ const categories = [
       cursor: "pointer",
       transition: "background-color 0.2s",
     },
+    
     checkoutSection: {
       marginTop: "24px",
       paddingTop: "16px",
@@ -785,7 +800,7 @@ productCard: {
 
 productImage: {
   width: "100%",
-  height: 170,
+  height: 180,
   objectFit: "cover",
 },
 
@@ -936,45 +951,65 @@ if (showWelcome) {
   }}
 >
   <h3 style={{ ...styles.panelTitle, marginBottom: 0 }}>
-    HUNGER HUNT
+    Hunger Hunt
   </h3>
 
   
 </div>
 
-  <button
-    onClick={() => setShowCart(true)}
-    style={{
-      border: "none",
-      background: "transparent",
-      cursor: "pointer",
-      position: "relative",
-    }}
-  >
-    <ShoppingCart size={34} />
+  <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+    <button
+      onClick={() => setShowCart(true)}
+      style={{
+        border: "none",
+        background: "transparent",
+        cursor: "pointer",
+        position: "relative",
+      }}
+    >
+      <ShoppingCart size={34} />
 
-    {cart.length > 0 && (
-      <span
-        style={{
-          position: "absolute",
-          top: -6,
-          right: -8,
-          background: "var(--danger-light)",
-          color: "var(--on-dark)",
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          fontSize: 12,
-          fontWeight: "bold",
-        }}
-      >
-        {cart.length}
-      </span>
+      {cart.length > 0 && (
+        <span
+          style={{
+            position: "absolute",
+            top: -6,
+            right: -8,
+            background: "var(--danger-light)",
+            color: "var(--on-dark)",
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: 12,
+            fontWeight: "bold",
+          }}
+        >
+          {cart.length}
+        </span>
+      )}
+    </button>
+
+    {onLogout && (
+    <button
+      onClick={onLogout}
+      style={{
+        padding: "10px 18px",
+        background: "var(--danger)",
+        color: "var(--on-dark)",
+        border: "none",
+        borderRadius: "8px",
+        fontWeight: "600",
+        fontSize: "13px",
+        cursor: "pointer",
+      }}
+    >
+      Logout
+    </button>
     )}
-  </button>
+  </div>
 </div>
             <div
   style={{
@@ -1013,6 +1048,22 @@ if (showWelcome) {
     </button>
   ))}
 </div>
+            {inventoryError && (
+              <div
+                style={{
+                  background: "var(--danger-bg-strong)",
+                  color: "var(--danger)",
+                  padding: "12px 14px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  marginBottom: "16px",
+                }}
+              >
+                {inventoryError}
+              </div>
+            )}
+
             <input
               style={styles.productSearchInput}
               placeholder="🔍 Quick filter products by name..."
@@ -1074,18 +1125,48 @@ if (showWelcome) {
         />
 
         <div style={styles.productBody}>
+<div
+  style={{
+    fontSize: "18px",
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: "8px",
+    textAlign: "left",
+  }}
+>
+  {p.name}
+</div>
 
-          <div style={styles.productTitle}>
-            {p.name}
-          </div>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "12px",
+  }}
+>
+  <div>
+    <div
+      style={{
+        fontSize: "18px",
+        fontWeight: "700",
+        color: "#111827",
+      }}
+    >
+      ₹{p.price}
+    </div>
+  </div>
 
-          <div style={styles.priceText}>
-            ₹{p.price}
-          </div>
-
-          <div style={styles.stockBadge}>
-            Stock : {p.stock}
-          </div>
+  <div
+    style={{
+      fontSize: "15px",
+      fontWeight: "500",
+      color: "#374151",
+    }}
+  >
+    {p.stock} Stock
+  </div>
+</div>
 
           <div style={styles.cardFooter}>
 
@@ -1479,7 +1560,7 @@ if (showWelcome) {
                     style={styles.successBtn}
                     onClick={() => {
   if (!selectedStudent) {
-    alert("Please select a student.");
+    toast.error("Please select a student.");
     return;
   }
 
@@ -1637,7 +1718,7 @@ if (showWelcome) {
 
             } catch (err) {
 
-              alert(
+              toast.error(
                 err.response?.data?.message ||
                 "Verification Failed"
               );
@@ -1661,3 +1742,6 @@ if (showWelcome) {
 };
 
 export default KioskBilling;
+
+
+

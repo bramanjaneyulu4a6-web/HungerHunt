@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
@@ -22,6 +23,7 @@ import KioskBilling from "./pages/KioskBilling";
 function App() {
   return (
     <Router>
+      <Toaster position="top-center" />
       <Routes>
         {/* Public Routes */}
         <Route

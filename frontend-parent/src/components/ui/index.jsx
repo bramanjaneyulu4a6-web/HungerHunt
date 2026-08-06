@@ -85,6 +85,49 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
   );
 }
 
+/* Shell shared by login, register, forgot-password and reset-password. */
+export function AuthLayout({ title, subtitle, children, footer }) {
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <header className="auth-header">
+          <h1 className="auth-title">{title}</h1>
+          {subtitle && <p className="auth-subtitle">{subtitle}</p>}
+        </header>
+
+        {children}
+
+        {footer && <p className="auth-footer">{footer}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* `id` is required rather than optional: the old markup used bare <label>
+   elements with no htmlFor, so nothing tied a label to its input. */
+export function AuthField({ id, label, aside, ...inputProps }) {
+  return (
+    <div className="auth-field">
+      {aside ? (
+        <div className="auth-label-row">
+          {/* Balances the aside so the label stays optically centred. */}
+          <span style={{ width: 20 }} aria-hidden="true" />
+          <label className="auth-label" htmlFor={id}>
+            {label}
+          </label>
+          {aside}
+        </div>
+      ) : (
+        <label className="auth-label" htmlFor={id}>
+          {label}
+        </label>
+      )}
+
+      <input id={id} className="auth-input" {...inputProps} />
+    </div>
+  );
+}
+
 export function EmptyState({ icon, title, children, action }) {
   return (
     <div className="empty-state">

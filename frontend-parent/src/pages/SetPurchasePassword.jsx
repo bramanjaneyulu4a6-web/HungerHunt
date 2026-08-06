@@ -1,395 +1,311 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import API from "../services/api";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import API from '../services/api';
+import { Banner, Button, Card, EmptyState, Skeleton } from '../components/ui';
+
+const MIN_LENGTH = 4;
 
 export default function SetPurchasePassword() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-const [student, setStudent] = useState(null);
-const [loading, setLoading] = useState(true);
+  const [student, setStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [hasPassword, setHasPassword] = useState(false);
 
-const [password, setPassword] = useState("");
-const [confirmPassword, setConfirmPassword] = useState("");
+  // Which of the two secondary forms is open: 'change', 'reset', or null.
+  const [openForm, setOpenForm] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-const [currentPassword, setCurrentPassword] = useState("");
-const [newPassword, setNewPassword] = useState("");
-const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-const [hasPassword, setHasPassword] = useState(false);
-const [showChange, setShowChange] = useState(false);
-const [showReset, setShowReset] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-const [resetPasswordValue, setResetPasswordValue] = useState("");
-const [confirmResetPassword, setConfirmResetPassword] = useState("");
-const [resetParentPassword, setResetParentPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
-const [error, setError] = useState("");
-const [success, setSuccess] = useState("");
+  const [resetParentPassword, setResetParentPassword] = useState('');
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
 
-  useEffect(() => {
-    API.get(`/parent/child/${id}`)
-      .then((res) => {
-       setStudent(res.data.student);
-setHasPassword(res.data.hasPurchasePassword);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError("Unable to load student.");
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  const savePassword = async () => {
-    setError("");
-    setSuccess("");
-
-    if (!password) {
-      return setError("Please enter a password.");
-    }
-
-    if (password.length < 4) {
-      return setError("Password must be at least 4 characters.");
-    }
-
-    if (password !== confirmPassword) {
-      return setError("Passwords do not match.");
-    }
+  const fetchStudent = async () => {
+    setLoadError('');
 
     try {
-      await API.post("/parent/set-purchase-password", {
-        studentId: id,
-        password,
-      });
-
-      setSuccess("Purchase password saved successfully.");
-      setTimeout(() => navigate(`/child/${id}`), 1200);
+      const res = await API.get(`/parent/child/${id}`);
+      setStudent(res.data.student);
+      setHasPassword(res.data.hasPurchasePassword);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to save password.");
+      console.error(err);
+      setLoadError(
+        err.response
+          ? err.response.data?.message || 'Unable to load student.'
+          : "Couldn't reach the server. Check your connection."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    setLoading(true);
+    fetchStudent();
+  }, [id]);
+
+  // Every submit here shares the same shape: validate, POST, report, go back.
+  const submit = async (endpoint, body, validate) => {
+    setError('');
+    setSuccess('');
+
+    const problem = validate();
+    if (problem) return setError(problem);
+
+    setSaving(true);
+
+    try {
+      await API.post(endpoint, { studentId: id, ...body });
+      setSuccess('Purchase password updated successfully.');
+      setTimeout(() => navigate(`/child/${id}`), 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save password.');
+      setSaving(false);
+    }
+  };
+
+  const savePassword = () =>
+    submit('/parent/set-purchase-password', { password }, () => {
+      if (!password) return 'Please enter a password.';
+      if (password.length < MIN_LENGTH)
+        return `Password must be at least ${MIN_LENGTH} characters.`;
+      if (password !== confirmPassword) return 'Passwords do not match.';
+      return null;
+    });
+
+  const changePassword = () =>
+    submit(
+      '/parent/change-purchase-password',
+      { currentPassword, newPassword },
+      () => {
+        if (!currentPassword) return 'Please enter the current password.';
+        if (newPassword.length < MIN_LENGTH)
+          return `Password must be at least ${MIN_LENGTH} characters.`;
+        if (newPassword !== confirmNewPassword) return 'Passwords do not match.';
+        return null;
+      }
+    );
+
+  const resetPassword = () =>
+    submit(
+      '/parent/reset-purchase-password',
+      { parentPassword: resetParentPassword, newPassword: resetPasswordValue },
+      () => {
+        if (!resetParentPassword) return 'Please enter your account password.';
+        if (resetPasswordValue.length < MIN_LENGTH)
+          return `Password must be at least ${MIN_LENGTH} characters.`;
+        if (resetPasswordValue !== confirmResetPassword)
+          return 'Passwords do not match.';
+        return null;
+      }
+    );
+
+  const toggle = (form) => {
+    setOpenForm(openForm === form ? null : form);
+    setError('');
+    setSuccess('');
+  };
+
+  const field = (label, value, onChange, autoComplete = 'new-password') => (
+    <div>
+      <label className="field-label" htmlFor={label}>
+        {label}
+      </label>
+      <input
+        id={label}
+        className="input"
+        type="password"
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+
   if (loading) {
-    return <h2 style={{ textAlign: "center", marginTop: 50 }}>Loading...</h2>;
+    return (
+      <div className="page">
+        <Card style={{ maxWidth: 500, margin: '0 auto' }}>
+          <Skeleton width="55%" height={24} />
+          <Skeleton width="40%" height={14} style={{ marginTop: 12 }} />
+          <Skeleton height={44} radius="var(--radius-sm)" style={{ marginTop: 24 }} />
+          <Skeleton height={44} radius="var(--radius-sm)" style={{ marginTop: 16 }} />
+        </Card>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="page">
+        <div style={{ maxWidth: 500, margin: '0 auto' }}>
+          <Banner variant="alert" icon="⚠️">
+            {loadError}
+          </Banner>
+          <Button
+            variant="ghost"
+            onClick={fetchStudent}
+            style={{ marginTop: 16 }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!student) {
-    return <h2 style={{ textAlign: "center", marginTop: 50 }}>Student not found.</h2>;
+    return (
+      <div className="page">
+        <div style={{ maxWidth: 500, margin: '0 auto' }}>
+          <EmptyState icon="🔍" title="Student not found">
+            This account may have been removed, or it isn&apos;t linked to your
+            phone number.
+          </EmptyState>
+        </div>
+      </div>
+    );
   }
-
-const changePassword = async () => {
-  setError("");
-  setSuccess("");
-
-  if (newPassword !== confirmNewPassword) {
-    return setError("Passwords do not match.");
-  }
-
-  try {
-    await API.post("/parent/change-purchase-password", {
-      studentId: id,
-      currentPassword,
-      newPassword,
-    });
-
-   setSuccess("Purchase password changed successfully.");
-
-setTimeout(() => navigate(`/child/${id}`), 1200);
-  } catch (err) {
-    setError(err.response?.data?.message || "Failed");
-  }
-};
-
-
-
-const resetPassword = async () => {
-  setError("");
-  setSuccess("");
-
-  if (!resetParentPassword) {
-    return setError("Please enter your account password.");
-  }
-
-  if (resetPasswordValue !== confirmResetPassword) {
-    return setError("Passwords do not match.");
-  }
-
-  if (resetPasswordValue.length < 4) {
-    return setError("Password must be at least 4 characters.");
-  }
-
-  if (!window.confirm("Reset purchase password?")) return;
-
-  try {
-    await API.post("/parent/reset-purchase-password", {
-      studentId: id,
-      parentPassword: resetParentPassword,
-      newPassword: resetPasswordValue,
-    });
-
-    setSuccess("Purchase password reset successfully.");
-
-setTimeout(() => navigate(`/child/${id}`), 1200);
-
-  } catch (err) {
-    setError(err.response?.data?.message || "Failed");
-  }
-};
-
-  const bannerStyle = (type) => ({
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    backgroundColor: type === "error" ? "var(--alert-bg)" : "var(--success-bg)",
-    border: type === "error" ? "1px solid var(--alert-border)" : "1px solid var(--success-border)",
-    color: type === "error" ? "var(--alert)" : "var(--success-strong)",
-    padding: "14px 16px",
-    borderRadius: "12px",
-    marginTop: 20,
-    fontSize: "14px",
-    fontWeight: 500,
-  });
 
   return (
-    <div
-      style={{
-        maxWidth: 500,
-        margin: "40px auto",
-        padding: 30,
-        borderRadius: 15,
-        background: "var(--surface)",
-        boxShadow: "0 5px 20px rgba(0,0,0,.1)",
-      }}
-    >
-      <h2>Set Purchase Password</h2>
-      <button
-  onClick={() => navigate(`/child/${id}`)}
-  style={{
-    marginBottom: 20,
-    padding: "8px 18px",
-    background: "#6B7280",
-    color: "var(--on-dark)",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-  }}
->
-  ← Back
-</button>
+    <div className="page">
+      <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        <Button
+          variant="ghost"
+          onClick={() => navigate(`/child/${id}`)}
+          style={{ marginBottom: 20 }}
+        >
+          <span aria-hidden="true">←</span> Back
+        </Button>
 
-      <h3>{student.name}</h3>
+        <Card>
+          <h1 className="page-title" style={{ fontSize: 24 }}>
+            Purchase Password
+          </h1>
+          <p className="card-meta" style={{ fontSize: 14 }}>
+            {student.name} · Grade {student.grade} · Room {student.hostelNumber}
+          </p>
 
-      <p>
-        Grade: {student.grade} | Room: {student.hostelNumber}
-      </p>
+          <p
+            style={{
+              marginTop: 12,
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: 'var(--muted)',
+            }}
+          >
+            This password is entered at the counter to authorise a purchase from{' '}
+            {student.name}&apos;s wallet.
+          </p>
 
-      {error && <div style={bannerStyle("error")}>⚠️ {error}</div>}
-      {success && <div style={bannerStyle("success")}>✅ {success}</div>}
+          {error && (
+            <Banner variant="alert" icon="⚠️" style={{ marginTop: 20 }}>
+              {error}
+            </Banner>
+          )}
 
-      {!hasPassword ? (
-  <>
-    <input
-      type="password"
-      placeholder="Purchase Password"
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 20,
-        boxSizing: "border-box",
-      }}
-    />
+          {success && (
+            <Banner variant="success" icon="✅" style={{ marginTop: 20 }}>
+              {success}
+            </Banner>
+          )}
 
-    <input
-      type="password"
-      placeholder="Confirm Password"
-      value={confirmPassword}
-      onChange={(e) => setConfirmPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 15,
-        boxSizing: "border-box",
-      }}
-    />
+          {!hasPassword ? (
+            <div style={{ display: 'grid', gap: 16, marginTop: 24 }}>
+              {field('Purchase Password', password, setPassword)}
+              {field('Confirm Password', confirmPassword, setConfirmPassword)}
 
-    <button
-      onClick={savePassword}
-      style={{
-        width: "100%",
-        marginTop: 25,
-        padding: 15,
-        background: "var(--primary)",
-        color: "var(--on-dark)",
-        border: "none",
-        borderRadius: 10,
-        fontWeight: 700,
-      }}
-    >
-      Save Password
-    </button>
-  </>
-) : (
-  <>
-  <button
-  onClick={() => {
-    setShowChange(!showChange);
-    setShowReset(false);
-    setError("");
-    setSuccess("");
-  }}
-  style={{
-    width: "100%",
-    padding: 15,
-    background: "var(--success)",
-    color: "var(--on-dark)",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: 700,
-    marginTop: 20,
-  }}
->
-  Change Password
-</button>
-{showChange && (
-  <>
-    <input
-      type="password"
-      placeholder="Current Password"
-      value={currentPassword}
-      onChange={(e) => setCurrentPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 20,
-        boxSizing: "border-box",
-      }}
-    />
+              <Button onClick={savePassword} disabled={saving} block>
+                {saving ? 'Saving…' : 'Save Password'}
+              </Button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
+              <Button
+                variant="ghost"
+                block
+                aria-expanded={openForm === 'change'}
+                onClick={() => toggle('change')}
+              >
+                Change Password
+              </Button>
 
-    <input
-      type="password"
-      placeholder="New Password"
-      value={newPassword}
-      onChange={(e) => setNewPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 15,
-        boxSizing: "border-box",
-      }}
-    />
+              {openForm === 'change' && (
+                <div style={{ display: 'grid', gap: 16, marginBottom: 4 }}>
+                  {field(
+                    'Current Password',
+                    currentPassword,
+                    setCurrentPassword,
+                    'current-password'
+                  )}
+                  {field('New Password', newPassword, setNewPassword)}
+                  {field(
+                    'Confirm New Password',
+                    confirmNewPassword,
+                    setConfirmNewPassword
+                  )}
 
-    <input
-      type="password"
-      placeholder="Confirm New Password"
-      value={confirmNewPassword}
-      onChange={(e) => setConfirmNewPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 15,
-        boxSizing: "border-box",
-      }}
-    />
+                  <Button onClick={changePassword} disabled={saving} block>
+                    {saving ? 'Saving…' : 'Save Changes'}
+                  </Button>
+                </div>
+              )}
 
-    <button
-      onClick={changePassword}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 20,
-        background: "var(--success)",
-        color: "var(--on-dark)",
-        border: "none",
-        borderRadius: 10,
-      }}
-    >
-      Save Changes
-    </button>
-  </>
-)}
-<button
-  onClick={() => {
-    setShowReset(!showReset);
-    setShowChange(false);
-    setError("");
-    setSuccess("");
-  }}
-  style={{
-    width: "100%",
-    padding: 15,
-    marginTop: 15,
-    background: "var(--danger)",
-    color: "var(--on-dark)",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: 700,
-  }}
->
-  Forgot Password / Reset
-</button>
-{showReset && (
-  <>
-    <input
-      type="password"
-      placeholder="Your Account Password"
-      value={resetParentPassword}
-      onChange={(e) => setResetParentPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 20,
-        boxSizing: "border-box",
-      }}
-    />
+              <Button
+                variant="ghost"
+                block
+                aria-expanded={openForm === 'reset'}
+                onClick={() => toggle('reset')}
+              >
+                Forgot Password / Reset
+              </Button>
 
-    <input
-      type="password"
-      placeholder="New Password"
-      value={resetPasswordValue}
-      onChange={(e) => setResetPasswordValue(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 15,
-        boxSizing: "border-box",
-      }}
-    />
+              {openForm === 'reset' && (
+                <div style={{ display: 'grid', gap: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    Confirm with your own account password to set a new purchase
+                    password.
+                  </p>
 
-    <input
-      type="password"
-      placeholder="Confirm New Password"
-      value={confirmResetPassword}
-      onChange={(e) => setConfirmResetPassword(e.target.value)}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 15,
-        boxSizing: "border-box",
-      }}
-    />
+                  {field(
+                    'Your Account Password',
+                    resetParentPassword,
+                    setResetParentPassword,
+                    'current-password'
+                  )}
+                  {field('New Password', resetPasswordValue, setResetPasswordValue)}
+                  {field(
+                    'Confirm New Password',
+                    confirmResetPassword,
+                    setConfirmResetPassword
+                  )}
 
-    <button
-      onClick={resetPassword}
-      style={{
-        width: "100%",
-        padding: 15,
-        marginTop: 20,
-        background: "var(--danger)",
-        color: "var(--on-dark)",
-        border: "none",
-        borderRadius: 10,
-      }}
-    >
-      Reset Password
-    </button>
-  </>
-)}
-  </>
-)}
-
-
+                  <Button
+                    variant="alert"
+                    onClick={resetPassword}
+                    disabled={saving}
+                    block
+                  >
+                    {saving ? 'Resetting…' : 'Reset Password'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

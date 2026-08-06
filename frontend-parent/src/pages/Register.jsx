@@ -1,316 +1,120 @@
 import { useState } from 'react';
 import API from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
+import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
 
 export default function Register() {
-//   const [formData, setFormData] = useState({
-//     fatherName: '',
-//     parentPhoneNumber: '',
-//     password: ''
-//   }); 
-
-const [formData, setFormData] = useState({
-  fatherName: '',
-  parentPhoneNumber: '',
-  email: '',   // ✅ ADD THIS
-  password: ''
-});
+  const [formData, setFormData] = useState({
+    fatherName: '',
+    parentPhoneNumber: '',
+    email: '',
+    password: '',
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setSubmitting(true);
+
     try {
-      await API.post('/parent/register', formData);  
+      await API.post('/parent/register', formData);
       setSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => navigate('/login'), 2500);
     } catch (err) {
-      setError(err.response?.data?.message || 'Verification failed. Ensure credentials match school records.');
+      setError(
+        err.response?.data?.message ||
+          'Verification failed. Ensure credentials match school records.'
+      );
+      setSubmitting(false);
     }
   };
 
+  const update = (field) => (e) =>
+    setFormData({ ...formData, [field]: e.target.value });
+
   return (
-    <div className="login-page-container">
-      {/* Inline Scoped CSS Stylesheet */}
-      <style>{`
-        html, body, #root {
-          background-color: var(--surface) !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          height: 100vh !important;
-          width: 100vw !important;
-          overflow-x: hidden !important;
-        }
+    <AuthLayout
+      title="Create Account"
+      subtitle="Use the Father Name & Phone Number registered with the school office"
+      footer={
+        <>
+          Already registered? <Link to="/login">Login here</Link>
+        </>
+      }
+    >
+      {error && (
+        <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
+          {error}
+        </Banner>
+      )}
 
-        .login-page-container {
-          min-height: 100vh;
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--surface) !important;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          box-sizing: border-box;
-          padding: 24px;
-        }
+      {success && (
+        <Banner variant="success" icon="✅" style={{ marginBottom: 28 }}>
+          {success}
+        </Banner>
+      )}
 
-        .login-card {
-          width: 100%;
-          max-width: 400px;
-          background-color: var(--surface);
-          padding: 12px 0px;
-          box-sizing: border-box;
-          border: none !important;
-          outline: none !important;
-          box-shadow: none !important;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
+      <form onSubmit={handleSubmit} className="auth-form">
+        <AuthField
+          id="father-name"
+          label="Father's Name (e.g., Stephen)"
+          type="text"
+          autoComplete="name"
+          required
+          placeholder="Enter registered father's name"
+          value={formData.fatherName}
+          onChange={update('fatherName')}
+        />
 
-        .login-header {
-          text-align: center;
-          margin-bottom: 36px;
-        }
+        <AuthField
+          id="phone"
+          label="Registered Phone Number"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          required
+          placeholder="e.g. 9876543210"
+          value={formData.parentPhoneNumber}
+          onChange={update('parentPhoneNumber')}
+        />
 
-        .login-title {
-          font-size: 32px;
-          font-weight: 800;
-          color: var(--ink);
-          margin: 0;
-          letter-spacing: -0.75px;
-        }
+        <AuthField
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="Enter email (used for password reset)"
+          value={formData.email}
+          onChange={update('email')}
+        />
 
-        .login-subtitle {
-          font-size: 14px;
-          color: var(--muted);
-          margin-top: 10px;
-          margin-bottom: 0;
-          line-height: 1.5;
-        }
+        <AuthField
+          id="password"
+          label="Set App Password"
+          type="password"
+          autoComplete="new-password"
+          required
+          placeholder="••••••••"
+          value={formData.password}
+          onChange={update('password')}
+        />
 
-        .error-banner {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background-color: var(--alert-bg);
-          border: 1px solid var(--alert-border);
-          color: var(--alert);
-          padding: 14px 16px;
-          border-radius: 12px;
-          margin-bottom: 28px;
-          font-size: 14px;
-        }
-
-        .success-banner {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          background-color: var(--success-bg);
-          border: 1px solid var(--success-border);
-          color: var(--success-strong);
-          padding: 14px 16px;
-          border-radius: 12px;
-          margin-bottom: 28px;
-          font-size: 14px;
-        }
-
-        .status-icon {
-          width: 18px;
-          height: 18px;
-          flex-shrink: 0;
-        }
-
-        .login-form {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .form-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.75px;
-          color: var(--ink-dim);
-          text-align: center;
-        }
-
-        .form-input {
-          width: 100%;
-          padding: 14px 16px;
-          background-color: var(--bg);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          font-size: 15px;
-          color: var(--ink);
-          outline: none;
-          transition: all 0.15s ease-in-out;
-          box-sizing: border-box;
-          text-align: center;
-        }
-
-        .form-input::placeholder {
-          color: var(--muted-soft);
-        }
-
-        .form-input:focus {
-          background-color: var(--surface);
-          border-color: var(--primary);
-          box-shadow: 0 0 0 4px var(--primary-bg);
-        }
-
-        .register-link {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--primary);
-          text-decoration: none;
-          transition: color 0.15s ease;
-        }
-
-        .register-link:hover {
-          color: var(--primary-hover);
-        }
-
-        .register-link {
-          text-decoration: underline;
-          text-underline-offset: 4px;
-        }
-
-        .submit-btn {
-          width: 100%;
-          background-color: var(--ink);
-          color: var(--on-dark);
-          padding: 15px 16px;
-          border: none;
-          border-radius: 12px;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          margin-top: 12px;
-        }
-
-        .submit-btn:hover {
-          background-color: var(--ink-strong);
-        }
-
-        .submit-btn:active {
-          transform: scale(0.995);
-        }
-
-        .login-footer {
-          margin-top: 36px;
-          text-align: center;
-          font-size: 14px;
-          color: var(--muted);
-        }
-      `}</style>
-
-      <div className="login-card">
-        {/* Header Section */}
-        <div className="login-header">
-          <h2 className="login-title">Create Account</h2>
-          <p className="login-subtitle">Use the Father Name & Phone Number registered with the school office</p>
-        </div>
-        
-        {/* Error Notification Banner */}
-        {error && (
-          <div className="error-banner">
-            <svg className="status-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Success Notification Banner */}
-        {success && (
-          <div className="success-banner">
-            <svg className="status-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{success}</span>
-          </div>
-        )}
-        
-        {/* Registration Form */}
-        <form onSubmit={handleSubmit} className="login-form">
-          
-          {/* Father's Name Field */}
-          <div className="form-group">
-            <label className="form-label">Father's Name (e.g., Stephen)</label>
-            <input 
-              type="text" 
-              required 
-              placeholder="Enter registered father's name"
-              className="form-input"
-              value={formData.fatherName} 
-              onChange={e => setFormData({...formData, fatherName: e.target.value})} 
-            />
-          </div>
-
-          {/* Phone Input Field */}
-          <div className="form-group">
-            <label className="form-label">Registered Phone Number</label>
-            <input 
-              type="text" 
-              required 
-              placeholder="e.g. 9876543210"
-              className="form-input"
-              value={formData.parentPhoneNumber}
-              onChange={e => setFormData({ ...formData, parentPhoneNumber: e.target.value })}
-            />
-          </div>
-<div className="form-group">
-  <label className="form-label">Email</label>
-  <input
-    type="email"
-    required
-    placeholder="Enter email (used for password reset)"
-    className="form-input"
-    value={formData.email}
-    onChange={(e) =>
-      setFormData({ ...formData, email: e.target.value })
-    }
-  />
-</div>
-          {/* Password Input Field */}
-          <div className="form-group">
-            <label className="form-label">Set App Password</label>
-            <input 
-              type="password" 
-              required 
-              placeholder="••••••••"
-              className="form-input"
-              value={formData.password} 
-              onChange={e => setFormData({ ...formData, password: e.target.value })} 
-            />
-          </div>
-
-          {/* Action Button */}
-          <button type="submit" className="submit-btn">
-            Verify & Register
-          </button>
-        </form>
-
-        {/* Footer Link Navigation */}
-        <p className="login-footer">
-          Already registered?{' '}
-          <Link to="/login" className="register-link">
-            Login here
-          </Link>
-        </p>
-      </div>
-    </div>
+        <Button
+          type="submit"
+          variant="dark"
+          block
+          className="auth-submit"
+          disabled={submitting || Boolean(success)}
+        >
+          {submitting ? 'Verifying…' : 'Verify & Register'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

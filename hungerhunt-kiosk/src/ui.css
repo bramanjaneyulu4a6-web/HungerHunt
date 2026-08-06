@@ -425,6 +425,19 @@
   border-color: var(--success-border);
 }
 
+/* Text button for a retry link sitting inside a banner or empty state. */
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 /* ---- app bar ---------------------------------------------------------- */
 
 .appbar {
@@ -697,6 +710,89 @@
   .btn:active {
     transform: none;
   }
+}
+
+/* ---- data table -------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th {
+  padding: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--bg-subtle);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Stacked fallback: below tablet width each row becomes a small ledger card,
+   labelled from the cell's data-label attribute, instead of forcing a dense
+   grid into a sideways scroll. */
+@media (max-width: 768px) {
+  .table--stack thead {
+    display: none;
+  }
+
+  .table--stack tr {
+    display: block;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table--stack tr:last-child {
+    border-bottom: none;
+  }
+
+  .table--stack td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border: none;
+    text-align: right;
+  }
+
+  .table--stack td::before {
+    content: attr(data-label);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: left;
+  }
+}
+
+/* Refresh control pinned to the corner of list pages. */
+.refresh-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+  box-shadow: var(--shadow-raised);
 }
 
 /* ---- admin sidebar ----------------------------------------------------- */

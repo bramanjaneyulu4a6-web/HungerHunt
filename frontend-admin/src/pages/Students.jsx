@@ -1,147 +1,178 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import api from '../utils/api';
-import * as XLSX from "xlsx";
+import { formatINR } from '../utils/format';
+import {
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+} from '../components/ui';
 
+const EMPTY_FORM = {
+  name: '',
+  fatherName: '',
+  hostelNumber: '',
+  grade: '',
+  parentPhoneNumber: '',
+};
+
+const SORTABLE_COLUMNS = [
+  { key: 'name', label: 'Name' },
+  { key: 'fatherName', label: "Father's Name" },
+  { key: 'hostelNumber', label: 'Hostel No.' },
+  { key: 'grade', label: 'Grade' },
+  { key: 'parentPhoneNumber', label: 'Parent Contact' },
+  { key: 'pocketMoney', label: 'Wallet Balance' },
+];
 
 const Students = () => {
   const [students, setStudents] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [topupAmount, setTopupAmount] = useState("");
-const [topupStudent, setTopupStudent] = useState(null);
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    fatherName: '', 
-    hostelNumber: '', 
-    // pocketMoney: 0, 
-    grade: '', 
-    parentPhoneNumber: '' 
-  });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [topupAmount, setTopupAmount] = useState('');
+  const [topupStudent, setTopupStudent] = useState(null);
+  const [topupSaving, setTopupSaving] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
-  // Sorting State
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
-  useEffect(() => { 
-    fetchStudents(); 
+  useEffect(() => {
+    fetchStudents();
   }, []);
 
   const fetchStudents = async () => {
+    setLoading(true);
+    setLoadError(false);
+
     try {
       const res = await api.get('/students');
       setStudents(res.data);
     } catch (error) {
       console.error(error);
-      alert('Failed to fetch student directory');
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
+
     try {
       if (editingId) {
         await api.put(`/students/${editingId}`, formData);
-        alert('Student profile updated successfully!');
+        toast.success('Student profile updated');
       } else {
         await api.post('/students', formData);
-        alert('Student profile saved successfully!');
+        toast.success('Student profile saved');
       }
-      setFormData({ name: '', fatherName: '', hostelNumber: '', pocketMoney: 0, grade: '', parentPhoneNumber: '' });
+      setFormData(EMPTY_FORM);
       setEditingId(null);
       fetchStudents();
     } catch (error) {
       console.error(error);
-      alert('Failed to save student record');
+      toast.error(error.response?.data?.message || 'Failed to save student record');
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleBulkUpload = async (e) => {
+    e.preventDefault();
 
-
-const handleBulkUpload = async (e) => {
-  e.preventDefault();
-
-  if (!excelFile) return alert("Please select an Excel sheet first");
-
-  const reader = new FileReader();
-
-  reader.onload = async (evt) => {
-    const data = evt.target.result;
-    const workbook = XLSX.read(data, { type: "binary" });
-
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
-
-    try {
-      await api.post('/students/bulk', {
-  students: jsonData
-});
-
-      alert("Bulk upload successful!");
-      setExcelFile(null);
-      fetchStudents();
-    } catch (error) {
-      console.error(error);
-      alert("Bulk import failed");
-    }
-  };
-
-  reader.readAsBinaryString(excelFile);
-};
-
-  const handleDelete = async (id, walletBalance) => {
-  if (walletBalance > 0) {
-    alert("Cannot delete student. Wallet balance is not zero.");
-    return;
-  }
-
-  if (confirm('Are you sure you want to remove this student permanently?')) {
-    try {
-      await api.delete(`/students/${id}`);
-      fetchStudents();
-    } catch (error) {
-      console.error(error);
-      alert('Failed to delete student profile');
-    }
-  }
-};
-  // const handleDelete = async (id) => {
-  //   if (confirm('Are you sure you want to remove this student permanently?')) {
-  //     try {
-  //       await api.delete(`/students/${id}`);
-  //       fetchStudents();
-  //     } catch (error) {
-  //       console.error(error);
-  //       alert('Failed to delete student profile');
-  //     }
-  //   }
-  // };
-const handleTopUp = async () => {
-  try {
-    if (!topupStudent) return;
-
-    if (!topupAmount || Number(topupAmount) <= 0) {
-      alert("Enter valid amount");
+    if (!excelFile) {
+      toast.error('Select an Excel sheet first');
       return;
     }
 
-    const res = await api.put(`/students/${topupStudent}/topup`, {
-      amount: Number(topupAmount),
-    });
+    setUploading(true);
 
-    alert(`Wallet updated! New balance: ₹${res.data.newBalance}`);
+    const reader = new FileReader();
 
-    setTopupStudent(null);
-    setTopupAmount("");
+    reader.onload = async (evt) => {
+      try {
+        const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-    fetchStudents(); // refresh table
-  } catch (error) {
-    console.error(error);
-    alert(error?.response?.data?.message || "Topup failed");
-  }
-};
-  // Sorting Handler Logic
+        await api.post('/students/bulk', { students: jsonData });
+
+        toast.success('Bulk upload successful');
+        setExcelFile(null);
+        e.target.reset?.();
+        fetchStudents();
+      } catch (error) {
+        console.error(error);
+        toast.error('Bulk import failed');
+      } finally {
+        setUploading(false);
+      }
+    };
+
+    reader.onerror = () => {
+      toast.error('Could not read the selected file');
+      setUploading(false);
+    };
+
+    reader.readAsBinaryString(excelFile);
+  };
+
+  const handleDelete = async (id, walletBalance) => {
+    if (walletBalance > 0) {
+      toast.error('Cannot delete: wallet balance is not zero');
+      return;
+    }
+
+    if (!window.confirm('Remove this student permanently?')) return;
+
+    try {
+      await api.delete(`/students/${id}`);
+      toast.success('Student removed');
+      fetchStudents();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete student profile');
+    }
+  };
+
+  const handleTopUp = async (e) => {
+    e.preventDefault();
+    if (!topupStudent) return;
+
+    if (!topupAmount || Number(topupAmount) <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+
+    setTopupSaving(true);
+
+    try {
+      const res = await api.put(`/students/${topupStudent}/topup`, {
+        amount: Number(topupAmount),
+      });
+
+      toast.success(`Wallet updated — new balance ${formatINR(res.data.newBalance)}`);
+      setTopupStudent(null);
+      setTopupAmount('');
+      fetchStudents();
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || 'Top-up failed');
+    } finally {
+      setTopupSaving(false);
+    }
+  };
+
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -150,564 +181,348 @@ const handleTopUp = async () => {
     setSortConfig({ key, direction });
   };
 
-  // Processing: Filter -> Sort
-  const filteredStudents = students.filter(st => {
+  const filteredStudents = students.filter((st) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return (
-      st.name?.toLowerCase().includes(query) || 
+      st.name?.toLowerCase().includes(query) ||
       st.hostelNumber?.toString().toLowerCase().includes(query)
     );
   });
 
   const sortedStudents = [...filteredStudents].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    
-    let aValue = a[sortConfig.key];
-    let bValue = b[sortConfig.key];
 
-    // Handle potential undefined or null values safely
-    if (aValue === undefined || aValue === null) aValue = '';
-    if (bValue === undefined || bValue === null) bValue = '';
+    let aValue = a[sortConfig.key] ?? '';
+    let bValue = b[sortConfig.key] ?? '';
 
-    // Numeric comparison for pocketMoney, string comparison for others
     if (typeof aValue === 'number' && typeof bValue === 'number') {
       return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-    } else {
-      return sortConfig.direction === 'asc'
-        ? aValue.toString().localeCompare(bValue.toString(), undefined, { numeric: true, sensitivity: 'base' })
-        : bValue.toString().localeCompare(aValue.toString(), undefined, { numeric: true, sensitivity: 'base' });
     }
+
+    return sortConfig.direction === 'asc'
+      ? aValue.toString().localeCompare(bValue.toString(), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        })
+      : bValue.toString().localeCompare(aValue.toString(), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
   });
 
-  // Render sort caret indicator
   const getSortIndicator = (key) => {
     if (sortConfig.key !== key) return ' ↕';
     return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
   };
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "var(--bg)",
-      padding: "32px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box",
-    },
-    headerFlex: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: "24px",
-    },
-    title: {
-      fontSize: "28px",
-      fontWeight: "700",
-      color: "var(--ink)",
-      letterSpacing: "-0.5px",
-      margin: 0,
-    },
-    bulkCardForm: {
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "10px",
-      padding: "8px 12px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-    },
-    fileInput: {
-      fontSize: "13px",
-      color: "var(--ink-soft)",
-    },
-    bulkBtn: {
-      padding: "8px 14px",
-      background: "#059669",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "8px",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-      whiteSpace: "nowrap",
-    },
-    bottomGrid: {
-      display: "grid",
-      gridTemplateColumns: "1fr 2fr",
-      gap: "24px",
-      alignItems: "start",
-    },
-    card: {
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "14px",
-      padding: "20px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      boxSizing: "border-box",
-    },
-    panelTitle: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "var(--ink)",
-      marginTop: 0,
-      marginBottom: "16px",
-    },
-    formGroupGrid: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "14px",
-    },
-    input: {
-      width: "100%",
-      padding: "12px 14px",
-      border: "1px solid var(--border)",
-      borderRadius: "10px",
-      fontSize: "14px",
-      color: "var(--ink)",
-      backgroundColor: "var(--surface)",
-      outline: "none",
-      transition: "border-color 0.2s",
-      boxSizing: "border-box",
-    },
-    searchBarContainer: {
-      marginBottom: "16px",
-    },
-    tableContainer: {
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "14px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      overflow: "hidden",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      textAlign: "left",
-    },
-    th: {
-      backgroundColor: "var(--bg-subtle)",
-      color: "var(--ink-soft)",
-      fontWeight: "600",
-      padding: "14px",
-      fontSize: "13px",
-      borderBottom: "2px solid var(--border)",
-      cursor: "pointer",
-      userSelect: "none",
-      transition: "background-color 0.2s, color 0.2s",
-    },
-    tr: {
-      transition: "background-color 0.2s",
-    },
-    td: {
-      padding: "14px",
-      fontSize: "14px",
-      color: "var(--ink)",
-      borderBottom: "1px solid var(--border)",
-    },
-    primaryBtn: {
-      width: "100%",
-      padding: "12px",
-      background: "var(--primary)",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-      marginTop: "6px",
-    },
-    cancelBtn: {
-      width: "100%",
-      padding: "10px",
-      background: "var(--bg-subtle)",
-      color: "var(--ink-soft)",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-      marginTop: "2px",
-    },
-    walletText: {
-      color: "#059669",
-      fontWeight: "700",
-    },
-    actionFlex: {
-      display: "flex",
-      gap: "12px",
-    },
-    editBtn: {
-      background: "none",
-      border: "none",
-      color: "var(--primary)",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      padding: 0,
-    },
-    removeBtn: {
-      background: "none",
-      border: "none",
-      color: "var(--danger)",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      padding: 0,
-    },
-    emptyState: {
-      color: "var(--muted)",
-      fontSize: "14px",
-      textAlign: "center",
-      padding: "32px 0",
-      margin: 0,
-    },
+  const startEdit = (st) => {
+    setEditingId(st._id);
+    setFormData({
+      name: st.name,
+      fatherName: st.fatherName,
+      hostelNumber: st.hostelNumber,
+      grade: st.grade,
+      parentPhoneNumber: st.parentPhoneNumber,
+    });
   };
-  
+
+  const formFields = [
+    { key: 'name', label: 'Student Name', type: 'text' },
+    { key: 'fatherName', label: "Father's Name", type: 'text' },
+    { key: 'hostelNumber', label: 'Hostel Room No.', type: 'text' },
+    { key: 'grade', label: 'Grade / Class', type: 'text' },
+    {
+      key: 'parentPhoneNumber',
+      label: 'Parent Contact Number',
+      type: 'tel',
+      inputMode: 'numeric',
+    },
+  ];
 
   return (
-    <div style={styles.page}>
+    <div className="page">
       {topupStudent && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 9999,
-    }}
-  >
-    <div
-      style={{
-        background: "var(--surface)",
-        padding: "20px",
-        borderRadius: "12px",
-        width: "320px",
-      }}
-    >
-      <h3 style={{ marginBottom: "10px" }}>Recharge Wallet</h3>
-
-      <input
-        type="number"
-        placeholder="Enter amount"
-        value={topupAmount}
-        onChange={(e) => setTopupAmount(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "10px",
-          border: "1px solid #ccc",
-          borderRadius: "8px",
-        }}
-      />
-
-      <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
-        <button
-          onClick={handleTopUp}
-          style={{
-            flex: 1,
-            background: "var(--success)",
-            color: "var(--on-dark)",
-            padding: "10px",
-            border: "none",
-            borderRadius: "8px",
-          }}
+        <div
+          className="modal-backdrop"
+          onClick={() => !topupSaving && setTopupStudent(null)}
         >
-          Recharge
-        </button>
-
-        <button
-          onClick={() => setTopupStudent(null)}
-          style={{
-            flex: 1,
-            background: "var(--muted)",
-            color: "var(--on-dark)",
-            padding: "10px",
-            border: "none",
-            borderRadius: "8px",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-      {/* Page Header */}
-      <div style={styles.headerFlex}>
-        <div>
-          <h1 style={styles.title}>Student Directory Management</h1>
-        </div>
-
-        {/* Bulk Upload Block */}
-        <form onSubmit={handleBulkUpload} style={styles.bulkCardForm}>
-          <input 
-            type="file" 
-            accept=".xlsx, .xls" 
-            onChange={(e) => setExcelFile(e.target.files[0])} 
-            style={styles.fileInput} 
-          />
-          <button 
-            type="submit" 
-            style={styles.bulkBtn}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#047857")}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#059669")}
+          <form
+            className="modal"
+            style={{ maxWidth: 340 }}
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleTopUp}
           >
-            Bulk Upload
-          </button>
-        </form>
-      </div>
+            <h3 className="modal-title">Recharge Wallet</h3>
 
-      {/* Main Bottom Operational Grid */}
-      <div style={styles.bottomGrid}>
-        
-        {/* LEFT SIDE: CONTROL FORM CARD */}
-        <div style={styles.card}>
-          <h3 style={styles.panelTitle}>
-            {editingId ? "Modify Student Profile" : "Register New Student"}
-          </h3>
-          <form onSubmit={handleSubmit} style={styles.formGroupGrid}>
-            <input 
-              type="text" 
-              placeholder="Student Name" 
-              required 
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+            <label className="field-label" htmlFor="topup-amount">
+              Amount (₹)
+            </label>
+            <input
+              id="topup-amount"
+              type="number"
+              min="1"
+              className="input"
+              placeholder="Enter amount"
+              value={topupAmount}
+              onChange={(e) => setTopupAmount(e.target.value)}
             />
-            <input 
-              type="text" 
-              placeholder="Father's Name" 
-              required 
-              value={formData.fatherName} 
-              onChange={e => setFormData({...formData, fatherName: e.target.value})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-            />
-            <input 
-              type="text" 
-              placeholder="Hostel Room No." 
-              required 
-              value={formData.hostelNumber} 
-              onChange={e => setFormData({...formData, hostelNumber: e.target.value})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-            />
-            {/* <input 
-              type="number" 
-              placeholder="Pocket Wallet Allocation (₹)" 
-              required 
-              value={formData.pocketMoney} 
-              onChange={e => setFormData({...formData, pocketMoney: Number(e.target.value)})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-            /> */}
-            <input 
-              type="text" 
-              placeholder="Grade / Class" 
-              required 
-              value={formData.grade} 
-              onChange={e => setFormData({...formData, grade: e.target.value})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-            />
-            <input 
-              type="text" 
-              placeholder="Parent Contact Number" 
-              required 
-              value={formData.parentPhoneNumber} 
-              onChange={e => setFormData({...formData, parentPhoneNumber: e.target.value})} 
-              style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-            />
-            
-            <button 
-              type="submit" 
-              style={styles.primaryBtn}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
-            >
-              {editingId ? 'Update Record' : 'Save Profile'}
-            </button>
 
-            {editingId && (
-              <button
-                type="button"
-                style={styles.cancelBtn}
-                onClick={() => {
-                  setEditingId(null);
-                  setFormData({ name: '', fatherName: '', hostelNumber: '', pocketMoney: 0, grade: '', parentPhoneNumber: '' });
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--border)")}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
+            <div className="modal-actions">
+              <Button
+                type="submit"
+                variant="success"
+                style={{ flex: 1 }}
+                disabled={topupSaving}
               >
-                Cancel Edit
-              </button>
-            )}
+                {topupSaving ? 'Recharging…' : 'Recharge'}
+              </Button>
+              <Button
+                variant="ghost"
+                style={{ flex: 1 }}
+                disabled={topupSaving}
+                onClick={() => setTopupStudent(null)}
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
         </div>
+      )}
 
-        {/* RIGHT SIDE: INTERACTIVE DIRECTORY LOOKUP & TABLE */}
-        <div>
-          {/* Live Dynamic Table Filter Bar */}
-          <div style={styles.searchBarContainer}>
-            <input 
-              type="text"
-              style={styles.input}
-              placeholder="Quick search directory by student name or hostel room..."
+      <PageHeader
+        title="Student Directory"
+        subtitle="Register students, manage profiles, and recharge wallets."
+        actions={
+          <form
+            onSubmit={handleBulkUpload}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              aria-label="Excel sheet for bulk upload"
+              style={{ fontSize: 13, color: 'var(--ink-soft)' }}
+              onChange={(e) => setExcelFile(e.target.files[0])}
+            />
+            <Button
+              type="submit"
+              variant="success"
+              className="btn--sm"
+              disabled={uploading}
+            >
+              {uploading ? 'Uploading…' : 'Bulk Upload'}
+            </Button>
+          </form>
+        }
+      />
+
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 24,
+          alignItems: 'flex-start',
+        }}
+      >
+        <Card className="card--tight" style={{ flex: '1 1 280px' }}>
+          <h3 className="section-title">
+            {editingId ? 'Modify Student Profile' : 'Register New Student'}
+          </h3>
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+          >
+            {formFields.map(({ key, label, ...inputProps }) => (
+              <div key={key}>
+                <label className="field-label" htmlFor={`student-${key}`}>
+                  {label}
+                </label>
+                <input
+                  id={`student-${key}`}
+                  className="input"
+                  required
+                  placeholder={label}
+                  value={formData[key]}
+                  onChange={(e) =>
+                    setFormData({ ...formData, [key]: e.target.value })
+                  }
+                  {...inputProps}
+                />
+              </div>
+            ))}
+
+            <Button type="submit" block disabled={saving}>
+              {saving
+                ? 'Saving…'
+                : editingId
+                  ? 'Update Record'
+                  : 'Save Profile'}
+            </Button>
+
+            {editingId && (
+              <Button
+                variant="ghost"
+                block
+                onClick={() => {
+                  setEditingId(null);
+                  setFormData(EMPTY_FORM);
+                }}
+              >
+                Cancel Edit
+              </Button>
+            )}
+          </form>
+        </Card>
+
+        <div style={{ flex: '2 1 480px', minWidth: 0 }}>
+          <div style={{ marginBottom: 16 }}>
+            <input
+              type="search"
+              className="input"
+              aria-label="Search students"
+              placeholder="🔍 Search by student name or hostel room…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
           </div>
 
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'name' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('name')}
-                  >
-                    Name{getSortIndicator('name')}
-                  </th>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'fatherName' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('fatherName')}
-                  >
-                    Father's Name{getSortIndicator('fatherName')}
-                  </th>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'hostelNumber' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('hostelNumber')}
-                  >
-                    Hostel No.{getSortIndicator('hostelNumber')}
-                  </th>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'grade' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('grade')}
-                  >
-                    Grade{getSortIndicator('grade')}
-                  </th>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'parentPhoneNumber' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('parentPhoneNumber')}
-                  >
-                    Parent Contact{getSortIndicator('parentPhoneNumber')}
-                  </th>
-                  <th 
-                    style={{
-                      ...styles.th, 
-                      backgroundColor: sortConfig.key === 'pocketMoney' ? 'var(--border)' : 'var(--bg-subtle)'
-                    }} 
-                    onClick={() => handleSort('pocketMoney')}
-                  >
-                    Wallet Balance{getSortIndicator('pocketMoney')}
-                  </th>
-                  <th style={{ ...styles.th, cursor: 'default' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedStudents.length === 0 ? (
+          {loading ? (
+            <div className="card">
+              <Skeleton height={22} width="40%" />
+              <Skeleton height={16} style={{ marginTop: 16 }} />
+              <Skeleton height={16} style={{ marginTop: 10 }} />
+              <Skeleton height={16} style={{ marginTop: 10 }} />
+            </div>
+          ) : loadError ? (
+            <Banner variant="alert" icon="⚠️">
+              Couldn't load the student directory. Check your connection and{' '}
+              <button
+                type="button"
+                className="link-button"
+                onClick={fetchStudents}
+              >
+                try again
+              </button>
+              .
+            </Banner>
+          ) : sortedStudents.length === 0 ? (
+            <EmptyState
+              icon="🎓"
+              title={
+                students.length === 0 ? 'No students yet' : 'No matching students'
+              }
+            >
+              {students.length === 0
+                ? 'Register a student with the form to get started.'
+                : `Nothing matches "${searchQuery}".`}
+            </EmptyState>
+          ) : (
+            <div className="table-wrap">
+              <table className="table table--stack table--hover">
+                <thead>
                   <tr>
-                    <td colSpan="7" style={styles.td}>
-                      <p style={styles.emptyState}>
-                        {students.length === 0 
-                          ? "No active student profiles discovered in the system directory."
-                          : "No profiles matched your search filtering criteria."}
-                      </p>
-                    </td>
+                    {SORTABLE_COLUMNS.map(({ key, label }) => (
+                      <th
+                        key={key}
+                        onClick={() => handleSort(key)}
+                        aria-sort={
+                          sortConfig.key === key
+                            ? sortConfig.direction === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : undefined
+                        }
+                        style={{
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          background:
+                            sortConfig.key === key
+                              ? 'var(--border)'
+                              : undefined,
+                        }}
+                      >
+                        {label}
+                        {getSortIndicator(key)}
+                      </th>
+                    ))}
+                    <th>Actions</th>
                   </tr>
-                ) : (
-                  sortedStudents.map((st) => (
-                    <tr 
-                      key={st._id} 
-                      style={styles.tr}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                    >
-                      <td style={styles.td}><strong>{st.name}</strong></td>
-                      <td style={styles.td}>{st.fatherName}</td>
-                      <td style={styles.td}>H-{st.hostelNumber || "N/A"}</td>
-                      <td style={styles.td}>{st.grade}</td>
-                      <td style={styles.td}>{st.parentPhoneNumber}</td>
-                      <td style={styles.td}>
-                        <span style={styles.walletText}>₹{st.pocketMoney}</span>
+                </thead>
+                <tbody>
+                  {sortedStudents.map((st) => (
+                    <tr key={st._id}>
+                      <td data-label="Name">
+                        <strong>{st.name}</strong>
                       </td>
-                      <td style={styles.td}>
-                        <div style={styles.actionFlex}>
-  
-  <button 
-    style={styles.editBtn} 
-    onClick={() => {
-      setEditingId(st._id);
-     setFormData({
-  name: st.name,
-  fatherName: st.fatherName,
-  hostelNumber: st.hostelNumber,
-  grade: st.grade,
-  parentPhoneNumber: st.parentPhoneNumber
-});
-    }}
-  >
-    Edit
-  </button>
-
-  <button 
-    style={{ ...styles.editBtn, color: "var(--success)" }} 
-    onClick={() => {
-      setTopupStudent(st._id);
-      setTopupAmount("");
-    }}
-  >
-    Recharge
-  </button>
-
-  <button 
-    style={styles.removeBtn} 
-    onClick={() => handleDelete(st._id, st.pocketMoney)}
-    // onClick={() => handleDelete(st._id)}
-  >
-    Remove
-  </button>
-
-</div>
+                      <td data-label="Father's Name">{st.fatherName}</td>
+                      <td data-label="Hostel No.">
+                        H-{st.hostelNumber || 'N/A'}
+                      </td>
+                      <td data-label="Grade">{st.grade}</td>
+                      <td data-label="Parent Contact">{st.parentPhoneNumber}</td>
+                      <td data-label="Wallet">
+                        <span
+                          style={{ color: 'var(--success)', fontWeight: 700 }}
+                        >
+                          {formatINR(st.pocketMoney)}
+                        </span>
+                      </td>
+                      <td data-label="Actions">
+                        <div style={{ display: 'flex', gap: 12 }}>
+                          <button
+                            type="button"
+                            className="link-button"
+                            style={{
+                              color: 'var(--primary)',
+                              textDecoration: 'none',
+                              fontSize: 13,
+                            }}
+                            onClick={() => startEdit(st)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="link-button"
+                            style={{
+                              color: 'var(--success)',
+                              textDecoration: 'none',
+                              fontSize: 13,
+                            }}
+                            onClick={() => {
+                              setTopupStudent(st._id);
+                              setTopupAmount('');
+                            }}
+                          >
+                            Recharge
+                          </button>
+                          <button
+                            type="button"
+                            className="link-button"
+                            style={{
+                              color: 'var(--danger)',
+                              textDecoration: 'none',
+                              fontSize: 13,
+                            }}
+                            onClick={() => handleDelete(st._id, st.pocketMoney)}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-
       </div>
     </div>
   );

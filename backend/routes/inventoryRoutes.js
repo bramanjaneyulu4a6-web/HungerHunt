@@ -1,23 +1,12 @@
-// import express from "express";
-// import { getInventory } from "../controllers/inventoryController.js";
-
-// const router = express.Router();
-
-// router.get("/", getInventory);
-
-// export default router;
-
-
-
 import express from "express";
 import { getInventory } from "../controllers/inventoryController.js";
 import { protectAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", protectAdmin, getInventory);
+// The kiosk signs in as staff, so stock levels never need to be public.
+router.use(protectAdmin);
 
-// Public endpoint for kiosk
-router.get("/public", getInventory);
+router.get("/", getInventory);
 
 export default router;

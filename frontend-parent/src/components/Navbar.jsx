@@ -1,33 +1,3 @@
-// import { useAuth } from '../context/AuthContext';
-// import { useNavigate, Link } from 'react-router-dom';
-
-// export default function Navbar() {
-//   const { parent, logout } = useAuth();
-//   const navigate = useNavigate();
-
-//   const handleLogout = () => {
-//     logout();
-//     navigate('/login');
-//   };
-
-//   return (
-//     <nav className="bg-blue-600 text-white shadow-md px-6 py-4 flex justify-between items-center">
-//       <Link to="/" className="text-xl font-bold tracking-wide">👨‍👩‍👦 Parent Portal</Link>
-//       {parent && (
-//         <div className="flex items-center gap-4">
-//           <span className="text-sm bg-blue-700 px-3 py-1 rounded-full">Welcome, {parent.fatherName}</span>
-//           <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 px-4 py-1.5 text-sm font-semibold rounded transitions duration-200">
-//             Logout
-//           </button>
-//         </div>
-//       )}
-//     </nav>
-//   );
-// }
-
-
-
-
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -95,7 +65,7 @@ export default function Navbar() {
     <nav style={styles.navbar}>
       {/* Brand Navigation Header */}
       <Link to="/" style={styles.brandLink}>
-        <span>👨‍👩‍👦 Portal Portal</span>
+        <span>👨‍👩‍👦 Parent Portal</span>
       </Link>
 
       {/* Conditional Right-Side Actions Block */}

@@ -20,10 +20,12 @@ const [hasPassword, setHasPassword] = useState(false);
 const [showChange, setShowChange] = useState(false);
 const [showReset, setShowReset] = useState(false);
 
-// const [resetPasswordValue, setResetPasswordValue] = useState("");
-// const [confirmResetPassword, setConfirmResetPassword] = useState("");
 const [resetPasswordValue, setResetPasswordValue] = useState("");
 const [confirmResetPassword, setConfirmResetPassword] = useState("");
+const [resetParentPassword, setResetParentPassword] = useState("");
+
+const [error, setError] = useState("");
+const [success, setSuccess] = useState("");
 
   useEffect(() => {
     API.get(`/parent/child/${id}`)
@@ -33,22 +35,25 @@ setHasPassword(res.data.hasPurchasePassword);
       })
       .catch((err) => {
         console.error(err);
-        alert("Unable to load student.");
+        setError("Unable to load student.");
       })
       .finally(() => setLoading(false));
   }, [id]);
 
   const savePassword = async () => {
+    setError("");
+    setSuccess("");
+
     if (!password) {
-      return alert("Please enter a password.");
+      return setError("Please enter a password.");
     }
 
     if (password.length < 4) {
-      return alert("Password must be at least 4 characters.");
+      return setError("Password must be at least 4 characters.");
     }
 
     if (password !== confirmPassword) {
-      return alert("Passwords do not match.");
+      return setError("Passwords do not match.");
     }
 
     try {
@@ -57,11 +62,10 @@ setHasPassword(res.data.hasPurchasePassword);
         password,
       });
 
-      alert("Purchase Password Saved Successfully.");
-
-      navigate(`/child/${id}`);
+      setSuccess("Purchase password saved successfully.");
+      setTimeout(() => navigate(`/child/${id}`), 1200);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save password.");
+      setError(err.response?.data?.message || "Failed to save password.");
     }
   };
 
@@ -74,8 +78,11 @@ setHasPassword(res.data.hasPurchasePassword);
   }
 
 const changePassword = async () => {
+  setError("");
+  setSuccess("");
+
   if (newPassword !== confirmNewPassword) {
-    return alert("Passwords do not match.");
+    return setError("Passwords do not match.");
   }
 
   try {
@@ -85,42 +92,63 @@ const changePassword = async () => {
       newPassword,
     });
 
-   alert("Purchase password changed successfully.");
+   setSuccess("Purchase password changed successfully.");
 
-navigate(`/child/${id}`);
+setTimeout(() => navigate(`/child/${id}`), 1200);
   } catch (err) {
-    alert(err.response?.data?.message || "Failed");
+    setError(err.response?.data?.message || "Failed");
   }
 };
 
 
 
 const resetPassword = async () => {
-  if (!window.confirm("Reset purchase password?")) return;
+  setError("");
+  setSuccess("");
+
+  if (!resetParentPassword) {
+    return setError("Please enter your account password.");
+  }
 
   if (resetPasswordValue !== confirmResetPassword) {
-    return alert("Passwords do not match.");
+    return setError("Passwords do not match.");
   }
 
   if (resetPasswordValue.length < 4) {
-    return alert("Password must be at least 4 characters.");
+    return setError("Password must be at least 4 characters.");
   }
+
+  if (!window.confirm("Reset purchase password?")) return;
 
   try {
     await API.post("/parent/reset-purchase-password", {
       studentId: id,
+      parentPassword: resetParentPassword,
       newPassword: resetPasswordValue,
     });
 
-    alert("Purchase password reset successfully.");
+    setSuccess("Purchase password reset successfully.");
 
-navigate(`/child/${id}`);
+setTimeout(() => navigate(`/child/${id}`), 1200);
 
   } catch (err) {
-    alert(err.response?.data?.message || "Failed");
+    setError(err.response?.data?.message || "Failed");
   }
 };
 
+  const bannerStyle = (type) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    backgroundColor: type === "error" ? "#fff1f2" : "#f0fdf4",
+    border: type === "error" ? "1px solid #ffe4e6" : "1px solid #bbf7d0",
+    color: type === "error" ? "#be123c" : "#15803d",
+    padding: "14px 16px",
+    borderRadius: "12px",
+    marginTop: 20,
+    fontSize: "14px",
+    fontWeight: 500,
+  });
 
   return (
     <div
@@ -154,6 +182,9 @@ navigate(`/child/${id}`);
       <p>
         Grade: {student.grade} | Room: {student.hostelNumber}
       </p>
+
+      {error && <div style={bannerStyle("error")}>⚠️ {error}</div>}
+      {success && <div style={bannerStyle("success")}>✅ {success}</div>}
 
       {!hasPassword ? (
   <>
@@ -205,6 +236,8 @@ navigate(`/child/${id}`);
   onClick={() => {
     setShowChange(!showChange);
     setShowReset(false);
+    setError("");
+    setSuccess("");
   }}
   style={{
     width: "100%",
@@ -280,6 +313,8 @@ navigate(`/child/${id}`);
   onClick={() => {
     setShowReset(!showReset);
     setShowChange(false);
+    setError("");
+    setSuccess("");
   }}
   style={{
     width: "100%",
@@ -298,13 +333,26 @@ navigate(`/child/${id}`);
   <>
     <input
       type="password"
+      placeholder="Your Account Password"
+      value={resetParentPassword}
+      onChange={(e) => setResetParentPassword(e.target.value)}
+      style={{
+        width: "100%",
+        padding: 15,
+        marginTop: 20,
+        boxSizing: "border-box",
+      }}
+    />
+
+    <input
+      type="password"
       placeholder="New Password"
       value={resetPasswordValue}
       onChange={(e) => setResetPasswordValue(e.target.value)}
       style={{
         width: "100%",
         padding: 15,
-        marginTop: 20,
+        marginTop: 15,
         boxSizing: "border-box",
       }}
     />
@@ -341,7 +389,7 @@ navigate(`/child/${id}`);
   </>
 )}
 
-      
+
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getMessaging, getToken } from "firebase/messaging";
+import { getMessaging } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBEvWAmL7sRp-we38W15pwBARNi2il_7S0",
@@ -13,14 +13,3 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const messaging = getMessaging(app);
-
-export const requestFCMToken = async () => {
-  try {
-    const token = await getToken(messaging, {
-      vapidKey: "BFuTs7ZBf_-Cm_zvY_h7djgvQK3hyMc8qqC22KQRj1eXx00OlBpnqvNr-kjJqaRUjOp99YZw4K9Dml5eSJ0HotE",
-    });
-    return token;
-  } catch (err) {
-    console.log("FCM error", err);
-  }
-};

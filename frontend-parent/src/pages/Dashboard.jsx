@@ -1,101 +1,36 @@
-// import { useEffect, useState } from 'react';
-// import API from '../services/api';
-// import { Link } from 'react-router-dom';
-
-// export default function Dashboard() {
-//   const [children, setChildren] = useState([]);
-//   const [loading, setLoading] = useState(true);
-
-// useEffect(() => {
-//   API.get('/parent/dashboard')
-//     .then(res => setChildren(res.data.children))
-//     .catch(err => console.error("Error loading linked students:", err))
-//     .finally(() => setLoading(false));
-// }, []);
-
-//   if (loading) return <div className="text-center p-10 font-medium text-gray-600">Loading child details...</div>;
-
-//   return (
-//     <div className="max-w-6xl mx-auto px-4 py-8">
-//       <h1 className="text-2xl font-bold text-gray-800 mb-6">Linked Children Accounts</h1>
-//       {children.length === 0 ? (
-//         <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 p-4 rounded-lg">
-//           No students found matching your registered details. Contact the school office administration.
-//         </div>
-//       ) : (
-//         <div className="grid gap-6 md:grid-cols-2">
-//           {children.map(child => (
-//             <div key={child._id} className="bg-white border rounded-xl p-6 shadow-sm flex flex-col justify-between">
-//               <div>
-//                 <div className="flex justify-between items-start mb-4">
-//                   <div>
-//                     <h2 className="text-xl font-bold text-gray-900">{child.name}</h2>
-//                     <p className="text-sm text-gray-500">Grade: {child.grade} | Room: {child.hostelNumber}</p>
-//                   </div>
-//                   <span className={`px-3 py-1 rounded-full font-bold text-sm ${child.pocketMoney > 500 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-//                     Bal: ₹{child.pocketMoney}
-//                   </span>
-//                 </div>
-//                 {child.pocketMoney <= 0 && (
-//                   <p className="text-xs text-red-600 font-medium mb-3">⚠️ Balance exhausted. Please top up at the school desk.</p>
-//                 )}
-//               </div>
-//               <Link to={`/child/${child._id}`} className="mt-4 block text-center bg-blue-50 text-blue-600 font-semibold py-2.5 rounded-lg hover:bg-blue-100 transition text-sm">
-//                 View Statements & Purchase History →
-//               </Link>
-//             </div>
-//           ))}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
-
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import API from '../services/api';
 import { Link } from 'react-router-dom';
-import { listenForMessages } from "../utils/notification";
-
-
+import { PUSH_EVENT } from '../utils/events';
 
 const Dashboard = () => {
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch linked student accounts on component mount
-  // useEffect(() => {
-  //   API.get('/parent/dashboard')
-  //     .then(res => setChildren(res.data.children || []))
-  //     .catch(err => console.error("Error loading linked students:", err))
-  //     .finally(() => setLoading(false));
-  // }, []);
-
-const fetchDashboard = async () => {
-  try {
-    const res = await API.get("/parent/dashboard");
-    setChildren(res.data.children || []);
-  } catch (err) {
-    console.error("Error loading linked students:", err);
-  } finally {
-    setLoading(false);
-  }
-};
-useEffect(() => {
-  fetchDashboard();
-
-  listenForMessages((payload) => {
-    console.log("📩 Notification received:", payload);
-
-    if (payload.data?.type === "RECHARGE") {
-      console.log("🔄 Refreshing dashboard...");
-      fetchDashboard();
+  const fetchDashboard = async () => {
+    try {
+      const res = await API.get("/parent/dashboard");
+      setChildren(res.data.children || []);
+    } catch (err) {
+      console.error("Error loading linked students:", err);
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
-}, []);
+  useEffect(() => {
+    fetchDashboard();
+
+    // Balances change from recharges and purchases made elsewhere.
+    const refresh = () => fetchDashboard();
+    window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
 
   // Dashboard Unified Styles Object matching system look and feel

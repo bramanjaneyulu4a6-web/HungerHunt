@@ -1,32 +1,3 @@
-// import mongoose from "mongoose";
-
-// const parentSchema = new mongoose.Schema(
-// {
-//   fatherName: String,
-//   phone: {
-//     type: String,
-//     unique: true
-//   },
-//   password: String,
-
-//   studentIds: [
-//     {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Student"
-//     }
-//   ]
-// },
-// { timestamps: true }
-// );
-
-// export default mongoose.model("Parent", parentSchema);
-
-
-
-
-
-
-
 import mongoose from "mongoose";
 
 const parentSchema = new mongoose.Schema(

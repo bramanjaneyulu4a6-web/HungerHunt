@@ -1,16 +1,3 @@
-// import Inventory from "../models/Inventory.js";
-
-// export const getInventory = async (req, res) => {
-
-//   const inventory = await Inventory
-//     .find()
-//     .populate("productId");
-
-//   res.json(inventory);
-// };
-
-
-
 import Inventory from "../models/Inventory.js";
 
 export const getInventory = async (req, res) => {

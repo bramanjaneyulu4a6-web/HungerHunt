@@ -1,4 +1,3 @@
-import React from "react";
 
 const RefreshButton = ({ onRefresh, loading = false }) => {
   return (

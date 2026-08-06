@@ -5,10 +5,8 @@ import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-router.get('/', getProducts);
+router.get('/', protectAdmin, getProducts);
 
-
-// router.post('/', protectAdmin, addProduct);
 router.post(
   '/',
   protectAdmin,

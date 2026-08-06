@@ -1,5 +1,4 @@
 import Student from '../models/Student.js';
-// import admin from "../config/firebase.js";
 import Parent from "../models/Parent.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
@@ -14,8 +13,20 @@ export const addStudent = async (req, res) => {
 
 export const getStudents = async (req, res) => {
   try {
-    const students = await Student.find();
-    res.json(students);
+    const page = Math.max(parseInt(req.query.page) || 0, 0);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
+
+    // Paginated only when asked for, so existing callers keep the full list.
+    if (page > 0 && limit > 0) {
+      const [students, total] = await Promise.all([
+        Student.find().sort({ name: 1 }).skip((page - 1) * limit).limit(limit),
+        Student.countDocuments(),
+      ]);
+
+      return res.json({ students, total, page, pages: Math.ceil(total / limit) });
+    }
+
+    res.json(await Student.find());
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -55,17 +66,30 @@ export const bulkImportStudents = async (req, res) => {
 };
 
 
+const SEARCH_FIELDS = "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl";
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const searchStudents = async (req, res) => {
   try {
-    const q = req.query.q;
+    const q = (req.query.q || "").trim();
+
+    // An empty query would otherwise dump the entire student roster.
+    if (q.length < 2) {
+      return res.status(400).json({ message: "Search term must be at least 2 characters" });
+    }
+
+    const pattern = new RegExp(escapeRegex(q), "i");
 
     const students = await Student.find({
       $or: [
-        { name: { $regex: q, $options: "i" } },
-        { hostelNumber: { $regex: q, $options: "i" } },
-        { parentPhoneNumber: { $regex: q, $options: "i" } }
+        { name: pattern },
+        { hostelNumber: pattern },
+        { parentPhoneNumber: pattern }
       ]
-    });
+    })
+      .select(SEARCH_FIELDS)
+      .limit(25);
 
     res.json(students);
   } catch (error) {
@@ -96,22 +120,15 @@ export const getActiveStudentCount = async (req, res) => {
 };
 
 export const topUpWallet = async (req, res) => {
-  console.log("🔥 topUpWallet called");
-
   try {
     const { amount } = req.body;
     const studentId = req.params.id;
-
-    console.log("Student ID:", studentId);
-    console.log("Recharge Amount:", amount);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
     const student = await Student.findById(studentId);
-
-    console.log("Student Found:", student?.name);
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
@@ -135,18 +152,11 @@ export const topUpWallet = async (req, res) => {
 
     await student.save();
 
-    console.log("✅ Student balance updated");
-
     const parent = await Parent.findOne({
       studentIds: studentId,
     });
 
-    console.log("Parent Found:", parent);
-    console.log("FCM Token:", parent?.fcmToken);
-
     if (parent?.fcmToken) {
-      console.log("📲 Sending notification...");
-
       await sendNotification(
         parent.fcmToken,
         "💰 Wallet Recharge",
@@ -156,10 +166,6 @@ export const topUpWallet = async (req, res) => {
           type: "RECHARGE",
         }
       );
-
-      console.log("✅ sendNotification() finished");
-    } else {
-      console.log("❌ Parent has no FCM token");
     }
 
     return res.json({
@@ -172,51 +178,3 @@ export const topUpWallet = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
-
-
-export const publicSearchStudents = async (req, res) => {
-  try {
-    const q = req.query.q || "";
-
-    const students = await Student.find({
-      $or: [
-        { name: { $regex: q, $options: "i" } },
-        { hostelNumber: { $regex: q, $options: "i" } },
-        { parentPhoneNumber: { $regex: q, $options: "i" } }
-      ]
-    }).select(
-      "_id name fatherName hostelNumber parentPhoneNumber pocketMoney photo class section"
-    );
-
-    res.json(students);
-  } catch (err) {
-    res.status(500).json({
-      message: err.message,
-    });
-  }
-};
-
-
-
-
-// const handleTopUp = async () => {
-//   if (!topupAmount || topupAmount <= 0) {
-//     return alert("Enter valid amount");
-//   }
-
-//   try {
-//     const res = await api.put(`/students/${topupStudent}/topup`, {
-//       amount: Number(topupAmount),
-//     });
-
-//     alert(res.data.message || "Wallet recharged successfully");
-
-//     setTopupAmount("");
-//     setTopupStudent(null);
-
-//     fetchStudents(); // refresh updated wallet
-//   } catch (error) {
-//     console.error(error);
-//     alert(error.response?.data?.message || "Wallet recharge failed");
-//   }
-// };

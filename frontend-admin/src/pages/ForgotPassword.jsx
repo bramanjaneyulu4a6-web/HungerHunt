@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/api";
 
@@ -11,11 +11,11 @@ const ForgotPassword = () => {
     e.preventDefault();
 
     try {
-      await api.post("/auth/admin/forgot-password", { email });
-      setMessage("Password reset instructions sent to your registered email.");
+      await api.post("/admin/forgot-password", { email });
+      setMessage("If that email is registered, a reset link has been sent.");
       setError("");
     } catch (err) {
-      setError(err.response?.data?.message || "Email verification failed.");
+      setError(err.response?.data?.message || "Something went wrong. Please try again.");
       setMessage("");
     }
   };

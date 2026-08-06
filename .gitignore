@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+
+# Secrets — never commit
+.env
+.env.*
+.env-*
+!.env.example
+firebase-service-account.json
+backend/uploads/
+
+# Native build output
+frontend-parent/ios/App/Pods/
+frontend-parent/ios/App/build/
+frontend-parent/ios/DerivedData/
+frontend-parent/android/.gradle/
+frontend-parent/android/app/build/
+
+.DS_Store
+*.log

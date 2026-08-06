@@ -1,364 +1,163 @@
-// import Student from '../models/Student.js';
-// import Product from '../models/Product.js';
-// import Transaction from '../models/Transaction.js';
-// // import admin from "../config/firebase.js";
-// import Parent from "../models/Parent.js";
-// import Inventory from "../models/Inventory.js";
-// import bcrypt from "bcryptjs";
-// import { sendNotification } from "../utils/sendNotification.js";
-
-// export const generateBill = async (req, res) => {
-//   const { studentId, items } = req.body; // items syntax: [{ productId, quantity }]
-  
-//   try {
-//     const student = await Student.findById(studentId);
-//     if (!student) return res.status(404).json({ message: 'Student record not found.' });
-
-//     let totalAmount = 0;
-//     let transactionItems = [];
-
-//     // Verify stock availability & Calculate costs
-//    for (const orderItem of items) {
-
-//   const inventory = await Inventory.findOne({
-//     productId: orderItem.productId
-//   }).populate("productId");
-
-//   if (!inventory) {
-//     return res.status(404).json({
-//       message: "Inventory record not found."
-//     });
-//   }
-
-//   if (inventory.stock < orderItem.quantity) {
-//     return res.status(400).json({
-//       message: `Insufficient stock for ${inventory.productId.name}`
-//     });
-//   }
-
-//   totalAmount += inventory.productId.price * orderItem.quantity;
-
-//   transactionItems.push({
-//     productId: inventory.productId._id,
-//     name: inventory.productId.name,
-//     quantity: orderItem.quantity,
-//     price: inventory.productId.price
-//   });
-// }
-
-//     // Wallet Balance Check
-//     if (student.pocketMoney < totalAmount) {
-//       return res.status(400).json({ message: 'Insufficient pocket money balance!' });
-//     }
-
-//     // Atomic adjustments alternative manual processing
-//     for (const orderItem of items) {
-
-//   await Inventory.findOneAndUpdate(
-//     {
-//       productId: orderItem.productId
-//     },
-//     {
-//       $inc: {
-//         stock: -orderItem.quantity
-//       }
-//     }
-//   );
-
-// }
-
-//     const previousBalance = student.pocketMoney;
-//     student.pocketMoney -= totalAmount;
-//     await student.save();
-
-//     const transaction = await Transaction.create({
-      
-//       studentId,
-//       items: transactionItems,
-//       totalAmount,
-//       previousBalance,
-//       remainingBalance: student.pocketMoney
-//     });
-//     const parent = await Parent.findOne({
-//   studentIds: studentId
-// });
-
-// if (parent?.fcmToken) {
-//   await sendNotification(
-//     parent.fcmToken,
-//     "🛒 Purchase Alert",
-//     `Spent ₹${totalAmount}. Balance ₹${student.pocketMoney}`,
-//     {
-//       type: "TRANSACTION",
-//       studentId: studentId.toString(),
-//     }
-//   );
-// }
-
-//     res.status(201).json({ message: 'Checkout successful!', transaction });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-// export const getAllTransactions = async (req, res) => {
-//   try {
-//     const transactions = await Transaction.find().populate('studentId', 'name grade').sort({ createdAt: -1 });
-//     res.json(transactions);
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-
-
-
-
-// export const verifyPayment = async (req, res) => {
-
-//     try {
-
-//         const {
-//             studentId,
-//             phone,
-//             password
-//         } = req.body;
-
-//         const student = await Student.findById(studentId);
-
-//         if (!student)
-//             return res.status(404).json({
-//                 message:"Student not found"
-//             });
-
-//         if (student.parentPhoneNumber !== phone)
-//             return res.status(400).json({
-//                 message:"Wrong mobile number"
-//             });
-
-//         const matched = await bcrypt.compare(
-//             password,
-//             student.purchasePassword
-//         );
-
-//         if (!matched)
-//             return res.status(400).json({
-//                 message:"Wrong purchase password"
-//             });
-
-//         res.json({
-//             success:true
-//         });
-
-//     } catch(err){
-
-//         res.status(500).json({
-//             message:err.message
-//         });
-
-//     }
-
-// };
-
-
-
-
-
-
-// 24-07-2026-for wallet control
-
-
-
-
-
-
-
-
-
-
 import Student from '../models/Student.js';
-import Product from '../models/Product.js';
 import Transaction from '../models/Transaction.js';
-// import admin from "../config/firebase.js";
 import Parent from "../models/Parent.js";
 import Inventory from "../models/Inventory.js";
 import bcrypt from "bcryptjs";
 import { sendNotification } from "../utils/sendNotification.js";
 
+const periodStart = (limitType) => {
+  const now = new Date();
+
+  if (limitType === "DAILY") {
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  if (limitType === "WEEKLY") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - now.getDay());
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+};
+
+// Puts stock back after a partially-applied checkout.
+const restoreStock = async (applied) => {
+  for (const { productId, quantity } of applied) {
+    try {
+      await Inventory.updateOne({ productId }, { $inc: { stock: quantity } });
+    } catch (err) {
+      console.error("Stock rollback failed for product", productId, err);
+    }
+  }
+};
+
 export const generateBill = async (req, res) => {
-  
-  const { studentId, items } = req.body; // items syntax: [{ productId, quantity }]
-  console.log("========== BILL ==========");
-console.log("studentId:", studentId);
-console.log("items:", items);
+  const { studentId, items } = req.body;
+
+  if (!studentId || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: 'A student and at least one item are required.' });
+  }
+
+  if (items.some((i) => !i.productId || !Number.isInteger(i.quantity) || i.quantity <= 0)) {
+    return res.status(400).json({ message: 'Every item needs a product and a positive whole quantity.' });
+  }
+
+  const applied = [];
+
   try {
     const student = await Student.findById(studentId);
-    console.log("Student:", student?.name);
-console.log("Wallet:", student?.pocketMoney);
-console.log("Wallet Control:", student?.walletControl);
     if (!student) return res.status(404).json({ message: 'Student record not found.' });
 
     let totalAmount = 0;
-    let transactionItems = [];
+    const transactionItems = [];
 
-    // Verify stock availability & Calculate costs
-   for (const orderItem of items) {
+    for (const orderItem of items) {
+      const inventory = await Inventory.findOne({
+        productId: orderItem.productId
+      }).populate("productId");
 
-  const inventory = await Inventory.findOne({
-    productId: orderItem.productId
-  }).populate("productId");
-
-  if (!inventory) {
-    return res.status(404).json({
-      message: "Inventory record not found."
-    });
-  }
-
-  if (inventory.stock < orderItem.quantity) {
-    return res.status(400).json({
-      message: `Insufficient stock for ${inventory.productId.name}`
-    });
-  }
-
-  totalAmount += inventory.productId.price * orderItem.quantity;
-
-  transactionItems.push({
-    productId: inventory.productId._id,
-    name: inventory.productId.name,
-    quantity: orderItem.quantity,
-    price: inventory.productId.price
-  });
-}
-// Wallet Control Check
-if (student.walletControl?.enabled) {
-
-  const now = new Date();
-  let startDate;
-
-  if (student.walletControl.limitType === "DAILY") {
-
-    startDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-
-  } else if (
-    student.walletControl.limitType === "WEEKLY"
-  ) {
-
-    startDate = new Date(now);
-
-    startDate.setDate(
-      now.getDate() - now.getDay()
-    );
-
-    startDate.setHours(0,0,0,0);
-
-  } else {
-
-    startDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
-
-  }
-
-  const spent = await Transaction.aggregate([
-    {
-      $match: {
-        studentId: student._id,
-        createdAt: {
-          $gte: startDate
-        }
+      if (!inventory || !inventory.productId) {
+        return res.status(404).json({ message: "Inventory record not found." });
       }
-    },
-    {
-      $group: {
-        _id: null,
-        total: {
-          $sum: "$totalAmount"
-        }
+
+      if (inventory.stock < orderItem.quantity) {
+        return res.status(400).json({
+          message: `Insufficient stock for ${inventory.productId.name}`
+        });
+      }
+
+      totalAmount += inventory.productId.price * orderItem.quantity;
+
+      transactionItems.push({
+        productId: inventory.productId._id,
+        name: inventory.productId.name,
+        quantity: orderItem.quantity,
+        price: inventory.productId.price
+      });
+    }
+
+    if (student.walletControl?.enabled) {
+      const spent = await Transaction.aggregate([
+        {
+          $match: {
+            studentId: student._id,
+            createdAt: { $gte: periodStart(student.walletControl.limitType) }
+          }
+        },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+      ]);
+
+      const alreadySpent = spent.length > 0 ? spent[0].total : 0;
+      const remainingLimit = Math.max(0, student.walletControl.limitAmount - alreadySpent);
+
+      if (totalAmount > remainingLimit) {
+        return res.status(400).json({
+          message: `${student.walletControl.limitType} limit exceeded. Remaining limit ₹${remainingLimit}`
+        });
       }
     }
-  ]);
 
-  const alreadySpent =
-  spent.length > 0
-    ? spent[0].total
-    : 0;
+    // Decrement conditionally so two simultaneous kiosks can never oversell.
+    // Anything already applied is restored if a later step fails.
+    for (const orderItem of items) {
+      const updated = await Inventory.findOneAndUpdate(
+        { productId: orderItem.productId, stock: { $gte: orderItem.quantity } },
+        { $inc: { stock: -orderItem.quantity } },
+        { new: true }
+      );
 
-const remainingLimit = Math.max(
-  0,
-  student.walletControl.limitAmount - alreadySpent
-);
+      if (!updated) {
+        await restoreStock(applied);
+        return res.status(409).json({
+          message: "Stock changed while checking out. Please review the cart and try again."
+        });
+      }
 
-console.log("Already Spent:", alreadySpent);
-console.log("Limit:", student.walletControl.limitAmount);
-console.log("Remaining:", remainingLimit);
-console.log("Current Purchase:", totalAmount);
+      applied.push({ productId: orderItem.productId, quantity: orderItem.quantity });
+    }
 
-if (
-  totalAmount > remainingLimit
-) {
+    // Same guard on the wallet: the balance must still cover the bill.
+    const debited = await Student.findOneAndUpdate(
+      { _id: studentId, pocketMoney: { $gte: totalAmount } },
+      { $inc: { pocketMoney: -totalAmount } },
+      { new: true }
+    );
 
-  return res.status(400).json({
-  message:
-    `${student.walletControl.limitType} limit exceeded. Remaining limit ₹${remainingLimit}`
-});
-
-}
-}
-console.log("Total Amount:", totalAmount);
-    // Wallet Balance Check
-    if (student.pocketMoney < totalAmount) {
+    if (!debited) {
+      await restoreStock(applied);
       return res.status(400).json({ message: 'Insufficient pocket money balance!' });
     }
 
-    // Atomic adjustments alternative manual processing
-    for (const orderItem of items) {
-
-  await Inventory.findOneAndUpdate(
-    {
-      productId: orderItem.productId
-    },
-    {
-      $inc: {
-        stock: -orderItem.quantity
-      }
+    let transaction;
+    try {
+      transaction = await Transaction.create({
+        studentId,
+        items: transactionItems,
+        totalAmount,
+        previousBalance: debited.pocketMoney + totalAmount,
+        remainingBalance: debited.pocketMoney
+      });
+    } catch (err) {
+      await restoreStock(applied);
+      await Student.updateOne({ _id: studentId }, { $inc: { pocketMoney: totalAmount } });
+      throw err;
     }
-  );
 
-}
+    const parent = await Parent.findOne({ studentIds: studentId });
 
-    const previousBalance = student.pocketMoney;
-    student.pocketMoney -= totalAmount;
-    await student.save();
-
-    const transaction = await Transaction.create({
-      
-      studentId,
-      items: transactionItems,
-      totalAmount,
-      previousBalance,
-      remainingBalance: student.pocketMoney
-    });
-    const parent = await Parent.findOne({
-  studentIds: studentId
-});
-
-if (parent?.fcmToken) {
-  await sendNotification(
-    parent.fcmToken,
-    "🛒 Purchase Alert",
-    `Spent ₹${totalAmount}. Balance ₹${student.pocketMoney}`,
-    {
-      type: "TRANSACTION",
-      studentId: studentId.toString(),
+    if (parent?.fcmToken) {
+      await sendNotification(
+        parent.fcmToken,
+        "🛒 Purchase Alert",
+        `Spent ₹${totalAmount}. Balance ₹${debited.pocketMoney}`,
+        {
+          type: "TRANSACTION",
+          studentId: studentId.toString(),
+        }
+      );
     }
-  );
-}
 
     res.status(201).json({ message: 'Checkout successful!', transaction });
   } catch (error) {
@@ -368,107 +167,62 @@ if (parent?.fcmToken) {
 
 export const getAllTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find().populate('studentId', 'name grade').sort({ createdAt: -1 });
-    res.json(transactions);
+    const page = Math.max(parseInt(req.query.page) || 0, 0);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
+
+    const query = Transaction.find()
+      .populate('studentId', 'name grade')
+      .sort({ createdAt: -1 });
+
+    // Paginated only when asked for, so existing callers keep the full list.
+    if (page > 0 && limit > 0) {
+      const [transactions, total] = await Promise.all([
+        query.skip((page - 1) * limit).limit(limit),
+        Transaction.countDocuments(),
+      ]);
+
+      return res.json({ transactions, total, page, pages: Math.ceil(total / limit) });
+    }
+
+    res.json(await query);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
-
-
-
 export const verifyPayment = async (req, res) => {
+  try {
+    const { studentId, phone, password } = req.body;
 
-    try {
+    const student = await Student.findById(studentId);
 
-        const {
-            studentId,
-            phone,
-            password
-        } = req.body;
-
-        const student = await Student.findById(studentId);
-
-        if (!student)
-            return res.status(404).json({
-                message:"Student not found"
-            });
-
-        if (student.parentPhoneNumber !== phone)
-            return res.status(400).json({
-                message:"Wrong mobile number"
-            });
-
-        const matched = await bcrypt.compare(
-            password,
-            student.purchasePassword
-        );
-
-        if (!matched)
-            return res.status(400).json({
-                message:"Wrong purchase password"
-            });
-
-        res.json({
-            success:true
-        });
-
-    } catch(err){
-
-        res.status(500).json({
-            message:err.message
-        });
-
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
     }
 
-};
+    if (student.parentPhoneNumber !== phone) {
+      return res.status(400).json({ message: "Wrong mobile number" });
+    }
 
+    if (!student.purchasePassword) {
+      return res.status(400).json({
+        message: "No purchase password has been set for this student yet."
+      });
+    }
 
+    if (!password) {
+      return res.status(400).json({ message: "Purchase password is required" });
+    }
 
-export const updateWalletControl = async (req, res) => {
+    const matched = await bcrypt.compare(password, student.purchasePassword);
 
-  try {
+    if (!matched) {
+      return res.status(400).json({ message: "Wrong purchase password" });
+    }
 
-    const { studentId } = req.params;
-
-   const {
-  enabled,
-  limitAmount,
-  limitType
-} = req.body;
-
-if (
-  enabled &&
-  (!limitAmount || limitAmount <= 0)
-) {
-  return res.status(400).json({
-    message: "Limit amount must be greater than 0"
-  });
-}
-
-    const student =
-      await Student.findByIdAndUpdate(
-        studentId,
-        {
-          walletControl: {
-            enabled,
-            limitAmount,
-            limitType
-          }
-        },
-        { new: true }
-      );
-
-    res.json(student);
+    res.json({ success: true });
 
   } catch (err) {
-
-    res.status(500).json({
-      message: err.message
-    });
-
+    res.status(500).json({ message: err.message });
   }
-
 };

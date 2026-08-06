@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
       const parsed = savedParent ? JSON.parse(savedParent) : null;
       setParent(parsed);
     } catch (e) {
-      console.log("Invalid parentData in localStorage");
+      console.error("Invalid parentData in localStorage", e);
       localStorage.removeItem('parentData');
     }
   }

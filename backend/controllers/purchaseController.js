@@ -30,8 +30,6 @@ export const getNewPurchases = async (req, res) => {
       .populate("items.productId")
       .sort({ createdAt: -1 });
 
-    console.log("NEW PURCHASES:", purchases.length);
-
     res.json(purchases);
 
   } catch (err) {

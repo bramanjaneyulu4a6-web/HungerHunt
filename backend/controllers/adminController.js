@@ -1,12 +1,11 @@
 import Admin from '../models/Admin.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { sendPasswordResetMail } from '../utils/mailer.js';
+import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
 
 export const registerAdmin = async (req, res) => {
   try {
-    console.log("REGISTER API HIT");
-    console.log("BODY:", req.body);
-
     const email = req.body?.email;
     const password = req.body?.password;
 
@@ -16,8 +15,22 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters"
+      });
+    }
+
     const adminCount = await Admin.countDocuments();
     const limit = parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3;
+
+    // Open only to bootstrap the very first account; after that an existing
+    // admin must be signed in, otherwise anyone could claim a free slot.
+    if (adminCount > 0 && !req.adminId) {
+      return res.status(401).json({
+        message: "Only a signed-in admin can create additional admin accounts."
+      });
+    }
 
     if (adminCount >= limit) {
       return res.status(400).json({
@@ -40,7 +53,6 @@ export const registerAdmin = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("REGISTER ERROR:", error);
     return res.status(500).json({
       message: error.message
     });
@@ -63,16 +75,71 @@ export const loginAdmin = async (req, res) => {
 };
 
 export const forgotPassword = async (req, res) => {
-  // Production ready apps use Nodemailer here. For simplicity:
-  const { email, newPassword } = req.body;
   try {
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(404).json({ message: 'Admin user not found' });
+    const { email } = req.body;
 
-    admin.password = newPassword;
+    if (!email) {
+      return res.status(400).json({ message: 'Email required' });
+    }
+
+    const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
+
+    // Always report success so this endpoint cannot be used to enumerate admins.
+    const genericResponse = {
+      message: 'If that email is registered, a reset link has been sent.'
+    };
+
+    if (!admin) return res.json(genericResponse);
+
+    const { raw, hashed } = createResetToken();
+    admin.resetPasswordToken = hashed;
+    admin.resetPasswordExpire = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await admin.save();
-    res.json({ message: 'Password updated successfully!' });
+
+    const baseUrl = process.env.ADMIN_CLIENT_URL || 'http://localhost:5174';
+
+    try {
+      await sendPasswordResetMail({
+        to: admin.email,
+        resetUrl: `${baseUrl}/reset-password/${raw}`,
+      });
+    } catch (mailError) {
+      admin.resetPasswordToken = undefined;
+      admin.resetPasswordExpire = undefined;
+      await admin.save();
+      return res.status(500).json({ message: 'Could not send the reset email. Try again later.' });
+    }
+
+    res.json(genericResponse);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password || password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+
+    const admin = await Admin.findOne({
+      resetPasswordToken: hashResetToken(req.params.token),
+      resetPasswordExpire: { $gt: new Date() },
+    });
+
+    if (!admin) {
+      return res.status(400).json({ message: 'Reset link is invalid or has expired' });
+    }
+
+    admin.password = password;
+    admin.resetPasswordToken = undefined;
+    admin.resetPasswordExpire = undefined;
+    await admin.save();
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

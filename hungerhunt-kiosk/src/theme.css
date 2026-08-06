@@ -103,6 +103,14 @@
   --warn-ink: var(--amber-800);
   --warn-bg: var(--amber-100);
 
+  /* dark chrome. The admin sidebar is the one dark surface in the system;
+     drawn from the slate ramp so a re-theme moves it with everything else. */
+  --chrome: var(--slate-900);
+  --chrome-raised: var(--slate-800);
+  --chrome-hover: var(--slate-700);
+  --chrome-ink: var(--slate-200);
+  --chrome-muted: var(--slate-300);
+
   /* Hunger Hunt's warm brand. Only the kiosk carries it today — the till is
      the surface a student actually sees. */
   --brand: #ff6b35;

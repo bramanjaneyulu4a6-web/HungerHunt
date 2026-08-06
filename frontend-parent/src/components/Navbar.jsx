@@ -14,8 +14,8 @@ export default function Navbar() {
   // Shared Styles Blueprint matching the administrative system layout
   const styles = {
     navbar: {
-      backgroundColor: "#ffffff",
-      borderBottom: "1px solid #e2e8f0",
+      backgroundColor: "var(--surface)",
+      borderBottom: "1px solid var(--border)",
       padding: "16px 32px",
       display: "flex",
       justifyContent: "space-between",
@@ -27,7 +27,7 @@ export default function Navbar() {
     brandLink: {
       fontSize: "18px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       textDecoration: "none",
       display: "flex",
       alignItems: "center",
@@ -42,15 +42,15 @@ export default function Navbar() {
     userBadge: {
       fontSize: "13px",
       fontWeight: "600",
-      color: "#334155",
-      backgroundColor: "#f1f5f9",
+      color: "var(--ink-soft)",
+      backgroundColor: "var(--bg-subtle)",
       padding: "6px 14px",
       borderRadius: "20px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
     },
     logoutBtn: {
-      backgroundColor: "#be123c",
-      color: "#ffffff",
+      backgroundColor: "var(--alert)",
+      color: "var(--on-dark)",
       border: "none",
       padding: "8px 16px",
       borderRadius: "10px",
@@ -80,7 +80,7 @@ export default function Navbar() {
             onClick={handleLogout} 
             style={styles.logoutBtn}
             onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#9f1239")}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#be123c")}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--alert)")}
           >
             Logout
           </button>

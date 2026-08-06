@@ -101,7 +101,7 @@ const refreshPage = async () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "40px 24px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -122,24 +122,24 @@ const refreshPage = async () => {
     title: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
     subtitle: {
       fontSize: "15px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "6px",
       marginBottom: 0,
     },
     input: {
       width: "100%",
       padding: "10px 14px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "all 0.2s",
       boxSizing: "border-box",
@@ -147,20 +147,20 @@ const refreshPage = async () => {
     quantityInput: {
       width: "120px",
       padding: "8px 12px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "all 0.2s",
       boxSizing: "border-box",
       textAlign: "center"
     },
     alertBanner: {
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      color: "#166534",
+      backgroundColor: "var(--success-bg)",
+      border: "1px solid var(--success-border)",
+      color: "var(--success-deep)",
       padding: "12px 16px",
       borderRadius: "8px",
       fontSize: "14px",
@@ -168,8 +168,8 @@ const refreshPage = async () => {
       marginBottom: "20px",
     },
     tableContainer: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
       overflow: "hidden",
@@ -181,28 +181,28 @@ const refreshPage = async () => {
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
+      backgroundColor: "var(--bg)",
+      color: "var(--ink-dim)",
       fontWeight: "600",
       padding: "16px",
       fontSize: "13px",
-      borderBottom: "1px solid #e2e8f0",
+      borderBottom: "1px solid var(--border)",
     },
     td: {
       padding: "16px",
       fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
+      color: "var(--ink-soft)",
+      borderBottom: "1px solid var(--bg-subtle)",
     },
     emptyState: {
       padding: "40px",
       textAlign: "center",
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "15px"
     },
     submitBtn: {
       padding: "12px 24px",
-      color: "#ffffff",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -213,12 +213,12 @@ const refreshPage = async () => {
   };
 
   const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
+    e.currentTarget.style.borderColor = "var(--primary)";
     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
   };
 
   const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
+    e.currentTarget.style.borderColor = "var(--border-strong)";
     e.currentTarget.style.boxShadow = "none";
   };
 
@@ -239,7 +239,7 @@ const refreshPage = async () => {
               disabled={loading}
               style={{
                 ...styles.submitBtn,
-                backgroundColor: loading ? "#93c5fd" : "#2563eb",
+                backgroundColor: loading ? "#93c5fd" : "var(--primary)",
                 cursor: loading ? "not-allowed" : "pointer",
               }}
             >
@@ -289,16 +289,16 @@ const refreshPage = async () => {
                 {filteredProducts.map((product) => (
                   <tr 
                     key={product._id}
-                    style={{ backgroundColor: product.quantity > 0 ? '#f0fdf4' : 'transparent' }}
+                    style={{ backgroundColor: product.quantity > 0 ? 'var(--success-bg)' : 'transparent' }}
                   >
                     <td style={styles.td}>
                       <strong>{product.name}</strong>
                     </td>
                     <td style={styles.td}>
-                      {product.stockGroup?.name || <span style={{ color: '#94a3b8' }}>None</span>}
+                      {product.stockGroup?.name || <span style={{ color: 'var(--muted-soft)' }}>None</span>}
                     </td>
                     <td style={styles.td}>
-                      {product.unit?.symbol || <span style={{ color: '#94a3b8' }}>None</span>}
+                      {product.unit?.symbol || <span style={{ color: 'var(--muted-soft)' }}>None</span>}
                     </td>
                     <td style={styles.td}>
                       <input

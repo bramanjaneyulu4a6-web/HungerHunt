@@ -73,7 +73,7 @@ const Inventory = () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "40px 24px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -89,32 +89,32 @@ const Inventory = () => {
     title: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
     subtitle: {
       fontSize: "15px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "6px",
       marginBottom: 0,
     },
     searchBar: {
       width: "100%",
       padding: "12px 16px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "10px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "all 0.2s",
       boxSizing: "border-box",
       marginBottom: "28px"
     },
     cardWrapper: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
       padding: "24px",
@@ -126,32 +126,32 @@ const Inventory = () => {
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
+      backgroundColor: "var(--bg)",
+      color: "var(--ink-dim)",
       fontWeight: "600",
       padding: "14px 16px",
       fontSize: "13px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
     },
     td: {
       padding: "14px 16px",
       fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
+      color: "var(--ink-soft)",
+      borderBottom: "1px solid var(--bg-subtle)",
     },
     emptyState: {
       padding: "48px",
       textAlign: "center",
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "15px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
     },
     blueBtn: {
       padding: "8px 14px",
-      color: "#ffffff",
-      backgroundColor: "#2563eb",
+      color: "var(--on-dark)",
+      backgroundColor: "var(--primary)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -163,8 +163,8 @@ const Inventory = () => {
     },
     dangerBtn: {
       padding: "8px 14px",
-      color: "#ffffff",
-      backgroundColor: "#dc2626",
+      color: "var(--on-dark)",
+      backgroundColor: "var(--danger)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -187,27 +187,27 @@ const Inventory = () => {
       zIndex: 9999
     },
     modalContent: {
-      background: "#ffffff",
+      background: "var(--surface)",
       padding: "28px",
       borderRadius: "16px",
       boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
       width: "100%",
       maxWidth: "440px",
-      border: "1px solid #e2e8f0"
+      border: "1px solid var(--border)"
     },
     modalTitle: {
       fontSize: "18px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: "0 0 16px 0"
     },
     modalInput: {
       width: "100%",
       padding: "10px 14px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
       fontSize: "14px",
-      color: "#0f172a",
+      color: "var(--ink)",
       outline: "none",
       boxSizing: "border-box",
       marginBottom: "14px",
@@ -215,8 +215,8 @@ const Inventory = () => {
     },
     saveBtn: {
       padding: "10px 18px",
-      backgroundColor: "#16a34a",
-      color: "#ffffff",
+      backgroundColor: "var(--success)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -226,8 +226,8 @@ const Inventory = () => {
     },
     cancelBtn: {
       padding: "10px 18px",
-      backgroundColor: "#64748b",
-      color: "#ffffff",
+      backgroundColor: "var(--muted)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -237,12 +237,12 @@ const Inventory = () => {
   };
 
   const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
+    e.currentTarget.style.borderColor = "var(--primary)";
     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
   };
 
   const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
+    e.currentTarget.style.borderColor = "var(--border-strong)";
     e.currentTarget.style.boxShadow = "none";
   };
 
@@ -273,7 +273,7 @@ const Inventory = () => {
             <div style={styles.modalContent}>
               <h3 style={styles.modalTitle}>Modify Catalog Specifications</h3>
 
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Product Identifier Label</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--ink-dim)', marginBottom: '6px' }}>Product Identifier Label</label>
               <input
                 type="text"
                 value={editName}
@@ -284,7 +284,7 @@ const Inventory = () => {
                 style={styles.modalInput}
               />
 
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Standard Base Selling Price (₹)</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--ink-dim)', marginBottom: '6px' }}>Standard Base Selling Price (₹)</label>
               <input
                 type="number"
                 step="0.01"
@@ -332,21 +332,21 @@ const Inventory = () => {
                   return (
                     <tr
                       key={item._id}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
                       <td style={styles.td}>{index + 1}</td>
-                      <td style={{ ...styles.td, fontWeight: "700", color: "#0f172a" }}>
+                      <td style={{ ...styles.td, fontWeight: "700", color: "var(--ink)" }}>
                         {item.productId?.name || "Unlinked Catalog Profile"}
                       </td>
-                      <td style={{ ...styles.td, textAlign: "center", fontWeight: "600", color: "#2563eb" }}>
+                      <td style={{ ...styles.td, textAlign: "center", fontWeight: "600", color: "var(--primary)" }}>
                         ₹ {(item.productId?.price || 0).toFixed(2)}
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <span
                           style={{
-                            backgroundColor: isLowStock ? "#fee2e2" : "#eff6ff",
-                            color: isLowStock ? "#dc2626" : "#2563eb",
+                            backgroundColor: isLowStock ? "var(--danger-bg-strong)" : "#eff6ff",
+                            color: isLowStock ? "var(--danger)" : "var(--primary)",
                             padding: "6px 12px",
                             borderRadius: "20px",
                             fontSize: "12px",

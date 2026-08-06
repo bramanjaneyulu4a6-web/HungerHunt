@@ -28,13 +28,13 @@ const Login = () => {
   minHeight: '100vh',   // use full screen height
   padding: '20px',
    width: '100vw', 
-  backgroundColor: '#ffffff', // pure white
+  backgroundColor: 'var(--surface)', // pure white
 },
     card: {
       width: '100%',
       maxWidth: '400px',
-      background: '#ffffff', // Pure white card
-      border: '1px solid #e2e8f0', // Clean soft border
+      background: 'var(--surface)', // Pure white card
+      border: '1px solid var(--border)', // Clean soft border
       borderRadius: '12px',
       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
       padding: '40px 32px',
@@ -48,17 +48,17 @@ const Login = () => {
       fontSize: '28px',
       margin: '0 0 6px 0',
       fontWeight: '700',
-      color: '#1e293b', // Deep slate for text
+      color: 'var(--ink-strong)', // Deep slate for text
     },
     subtitle: {
       fontSize: '14px',
-      color: '#64748b', // Medium gray-blue text
+      color: 'var(--muted)', // Medium gray-blue text
       margin: 0,
     },
     errorBox: {
-      backgroundColor: '#fef2f2',
-      border: '1px solid #fee2e2',
-      color: '#ef4444',
+      backgroundColor: 'var(--danger-bg)',
+      border: '1px solid var(--danger-bg-strong)',
+      color: 'var(--danger-light)',
       padding: '12px',
       borderRadius: '6px',
       marginBottom: '20px',
@@ -73,16 +73,16 @@ const Login = () => {
       fontSize: '13px',
       fontWeight: '600',
       marginBottom: '6px',
-      color: '#475569',
+      color: 'var(--ink-dim)',
     },
     input: {
       width: '100%',
       padding: '12px',
       fontSize: '15px',
-      background: '#ffffff',
-      border: '1px solid #cbd5e1',
+      background: 'var(--surface)',
+      border: '1px solid var(--border-strong)',
       borderRadius: '8px',
-      color: '#0f172a',
+      color: 'var(--ink)',
       boxSizing: 'border-box',
       outline: 'none',
       transition: 'border-color 0.2s',
@@ -95,11 +95,11 @@ const Login = () => {
       marginBottom: '24px',
     },
     linkLeft: {
-      color: '#64748b',
+      color: 'var(--muted)',
       textDecoration: 'none',
     },
     linkRight: {
-      color: '#2563eb', // Vibrant Blue Link
+      color: 'var(--primary)', // Vibrant Blue Link
       textDecoration: 'none',
       fontWeight: '600',
     },
@@ -108,8 +108,8 @@ const Login = () => {
       padding: '13px',
       fontSize: '16px',
       fontWeight: '600',
-      background: '#2563eb', // Classic Blue Button
-      color: '#ffffff',
+      background: 'var(--primary)', // Classic Blue Button
+      color: 'var(--on-dark)',
       border: 'none',
       borderRadius: '8px',
       cursor: 'pointer',

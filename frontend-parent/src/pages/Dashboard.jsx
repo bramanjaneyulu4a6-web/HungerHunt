@@ -37,7 +37,7 @@ const Dashboard = () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       boxSizing: "border-box",
@@ -48,13 +48,13 @@ const Dashboard = () => {
     title: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.75px",
       margin: 0,
     },
     subtitle: {
       fontSize: "14px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "6px",
       marginBottom: 0,
       lineHeight: "1.5", // FIX: Changed from line-height to camelCase lineHeight
@@ -66,8 +66,8 @@ const Dashboard = () => {
       marginBottom: "24px",
     },
     childCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "24px",
       boxShadow: "0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04)",
@@ -86,43 +86,43 @@ const Dashboard = () => {
     childName: {
       fontSize: "20px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: 0,
     },
     childMeta: {
       fontSize: "13px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "4px",
       marginBottom: 0,
     },
     balanceBadge: (amt) => ({
       fontSize: "13px",
       fontWeight: "700",
-      backgroundColor: amt > 500 ? "#f0fdf4" : "#fff1f2",
-      color: amt > 500 ? "#16a34a" : "#be123c",
+      backgroundColor: amt > 500 ? "var(--success-bg)" : "var(--alert-bg)",
+      color: amt > 500 ? "var(--success)" : "var(--alert)",
       padding: "6px 12px",
       borderRadius: "20px",
       whiteSpace: "nowrap",
-      border: amt > 500 ? "1px solid #bbf7d0" : "1px solid #ffe4e6",
+      border: amt > 500 ? "1px solid var(--success-border)" : "1px solid var(--alert-border)",
     }),
     warningBanner: {
       display: "flex",
       alignItems: "center",
       gap: "6px",
-      color: "#be123c",
-      backgroundColor: "#fff1f2",
+      color: "var(--alert)",
+      backgroundColor: "var(--alert-bg)",
       padding: "10px 12px",
       borderRadius: "8px",
       fontSize: "12px",
       fontWeight: "500",
       marginTop: "12px",
-      border: "1px solid #ffe4e6",
+      border: "1px solid var(--alert-border)",
     },
     actionBtn: {
       display: "block",
       textAlign: "center",
-      backgroundColor: "#0f172a",
-      color: "#ffffff",
+      backgroundColor: "var(--ink)",
+      color: "var(--on-dark)",
       textDecoration: "none",
       padding: "12px 16px",
       borderRadius: "10px",
@@ -145,7 +145,7 @@ const Dashboard = () => {
       padding: "60px 0",
       fontSize: "16px",
       fontWeight: "500",
-      color: "#64748b",
+      color: "var(--muted)",
     }
   };
 
@@ -216,7 +216,7 @@ const Dashboard = () => {
       ...styles.actionBtn,
       flex: 1,
       marginTop: 0,
-      background: "#2563EB",
+      background: "var(--primary)",
     }}
   >
     Set Password

@@ -189,7 +189,7 @@ const handleTopUp = async () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -203,7 +203,7 @@ const handleTopUp = async () => {
     title: {
       fontSize: "28px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
@@ -211,20 +211,20 @@ const handleTopUp = async () => {
       display: "flex",
       alignItems: "center",
       gap: "12px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       padding: "8px 12px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
     },
     fileInput: {
       fontSize: "13px",
-      color: "#334155",
+      color: "var(--ink-soft)",
     },
     bulkBtn: {
       padding: "8px 14px",
       background: "#059669",
-      color: "#ffffff",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -240,8 +240,8 @@ const handleTopUp = async () => {
       alignItems: "start",
     },
     card: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "20px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -250,7 +250,7 @@ const handleTopUp = async () => {
     panelTitle: {
       fontSize: "16px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginTop: 0,
       marginBottom: "16px",
     },
@@ -262,11 +262,11 @@ const handleTopUp = async () => {
     input: {
       width: "100%",
       padding: "12px 14px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "border-color 0.2s",
       boxSizing: "border-box",
@@ -275,8 +275,8 @@ const handleTopUp = async () => {
       marginBottom: "16px",
     },
     tableContainer: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       overflow: "hidden",
@@ -287,12 +287,12 @@ const handleTopUp = async () => {
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
+      backgroundColor: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       padding: "14px",
       fontSize: "13px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
       cursor: "pointer",
       userSelect: "none",
       transition: "background-color 0.2s, color 0.2s",
@@ -303,14 +303,14 @@ const handleTopUp = async () => {
     td: {
       padding: "14px",
       fontSize: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--border)",
     },
     primaryBtn: {
       width: "100%",
       padding: "12px",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -322,8 +322,8 @@ const handleTopUp = async () => {
     cancelBtn: {
       width: "100%",
       padding: "10px",
-      background: "#f1f5f9",
-      color: "#334155",
+      background: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -343,7 +343,7 @@ const handleTopUp = async () => {
     editBtn: {
       background: "none",
       border: "none",
-      color: "#2563eb",
+      color: "var(--primary)",
       fontWeight: "600",
       fontSize: "13px",
       cursor: "pointer",
@@ -352,14 +352,14 @@ const handleTopUp = async () => {
     removeBtn: {
       background: "none",
       border: "none",
-      color: "#dc2626",
+      color: "var(--danger)",
       fontWeight: "600",
       fontSize: "13px",
       cursor: "pointer",
       padding: 0,
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       textAlign: "center",
       padding: "32px 0",
@@ -384,7 +384,7 @@ const handleTopUp = async () => {
   >
     <div
       style={{
-        background: "#fff",
+        background: "var(--surface)",
         padding: "20px",
         borderRadius: "12px",
         width: "320px",
@@ -410,8 +410,8 @@ const handleTopUp = async () => {
           onClick={handleTopUp}
           style={{
             flex: 1,
-            background: "#16a34a",
-            color: "#fff",
+            background: "var(--success)",
+            color: "var(--on-dark)",
             padding: "10px",
             border: "none",
             borderRadius: "8px",
@@ -424,8 +424,8 @@ const handleTopUp = async () => {
           onClick={() => setTopupStudent(null)}
           style={{
             flex: 1,
-            background: "#64748b",
-            color: "#fff",
+            background: "var(--muted)",
+            color: "var(--on-dark)",
             padding: "10px",
             border: "none",
             borderRadius: "8px",
@@ -478,8 +478,8 @@ const handleTopUp = async () => {
               value={formData.name} 
               onChange={e => setFormData({...formData, name: e.target.value})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
             <input 
               type="text" 
@@ -488,8 +488,8 @@ const handleTopUp = async () => {
               value={formData.fatherName} 
               onChange={e => setFormData({...formData, fatherName: e.target.value})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
             <input 
               type="text" 
@@ -498,8 +498,8 @@ const handleTopUp = async () => {
               value={formData.hostelNumber} 
               onChange={e => setFormData({...formData, hostelNumber: e.target.value})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
             {/* <input 
               type="number" 
@@ -508,8 +508,8 @@ const handleTopUp = async () => {
               value={formData.pocketMoney} 
               onChange={e => setFormData({...formData, pocketMoney: Number(e.target.value)})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             /> */}
             <input 
               type="text" 
@@ -518,8 +518,8 @@ const handleTopUp = async () => {
               value={formData.grade} 
               onChange={e => setFormData({...formData, grade: e.target.value})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
             <input 
               type="text" 
@@ -528,15 +528,15 @@ const handleTopUp = async () => {
               value={formData.parentPhoneNumber} 
               onChange={e => setFormData({...formData, parentPhoneNumber: e.target.value})} 
               style={styles.input}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
             
             <button 
               type="submit" 
               style={styles.primaryBtn}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
             >
               {editingId ? 'Update Record' : 'Save Profile'}
             </button>
@@ -549,8 +549,8 @@ const handleTopUp = async () => {
                   setEditingId(null);
                   setFormData({ name: '', fatherName: '', hostelNumber: '', pocketMoney: 0, grade: '', parentPhoneNumber: '' });
                 }}
-                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e2e8f0")}
-                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#f1f5f9")}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--border)")}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
               >
                 Cancel Edit
               </button>
@@ -568,8 +568,8 @@ const handleTopUp = async () => {
               placeholder="Quick search directory by student name or hostel room..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
           </div>
 
@@ -580,7 +580,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'name' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'name' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('name')}
                   >
@@ -589,7 +589,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'fatherName' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'fatherName' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('fatherName')}
                   >
@@ -598,7 +598,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'hostelNumber' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'hostelNumber' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('hostelNumber')}
                   >
@@ -607,7 +607,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'grade' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'grade' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('grade')}
                   >
@@ -616,7 +616,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'parentPhoneNumber' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'parentPhoneNumber' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('parentPhoneNumber')}
                   >
@@ -625,7 +625,7 @@ const handleTopUp = async () => {
                   <th 
                     style={{
                       ...styles.th, 
-                      backgroundColor: sortConfig.key === 'pocketMoney' ? '#e2e8f0' : '#f1f5f9'
+                      backgroundColor: sortConfig.key === 'pocketMoney' ? 'var(--border)' : 'var(--bg-subtle)'
                     }} 
                     onClick={() => handleSort('pocketMoney')}
                   >
@@ -650,7 +650,7 @@ const handleTopUp = async () => {
                     <tr 
                       key={st._id} 
                       style={styles.tr}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
                       <td style={styles.td}><strong>{st.name}</strong></td>
@@ -681,7 +681,7 @@ const handleTopUp = async () => {
   </button>
 
   <button 
-    style={{ ...styles.editBtn, color: "#16a34a" }} 
+    style={{ ...styles.editBtn, color: "var(--success)" }} 
     onClick={() => {
       setTopupStudent(st._id);
       setTopupAmount("");

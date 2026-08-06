@@ -129,7 +129,7 @@ const RechargeHistory = () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box"
@@ -149,19 +149,19 @@ const RechargeHistory = () => {
     title: {
       fontSize: "28px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0
     },
     subtitle: {
       fontSize: "14px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "4px",
       marginBottom: 0
     },
     btnGlobalExcel: {
-      backgroundColor: "#2563eb",
-      color: "#ffffff",
+      backgroundColor: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       padding: "10px 18px",
@@ -175,8 +175,8 @@ const RechargeHistory = () => {
       transition: "background-color 0.2s, transform 0.1s"
     },
     section: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "20px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
@@ -187,11 +187,11 @@ const RechargeHistory = () => {
     input: {
       width: "100%",
       padding: "12px 14px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "10px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "border-color 0.2s",
       boxSizing: "border-box",
@@ -202,9 +202,9 @@ const RechargeHistory = () => {
       gap: "12px",
     },
     accordionItem: (isOpen) => ({
-      border: isOpen ? "1px solid #2563eb" : "1px solid #e2e8f0",
+      border: isOpen ? "1px solid var(--primary)" : "1px solid var(--border)",
       borderRadius: "12px",
-      backgroundColor: "#ffffff",
+      backgroundColor: "var(--surface)",
       overflow: "hidden",
       transition: "all 0.2s ease",
       boxShadow: isOpen ? "0 4px 6px -1px rgba(0, 0, 0, 0.02)" : "none",
@@ -212,7 +212,7 @@ const RechargeHistory = () => {
     studentHeaderBtn: (isOpen) => ({
       width: "100%",
       padding: "16px 20px",
-      background: isOpen ? "#f1f5f9" : "transparent",
+      background: isOpen ? "var(--bg-subtle)" : "transparent",
       border: "none",
       textAlign: "left",
       cursor: "pointer",
@@ -229,11 +229,11 @@ const RechargeHistory = () => {
     studentName: {
       fontWeight: "600",
       fontSize: "15px",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     hostelTag: {
       fontSize: "12px",
-      color: "#64748b",
+      color: "var(--muted)",
       fontWeight: "500",
     },
     rightControls: {
@@ -244,19 +244,19 @@ const RechargeHistory = () => {
     studentWallet: {
       fontWeight: "700",
       fontSize: "15px",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     chevron: (isOpen) => ({
       fontSize: "12px",
-      color: "#64748b",
+      color: "var(--muted)",
       transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
       transition: "transform 0.2s ease",
       display: "inline-block",
     }),
     dropdownBody: {
       padding: "20px",
-      borderTop: "1px solid #e2e8f0",
-      backgroundColor: "#ffffff",
+      borderTop: "1px solid var(--border)",
+      backgroundColor: "var(--surface)",
     },
     dropdownHeaderAction: {
       display: "flex",
@@ -267,13 +267,13 @@ const RechargeHistory = () => {
     dropdownTitle: {
       fontSize: "14px",
       fontWeight: "600",
-      color: "#475569",
+      color: "var(--ink-dim)",
       margin: 0,
     },
     btnExcel: {
       background: "none",
       border: "none",
-      color: "#2563eb",
+      color: "var(--primary)",
       fontWeight: "600",
       fontSize: "13px",
       cursor: "pointer",
@@ -286,7 +286,7 @@ const RechargeHistory = () => {
       width: "100%",
       overflowX: "auto",
       borderRadius: "10px",
-      border: "1px solid #e2e8f0"
+      border: "1px solid var(--border)"
     },
     mainTable: {
       width: "100%",
@@ -295,34 +295,34 @@ const RechargeHistory = () => {
       fontSize: "14px"
     },
     mainTh: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
+      backgroundColor: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       padding: "14px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
       fontSize: "13px"
     },
     mainTd: {
       padding: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--border)",
       verticalAlign: "middle"
     },
     sNoText: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontWeight: "500"
     },
     dateText: {
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontWeight: "500",
     },
     amountText: {
       fontWeight: "700",
-      color: "#0f172a"
+      color: "var(--ink)"
     },
     rechargeBadgeSuccess: {
       backgroundColor: "#fdf2f8",
-      color: "#2563eb",
+      color: "var(--primary)",
       padding: "4px 10px",
       borderRadius: "8px",
       fontSize: "11px",
@@ -331,7 +331,7 @@ const RechargeHistory = () => {
       border: "1px solid #bfdbfe"
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       textAlign: "center",
       padding: "40px 0",
@@ -351,8 +351,8 @@ const RechargeHistory = () => {
           <button 
             style={styles.btnGlobalExcel}
             onClick={downloadAllStudentsExcel}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
           >
             📊 Export All Students (.csv)
           </button>
@@ -370,8 +370,8 @@ const RechargeHistory = () => {
             placeholder="Search roster by student name or hostel code..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "#cbd5e1")}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-strong)")}
           />
         </div>
 
@@ -392,7 +392,7 @@ const RechargeHistory = () => {
                     onClick={() => handleToggleDropdown(st._id)}
                     style={styles.studentHeaderBtn(isOpen)}
                     onMouseOver={(e) => {
-                      if (!isOpen) e.currentTarget.style.backgroundColor = "#f8fafc";
+                      if (!isOpen) e.currentTarget.style.backgroundColor = "var(--bg)";
                     }}
                     onMouseOut={(e) => {
                       if (!isOpen) e.currentTarget.style.backgroundColor = "transparent";
@@ -445,7 +445,7 @@ const RechargeHistory = () => {
                                 <tr
                                   key={index}
                                   style={{ transition: "background-color 0.2s" }}
-                                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
                                   onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                 >
                                   {/* Serial Number Row */}

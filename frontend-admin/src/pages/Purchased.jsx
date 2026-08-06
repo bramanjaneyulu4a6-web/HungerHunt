@@ -111,7 +111,7 @@ const loadData = async () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "40px 24px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -127,13 +127,13 @@ const loadData = async () => {
     title: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
     subtitle: {
       fontSize: "15px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "6px",
       marginBottom: 0,
     },
@@ -141,7 +141,7 @@ const loadData = async () => {
       display: "flex",
       gap: "12px",
       marginBottom: "28px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
       paddingBottom: "12px"
     },
     tabBtn: {
@@ -153,19 +153,19 @@ const loadData = async () => {
       cursor: "pointer",
       transition: "all 0.2s",
       backgroundColor: "transparent",
-      color: "#64748b"
+      color: "var(--muted)"
     },
     activeNewTab: {
-      backgroundColor: "#2563eb",
-      color: "#ffffff",
+      backgroundColor: "var(--primary)",
+      color: "var(--on-dark)",
     },
     activeDoneTab: {
-      backgroundColor: "#16a34a",
-      color: "#ffffff",
+      backgroundColor: "var(--success)",
+      color: "var(--on-dark)",
     },
     cardWrapper: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
       padding: "24px",
@@ -179,17 +179,17 @@ const loadData = async () => {
       gap: "12px",
       marginBottom: "16px",
       paddingBottom: "12px",
-      borderBottom: "1px solid #f1f5f9"
+      borderBottom: "1px solid var(--bg-subtle)"
     },
     cardTitle: {
       fontSize: "18px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: 0,
     },
     timestamp: {
       fontSize: "13px",
-      color: "#64748b",
+      color: "var(--muted)",
       margin: 0,
     },
     table: {
@@ -199,27 +199,27 @@ const loadData = async () => {
       marginBottom: "20px"
     },
     th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
+      backgroundColor: "var(--bg)",
+      color: "var(--ink-dim)",
       fontWeight: "600",
       padding: "12px 16px",
       fontSize: "13px",
-      borderBottom: "1px solid #e2e8f0",
+      borderBottom: "1px solid var(--border)",
     },
     td: {
       padding: "12px 16px",
       fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
+      color: "var(--ink-soft)",
+      borderBottom: "1px solid var(--bg-subtle)",
     },
     numInput: {
       width: "110px",
       padding: "8px 12px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "all 0.2s",
       boxSizing: "border-box",
@@ -227,16 +227,16 @@ const loadData = async () => {
     emptyState: {
       padding: "48px",
       textAlign: "center",
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "15px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
     },
     actionBtn: {
       padding: "10px 20px",
-      color: "#ffffff",
-      backgroundColor: "#16a34a",
+      color: "var(--on-dark)",
+      backgroundColor: "var(--success)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -248,12 +248,12 @@ const loadData = async () => {
   };
 
   const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
+    e.currentTarget.style.borderColor = "var(--primary)";
     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
   };
 
   const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
+    e.currentTarget.style.borderColor = "var(--border-strong)";
     e.currentTarget.style.boxShadow = "none";
   };
 
@@ -307,7 +307,7 @@ const loadData = async () => {
                   <div key={purchase._id} style={styles.cardWrapper}>
                     <div style={styles.cardHeader}>
                       <h3 style={styles.cardTitle}>Purchase Sheet #{purchase._id.slice(-6).toUpperCase()}</h3>
-                      <span style={{ color: '#2563eb', fontWeight: '600', fontSize: '13px', backgroundColor: '#eff6ff', padding: '4px 10px', borderRadius: '20px' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '13px', backgroundColor: '#eff6ff', padding: '4px 10px', borderRadius: '20px' }}>
                         Order Grand Total: ₹ {grandTotal.toFixed(2)}
                       </span>
                     </div>
@@ -362,7 +362,7 @@ const loadData = async () => {
                                   style={styles.numInput}
                                 />
                               </td>
-                              <td style={{ ...styles.td, fontWeight: "600", color: productTotal > 0 ? "#0f172a" : "#94a3b8" }}>
+                              <td style={{ ...styles.td, fontWeight: "600", color: productTotal > 0 ? "var(--ink)" : "var(--muted-soft)" }}>
                                 ₹ {productTotal.toFixed(2)}
                               </td>
                             </tr>
@@ -376,7 +376,7 @@ const loadData = async () => {
                       disabled={loading}
                       style={{
                         ...styles.actionBtn,
-                        backgroundColor: loading ? "#a3e635" : "#16a34a",
+                        backgroundColor: loading ? "#a3e635" : "var(--success)",
                         cursor: loading ? "not-allowed" : "pointer",
                       }}
                     >
@@ -411,7 +411,7 @@ const loadData = async () => {
                           🟢 Closed on: {new Date(purchase.completedAt).toLocaleString()}
                         </p>
                       </div>
-                      <span style={{ color: '#16a34a', fontWeight: '700', fontSize: '14px', backgroundColor: '#f0fdf4', padding: '6px 14px', borderRadius: '20px', border: '1px solid #bbf7d0' }}>
+                      <span style={{ color: 'var(--success)', fontWeight: '700', fontSize: '14px', backgroundColor: 'var(--success-bg)', padding: '6px 14px', borderRadius: '20px', border: '1px solid var(--success-border)' }}>
                         Total Spent: ₹ {completedGrandTotal.toFixed(2)}
                       </span>
                     </div>
@@ -435,10 +435,10 @@ const loadData = async () => {
                                 <strong>{item.productId?.name || "Unlinked Catalog Product"}</strong>
                               </td>
                               <td style={styles.td}>{item.quantity}</td>
-                              <td style={{ ...styles.td, color: '#475569' }}>
+                              <td style={{ ...styles.td, color: 'var(--ink-dim)' }}>
                                 ₹ {item.purchasePrice?.toFixed(2) || "0.00"}
                               </td>
-                              <td style={{ ...styles.td, color: '#16a34a', fontWeight: '600' }}>
+                              <td style={{ ...styles.td, color: 'var(--success)', fontWeight: '600' }}>
                                 ₹ {historicalProductTotal.toFixed(2)}
                               </td>
                             </tr>

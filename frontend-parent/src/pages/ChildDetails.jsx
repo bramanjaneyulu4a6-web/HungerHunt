@@ -79,7 +79,7 @@ const saveWalletControl = async () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       boxSizing: "border-box",
@@ -87,15 +87,15 @@ const saveWalletControl = async () => {
     backLink: {
       fontSize: "14px",
       fontWeight: "600",
-      color: "#2563eb",
+      color: "var(--primary)",
       textDecoration: "none",
       display: "inline-flex",
       alignItems: "center",
       marginBottom: "24px",
     },
     profileCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "24px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -109,12 +109,12 @@ const saveWalletControl = async () => {
     studentName: {
       fontSize: "24px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: 0,
     },
     studentMeta: {
       fontSize: "14px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "4px",
       marginBottom: 0,
     },
@@ -124,7 +124,7 @@ const saveWalletControl = async () => {
     balanceLabel: {
       fontSize: "12px",
       fontWeight: "600",
-      color: "#64748b",
+      color: "var(--muted)",
       textTransform: "uppercase",
       letterSpacing: "0.5px",
       margin: 0,
@@ -132,12 +132,12 @@ const saveWalletControl = async () => {
     balanceValue: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: "2px 0 0 0",
     },
     toggleBar: {
       display: "flex",
-      backgroundColor: "#e2e8f0",
+      backgroundColor: "var(--border)",
       padding: "4px",
       borderRadius: "10px",
       marginBottom: "32px",
@@ -153,20 +153,20 @@ const saveWalletControl = async () => {
       borderRadius: "8px",
       cursor: "pointer",
       border: "none",
-      backgroundColor: isActive ? "#ffffff" : "transparent",
-      color: isActive ? "#0f172a" : "#64748b",
+      backgroundColor: isActive ? "var(--surface)" : "transparent",
+      color: isActive ? "var(--ink)" : "var(--muted)",
       boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
       transition: "all 0.15s ease",
     }),
     sectionTitle: {
       fontSize: "18px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginBottom: "16px",
     },
     invoiceCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "12px",
       padding: "20px",
       marginBottom: "16px",
@@ -175,15 +175,15 @@ const saveWalletControl = async () => {
     invoiceHeader: {
       display: "flex",
       justifyContent: "space-between",
-      borderBottom: "1px dashed #e2e8f0",
+      borderBottom: "1px dashed var(--border)",
       paddingBottom: "12px",
       marginBottom: "12px",
       fontSize: "13px",
-      color: "#64748b",
+      color: "var(--muted)",
       fontWeight: "500",
     },
     invoiceId: {
-      color: "#0f172a",
+      color: "var(--ink)",
       fontWeight: "600",
     },
     itemList: {
@@ -195,49 +195,49 @@ const saveWalletControl = async () => {
       display: "flex",
       justifyContent: "space-between",
       fontSize: "14px",
-      color: "#334155",
+      color: "var(--ink-soft)",
       padding: "6px 0",
     },
     itemQty: {
       fontSize: "12px",
-      color: "#94a3b8",
+      color: "var(--muted-soft)",
       marginLeft: "6px",
       fontWeight: "600",
     },
     itemPrice: {
       fontWeight: "500",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     invoiceTotalRow: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       paddingTop: "12px",
-      borderTop: "1px solid #e2e8f0",
+      borderTop: "1px solid var(--border)",
       fontWeight: "700",
       fontSize: "15px",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginBottom: "8px",
     },
     totalDeductedAmount: {
-      color: "#be123c",
+      color: "var(--alert)",
     },
     totalCreditedAmount: {
-      color: "#16a34a",
+      color: "var(--success)",
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       textAlign: "center",
       padding: "40px 0",
-      background: "#ffffff",
-      border: "1px dashed #cbd5e1",
+      background: "var(--surface)",
+      border: "1px dashed var(--border-strong)",
       borderRadius: "12px",
       margin: 0,
     },
     statusMessageContainer: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
@@ -247,24 +247,24 @@ const saveWalletControl = async () => {
     loadingText: {
       fontSize: "16px",
       fontWeight: "500",
-      color: "#64748b",
+      color: "var(--muted)",
     },
     errorText: {
       fontSize: "16px",
       fontWeight: "600",
-      color: "#be123c",
-      backgroundColor: "#fff1f2",
+      color: "var(--alert)",
+      backgroundColor: "var(--alert-bg)",
       padding: "16px 24px",
       borderRadius: "12px",
-      border: "1px solid #ffe4e6",
+      border: "1px solid var(--alert-border)",
     },
     banner: (type) => ({
       display: "flex",
       alignItems: "center",
       gap: "10px",
-      backgroundColor: type === "error" ? "#fff1f2" : "#f0fdf4",
-      border: type === "error" ? "1px solid #ffe4e6" : "1px solid #bbf7d0",
-      color: type === "error" ? "#be123c" : "#15803d",
+      backgroundColor: type === "error" ? "var(--alert-bg)" : "var(--success-bg)",
+      border: type === "error" ? "1px solid var(--alert-border)" : "1px solid var(--success-border)",
+      color: type === "error" ? "var(--alert)" : "var(--success-strong)",
       padding: "14px 16px",
       borderRadius: "12px",
       marginBottom: "20px",
@@ -438,10 +438,10 @@ const saveWalletControl = async () => {
 {activeTab === "wallet" && (
   <div
     style={{
-      backgroundColor: "#ffffff",
+      backgroundColor: "var(--surface)",
       padding: "24px",
       borderRadius: "16px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
       maxWidth: "100%",
     }}
@@ -450,7 +450,7 @@ const saveWalletControl = async () => {
     style={{
       fontSize: "20px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginTop: 0,
       marginBottom: "20px",
     }}
@@ -473,7 +473,7 @@ const saveWalletControl = async () => {
       gap: "10px",
       fontSize: "15px",
       fontWeight: "600",
-      color: "#334155",
+      color: "var(--ink-soft)",
       cursor: "pointer",
       marginBottom: "20px",
     }}
@@ -485,7 +485,7 @@ const saveWalletControl = async () => {
       style={{
         width: "18px",
         height: "18px",
-        accentColor: "#2563eb",
+        accentColor: "var(--primary)",
         cursor: "pointer",
       }}
     />
@@ -508,7 +508,7 @@ const saveWalletControl = async () => {
           display: "block",
           fontSize: "13px",
           fontWeight: "600",
-          color: "#64748b",
+          color: "var(--muted)",
           marginBottom: "6px",
         }}
       >
@@ -524,10 +524,10 @@ const saveWalletControl = async () => {
           padding: "10px 14px",
           fontSize: "15px",
           borderRadius: "8px",
-          border: "1px solid #cbd5e1",
+          border: "1px solid var(--border-strong)",
           outline: "none",
           boxSizing: "border-box",
-          color: "#0f172a",
+          color: "var(--ink)",
         }}
       />
     </div>
@@ -539,7 +539,7 @@ const saveWalletControl = async () => {
           display: "block",
           fontSize: "13px",
           fontWeight: "600",
-          color: "#64748b",
+          color: "var(--muted)",
           marginBottom: "6px",
         }}
       >
@@ -553,11 +553,11 @@ const saveWalletControl = async () => {
           padding: "10px 14px",
           fontSize: "15px",
           borderRadius: "8px",
-          border: "1px solid #cbd5e1",
-          backgroundColor: "#ffffff",
+          border: "1px solid var(--border-strong)",
+          backgroundColor: "var(--surface)",
           outline: "none",
           boxSizing: "border-box",
-          color: "#0f172a",
+          color: "var(--ink)",
           cursor: "pointer",
         }}
       >
@@ -574,8 +574,8 @@ const saveWalletControl = async () => {
     style={{
       width: "250px",
       padding: "12px",
-      backgroundColor: "#2563eb", // Matches the blue primary button style
-      color: "#ffffff",
+      backgroundColor: "var(--primary)", // Matches the blue primary button style
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontSize: "15px",

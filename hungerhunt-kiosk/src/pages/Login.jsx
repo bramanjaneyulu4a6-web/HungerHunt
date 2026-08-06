@@ -9,7 +9,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "var(--bg)",
     fontFamily: "system-ui, -apple-system, sans-serif",
     padding: "32px",
     boxSizing: "border-box",
@@ -17,8 +17,8 @@ const styles = {
   card: {
     width: "100%",
     maxWidth: "420px",
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
     borderRadius: "14px",
     padding: "32px",
     boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -50,16 +50,16 @@ const styles = {
     marginBottom: "6px",
     fontSize: "13px",
     fontWeight: "600",
-    color: "#334155",
+    color: "var(--ink-soft)",
   },
   input: {
     width: "100%",
     padding: "12px 14px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     fontSize: "14px",
-    color: "#0f172a",
-    backgroundColor: "#ffffff",
+    color: "var(--ink)",
+    backgroundColor: "var(--surface)",
     outline: "none",
     transition: "border-color 0.2s",
     boxSizing: "border-box",
@@ -68,7 +68,7 @@ const styles = {
     width: "100%",
     padding: "12px 24px",
     background: "orange",
-    color: "#ffffff",
+    color: "var(--on-dark)",
     border: "none",
     borderRadius: "10px",
     fontWeight: "600",
@@ -82,8 +82,8 @@ const styles = {
     cursor: "not-allowed",
   },
   error: {
-    background: "#fee2e2",
-    color: "#dc2626",
+    background: "var(--danger-bg-strong)",
+    color: "var(--danger)",
     padding: "10px 14px",
     borderRadius: "8px",
     fontSize: "13px",
@@ -145,8 +145,8 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@hungerhunt.com"
               autoComplete="username"
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
           </div>
 
@@ -162,8 +162,8 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
             />
           </div>
 

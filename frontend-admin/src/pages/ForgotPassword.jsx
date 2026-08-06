@@ -29,14 +29,14 @@ const ForgotPassword = () => {
       minHeight: "100vh",
       padding: "20px",
       width: "100%",
-      backgroundColor: "#ffffff"
+      backgroundColor: "var(--surface)"
     },
 
     card: {
       width: "100%",
       maxWidth: "400px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "12px",
       boxShadow:
         "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
@@ -52,19 +52,19 @@ const ForgotPassword = () => {
       fontSize: "28px",
       margin: "0 0 6px 0",
       fontWeight: "700",
-      color: "#1e293b"
+      color: "var(--ink-strong)"
     },
 
     subtitle: {
       fontSize: "14px",
-      color: "#64748b",
+      color: "var(--muted)",
       margin: 0
     },
 
     successBox: {
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      color: "#16a34a",
+      backgroundColor: "var(--success-bg)",
+      border: "1px solid var(--success-border)",
+      color: "var(--success)",
       padding: "12px",
       borderRadius: "6px",
       marginBottom: "18px",
@@ -73,9 +73,9 @@ const ForgotPassword = () => {
     },
 
     errorBox: {
-      backgroundColor: "#fef2f2",
-      border: "1px solid #fee2e2",
-      color: "#ef4444",
+      backgroundColor: "var(--danger-bg)",
+      border: "1px solid var(--danger-bg-strong)",
+      color: "var(--danger-light)",
       padding: "12px",
       borderRadius: "6px",
       marginBottom: "18px",
@@ -92,17 +92,17 @@ const ForgotPassword = () => {
       fontSize: "13px",
       fontWeight: "600",
       marginBottom: "6px",
-      color: "#475569"
+      color: "var(--ink-dim)"
     },
 
     input: {
       width: "100%",
       padding: "12px",
       fontSize: "15px",
-      background: "#ffffff",
-      border: "1px solid #cbd5e1",
+      background: "var(--surface)",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
-      color: "#0f172a",
+      color: "var(--ink)",
       boxSizing: "border-box",
       outline: "none"
     },
@@ -112,8 +112,8 @@ const ForgotPassword = () => {
       padding: "13px",
       fontSize: "16px",
       fontWeight: "600",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       cursor: "pointer",
@@ -121,7 +121,7 @@ const ForgotPassword = () => {
     },
 
     link: {
-      color: "#2563eb",
+      color: "var(--primary)",
       textDecoration: "none",
       fontWeight: "600"
     },
@@ -130,7 +130,7 @@ const ForgotPassword = () => {
       textAlign: "center",
       marginTop: "18px",
       fontSize: "13px",
-      color: "#64748b"
+      color: "var(--muted)"
     }
   };
 

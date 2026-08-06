@@ -378,7 +378,7 @@ const categories = [
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -392,8 +392,8 @@ const categories = [
 },
     card: {
       width: "100%",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "20px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -408,7 +408,7 @@ const categories = [
   fontSize: "42px",
   fontWeight: "900",
   fontFamily: "'Arial Black', 'Montserrat', 'Poppins', sans-serif",
-  color: "#2563EB",
+  color: "var(--primary)",
   letterSpacing: "2px",
   textTransform: "uppercase",
   textShadow: "2px 2px 6px rgba(37,99,235,0.25)",
@@ -418,11 +418,11 @@ const categories = [
     input: {
       flex: 1,
       padding: "12px 14px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "border-color 0.2s",
       boxSizing: "border-box",
@@ -430,11 +430,11 @@ const categories = [
     productSearchInput: {
       width: "100%",
       padding: "10px 12px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "8px",
       fontSize: "13px",
-      color: "#0f172a",
-      backgroundColor: "#f8fafc",
+      color: "var(--ink)",
+      backgroundColor: "var(--bg)",
       outline: "none",
       transition: "border-color 0.2s, background-color 0.2s",
       boxSizing: "border-box",
@@ -442,8 +442,8 @@ const categories = [
     },
     primaryBtn: {
       padding: "12px 24px",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -458,7 +458,7 @@ const categories = [
     resultsTitle: {
       fontSize: "15px",
       fontWeight: "600",
-      color: "#1e293b",
+      color: "var(--ink-strong)",
       marginBottom: "12px",
     },
     table: {
@@ -468,12 +468,12 @@ const categories = [
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
+      backgroundColor: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       padding: "12px",
       fontSize: "13px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
     },
     tr: {
       cursor: "pointer",
@@ -482,13 +482,13 @@ const categories = [
     td: {
       padding: "12px",
       fontSize: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--border)",
     },
     selectBtn: {
       padding: "6px 12px",
       background: "#0284c7",
-      color: "#ffffff",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "6px",
       fontWeight: "600",
@@ -501,15 +501,15 @@ const categories = [
       alignItems: "center",
       marginTop: "16px",
       paddingTop: "16px",
-      borderTop: "1px solid #f1f5f9",
+      borderTop: "1px solid var(--bg-subtle)",
     },
     studentInlineBanner: {
       display: "flex",
       gap: "16px",
       fontSize: "14px",
-      color: "#475569",
+      color: "var(--ink-dim)",
       fontWeight: "500",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "10px 14px",
       borderRadius: "8px",
       marginBottom: "16px",
@@ -517,17 +517,17 @@ const categories = [
     studentName: {
       fontSize: "15px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     studentMeta: {
       fontSize: "13px",
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontWeight: "500",
     },
     walletBadge: {
       padding: "8px 14px",
-      background: "#fef3c7",
-      color: "#92400e",
+      background: "var(--warn-bg)",
+      color: "var(--warn-ink)",
       borderRadius: "8px",
       fontSize: "14px",
       fontWeight: "600",
@@ -543,19 +543,19 @@ const categories = [
       justifyContent: "space-between",
       alignItems: "center",
       padding: "12px 14px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       marginBottom: "10px",
     },
     productName: {
       fontWeight: "600",
       fontSize: "14px",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     productStock: {
       fontSize: "12px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "2px",
     },
     actionControlWrap: {
@@ -566,17 +566,17 @@ const categories = [
     qtySelector: {
       display: "flex",
       alignItems: "center",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "8px",
       overflow: "hidden",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
     },
     qtyBtn: {
       width: "32px",
       height: "32px",
       border: "none",
       background: "transparent",
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontSize: "16px",
       fontWeight: "600",
       cursor: "pointer",
@@ -590,19 +590,19 @@ const categories = [
       height: "32px",
       borderTop: "none",
       borderBottom: "none",
-      borderLeft: "1px solid #e2e8f0",
-      borderRight: "1px solid #e2e8f0",
-      background: "#ffffff",
+      borderLeft: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      background: "var(--surface)",
       textAlign: "center",
       fontSize: "13px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
       outline: "none",
     },
     addBtn: {
       padding: "8px 14px",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -613,7 +613,7 @@ const categories = [
     checkoutSection: {
       marginTop: "24px",
       paddingTop: "16px",
-      borderTop: "1px solid #e2e8f0",
+      borderTop: "1px solid var(--border)",
     },
     totalRow: {
       display: "flex",
@@ -623,16 +623,16 @@ const categories = [
     totalLabel: {
       fontSize: "16px",
       fontWeight: "600",
-      color: "#64748b",
+      color: "var(--muted)",
     },
     totalAmount: {
       fontSize: "22px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     remainingBalance: (isNegative) => ({
       fontSize: "13px",
-      color: isNegative ? "#dc2626" : "#16a34a",
+      color: isNegative ? "var(--danger)" : "var(--success)",
       fontWeight: "500",
       marginTop: "4px",
       textAlign: "right",
@@ -645,8 +645,8 @@ const categories = [
     successBtn: {
       flex: 1,
       padding: "12px",
-      background: "#16a34a",
-      color: "#ffffff",
+      background: "var(--success)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -656,8 +656,8 @@ const categories = [
     },
     cancelBtn: {
       padding: "12px 20px",
-      background: "#dc2626",
-      color: "#ffffff",
+      background: "var(--danger)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -666,13 +666,13 @@ const categories = [
       transition: "background-color 0.2s",
     },
     highlightPrice: {
-      color: "#0f172a",
+      color: "var(--ink)",
       fontWeight: "700",
       fontSize: "14px",
       marginRight: "8px",
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       margin: 0,
     },
@@ -682,25 +682,25 @@ const categories = [
       textAlign: "center",
       fontSize: "13px",
       fontWeight: "600",
-      color: "#0f172a",
-      border: "1px solid #cbd5e1",
+      color: "var(--ink)",
+      border: "1px solid var(--border-strong)",
       borderRadius: "4px",
       outline: "none",
-      backgroundColor: "#ffffff",
+      backgroundColor: "var(--surface)",
     },
     cartQtyBtn: {
       width: "24px",
       height: "24px",
       borderRadius: "4px",
-      border: "1px solid #cbd5e1",
-      background: "#f8fafc",
+      border: "1px solid var(--border-strong)",
+      background: "var(--bg)",
       cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
       fontWeight: "700",
       fontSize: "12px",
-      color: "#475569",
+      color: "var(--ink-dim)",
     },
     removeBtn: {
   width: "26px",
@@ -708,8 +708,8 @@ const categories = [
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#fee2e2",
-  color: "#ef4444",
+  background: "var(--danger-bg-strong)",
+  color: "var(--danger-light)",
   border: "none",
   borderRadius: "6px",
   fontSize: "16px",
@@ -729,9 +729,9 @@ welcomeScreen: {
   textAlign: "center",
 
   background:
-    "linear-gradient(135deg,#FF6B35 0%, #F59E0B 50%, #FACC15 100%)",
+    "linear-gradient(135deg,#FF6B35 0%, var(--warn) 50%, #FACC15 100%)",
 
-  color: "#ffffff",
+  color: "var(--on-dark)",
   overflow: "hidden",
 },
 
@@ -739,7 +739,7 @@ welcomeTitle: {
   fontSize: "72px",
   fontWeight: "900",
   letterSpacing: "2px",
-  color: "#ffffff",
+  color: "var(--on-dark)",
   textShadow: "3px 3px 10px rgba(0,0,0,.25)",
   marginTop: 25,
   marginBottom: 15,
@@ -758,7 +758,7 @@ startButton: {
   fontWeight: "700",
   border: "none",
   borderRadius: "60px",
-  background: "#ffffff",
+  background: "var(--surface)",
   color: "#EA580C",
   cursor: "pointer",
   boxShadow: "0 15px 30px rgba(0,0,0,.25)",
@@ -775,7 +775,7 @@ productGrid: {
 },
 
 productCard: {
-  background: "#fff",
+  background: "var(--surface)",
   borderRadius: 18,
   overflow: "hidden",
   boxShadow: "0 8px 25px rgba(0,0,0,.08)",
@@ -800,15 +800,15 @@ productTitle: {
 },
 
 priceText: {
-  color: "#2563EB",
+  color: "var(--primary)",
   fontWeight: 700,
   fontSize: 20,
 },
 
 stockBadge: {
   display: "inline-block",
-  background: "#DCFCE7",
-  color: "#166534",
+  background: "var(--success-bg-strong)",
+  color: "var(--success-deep)",
   padding: "4px 10px",
   borderRadius: 20,
   fontSize: 12,
@@ -886,30 +886,30 @@ if (showWelcome) {
           height: 10px;
         }
         ::-webkit-scrollbar-track {
-          background: #f1f5f9;
+          background: var(--bg-subtle);
           border-radius: 8px;
         }
         ::-webkit-scrollbar-thumb {
-          background: #2563eb;
+          background: var(--primary);
           border-radius: 8px;
-          border: 2px solid #f1f5f9;
+          border: 2px solid var(--bg-subtle);
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: #1d4ed8;
+          background: var(--primary-hover);
         }
         .product-scroll-panel::-webkit-scrollbar {
           width: 6px;
         }
         .product-scroll-panel::-webkit-scrollbar-track {
-          background: #f8fafc;
+          background: var(--bg);
           border-radius: 4px;
         }
         .product-scroll-panel::-webkit-scrollbar-thumb {
-          background: #3b82f6;
+          background: var(--primary-light);
           border-radius: 4px;
         }
         .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-          background: #2563eb;
+          background: var(--primary);
         }
       `}</style>
 
@@ -959,8 +959,8 @@ if (showWelcome) {
           position: "absolute",
           top: -6,
           right: -8,
-          background: "#ef4444",
-          color: "#fff",
+          background: "var(--danger-light)",
+          color: "var(--on-dark)",
           width: 20,
           height: 20,
           borderRadius: "50%",
@@ -1000,12 +1000,12 @@ if (showWelcome) {
 
         background:
           selectedCategory === category
-            ? "#2563EB"
+            ? "var(--primary)"
             : "#E5E7EB",
 
         color:
           selectedCategory === category
-            ? "#fff"
+            ? "var(--surface)"
             : "#111827",
       }}
     >
@@ -1019,12 +1019,12 @@ if (showWelcome) {
               value={productSearchQuery}
               onChange={(e) => setProductSearchQuery(e.target.value)}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#2563eb";
-                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.borderColor = "var(--primary)";
+                e.currentTarget.style.backgroundColor = "var(--surface)";
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e2e8f0";
-                e.currentTarget.style.backgroundColor = "#f8fafc";
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.backgroundColor = "var(--bg)";
               }}
             />
 
@@ -1179,7 +1179,7 @@ if (showWelcome) {
         width: "90%",
         maxWidth: "900px",
         height: "85vh",
-        background: "#fff",
+        background: "var(--surface)",
         borderRadius: "18px",
         boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
         zIndex: 999,
@@ -1274,11 +1274,11 @@ if (showWelcome) {
       margin: "18px 0",
       border: "1px solid #E5E7EB",
       borderRadius: 12,
-      background: "#F8FAFC",
+      background: "var(--bg)",
     }}
   >
     <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>
         Student
       </div>
       <div style={{ fontWeight: 700, fontSize: 17 }}>
@@ -1287,7 +1287,7 @@ if (showWelcome) {
     </div>
 
     <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>
         Father
       </div>
       <div style={{ fontWeight: 700, fontSize: 17 }}>
@@ -1296,7 +1296,7 @@ if (showWelcome) {
     </div>
 
     <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>
         Hostel No
       </div>
       <div style={{ fontWeight: 700, fontSize: 17 }}>
@@ -1305,7 +1305,7 @@ if (showWelcome) {
     </div>
 
     <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
+      <div style={{ fontSize: 12, color: "var(--muted)" }}>
         Phone
       </div>
       <div style={{ fontWeight: 700, fontSize: 17 }}>
@@ -1316,8 +1316,8 @@ if (showWelcome) {
     <div
       style={{
         marginLeft: "auto",
-        background: "#FEF3C7",
-        color: "#92400E",
+        background: "var(--warn-bg)",
+        color: "var(--warn-ink)",
         padding: "12px 18px",
         borderRadius: 10,
         textAlign: "center",
@@ -1470,8 +1470,8 @@ if (showWelcome) {
                   <button
                      style={styles.cancelBtn}
                     onClick={handleCancelPayment}
-                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#dc2626")}
+                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-strong)")}
+                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--danger)")}
                   >
                      Cancel Payment
                   </button>
@@ -1485,8 +1485,8 @@ if (showWelcome) {
 
   setShowVerifyModal(true);
 }}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#15803d")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#16a34a")}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--success-strong)")}
+                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--success)")}
                      disabled={
    !selectedStudent ||
   cart.length === 0 ||
@@ -1527,7 +1527,7 @@ if (showWelcome) {
         left: "50%",
         transform: "translate(-50%,-50%)",
         width: 430,
-        background: "#fff",
+        background: "var(--surface)",
         borderRadius: 18,
         padding: 30,
         zIndex: 1001,
@@ -1614,8 +1614,8 @@ if (showWelcome) {
             padding: 14,
             borderRadius: 10,
             border: "none",
-            background: "#16A34A",
-            color: "#fff",
+            background: "var(--success)",
+            color: "var(--on-dark)",
             cursor: "pointer"
           }}
           onClick={async () => {

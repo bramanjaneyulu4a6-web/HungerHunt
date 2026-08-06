@@ -186,7 +186,7 @@ const Products = () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "40px 24px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -207,13 +207,13 @@ const Products = () => {
     title: {
       fontSize: "32px",
       fontWeight: "800",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
     subtitle: {
       fontSize: "15px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "6px",
       marginBottom: 0,
     },
@@ -223,10 +223,10 @@ const Products = () => {
     },
     actionBtn: {
       padding: "10px 18px",
-      backgroundColor: "#ffffff",
-      border: "1px solid #cbd5e1",
+      backgroundColor: "var(--surface)",
+      border: "1px solid var(--border-strong)",
       borderRadius: "10px",
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       fontSize: "14px",
       cursor: "pointer",
@@ -234,13 +234,13 @@ const Products = () => {
       transition: "all 0.2s",
     },
     activeBtn: {
-      backgroundColor: "#2563eb",
-      color: "#ffffff",
-      border: "1px solid #2563eb",
+      backgroundColor: "var(--primary)",
+      color: "var(--on-dark)",
+      border: "1px solid var(--primary)",
     },
     tableContainer: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
       overflow: "hidden",
@@ -251,18 +251,18 @@ const Products = () => {
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
+      backgroundColor: "var(--bg)",
+      color: "var(--ink-dim)",
       fontWeight: "600",
       padding: "16px",
       fontSize: "13px",
-      borderBottom: "1px solid #e2e8f0",
+      borderBottom: "1px solid var(--border)",
     },
     td: {
       padding: "16px",
       fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
+      color: "var(--ink-soft)",
+      borderBottom: "1px solid var(--bg-subtle)",
     },
     actionFlex: {
       display: "flex",
@@ -271,7 +271,7 @@ const Products = () => {
     editBtn: {
       background: "none",
       border: "none",
-      color: "#2563eb",
+      color: "var(--primary)",
       fontWeight: "600",
       fontSize: "13px",
       cursor: "pointer",
@@ -280,16 +280,16 @@ const Products = () => {
     deleteBtn: {
       background: "none",
       border: "none",
-      color: "#ef4444",
+      color: "var(--danger-light)",
       fontWeight: "600",
       fontSize: "13px",
       cursor: "pointer",
       padding: 0,
     },
     alertBanner: {
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      color: "#166534",
+      backgroundColor: "var(--success-bg)",
+      border: "1px solid var(--success-border)",
+      color: "var(--success-deep)",
       padding: "12px 16px",
       borderRadius: "8px",
       fontSize: "14px",
@@ -299,7 +299,7 @@ const Products = () => {
     emptyState: {
       padding: "40px",
       textAlign: "center",
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "15px"
     },
     // Modal Overlay Styling Component Styles
@@ -317,8 +317,8 @@ const Products = () => {
       zIndex: 1000,
     },
     modalCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "16px",
       padding: "28px",
       width: "100%",
@@ -334,20 +334,20 @@ const Products = () => {
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: "20px",
-      borderBottom: "1px solid #f1f5f9",
+      borderBottom: "1px solid var(--bg-subtle)",
       paddingBottom: "12px",
     },
     modalTitle: {
       fontSize: "18px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: 0,
     },
     closeXBtn: {
       background: "none",
       border: "none",
       fontSize: "20px",
-      color: "#94a3b8",
+      color: "var(--muted-soft)",
       cursor: "pointer",
     },
     formGrid: {
@@ -358,11 +358,11 @@ const Products = () => {
     input: {
       width: "100%",
       padding: "10px 14px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       borderRadius: "8px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "all 0.2s",
       boxSizing: "border-box",
@@ -371,7 +371,7 @@ const Products = () => {
       display: 'block', 
       fontSize: '13px', 
       fontWeight: '600', 
-      color: '#475569', 
+      color: 'var(--ink-dim)', 
       marginBottom: '6px'
     },
     modalFooter: {
@@ -379,12 +379,12 @@ const Products = () => {
       justifyContent: "flex-end",
       gap: "12px",
       marginTop: "24px",
-      borderTop: "1px solid #f1f5f9",
+      borderTop: "1px solid var(--bg-subtle)",
       paddingTop: "16px",
     },
     saveBtn: {
       padding: "10px 20px",
-      color: "#ffffff",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -394,12 +394,12 @@ const Products = () => {
   };
 
   const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
+    e.currentTarget.style.borderColor = "var(--primary)";
     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
   };
 
   const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
+    e.currentTarget.style.borderColor = "var(--border-strong)";
     e.currentTarget.style.boxShadow = "none";
   };
 
@@ -507,8 +507,8 @@ const Products = () => {
                           <button
                             style={styles.deleteBtn}
                             onClick={() => handleDelete(p._id)}
-                            onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-                            onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
+                            onMouseOver={(e) => e.currentTarget.style.color = "var(--danger-strong)"}
+                            onMouseOut={(e) => e.currentTarget.style.color = "var(--danger-light)"}
                           >
                             Delete
                           </button>
@@ -548,7 +548,7 @@ const Products = () => {
                 </div>
                 <div style={styles.modalFooter}>
                   <button type="button" style={styles.actionBtn} onClick={() => setIsGroupOpen(false)}>Cancel</button>
-                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Group</button>
+                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "var(--primary)" }}>Add Group</button>
                 </div>
               </form>
             </div>
@@ -592,7 +592,7 @@ const Products = () => {
                 </div>
                 <div style={styles.modalFooter}>
                   <button type="button" style={styles.actionBtn} onClick={() => setIsUnitOpen(false)}>Cancel</button>
-                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Unit Setup</button>
+                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "var(--primary)" }}>Add Unit Setup</button>
                 </div>
               </form>
             </div>
@@ -604,7 +604,7 @@ const Products = () => {
           <div style={styles.modalOverlay}>
             <div style={{ ...styles.modalCard, ...styles.modalCardLarge }}>
               <div style={styles.modalHeader}>
-                <h3 style={{ ...styles.modalTitle, color: editingId ? '#2563eb' : '#0f172a' }}>
+                <h3 style={{ ...styles.modalTitle, color: editingId ? 'var(--primary)' : 'var(--ink)' }}>
                   {editingId ? '📝 Edit Product Parameters' : 'Product Details Entry'}
                 </h3>
                 <button style={styles.closeXBtn} onClick={() => { setIsProductOpen(false); clearForm(); }}>&times;</button>
@@ -681,7 +681,7 @@ const Products = () => {
                     disabled={loading}
                     style={{
                       ...styles.saveBtn,
-                      backgroundColor: loading ? "#93c5fd" : (editingId ? "#16a34a" : "#2563eb"),
+                      backgroundColor: loading ? "#93c5fd" : (editingId ? "var(--success)" : "var(--primary)"),
                       cursor: loading ? "not-allowed" : "pointer"
                     }}
                   >

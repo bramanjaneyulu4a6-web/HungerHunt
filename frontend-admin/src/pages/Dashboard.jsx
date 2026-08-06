@@ -144,7 +144,7 @@ const [selectedDate, setSelectedDate] = useState("");
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -155,13 +155,13 @@ const [selectedDate, setSelectedDate] = useState("");
     title: {
       fontSize: "28px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       letterSpacing: "-0.5px",
       margin: 0,
     },
     subtitle: {
       fontSize: "14px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "4px",
       marginBottom: 0,
     },
@@ -172,25 +172,25 @@ const [selectedDate, setSelectedDate] = useState("");
       marginBottom: "24px",
     },
     statCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "18px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
     },
     statLabel: {
       fontSize: "12px",
-      color: "#64748b",
+      color: "var(--muted)",
     },
     statValue: {
       fontSize: "22px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginTop: "6px",
     },
     section: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "20px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -206,7 +206,7 @@ const [selectedDate, setSelectedDate] = useState("");
     sectionTitle: {
       fontSize: "16px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
       margin: 0,
     },
     controlsGroup: {
@@ -218,9 +218,9 @@ const [selectedDate, setSelectedDate] = useState("");
     searchInput: {
       padding: "8px 14px",
       borderRadius: "8px",
-      border: "1px solid #cbd5e1",
-      backgroundColor: "#ffffff",
-      color: "#0f172a", /* FIX: Explicitly set text color so typed values are readable */
+      border: "1px solid var(--border-strong)",
+      backgroundColor: "var(--surface)",
+      color: "var(--ink)", /* FIX: Explicitly set text color so typed values are readable */
       fontSize: "14px",
       outline: "none",
       fontFamily: "inherit",
@@ -231,17 +231,17 @@ const [selectedDate, setSelectedDate] = useState("");
     dateInput: {
       padding: "8px 12px",
       borderRadius: "8px",
-      border: "1px solid #2563eb",
+      border: "1px solid var(--primary)",
       fontSize: "14px",
-      color: "#ffffff", /* Keeps white text on blue background */
+      color: "var(--on-dark)", /* Keeps white text on blue background */
       outline: "none",
       fontFamily: "inherit",
-      backgroundColor: "#2563eb",
+      backgroundColor: "var(--primary)",
       cursor: "pointer",
     },
     downloadBtn: {
-      backgroundColor: "#16a34a",
-      color: "#ffffff",
+      backgroundColor: "var(--success)",
+      color: "var(--on-dark)",
       border: "none",
       padding: "8px 16px",
       borderRadius: "8px",
@@ -257,7 +257,7 @@ const [selectedDate, setSelectedDate] = useState("");
       width: "100%",
       overflowX: "auto",
       borderRadius: "10px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
     },
     mainTable: {
       width: "100%",
@@ -266,52 +266,52 @@ const [selectedDate, setSelectedDate] = useState("");
       fontSize: "14px",
     },
     mainTh: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
+      backgroundColor: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       padding: "14px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
       fontSize: "13px",
     },
     mainTd: {
       padding: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--border)",
       verticalAlign: "middle",
     },
     sNoText: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontWeight: "500",
     },
     nameLink: {
-      color: "#2563eb",
+      color: "var(--primary)",
       fontWeight: "600",
       cursor: "pointer",
       display: "inline-block",
     },
     timeText: {
       fontSize: "13px",
-      color: "#64748b",
+      color: "var(--muted)",
     },
     amountText: {
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     statusBadge: {
       fontSize: "11px",
-      color: "#16a34a",
+      color: "var(--success)",
       fontWeight: "600",
-      backgroundColor: "#f0fdf4",
+      backgroundColor: "var(--success-bg)",
       padding: "4px 10px",
       borderRadius: "8px",
       display: "inline-block",
-      border: "1px solid #bbf7d0",
+      border: "1px solid var(--success-border)",
     },
     expandedContainer: {
       padding: "16px",
-      background: "#ffffff",
+      background: "var(--surface)",
       borderRadius: "10px",
-      border: "1px solid #cbd5e1",
+      border: "1px solid var(--border-strong)",
       boxSizing: "border-box",
       margin: "4px 0 12px 0",
       boxShadow:
@@ -321,7 +321,7 @@ const [selectedDate, setSelectedDate] = useState("");
       display: "block",
       fontSize: "13px",
       fontWeight: "700",
-      color: "#1e293b",
+      color: "var(--ink-strong)",
       marginBottom: "12px",
       letterSpacing: "0.2px",
     },
@@ -332,26 +332,26 @@ const [selectedDate, setSelectedDate] = useState("");
       fontSize: "13px",
     },
     subTh: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
+      backgroundColor: "var(--bg)",
+      color: "var(--ink-dim)",
       fontWeight: "600",
       padding: "10px 12px",
-      borderBottom: "1px solid #e2e8f0",
-      borderTop: "1px solid #e2e8f0",
+      borderBottom: "1px solid var(--border)",
+      borderTop: "1px solid var(--border)",
     },
     subTd: {
       padding: "10px 12px",
-      color: "#0f172a",
-      borderBottom: "1px solid #f1f5f9",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--bg-subtle)",
     },
     textMuted: {
-      color: "#64748b",
+      color: "var(--muted)",
     },
     textBold: {
       fontWeight: "600",
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       textAlign: "center",
       padding: "40px 0",
@@ -409,8 +409,8 @@ const [selectedDate, setSelectedDate] = useState("");
               style={styles.searchInput}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#cbd5e1")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-strong)")}
             />
 
             {/* Calendar Input Field */}
@@ -426,10 +426,10 @@ const [selectedDate, setSelectedDate] = useState("");
               style={styles.downloadBtn}
               onClick={downloadExcel}
               onMouseOver={(e) =>
-                (e.currentTarget.style.backgroundColor = "#15803d")
+                (e.currentTarget.style.backgroundColor = "var(--success-strong)")
               }
               onMouseOut={(e) =>
-                (e.currentTarget.style.backgroundColor = "#16a34a")
+                (e.currentTarget.style.backgroundColor = "var(--success)")
               }
             >
               📊 Export Sheet
@@ -472,17 +472,17 @@ const [selectedDate, setSelectedDate] = useState("");
                       <tr
                         style={{
                           backgroundColor: isExpanded
-                            ? "#f1f5f9"
+                            ? "var(--bg-subtle)"
                             : "transparent",
                           transition: "background-color 0.2s",
                         }}
                         onMouseOver={(e) => {
                           if (!isExpanded)
-                            e.currentTarget.style.backgroundColor = "#f8fafc";
+                            e.currentTarget.style.backgroundColor = "var(--bg)";
                         }}
                         onMouseOut={(e) => {
                           e.currentTarget.style.backgroundColor = isExpanded
-                            ? "#f1f5f9"
+                            ? "var(--bg-subtle)"
                             : "transparent";
                         }}
                       >
@@ -528,7 +528,7 @@ const [selectedDate, setSelectedDate] = useState("");
                             style={{
                               ...styles.mainTd,
                               padding: "0 20px",
-                              backgroundColor: "#f1f5f9",
+                              backgroundColor: "var(--bg-subtle)",
                             }}
                           >
                             <div style={styles.expandedContainer}>

@@ -299,7 +299,7 @@ const fetchCatalog = async () => {
   const styles = {
     page: {
       minHeight: "100vh",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
       padding: "32px",
       fontFamily: "system-ui, -apple-system, sans-serif",
       boxSizing: "border-box",
@@ -314,8 +314,8 @@ const fetchCatalog = async () => {
       alignItems: "start",
     },
     card: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "14px",
       padding: "20px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
@@ -329,18 +329,18 @@ const fetchCatalog = async () => {
     panelTitle: {
       fontSize: "30px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
       marginTop: 0,
       marginBottom: "16px",
     },
     input: {
       flex: 1,
       padding: "12px 14px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
+      color: "var(--ink)",
+      backgroundColor: "var(--surface)",
       outline: "none",
       transition: "border-color 0.2s",
       boxSizing: "border-box",
@@ -348,11 +348,11 @@ const fetchCatalog = async () => {
     productSearchInput: {
       width: "100%",
       padding: "10px 12px",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "8px",
       fontSize: "13px",
-      color: "#0f172a",
-      backgroundColor: "#f8fafc",
+      color: "var(--ink)",
+      backgroundColor: "var(--bg)",
       outline: "none",
       transition: "border-color 0.2s, background-color 0.2s",
       boxSizing: "border-box",
@@ -360,8 +360,8 @@ const fetchCatalog = async () => {
     },
     primaryBtn: {
       padding: "12px 24px",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -376,7 +376,7 @@ const fetchCatalog = async () => {
     resultsTitle: {
       fontSize: "15px",
       fontWeight: "600",
-      color: "#1e293b",
+      color: "var(--ink-strong)",
       marginBottom: "12px",
     },
     table: {
@@ -386,12 +386,12 @@ const fetchCatalog = async () => {
       textAlign: "left",
     },
     th: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
+      backgroundColor: "var(--bg-subtle)",
+      color: "var(--ink-soft)",
       fontWeight: "600",
       padding: "12px",
       fontSize: "13px",
-      borderBottom: "2px solid #e2e8f0",
+      borderBottom: "2px solid var(--border)",
     },
     tr: {
       cursor: "pointer",
@@ -400,13 +400,13 @@ const fetchCatalog = async () => {
     td: {
       padding: "12px",
       fontSize: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
+      color: "var(--ink)",
+      borderBottom: "1px solid var(--border)",
     },
     selectBtn: {
       padding: "6px 12px",
       background: "#0284c7",
-      color: "#ffffff",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "6px",
       fontWeight: "600",
@@ -419,15 +419,15 @@ const fetchCatalog = async () => {
       alignItems: "center",
       marginTop: "16px",
       paddingTop: "16px",
-      borderTop: "1px solid #f1f5f9",
+      borderTop: "1px solid var(--bg-subtle)",
     },
     studentInlineBanner: {
       display: "flex",
       gap: "16px",
       fontSize: "14px",
-      color: "#475569",
+      color: "var(--ink-dim)",
       fontWeight: "500",
-      backgroundColor: "#f1f5f9",
+      backgroundColor: "var(--bg-subtle)",
       padding: "10px 14px",
       borderRadius: "8px",
       marginBottom: "16px",
@@ -435,17 +435,17 @@ const fetchCatalog = async () => {
     studentName: {
       fontSize: "15px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     studentMeta: {
       fontSize: "13px",
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontWeight: "500",
     },
     walletBadge: {
       padding: "8px 14px",
-      background: "#fef3c7",
-      color: "#92400e",
+      background: "var(--warn-bg)",
+      color: "var(--warn-ink)",
       borderRadius: "8px",
       fontSize: "14px",
       fontWeight: "600",
@@ -461,19 +461,19 @@ const fetchCatalog = async () => {
       justifyContent: "space-between",
       alignItems: "center",
       padding: "12px 14px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
       borderRadius: "10px",
       marginBottom: "10px",
     },
     productName: {
       fontWeight: "600",
       fontSize: "14px",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     productStock: {
       fontSize: "12px",
-      color: "#64748b",
+      color: "var(--muted)",
       marginTop: "2px",
     },
     actionControlWrap: {
@@ -484,17 +484,17 @@ const fetchCatalog = async () => {
     qtySelector: {
       display: "flex",
       alignItems: "center",
-      border: "1px solid #e2e8f0",
+      border: "1px solid var(--border)",
       borderRadius: "8px",
       overflow: "hidden",
-      backgroundColor: "#f8fafc",
+      backgroundColor: "var(--bg)",
     },
     qtyBtn: {
       width: "32px",
       height: "32px",
       border: "none",
       background: "transparent",
-      color: "#334155",
+      color: "var(--ink-soft)",
       fontSize: "16px",
       fontWeight: "600",
       cursor: "pointer",
@@ -508,19 +508,19 @@ const fetchCatalog = async () => {
       height: "32px",
       borderTop: "none",
       borderBottom: "none",
-      borderLeft: "1px solid #e2e8f0",
-      borderRight: "1px solid #e2e8f0",
-      background: "#ffffff",
+      borderLeft: "1px solid var(--border)",
+      borderRight: "1px solid var(--border)",
+      background: "var(--surface)",
       textAlign: "center",
       fontSize: "13px",
       fontWeight: "600",
-      color: "#0f172a",
+      color: "var(--ink)",
       outline: "none",
     },
     addBtn: {
       padding: "8px 14px",
-      background: "#2563eb",
-      color: "#ffffff",
+      background: "var(--primary)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "8px",
       fontWeight: "600",
@@ -531,7 +531,7 @@ const fetchCatalog = async () => {
     checkoutSection: {
       marginTop: "24px",
       paddingTop: "16px",
-      borderTop: "1px solid #e2e8f0",
+      borderTop: "1px solid var(--border)",
     },
     totalRow: {
       display: "flex",
@@ -541,16 +541,16 @@ const fetchCatalog = async () => {
     totalLabel: {
       fontSize: "16px",
       fontWeight: "600",
-      color: "#64748b",
+      color: "var(--muted)",
     },
     totalAmount: {
       fontSize: "22px",
       fontWeight: "700",
-      color: "#0f172a",
+      color: "var(--ink)",
     },
     remainingBalance: (isNegative) => ({
       fontSize: "13px",
-      color: isNegative ? "#dc2626" : "#16a34a",
+      color: isNegative ? "var(--danger)" : "var(--success)",
       fontWeight: "500",
       marginTop: "4px",
       textAlign: "right",
@@ -563,8 +563,8 @@ const fetchCatalog = async () => {
     successBtn: {
       flex: 1,
       padding: "12px",
-      background: "#16a34a",
-      color: "#ffffff",
+      background: "var(--success)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -574,8 +574,8 @@ const fetchCatalog = async () => {
     },
     cancelBtn: {
       padding: "12px 20px",
-      background: "#dc2626",
-      color: "#ffffff",
+      background: "var(--danger)",
+      color: "var(--on-dark)",
       border: "none",
       borderRadius: "10px",
       fontWeight: "600",
@@ -584,13 +584,13 @@ const fetchCatalog = async () => {
       transition: "background-color 0.2s",
     },
     highlightPrice: {
-      color: "#0f172a",
+      color: "var(--ink)",
       fontWeight: "700",
       fontSize: "14px",
       marginRight: "8px",
     },
     emptyState: {
-      color: "#64748b",
+      color: "var(--muted)",
       fontSize: "14px",
       margin: 0,
     },
@@ -600,25 +600,25 @@ const fetchCatalog = async () => {
       textAlign: "center",
       fontSize: "13px",
       fontWeight: "600",
-      color: "#0f172a",
-      border: "1px solid #cbd5e1",
+      color: "var(--ink)",
+      border: "1px solid var(--border-strong)",
       borderRadius: "4px",
       outline: "none",
-      backgroundColor: "#ffffff",
+      backgroundColor: "var(--surface)",
     },
     cartQtyBtn: {
       width: "24px",
       height: "24px",
       borderRadius: "4px",
-      border: "1px solid #cbd5e1",
-      background: "#f8fafc",
+      border: "1px solid var(--border-strong)",
+      background: "var(--bg)",
       cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
       fontWeight: "700",
       fontSize: "12px",
-      color: "#475569",
+      color: "var(--ink-dim)",
     },
     removeBtn: {
       width: "26px",
@@ -626,8 +626,8 @@ const fetchCatalog = async () => {
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "#fee2e2",
-      color: "#ef4444",
+      background: "var(--danger-bg-strong)",
+      color: "var(--danger-light)",
       border: "none",
       borderRadius: "6px",
       fontSize: "16px",
@@ -647,30 +647,30 @@ const fetchCatalog = async () => {
           height: 10px;
         }
         ::-webkit-scrollbar-track {
-          background: #f1f5f9;
+          background: var(--bg-subtle);
           border-radius: 8px;
         }
         ::-webkit-scrollbar-thumb {
-          background: #2563eb;
+          background: var(--primary);
           border-radius: 8px;
-          border: 2px solid #f1f5f9;
+          border: 2px solid var(--bg-subtle);
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: #1d4ed8;
+          background: var(--primary-hover);
         }
         .product-scroll-panel::-webkit-scrollbar {
           width: 6px;
         }
         .product-scroll-panel::-webkit-scrollbar-track {
-          background: #f8fafc;
+          background: var(--bg);
           border-radius: 4px;
         }
         .product-scroll-panel::-webkit-scrollbar-thumb {
-          background: #3b82f6;
+          background: var(--primary-light);
           border-radius: 4px;
         }
         .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-          background: #2563eb;
+          background: var(--primary);
         }
       `}</style>
 
@@ -685,15 +685,15 @@ const fetchCatalog = async () => {
               placeholder="Search student profile by name or hostel number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
               onKeyDown={(e) => e.key === 'Enter' && handleStudentSearch()}
             />
             <button
               style={styles.primaryBtn}
               onClick={handleStudentSearch}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
+              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
             >
               Search
             </button>
@@ -723,7 +723,7 @@ const fetchCatalog = async () => {
                         setSearchResults([]);
                         fetchCatalog();
                       }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
                       <td style={styles.td}><strong>{student.name}</strong></td>
@@ -745,9 +745,9 @@ const fetchCatalog = async () => {
             <div style={styles.studentRowDetails}>
               <div>
                 <span style={styles.studentName}>{selectedStudent.name}</span>
-                <span style={{ color: "#cbd5e1", margin: "0 8px" }}>|</span>
+                <span style={{ color: "var(--border-strong)", margin: "0 8px" }}>|</span>
                 <span style={styles.studentMeta}>Hostel: {selectedStudent.hostelNumber || "N/A"}</span>
-                <span style={{ color: "#cbd5e1", margin: "0 8px" }}>|</span>
+                <span style={{ color: "var(--border-strong)", margin: "0 8px" }}>|</span>
                 <span style={styles.studentMeta}>Father: {selectedStudent.fatherName}</span>
               </div>
               <div style={styles.walletBadge}>
@@ -780,12 +780,12 @@ const fetchCatalog = async () => {
               value={productSearchQuery}
               onChange={(e) => setProductSearchQuery(e.target.value)}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#2563eb";
-                e.currentTarget.style.backgroundColor = "#ffffff";
+                e.currentTarget.style.borderColor = "var(--primary)";
+                e.currentTarget.style.backgroundColor = "var(--surface)";
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e2e8f0";
-                e.currentTarget.style.backgroundColor = "#f8fafc";
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.backgroundColor = "var(--bg)";
               }}
             />
 
@@ -812,7 +812,7 @@ const fetchCatalog = async () => {
                             style={styles.qtyBtn} 
                             type="button"
                             onClick={() => updateStagedQuantity(p._id, -1, p.stock)}
-                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e2e8f0")}
+                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--border)")}
                             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                           >-</button>
                           <input 
@@ -825,7 +825,7 @@ const fetchCatalog = async () => {
                             style={styles.qtyBtn} 
                             type="button"
                             onClick={() => updateStagedQuantity(p._id, 1, p.stock)}
-                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e2e8f0")}
+                            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--border)")}
                             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                           >+</button>
                         </div>
@@ -833,8 +833,8 @@ const fetchCatalog = async () => {
                         <button
                           style={styles.addBtn}
                           onClick={() => addToCart(p)}
-                          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-                          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+                          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
+                          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
                         >
                           Add
                         </button>
@@ -877,7 +877,7 @@ const fetchCatalog = async () => {
                     <tbody>
                       {cart.map((item, index) => (
                         <tr key={item._id}>
-                          <td style={{ ...styles.td, padding: "10px 4px", color: "#64748b" }}>
+                          <td style={{ ...styles.td, padding: "10px 4px", color: "var(--muted)" }}>
                             {index + 1}
                           </td>
                           <td style={{ ...styles.td, padding: "10px 4px", fontWeight: "500" }}>
@@ -914,12 +914,12 @@ const fetchCatalog = async () => {
                               style={styles.removeBtn} 
                               onClick={() => removeFromCart(item._id)}
                               onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor = "#ef4444";
-                                e.currentTarget.style.color = "#ffffff";
+                                e.currentTarget.style.backgroundColor = "var(--danger-light)";
+                                e.currentTarget.style.color = "var(--surface)";
                               }}
                               onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor = "#fee2e2";
-                                e.currentTarget.style.color = "#ef4444";
+                                e.currentTarget.style.backgroundColor = "var(--danger-bg-strong)";
+                                e.currentTarget.style.color = "var(--danger-light)";
                               }}
                               title="Remove item"
                             >
@@ -950,8 +950,8 @@ const fetchCatalog = async () => {
                   <button
                     style={styles.cancelBtn}
                     onClick={handleCancelPayment}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
-                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#dc2626")}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-strong)")}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--danger)")}
                   >
                     Cancel Payment
                   </button>
@@ -964,8 +964,8 @@ const fetchCatalog = async () => {
                       }
                       setShowVerifyModal(true);
                     }}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#15803d")}
-                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#16a34a")}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--success-strong)")}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--success)")}
                     disabled={cart.length === 0 || (selectedStudent.pocketMoney - invoiceTotal < 0)}
                   >
                     Complete Payment
@@ -1000,7 +1000,7 @@ const fetchCatalog = async () => {
               left: "50%",
               transform: "translate(-50%,-50%)",
               width: 430,
-              background: "#fff",
+              background: "var(--surface)",
               borderRadius: 18,
               padding: 30,
               zIndex: 1001,
@@ -1087,8 +1087,8 @@ const fetchCatalog = async () => {
                   padding: 14,
                   borderRadius: 10,
                   border: "none",
-                  background: "#16A34A",
-                  color: "#fff",
+                  background: "var(--success)",
+                  color: "var(--on-dark)",
                   cursor: "pointer"
                 }}
                 onClick={async () => {

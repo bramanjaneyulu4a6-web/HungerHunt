@@ -43,7 +43,7 @@ navigate("/");
       {/* Inline Scoped CSS Stylesheet */}
       <style>{`
         html, body, #root {
-          background-color: #ffffff !important;
+          background-color: var(--surface) !important;
           margin: 0 !important;
           padding: 0 !important;
           height: 100vh !important;
@@ -57,7 +57,7 @@ navigate("/");
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #ffffff !important;
+          background: var(--surface) !important;
           font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           box-sizing: border-box;
           padding: 24px;
@@ -66,7 +66,7 @@ navigate("/");
         .login-card {
           width: 100%;
           max-width: 400px;
-          background-color: #ffffff;
+          background-color: var(--surface);
           padding: 12px 0px;
           box-sizing: border-box;
           border: none !important;
@@ -85,14 +85,14 @@ navigate("/");
         .login-title {
           font-size: 32px;
           font-weight: 800;
-          color: #0f172a;
+          color: var(--ink);
           margin: 0;
           letter-spacing: -0.75px;
         }
 
         .login-subtitle {
           font-size: 14px;
-          color: #64748b;
+          color: var(--muted);
           margin-top: 10px;
           margin-bottom: 0;
           line-height: 1.5;
@@ -102,9 +102,9 @@ navigate("/");
           display: flex;
           align-items: center;
           gap: 10px;
-          background-color: #fff1f2;
-          border: 1px solid #ffe4e6;
-          color: #be123c;
+          background-color: var(--alert-bg);
+          border: 1px solid var(--alert-border);
+          color: var(--alert);
           padding: 14px 16px;
           border-radius: 12px;
           margin-bottom: 28px;
@@ -114,7 +114,7 @@ navigate("/");
         .error-icon {
           width: 18px;
           height: 18px;
-          color: #f43f5e;
+          color: var(--alert-light);
           flex-shrink: 0;
         }
 
@@ -141,18 +141,18 @@ navigate("/");
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.75px;
-          color: #475569;
+          color: var(--ink-dim);
           text-align: center;
         }
 
         .form-input {
           width: 100%;
           padding: 14px 16px;
-          background-color: #f8fafc;
-          border: 1px solid #e2e8f0;
+          background-color: var(--bg);
+          border: 1px solid var(--border);
           border-radius: 12px;
           font-size: 15px;
-          color: #0f172a;
+          color: var(--ink);
           outline: none;
           transition: all 0.15s ease-in-out;
           box-sizing: border-box;
@@ -160,25 +160,25 @@ navigate("/");
         }
 
         .form-input::placeholder {
-          color: #94a3b8;
+          color: var(--muted-soft);
         }
 
         .form-input:focus {
-          background-color: #ffffff;
-          border-color: #2563eb;
-          box-shadow: 0 0 0 4px #dbeafe;
+          background-color: var(--surface);
+          border-color: var(--primary);
+          box-shadow: 0 0 0 4px var(--primary-bg);
         }
 
         .forgot-link, .register-link {
           font-size: 13px;
           font-weight: 600;
-          color: #2563eb;
+          color: var(--primary);
           text-decoration: none;
           transition: color 0.15s ease;
         }
 
         .forgot-link:hover, .register-link:hover {
-          color: #1d4ed8;
+          color: var(--primary-hover);
         }
 
         .register-link {
@@ -188,8 +188,8 @@ navigate("/");
 
         .submit-btn {
           width: 100%;
-          background-color: #0f172a;
-          color: #ffffff;
+          background-color: var(--ink);
+          color: var(--on-dark);
           padding: 15px 16px;
           border: none;
           border-radius: 12px;
@@ -201,7 +201,7 @@ navigate("/");
         }
 
         .submit-btn:hover {
-          background-color: #1e293b;
+          background-color: var(--ink-strong);
         }
 
         .submit-btn:active {
@@ -212,7 +212,7 @@ navigate("/");
           margin-top: 36px;
           text-align: center;
           font-size: 14px;
-          color: #64748b;
+          color: var(--muted);
         }
       `}</style>
 

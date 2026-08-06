@@ -389,459 +389,9 @@ const categories = [
     products.map(p => p.stockGroup?.name).filter(Boolean)
   ),
 ];
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "var(--bg)",
-      padding: "32px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box",
-    },
-    topSection: {
-      marginBottom: "24px",
-    },
-   bottomGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-},
-    card: {
-      width: "100%",
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "14px",
-      padding: "20px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      boxSizing: "border-box",
-    },
-    lookupFlex: {
-      display: "flex",
-      gap: "16px",
-      alignItems: "center",
-    },
-   panelTitle: {
-  fontSize: "42px",
-  fontWeight: "900",
-  fontFamily: "'Poppins', sans-serif",
-  color: "#033d6c",
-  letterSpacing: "2px",
-  // textTransform: "uppercase",
-  textShadow: "2px 2px 6px rgba(66, 55, 10, 0.25)",
-  marginTop: 0,
-  marginBottom: "16px",
-},
-    input: {
-      flex: 1,
-      padding: "12px 14px",
-      border: "1px solid var(--border)",
-      borderRadius: "10px",
-      fontSize: "14px",
-      color: "var(--ink)",
-      backgroundColor: "var(--surface)",
-      outline: "none",
-      transition: "border-color 0.2s",
-      boxSizing: "border-box",
-    },
-    productSearchInput: {
-      width: "100%",
-      padding: "10px 12px",
-      border: "1px solid var(--border)",
-      borderRadius: "8px",
-      fontSize: "13px",
-      color: "var(--ink)",
-      backgroundColor: "var(--bg)",
-      outline: "none",
-      transition: "border-color 0.2s, background-color 0.2s",
-      boxSizing: "border-box",
-      marginBottom: "16px",
-    },
-    primaryBtn: {
-      padding: "12px 24px",
-      background: "orange",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-      whiteSpace: "nowrap",
-    },
-    resultsSection: {
-      marginTop: "20px",
-    },
-    resultsTitle: {
-      fontSize: "15px",
-      fontWeight: "600",
-      color: "var(--ink-strong)",
-      marginBottom: "12px",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      marginTop: "8px",
-      textAlign: "left",
-    },
-    th: {
-      backgroundColor: "var(--bg-subtle)",
-      color: "var(--ink-soft)",
-      fontWeight: "600",
-      padding: "12px",
-      fontSize: "13px",
-      borderBottom: "2px solid var(--border)",
-    },
-    tr: {
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    td: {
-      padding: "12px",
-      fontSize: "14px",
-      color: "var(--ink)",
-      borderBottom: "1px solid var(--border)",
-    },
-    selectBtn: {
-      padding: "6px 12px",
-      background: "#0284c7",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "6px",
-      fontWeight: "600",
-      fontSize: "12px",
-      cursor: "pointer",
-    },
-    studentRowDetails: {
-      display: "flex",
-      gap: "24px",
-      alignItems: "center",
-      marginTop: "16px",
-      paddingTop: "16px",
-      borderTop: "1px solid var(--bg-subtle)",
-    },
-    studentInlineBanner: {
-      display: "flex",
-      gap: "16px",
-      fontSize: "14px",
-      color: "var(--ink-dim)",
-      fontWeight: "500",
-      backgroundColor: "var(--bg-subtle)",
-      padding: "10px 14px",
-      borderRadius: "8px",
-      marginBottom: "16px",
-    },
-    studentName: {
-      fontSize: "15px",
-      fontWeight: "600",
-      color: "var(--ink)",
-    },
-    studentMeta: {
-      fontSize: "13px",
-      color: "var(--ink-soft)",
-      fontWeight: "500",
-    },
-    walletBadge: {
-      padding: "8px 14px",
-      background: "var(--warn-bg)",
-      color: "var(--warn-ink)",
-      borderRadius: "8px",
-      fontSize: "14px",
-      fontWeight: "600",
-      marginLeft: "auto",
-    },
-    scrollContainer: {
-  maxHeight: "750px",
-      overflowY: "auto",
-      paddingRight: "6px",
-    },
-    productItem: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "10px",
-      marginBottom: "10px",
-    },
-    productName: {
-      fontWeight: "600",
-      fontSize: "14px",
-      color: "var(--ink)",
-    },
-    productStock: {
-      fontSize: "12px",
-      color: "var(--muted)",
-      marginTop: "2px",
-    },
-    actionControlWrap: {
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-    },
-    qtySelector: {
-      display: "flex",
-      alignItems: "center",
-      border: "1px solid var(--border)",
-      borderRadius: "8px",
-      overflow: "hidden",
-      backgroundColor: "var(--bg)",
-    },
-    qtyBtn: {
-      width: "32px",
-      height: "32px",
-      border: "none",
-      background: "transparent",
-      color: "var(--ink-soft)",
-      fontSize: "16px",
-      fontWeight: "600",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "background-color 0.15s",
-    },
-    qtyInput: {
-      width: "40px",
-      height: "32px",
-      borderTop: "none",
-      borderBottom: "none",
-      borderLeft: "1px solid var(--border)",
-      borderRight: "1px solid var(--border)",
-      background: "var(--surface)",
-      textAlign: "center",
-      fontSize: "13px",
-      fontWeight: "600",
-      color: "var(--ink)",
-      outline: "none",
-    },
-    addBtn: {
-      padding: "8px 14px",
-      background: "var(--primary)",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "8px",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    
-    checkoutSection: {
-      marginTop: "24px",
-      paddingTop: "16px",
-      borderTop: "1px solid var(--border)",
-    },
-    totalRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    totalLabel: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "var(--muted)",
-    },
-    totalAmount: {
-      fontSize: "22px",
-      fontWeight: "700",
-      color: "var(--ink)",
-    },
-    remainingBalance: (isNegative) => ({
-      fontSize: "13px",
-      color: isNegative ? "var(--danger)" : "var(--success)",
-      fontWeight: "500",
-      marginTop: "4px",
-      textAlign: "right",
-    }),
-    btnActionGroup: {
-      display: "flex",
-      gap: "12px",
-      marginTop: "16px",
-    },
-    successBtn: {
-      flex: 1,
-      padding: "12px",
-      background: "var(--success)",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    cancelBtn: {
-      padding: "12px 20px",
-      background: "var(--danger)",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    highlightPrice: {
-      color: "var(--ink)",
-      fontWeight: "700",
-      fontSize: "14px",
-      marginRight: "8px",
-    },
-    emptyState: {
-      color: "var(--muted)",
-      fontSize: "14px",
-      margin: 0,
-    },
-    cartQtyText: {
-      width: "35px",
-      height: "24px",
-      textAlign: "center",
-      fontSize: "13px",
-      fontWeight: "600",
-      color: "var(--ink)",
-      border: "1px solid var(--border-strong)",
-      borderRadius: "4px",
-      outline: "none",
-      backgroundColor: "var(--surface)",
-    },
-    cartQtyBtn: {
-      width: "24px",
-      height: "24px",
-      borderRadius: "4px",
-      border: "1px solid var(--border-strong)",
-      background: "var(--bg)",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: "700",
-      fontSize: "12px",
-      color: "var(--ink-dim)",
-    },
-    removeBtn: {
-  width: "26px",
-  height: "26px",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "var(--danger-bg-strong)",
-  color: "var(--danger-light)",
-  border: "none",
-  borderRadius: "6px",
-  fontSize: "16px",
-  fontWeight: "600",
-  cursor: "pointer",
-  transition: "all 0.2s ease",
-  lineHeight: "1",
-  padding: 0,
-},
-
-welcomeScreen: {
-  minHeight: "100vh",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-  alignItems: "center",
-  textAlign: "center",
-
-  background:
-    "linear-gradient(135deg,#FF6B35 0%, var(--warn) 50%, #FACC15 100%)",
-
-  color: "var(--on-dark)",
-  overflow: "hidden",
-},
-
-welcomeTitle: {
-  fontSize: "72px",
-  fontWeight: "900",
-  letterSpacing: "2px",
-  color: "var(--on-dark)",
-  textShadow: "3px 3px 10px rgba(0,0,0,.25)",
-  marginTop: 25,
-  marginBottom: 15,
-},
-
-welcomeSubTitle: {
-  fontSize: "28px",
-  fontWeight: "500",
-  color: "#FFF7ED",
-  // marginBottom: "45px",
-},
-
-startButton: {
-  padding: "22px 85px",
-  fontSize: "28px",
-  fontWeight: "700",
-  border: "none",
-  borderRadius: "60px",
-  background: "var(--surface)",
-  color: "#EA580C",
-  cursor: "pointer",
-  boxShadow: "0 15px 30px rgba(0,0,0,.25)",
-  transition: ".3s",
-  marginTop: 0,       // remove top margin
-},
-
-
-
-productGrid: {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-  gap: 22,
-},
-
-productCard: {
-  background: "var(--surface)",
-  borderRadius: 18,
-  overflow: "hidden",
-  boxShadow: "0 8px 25px rgba(0,0,0,.08)",
-  border: "1px solid #eee",
-  transition: ".25s",
-},
-
-productImage: {
-  width: "100%",
-  height: 180,
-  objectFit: "cover",
-},
-
-productBody: {
-  padding: 15,
-},
-
-productTitle: {
-  fontWeight: 700,
-  fontSize: 18,
-  marginBottom: 8,
-},
-
-priceText: {
-  color: "var(--primary)",
-  fontWeight: 700,
-  fontSize: 20,
-},
-
-stockBadge: {
-  display: "inline-block",
-  background: "var(--success-bg-strong)",
-  color: "var(--success-deep)",
-  padding: "4px 10px",
-  borderRadius: 20,
-  fontSize: 12,
-  marginTop: 6,
-},
-
-cardFooter: {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 14,
-},
-
-    
-  };
 if (showWelcome) {
   return (
-    <div style={styles.welcomeScreen}>
+    <div className="kiosk-welcome">
       
      <img
   src={hungerLogo}
@@ -854,7 +404,7 @@ if (showWelcome) {
   }}
 />
 
-{/* <h1 style={styles.welcomeTitle}>
+{/* <h1 className="kiosk-welcome-title">
   HUNGER HUNT
 </h1> */}
 
@@ -880,13 +430,7 @@ if (showWelcome) {
   
   </p> */}
 
-  <button
-    style={{
-      ...styles.startButton,
-      marginTop: 0,
-    }}
-    onClick={() => setShowWelcome(false)}
-  >
+  <button className="kiosk-start" onClick={() => setShowWelcome(false)}>
     START ORDER
   </button>
 </div>
@@ -894,7 +438,7 @@ if (showWelcome) {
   );
 }
   return (
-    <div style={styles.page}>
+    <div className="page">
       <style>{`
         ::-webkit-scrollbar {
           width: 10px;
@@ -931,9 +475,9 @@ if (showWelcome) {
       
 
       {/* BOTTOM SECTION - DUAL SIDE-BY-SIDE PANEL */}
-      <div style={styles.bottomGrid}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
           {/* LEFT SIDE: AVAILABLE PRODUCTS */}
-          <div style={styles.card}>
+          <div className="card">
             <div
   style={{
     display: "flex",
@@ -950,7 +494,7 @@ if (showWelcome) {
     marginBottom: "16px",
   }}
 >
-  <h3 style={{ ...styles.panelTitle, marginBottom: 0 }}>
+  <h3 className="kiosk-title" style={{ marginBottom: 0 }}>
     Hunger Hunt
   </h3>
 
@@ -1065,7 +609,7 @@ if (showWelcome) {
             )}
 
             <input
-              style={styles.productSearchInput}
+              className="kiosk-search"
               placeholder="🔍 Quick filter products by name..."
               value={productSearchQuery}
               onChange={(e) => setProductSearchQuery(e.target.value)}
@@ -1079,7 +623,7 @@ if (showWelcome) {
               }}
             />
 
-            <div className="product-scroll-panel" style={styles.scrollContainer}>
+            <div className="product-scroll-panel" className="kiosk-scroll">
               {loadingProducts ? (
   <div
     style={{
@@ -1094,17 +638,11 @@ if (showWelcome) {
     Loading Products...
   </div>
 ) : filteredProducts.length === 0 ? (
-  <p
-    style={{
-      ...styles.emptyState,
-      textAlign: "center",
-      padding: "20px 0",
-    }}
-  >
+  <p className="kiosk-empty" style={{ textAlign: "center", padding: "20px 0" }}>
     No active items match your product filters.
   </p>
 ) : (
-                <div style={styles.productGrid}>
+                <div className="kiosk-grid">
   {filteredProducts.map((p) => {
 
     const cartItem = cart.find(item => item._id === p._id);
@@ -1116,15 +654,15 @@ if (showWelcome) {
 
     return (
 
-      <div key={p._id} style={styles.productCard}>
+      <div key={p._id} className="kiosk-product">
 
         <img
           src={p.image || "https://placehold.co/400x300?text=No+Image"}
           alt={p.name}
-          style={styles.productImage}
+          className="kiosk-product-img"
         />
 
-        <div style={styles.productBody}>
+        <div className="kiosk-product-body">
 <div
   style={{
     fontSize: "18px",
@@ -1168,12 +706,12 @@ if (showWelcome) {
   </div>
 </div>
 
-          <div style={styles.cardFooter}>
+          <div className="kiosk-card-footer">
 
-            <div style={styles.qtySelector}>
+            <div className="kiosk-qty">
 
               <button
-                style={styles.qtyBtn}
+                className="kiosk-qty-btn"
                 onClick={() => {
                   if (cartItem)
                     updateCartItemQuantity(p._id, -1);
@@ -1186,7 +724,7 @@ if (showWelcome) {
 
               <input
                 value={currentQty}
-                style={styles.qtyInput}
+                className="kiosk-qty-input"
                 onChange={(e) => {
                   if (cartItem)
                     handleCartManualQuantityChange(
@@ -1203,7 +741,7 @@ if (showWelcome) {
               />
 
               <button
-                style={styles.qtyBtn}
+                className="kiosk-qty-btn"
                 onClick={() => {
                   if (cartItem)
                     updateCartItemQuantity(p._id, 1);
@@ -1217,7 +755,7 @@ if (showWelcome) {
             </div>
 
             <button
-              style={styles.addBtn}
+              className="btn btn--primary btn--sm"
               onClick={() => addToCart(p)}
             >
               Add
@@ -1290,44 +828,44 @@ if (showWelcome) {
         </button>
       </div>
 
-      <div style={styles.lookupFlex}>
+      <div className="kiosk-lookup">
   <input
-    style={styles.input}
+    className="kiosk-input"
     placeholder="Search Student Name / Hostel Number"
     value={searchQuery}
     onChange={(e) => setSearchQuery(e.target.value)}
   />
 
   <button
-    style={styles.primaryBtn}
+    className="btn btn--brand"
     onClick={handleStudentSearch}
   >
     Search
   </button>
 </div>
 {searchResults.length > 0 && (
-  <div style={styles.resultsSection}>
-    <table style={styles.table}>
+  <div className="kiosk-results">
+    <table className="kiosk-table">
       <thead>
         <tr>
-          <th style={styles.th}>Student</th>
-          <th style={styles.th}>Hostel</th>
-          <th style={styles.th}></th>
+          <th>Student</th>
+          <th>Hostel</th>
+          <th></th>
         </tr>
       </thead>
 
       <tbody>
         {searchResults.map((student) => (
           <tr key={student._id}>
-            <td style={styles.td}>{student.name}</td>
+            <td>{student.name}</td>
 
-            <td style={styles.td}>
+            <td>
               {student.hostelNumber}
             </td>
 
-            <td style={styles.td}>
+            <td>
               <button
-                style={styles.selectBtn}
+                className="btn btn--primary btn--sm"
                 onClick={() => {
                   setSelectedStudent(student);
                   setSearchResults([]);
@@ -1422,17 +960,17 @@ if (showWelcome) {
 )}
 
       {cart.length === 0 ? (
-  <p style={styles.emptyState}>Cart is empty.</p>
+  <p className="kiosk-empty">Cart is empty.</p>
 ) : (
-  <table style={styles.table}>
+  <table className="kiosk-table">
     <thead>
   <tr>
-    <th style={styles.th}>Image</th>
-    <th style={styles.th}>Product Name</th>
-    <th style={styles.th}>Unit Price</th>
-    <th style={styles.th}>Quantity</th>
-    <th style={styles.th}>Total Price</th>
-    <th style={styles.th}></th>
+    <th>Image</th>
+    <th>Product Name</th>
+    <th>Unit Price</th>
+    <th>Quantity</th>
+    <th>Total Price</th>
+    <th></th>
   </tr>
 </thead>
 
@@ -1441,7 +979,7 @@ if (showWelcome) {
     <tr key={item._id}>
 
       {/* Product Image */}
-      <td style={styles.td}>
+      <td>
         <img
           src={item.image || "https://placehold.co/80x80?text=No+Image"}
           alt={item.name}
@@ -1456,17 +994,17 @@ if (showWelcome) {
       </td>
 
       {/* Product Name */}
-      <td style={styles.td}>
+      <td>
         <strong>{item.name}</strong>
       </td>
 
       {/* Unit Price */}
-      <td style={styles.td}>
+      <td>
         ₹{item.price}
       </td>
 
       {/* Quantity */}
-      <td style={styles.td}>
+      <td>
         <div
           style={{
             display: "flex",
@@ -1475,7 +1013,7 @@ if (showWelcome) {
           }}
         >
           <button
-            style={styles.cartQtyBtn}
+            className="kiosk-cart-qty-btn"
             onClick={() =>
               updateCartItemQuantity(item._id, -1)
             }
@@ -1485,7 +1023,7 @@ if (showWelcome) {
 
           <input
             value={item.quantity}
-            style={styles.cartQtyText}
+            className="kiosk-cart-qty"
             onChange={(e) =>
               handleCartManualQuantityChange(
                 item._id,
@@ -1495,7 +1033,7 @@ if (showWelcome) {
           />
 
           <button
-            style={styles.cartQtyBtn}
+            className="kiosk-cart-qty-btn"
             onClick={() =>
               updateCartItemQuantity(item._id, 1)
             }
@@ -1506,14 +1044,14 @@ if (showWelcome) {
       </td>
 
       {/* Total */}
-      <td style={styles.td}>
+      <td>
         ₹{item.price * item.quantity}
       </td>
 
       {/* Remove */}
-      <td style={styles.td}>
+      <td>
         <button
-          style={styles.removeBtn}
+          className="kiosk-remove"
           onClick={() => removeFromCart(item._id)}
         >
           ×
@@ -1525,31 +1063,37 @@ if (showWelcome) {
 </tbody>
   </table>
 )}
-       {/* <div style={styles.checkoutSection}>
-                <div style={styles.totalRow}>
-                  <span style={styles.totalLabel}>Total Bill</span>
-                  <span style={styles.totalAmount}>₹{invoiceTotal}</span>
+       {/* <div className="kiosk-checkout">
+                <div className="kiosk-total-row">
+                  <span className="kiosk-total-label">Total Bill</span>
+                  <span className="kiosk-total-amount">₹{invoiceTotal}</span>
            </div> */}
-<div style={styles.checkoutSection}>
-  <div style={styles.totalRow}>
-    <span style={styles.totalLabel}>
+<div className="kiosk-checkout">
+  <div className="kiosk-total-row">
+    <span className="kiosk-total-label">
       Total Bill
     </span>
 
-    <span style={styles.totalAmount}>
+    <span className="kiosk-total-amount">
       ₹{invoiceTotal}
     </span>
   </div>
                 {selectedStudent && (
-  <div style={styles.remainingBalance(selectedStudent.pocketMoney - invoiceTotal < 0)}>
+  <div
+    className={`kiosk-balance${
+      selectedStudent.pocketMoney - invoiceTotal < 0
+        ? " kiosk-balance--negative"
+        : ""
+    }`}
+  >
                    {selectedStudent.pocketMoney - invoiceTotal < 0
                     ? `Overdraft Limit Exceeded by ₹${Math.abs(selectedStudent.pocketMoney - invoiceTotal)}`
                      : `Remaining Balance: ₹${selectedStudent.pocketMoney - invoiceTotal}`}
                  </div>)}
 
-                 <div style={styles.btnActionGroup}>
+                 <div className="kiosk-actions">
                   <button
-                     style={styles.cancelBtn}
+                     className="btn btn--danger"
                     onClick={handleCancelPayment}
                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-strong)")}
                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--danger)")}
@@ -1557,7 +1101,7 @@ if (showWelcome) {
                      Cancel Payment
                   </button>
                   <button
-                    style={styles.successBtn}
+                    className="btn btn--success" style={{ flex: 1 }}
                     onClick={() => {
   if (!selectedStudent) {
     toast.error("Please select a student.");

@@ -103,6 +103,12 @@
   --warn-ink: var(--amber-800);
   --warn-bg: var(--amber-100);
 
+  /* Hunger Hunt's warm brand. Only the kiosk carries it today — the till is
+     the surface a student actually sees. */
+  --brand: #ff6b35;
+  --brand-amber: #facc15;
+  --brand-deep: #ea580c;
+
   /* ---- shape --------------------------------------------------------- */
   --radius-sm: 8px;
   --radius: 10px;

@@ -153,6 +153,38 @@
   background: var(--bg-subtle);
 }
 
+.btn--success {
+  background: var(--success);
+  color: var(--on-dark);
+}
+.btn--success:hover:not(:disabled) {
+  background: var(--success-strong);
+}
+
+.btn--danger {
+  background: var(--danger);
+  color: var(--on-dark);
+}
+.btn--danger:hover:not(:disabled) {
+  background: var(--danger-strong);
+}
+
+.btn--brand {
+  background: var(--brand);
+  color: var(--on-dark);
+}
+.btn--brand:hover:not(:disabled) {
+  background: var(--brand-deep);
+}
+
+/* Compact variant for buttons sitting inside a row or table cell. Drops below
+   the 44px touch floor, so keep it off primary till actions. */
+.btn--sm {
+  min-height: 34px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
 .btn--block {
   display: flex;
   width: 100%;
@@ -665,4 +697,333 @@
   .btn:active {
     transform: none;
   }
+}
+
+/* ---- kiosk till -------------------------------------------------------- */
+
+/* The billing screen is shared byte-for-byte between the kiosk and the admin
+   console (see scripts/check-shared-files.mjs), so its styles live here rather
+   than in a page-local object either app could edit on its own. */
+
+.kiosk-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  text-align: center;
+  overflow: hidden;
+  color: var(--on-dark);
+  background: linear-gradient(
+    135deg,
+    var(--brand) 0%,
+    var(--warn) 50%,
+    var(--brand-amber) 100%
+  );
+}
+
+.kiosk-welcome-title {
+  margin: 25px 0 15px;
+  font-size: 72px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--on-dark);
+  text-shadow: 3px 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.kiosk-start {
+  padding: 22px 85px;
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--brand-deep);
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kiosk-start:active {
+  transform: scale(0.97);
+}
+
+.kiosk-title {
+  margin: 0 0 16px;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #033d6c;
+  text-shadow: 2px 2px 6px rgba(66, 55, 10, 0.25);
+}
+
+.kiosk-lookup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Student lookup input — wider and taller than the standard field, since it
+   is the first thing touched on every sale. */
+.kiosk-input {
+  flex: 1;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.kiosk-input:focus {
+  border-color: var(--primary);
+}
+
+.kiosk-search {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.kiosk-search:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+.kiosk-results {
+  margin-top: 20px;
+}
+
+.kiosk-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.kiosk-table th {
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--bg-subtle);
+  border-bottom: 2px solid var(--border);
+}
+
+.kiosk-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--border);
+}
+
+.kiosk-scroll {
+  max-height: 750px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* ---- product grid ---- */
+
+.kiosk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 22px;
+}
+
+.kiosk-product {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-raised);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.kiosk-product:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+
+.kiosk-product-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.kiosk-product-body {
+  padding: 15px;
+}
+
+.kiosk-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* ---- quantity stepper ---- */
+
+.kiosk-qty {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.kiosk-qty-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.kiosk-qty-btn:hover {
+  background: var(--bg-subtle);
+}
+
+.kiosk-qty-input {
+  width: 40px;
+  height: 32px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  outline: none;
+}
+
+/* ---- cart ---- */
+
+.kiosk-cart-qty {
+  width: 35px;
+  height: 24px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  outline: none;
+}
+
+.kiosk-cart-qty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.kiosk-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--danger-light);
+  background: var(--danger-bg-strong);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.kiosk-remove:hover {
+  background: var(--danger-light);
+  color: var(--on-dark);
+}
+
+/* ---- checkout summary ---- */
+
+.kiosk-checkout {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.kiosk-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kiosk-total-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.kiosk-total-amount {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.kiosk-balance {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--success);
+}
+
+.kiosk-balance--negative {
+  color: var(--danger);
+}
+
+.kiosk-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.kiosk-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
 }

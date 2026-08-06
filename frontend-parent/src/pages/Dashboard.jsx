@@ -1,18 +1,61 @@
 import { useState, useEffect } from 'react';
 import API from '../services/api';
-import { Link } from 'react-router-dom';
 import { PUSH_EVENT } from '../utils/events';
+import {
+  AnimateIn,
+  Badge,
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+} from '../components/ui';
+
+const LOW_BALANCE = 500;
+
+const DashboardSkeleton = () => (
+  <div className="card-grid">
+    {[0, 1].map((i) => (
+      <Card key={i}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <Skeleton width="45%" height={20} />
+            <Skeleton width="65%" height={13} style={{ marginTop: 10 }} />
+          </div>
+          <Skeleton width={92} height={30} radius="var(--radius-pill)" />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Skeleton height={44} radius="var(--radius)" />
+          <Skeleton height={44} radius="var(--radius)" />
+        </div>
+      </Card>
+    ))}
+  </div>
+);
 
 const Dashboard = () => {
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchDashboard = async () => {
     try {
-      const res = await API.get("/parent/dashboard");
+      const res = await API.get('/parent/dashboard');
       setChildren(res.data.children || []);
+      setError('');
     } catch (err) {
-      console.error("Error loading linked students:", err);
+      // Previously this only reached the console, so a failed load was
+      // indistinguishable from a parent with no children linked.
+      console.error('Error loading linked students:', err);
+      setError("Couldn't load your children's accounts. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -24,206 +67,113 @@ const Dashboard = () => {
     // Balances change from recharges and purchases made elsewhere.
     const refresh = () => fetchDashboard();
     window.addEventListener(PUSH_EVENT, refresh);
-    window.addEventListener("focus", refresh);
+    window.addEventListener('focus', refresh);
 
     return () => {
       window.removeEventListener(PUSH_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
+      window.removeEventListener('focus', refresh);
     };
   }, []);
 
-
-  // Dashboard Unified Styles Object matching system look and feel
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "var(--bg)",
-      padding: "32px",
-      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      boxSizing: "border-box",
-    },
-    header: {
-      marginBottom: "32px",
-    },
-    title: {
-      fontSize: "32px",
-      fontWeight: "800",
-      color: "var(--ink)",
-      letterSpacing: "-0.75px",
-      margin: 0,
-    },
-    subtitle: {
-      fontSize: "14px",
-      color: "var(--muted)",
-      marginTop: "6px",
-      marginBottom: 0,
-      lineHeight: "1.5", // FIX: Changed from line-height to camelCase lineHeight
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-      gap: "24px",
-      marginBottom: "24px",
-    },
-    childCard: {
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "14px",
-      padding: "24px",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04)",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "space-between",
-      boxSizing: "border-box",
-    },
-    cardHeaderRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: "16px",
-      gap: "12px",
-    },
-    childName: {
-      fontSize: "20px",
-      fontWeight: "700",
-      color: "var(--ink)",
-      margin: 0,
-    },
-    childMeta: {
-      fontSize: "13px",
-      color: "var(--muted)",
-      marginTop: "4px",
-      marginBottom: 0,
-    },
-    balanceBadge: (amt) => ({
-      fontSize: "13px",
-      fontWeight: "700",
-      backgroundColor: amt > 500 ? "var(--success-bg)" : "var(--alert-bg)",
-      color: amt > 500 ? "var(--success)" : "var(--alert)",
-      padding: "6px 12px",
-      borderRadius: "20px",
-      whiteSpace: "nowrap",
-      border: amt > 500 ? "1px solid var(--success-border)" : "1px solid var(--alert-border)",
-    }),
-    warningBanner: {
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      color: "var(--alert)",
-      backgroundColor: "var(--alert-bg)",
-      padding: "10px 12px",
-      borderRadius: "8px",
-      fontSize: "12px",
-      fontWeight: "500",
-      marginTop: "12px",
-      border: "1px solid var(--alert-border)",
-    },
-    actionBtn: {
-      display: "block",
-      textAlign: "center",
-      backgroundColor: "var(--ink)",
-      color: "var(--on-dark)",
-      textDecoration: "none",
-      padding: "12px 16px",
-      borderRadius: "10px",
-      fontSize: "14px",
-      fontWeight: "600",
-      transition: "background-color 0.15s ease",
-      marginTop: "20px",
-    },
-    infoBanner: {
-      backgroundColor: "#fef08a",
-      border: "1px solid #fef08a",
-      color: "#713f12",
-      padding: "16px 20px",
-      borderRadius: "12px",
-      fontSize: "14px",
-      lineHeight: "1.5",
-    },
-    loadingText: {
-      textAlign: "center",
-      padding: "60px 0",
-      fontSize: "16px",
-      fontWeight: "500",
-      color: "var(--muted)",
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.loadingText}>Loading student records...</div>
-      </div>
-    );
-  }
-
   return (
-    <div style={styles.page}>
-      {/* Header Section */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>Linked Children Accounts</h1>
-        <p style={styles.subtitle}>
-          Monitor student account balances, digital smart-wallet transactions, and purchase logs
-        </p>
-      </div>
+    <div className="page">
+      <PageHeader
+        title="Linked Children Accounts"
+        subtitle="Monitor student account balances, digital smart-wallet transactions, and purchase logs"
+      />
 
-      {/* Main Grid View */}
-      {children.length === 0 ? (
-        <div style={styles.infoBanner}>
-          ⚠️ No students found matching your registered phone number. Please contact the school office administration to link your ward's records.
-        </div>
-      ) : (
-        <div style={styles.grid}>
-          {children.map((child) => (
-            <div key={child._id} style={styles.childCard}>
-              <div>
-                <div style={styles.cardHeaderRow}>
+      {loading && <DashboardSkeleton />}
+
+      {!loading && error && (
+        <Banner variant="alert" icon="⚠️">
+          {error}{' '}
+          <button
+            onClick={fetchDashboard}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: 'inherit',
+              font: 'inherit',
+              fontWeight: 700,
+              textDecoration: 'underline',
+              cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+        </Banner>
+      )}
+
+      {!loading && !error && children.length === 0 && (
+        <EmptyState icon="🎒" title="No students linked yet">
+          We couldn&apos;t find any students registered to your phone number.
+          Please contact the school office to link your ward&apos;s records.
+        </EmptyState>
+      )}
+
+      {!loading && !error && children.length > 0 && (
+        <div className="card-grid">
+          {children.map((child, i) => {
+            const balance = child.pocketMoney || 0;
+
+            return (
+              <AnimateIn key={child._id} index={i}>
+                <Card
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    height: '100%',
+                  }}
+                >
                   <div>
-                    <h2 style={styles.childName}>{child.name}</h2>
-                    <p style={styles.childMeta}>
-                      Grade: {child.grade || "N/A"} | Room: {child.hostelNumber || "N/A"}
-                    </p>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <h2 className="card-title">{child.name}</h2>
+                        <p className="card-meta">
+                          Grade: {child.grade || 'N/A'} | Room:{' '}
+                          {child.hostelNumber || 'N/A'}
+                        </p>
+                      </div>
+
+                      {/* The glyph repeats what the colour says, so a low
+                          balance still reads without green-vs-red vision. */}
+                      <Badge variant={balance > LOW_BALANCE ? 'success' : 'alert'}>
+                        <span aria-hidden="true">
+                          {balance > LOW_BALANCE ? '✓' : '!'}
+                        </span>
+                        ₹{balance}
+                      </Badge>
+                    </div>
+
+                    {balance <= 0 && (
+                      <Banner variant="alert" icon="⚠️" style={{ marginTop: 12 }}>
+                        Balance exhausted. Please top up at the school accounts
+                        counter.
+                      </Banner>
+                    )}
                   </div>
-                  <span style={styles.balanceBadge(child.pocketMoney || 0)}>
-                    Bal: ₹{child.pocketMoney || 0}
-                  </span>
-                </div>
 
-                {/* Depleted Balance Alert Banner */}
-                {(child.pocketMoney || 0) <= 0 && (
-                  <div style={styles.warningBanner}>
-                    <span>⚠️ Balance exhausted. Please top up at the school accounts counter.</span>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                    <Button to={`/child/${child._id}`} variant="dark" block>
+                      View Details
+                    </Button>
+                    <Button to={`/purchase-password/${child._id}`} block>
+                      Set Password
+                    </Button>
                   </div>
-                )}
-              </div>
-
-              {/* Redirection Navigation Link */}
-              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-  <Link
-    to={`/child/${child._id}`}
-    style={{
-      ...styles.actionBtn,
-      flex: 1,
-      marginTop: 0,
-    }}
-  >
-    View Details
-  </Link>
-
-  <Link
-    to={`/purchase-password/${child._id}`}
-    style={{
-      ...styles.actionBtn,
-      flex: 1,
-      marginTop: 0,
-      background: "var(--primary)",
-    }}
-  >
-    Set Password
-  </Link>
-</div>
-            </div>
-          ))}
+                </Card>
+              </AnimateIn>
+            );
+          })}
         </div>
       )}
     </div>

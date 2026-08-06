@@ -1,18 +1,43 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../utils/api";
+import { formatINR } from "../utils/format";
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+} from "../components/ui";
 
 const RechargeHistory = () => {
   const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    api.get("/students").then((res) => {
-      setStudents(res.data || []);
-    });
+    fetchStudents();
   }, []);
 
-  // Filter students by Name OR Hostel Number
+  const fetchStudents = async () => {
+    setLoading(true);
+    setLoadError(false);
+
+    try {
+      const res = await api.get("/students");
+      setStudents(res.data || []);
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredStudents = students.filter((st) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
@@ -22,402 +47,243 @@ const RechargeHistory = () => {
     );
   });
 
-  // Toggle dropdown section for selected student
   const handleToggleDropdown = (id) => {
     setSelectedStudentId(selectedStudentId === id ? null : id);
   };
 
-  // Export ALL filtered student metrics to Excel (CSV format)
+  const downloadCsv = (rows, filename) => {
+    const blob = new Blob([rows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const esc = (value) =>
+    `"${(value ?? "N/A").toString().replace(/"/g, '""')}"`;
+
   const downloadAllStudentsExcel = () => {
     if (filteredStudents.length === 0) {
-      alert("No student data available to export.");
+      toast.error("No student data available to export");
       return;
     }
 
-    // CSV Headers - Includes Name, Hostel, Grade, and Father's Name
     const headers = [
-      "S.No.", 
-      "Student Name", 
-      "Hostel Number", 
-      "Grade", 
-      "Father's Name", 
-      "Current Wallet Balance (INR)", 
-      "Total Transactions Logged"
+      "S.No.",
+      "Student Name",
+      "Hostel Number",
+      "Grade",
+      "Father's Name",
+      "Current Wallet Balance (INR)",
+      "Total Transactions Logged",
     ];
 
-    // Transform all student objects into CSV rows
-    const rows = filteredStudents.map((st, index) => [
-      index + 1,
-      `"${st.name ? st.name.replace(/"/g, '""') : "N/A"}"`,         // Escape quotes safely
-      `"${st.hostelNumber ? st.hostelNumber.toString().replace(/"/g, '""') : "N/A"}"`,
-      `"${st.grade ? st.grade.replace(/"/g, '""') : "N/A"}"`,       
-      `"${st.fatherName ? st.fatherName.replace(/"/g, '""') : "N/A"}"`, 
-      st.pocketMoney ?? 0,
-      st.rechargeHistory ? st.rechargeHistory.length : 0
-    ]);
+    const rows = filteredStudents.map((st, index) =>
+      [
+        index + 1,
+        esc(st.name),
+        esc(st.hostelNumber),
+        esc(st.grade),
+        esc(st.fatherName),
+        st.pocketMoney ?? 0,
+        st.rechargeHistory ? st.rechargeHistory.length : 0,
+      ].join(",")
+    );
 
-    // Combine headers and rows
-    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-
-    // Trigger download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `All_Students_Wallet_Report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv([headers.join(","), ...rows], "All_Students_Wallet_Report.csv");
   };
 
-  // Export individual transaction ledger to Excel (CSV format) with Student Metadata Info
   const downloadExcel = (e, student) => {
-    e.stopPropagation(); // Prevent dropdown from closing when clicking download
-    
-    if (!student || !student.rechargeHistory || student.rechargeHistory.length === 0) {
-      alert("No transaction history available to export.");
+    e.stopPropagation();
+
+    if (!student?.rechargeHistory?.length) {
+      toast.error("No transaction history available to export");
       return;
     }
 
-    // Clean data variables for CSV formatting safety
-    const safeName = student.name ? student.name.replace(/"/g, '""') : "N/A";
-    const safeHostel = student.hostelNumber ? student.hostelNumber.toString().replace(/"/g, '""') : "N/A";
-    const safeGrade = student.grade ? student.grade.replace(/"/g, '""') : "N/A";
-    const safeFatherName = student.fatherName ? student.fatherName.replace(/"/g, '""') : "N/A";
-
-    // Build Descriptive Context Meta Headers at top of spreadsheet file
     const metaRows = [
       `"STUDENT TRANSACTION STATEMENT"`,
-      `"Student Name:","${safeName}"`,
-      `"Hostel Number:","${safeHostel}"`,
-      `"Grade:","${safeGrade}"`,
-      `"Father's Name:","${safeFatherName}"`,
-      `""` // Empty string row for a clean line break separator layout inside Excel
+      `"Student Name:",${esc(student.name)}`,
+      `"Hostel Number:",${esc(student.hostelNumber)}`,
+      `"Grade:",${esc(student.grade)}`,
+      `"Father's Name:",${esc(student.fatherName)}`,
+      `""`,
     ];
 
-    // Main Ledger Columns Headers
-    const tableHeaders = ["S.No.", "Timestamp", "Previous Balance (INR)", "Credit Allocation (INR)", "Closing Balance (INR)"];
-    
-    // Transform history data objects into CSV lines rows array
-    const transactionRows = student.rechargeHistory.map((r, index) => [
-      index + 1,
-      `"${new Date(r.date).toLocaleString()}"`, 
-      r.previousBalance,
-      r.amount,
-      r.newBalance
-    ]);
+    const tableHeaders = [
+      "S.No.",
+      "Timestamp",
+      "Previous Balance (INR)",
+      "Credit Allocation (INR)",
+      "Closing Balance (INR)",
+    ];
 
-    // Combine metadata block layout, structural headers row layout and dataset rows together
-    const csvContent = [
-      ...metaRows,
-      tableHeaders.join(","),
-      ...transactionRows.map(row => row.join(","))
-    ].join("\n");
-    
-    // Create blob container trigger setup
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${safeName.replace(/\s+/g, "_")}_recharge_history.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    const transactionRows = student.rechargeHistory.map((r, index) =>
+      [
+        index + 1,
+        `"${new Date(r.date).toLocaleString()}"`,
+        r.previousBalance,
+        r.amount,
+        r.newBalance,
+      ].join(",")
+    );
 
-  // UI elements styles layout configuration paradigm context dictionary object map properties definitions
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "var(--bg)",
-      padding: "32px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box"
-    },
-    header: {
-      marginBottom: "24px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "16px"
-    },
-    titleWrapper: {
-      display: "flex",
-      flexDirection: "column"
-    },
-    title: {
-      fontSize: "28px",
-      fontWeight: "700",
-      color: "var(--ink)",
-      letterSpacing: "-0.5px",
-      margin: 0
-    },
-    subtitle: {
-      fontSize: "14px",
-      color: "var(--muted)",
-      marginTop: "4px",
-      marginBottom: 0
-    },
-    btnGlobalExcel: {
-      backgroundColor: "var(--primary)",
-      color: "var(--on-dark)",
-      border: "none",
-      borderRadius: "10px",
-      padding: "10px 18px",
-      fontSize: "14px",
-      fontWeight: "600",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      boxShadow: "0 2px 4px rgba(37,  99,  235,  0.15)",
-      transition: "background-color 0.2s, transform 0.1s"
-    },
-    section: {
-      background: "var(--surface)",
-      border: "1px solid var(--border)",
-      borderRadius: "14px",
-      padding: "20px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
-    },
-    searchBarContainer: {
-      marginBottom: "16px",
-    },
-    input: {
-      width: "100%",
-      padding: "12px 14px",
-      border: "1px solid var(--border-strong)",
-      borderRadius: "10px",
-      fontSize: "14px",
-      color: "var(--ink)",
-      backgroundColor: "var(--surface)",
-      outline: "none",
-      transition: "border-color 0.2s",
-      boxSizing: "border-box",
-    },
-    studentList: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "12px",
-    },
-    accordionItem: (isOpen) => ({
-      border: isOpen ? "1px solid var(--primary)" : "1px solid var(--border)",
-      borderRadius: "12px",
-      backgroundColor: "var(--surface)",
-      overflow: "hidden",
-      transition: "all 0.2s ease",
-      boxShadow: isOpen ? "0 4px 6px -1px rgba(0, 0, 0, 0.02)" : "none",
-    }),
-    studentHeaderBtn: (isOpen) => ({
-      width: "100%",
-      padding: "16px 20px",
-      background: isOpen ? "var(--bg-subtle)" : "transparent",
-      border: "none",
-      textAlign: "left",
-      cursor: "pointer",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      transition: "background-color 0.2s",
-    }),
-    identityWrapper: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "4px",
-    },
-    studentName: {
-      fontWeight: "600",
-      fontSize: "15px",
-      color: "var(--ink)",
-    },
-    hostelTag: {
-      fontSize: "12px",
-      color: "var(--muted)",
-      fontWeight: "500",
-    },
-    rightControls: {
-      display: "flex",
-      alignItems: "center",
-      gap: "16px",
-    },
-    studentWallet: {
-      fontWeight: "700",
-      fontSize: "15px",
-      color: "var(--ink)",
-    },
-    chevron: (isOpen) => ({
-      fontSize: "12px",
-      color: "var(--muted)",
-      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-      transition: "transform 0.2s ease",
-      display: "inline-block",
-    }),
-    dropdownBody: {
-      padding: "20px",
-      borderTop: "1px solid var(--border)",
-      backgroundColor: "var(--surface)",
-    },
-    dropdownHeaderAction: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: "16px",
-    },
-    dropdownTitle: {
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "var(--ink-dim)",
-      margin: 0,
-    },
-    btnExcel: {
-      background: "none",
-      border: "none",
-      color: "var(--primary)",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      padding: 0,
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-    },
-    mainTableContainer: {
-      width: "100%",
-      overflowX: "auto",
-      borderRadius: "10px",
-      border: "1px solid var(--border)"
-    },
-    mainTable: {
-      width: "100%",
-      borderCollapse: "collapse",
-      textAlign: "left",
-      fontSize: "14px"
-    },
-    mainTh: {
-      backgroundColor: "var(--bg-subtle)",
-      color: "var(--ink-soft)",
-      fontWeight: "600",
-      padding: "14px",
-      borderBottom: "2px solid var(--border)",
-      fontSize: "13px"
-    },
-    mainTd: {
-      padding: "14px",
-      color: "var(--ink)",
-      borderBottom: "1px solid var(--border)",
-      verticalAlign: "middle"
-    },
-    sNoText: {
-      color: "var(--muted)",
-      fontWeight: "500"
-    },
-    dateText: {
-      color: "var(--ink-soft)",
-      fontWeight: "500",
-    },
-    amountText: {
-      fontWeight: "700",
-      color: "var(--ink)"
-    },
-    rechargeBadgeSuccess: {
-      backgroundColor: "#fdf2f8",
-      color: "var(--primary)",
-      padding: "4px 10px",
-      borderRadius: "8px",
-      fontSize: "11px",
-      fontWeight: "700",
-      display: "inline-block",
-      border: "1px solid #bfdbfe"
-    },
-    emptyState: {
-      color: "var(--muted)",
-      fontSize: "14px",
-      textAlign: "center",
-      padding: "40px 0",
-      margin: 0
-    }
+    const safeName = (student.name || "student").replace(/\s+/g, "_");
+    downloadCsv(
+      [...metaRows, tableHeaders.join(","), ...transactionRows],
+      `${safeName}_recharge_history.csv`
+    );
   };
 
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.titleWrapper}>
-          <h1 style={styles.title}>Wallet Recharge Registry</h1>
-          <p style={styles.subtitle}>Manage and audit administrative institutional balances</p>
-        </div>
-        {students.length > 0 && (
-          <button 
-            style={styles.btnGlobalExcel}
-            onClick={downloadAllStudentsExcel}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-hover)")}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--primary)")}
-          >
-            📊 Export All Students (.csv)
-          </button>
-        )}
-      </div>
+    <div className="page">
+      <PageHeader
+        title="Wallet Recharge Registry"
+        subtitle="Audit every top-up and current balance across the roster."
+        actions={
+          students.length > 0 && (
+            <Button onClick={downloadAllStudentsExcel}>
+              📊 Export All Students (.csv)
+            </Button>
+          )
+        }
+      />
 
-      {/* Main Content Component Container */}
-      <div style={styles.section}>
-        
-        {/* Search Bar matching look and feel */}
-        <div style={styles.searchBarContainer}>
+      <Card>
+        <div style={{ marginBottom: 16 }}>
           <input
-            type="text"
-            style={styles.input}
-            placeholder="Search roster by student name or hostel code..."
+            type="search"
+            className="input"
+            aria-label="Search students"
+            placeholder="🔍 Search by student name or hostel number…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary)")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-strong)")}
           />
         </div>
 
-        <div style={styles.studentList}>
-          {filteredStudents.length === 0 ? (
-            <p style={styles.emptyState}>
-              {students.length === 0 
-                ? "No active student metrics discovered in the system roster."
-                : "No items matched your search filtering criteria."}
-            </p>
-          ) : (
-            filteredStudents.map((st) => {
+        {loading ? (
+          <div>
+            <Skeleton height={56} />
+            <Skeleton height={56} style={{ marginTop: 12 }} />
+            <Skeleton height={56} style={{ marginTop: 12 }} />
+          </div>
+        ) : loadError ? (
+          <Banner variant="alert" icon="⚠️">
+            Couldn't load the student roster. Check your connection and{" "}
+            <button
+              type="button"
+              className="link-button"
+              onClick={fetchStudents}
+            >
+              try again
+            </button>
+            .
+          </Banner>
+        ) : filteredStudents.length === 0 ? (
+          <EmptyState
+            icon="🎓"
+            title={
+              students.length === 0 ? "No students yet" : "No matching students"
+            }
+          >
+            {students.length === 0
+              ? "Students you add will appear here with their recharge history."
+              : `Nothing matches "${searchQuery}".`}
+          </EmptyState>
+        ) : (
+          <div className="accordion">
+            {filteredStudents.map((st) => {
               const isOpen = selectedStudentId === st._id;
               return (
-                <div key={st._id} style={styles.accordionItem(isOpen)}>
-                  {/* Dropdown Header Trigger */}
+                <div
+                  key={st._id}
+                  className={`accordion-item${
+                    isOpen ? " accordion-item--open" : ""
+                  }`}
+                >
                   <button
+                    type="button"
+                    className="accordion-trigger"
+                    aria-expanded={isOpen}
                     onClick={() => handleToggleDropdown(st._id)}
-                    style={styles.studentHeaderBtn(isOpen)}
-                    onMouseOver={(e) => {
-                      if (!isOpen) e.currentTarget.style.backgroundColor = "var(--bg)";
-                    }}
-                    onMouseOut={(e) => {
-                      if (!isOpen) e.currentTarget.style.backgroundColor = "transparent";
-                    }}
                   >
-                    <div style={styles.identityWrapper}>
-                      <span style={styles.studentName}>{st.name}</span>
-                      <span style={styles.hostelTag}>Hostel ID: H—{st.hostelNumber || "N/A"}</span>
-                    </div>
-                    
-                    <div style={styles.rightControls}>
-                      <span style={styles.studentWallet}>₹{st.pocketMoney}</span>
-                      <span style={styles.chevron(isOpen)}>▼</span>
-                    </div>
+                    <span
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: 15,
+                          color: "var(--ink)",
+                        }}
+                      >
+                        {st.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: "var(--muted)",
+                        }}
+                      >
+                        Hostel ID: H—{st.hostelNumber || "N/A"}
+                      </span>
+                    </span>
+
+                    <span
+                      style={{ display: "flex", alignItems: "center", gap: 16 }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 15,
+                          color: "var(--ink)",
+                        }}
+                      >
+                        {formatINR(st.pocketMoney)}
+                      </span>
+                      <span className="accordion-chevron" aria-hidden="true">
+                        ▼
+                      </span>
+                    </span>
                   </button>
 
-                  {/* Dropdown Expandable History Content */}
                   {isOpen && (
-                    <div style={styles.dropdownBody}>
-                      <div style={styles.dropdownHeaderAction}>
-                        <h4 style={styles.dropdownTitle}>Account History Statements</h4>
-                        {st.rechargeHistory && st.rechargeHistory.length > 0 && (
+                    <div className="accordion-body">
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: "var(--ink-dim)",
+                          }}
+                        >
+                          Recharge History
+                        </h4>
+                        {st.rechargeHistory?.length > 0 && (
                           <button
+                            type="button"
+                            className="link-button"
+                            style={{ color: "var(--primary)" }}
                             onClick={(e) => downloadExcel(e, st)}
-                            style={styles.btnExcel}
                           >
                             💾 Export Statement (.csv)
                           </button>
@@ -425,54 +291,71 @@ const RechargeHistory = () => {
                       </div>
 
                       {!st.rechargeHistory || st.rechargeHistory.length === 0 ? (
-                        <p style={styles.emptyState}>
-                          No transactional entries logged for this student context.
+                        <p
+                          style={{
+                            margin: 0,
+                            padding: "24px 0",
+                            textAlign: "center",
+                            fontSize: 14,
+                            color: "var(--muted)",
+                          }}
+                        >
+                          No recharges recorded for this student yet.
                         </p>
                       ) : (
-                        <div style={styles.mainTableContainer}>
-                          <table style={styles.mainTable}>
+                        <div className="table-wrap">
+                          <table className="table table--stack table--hover">
                             <thead>
                               <tr>
-                                <th style={{ ...styles.mainTh, width: "60px" }}>S.No.</th>
-                                <th style={styles.mainTh}>Timestamp</th>
-                                <th style={{ ...styles.mainTh, textAlign: "right", width: "180px" }}>Previous Balance</th>
-                                <th style={{ ...styles.mainTh, textAlign: "center", width: "180px" }}>Credit Allocation</th>
-                                <th style={{ ...styles.mainTh, textAlign: "right", width: "180px" }}>Closing Balance</th>
+                                <th style={{ width: 60 }}>#</th>
+                                <th>Timestamp</th>
+                                <th style={{ width: 180, textAlign: "right" }}>
+                                  Previous Balance
+                                </th>
+                                <th style={{ width: 180, textAlign: "center" }}>
+                                  Amount Added
+                                </th>
+                                <th style={{ width: 180, textAlign: "right" }}>
+                                  Closing Balance
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
                               {st.rechargeHistory.map((r, index) => (
-                                <tr
-                                  key={index}
-                                  style={{ transition: "background-color 0.2s" }}
-                                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--bg)")}
-                                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                >
-                                  {/* Serial Number Row */}
-                                  <td style={{ ...styles.mainTd, ...styles.sNoText }}>
+                                <tr key={index}>
+                                  <td data-label="#" style={{ color: "var(--muted)" }}>
                                     {index + 1}
                                   </td>
-                                  
-                                  {/* Date Profile Timestamp Column */}
-                                  <td style={{ ...styles.mainTd, ...styles.dateText }}>
+                                  <td data-label="Timestamp">
                                     {new Date(r.date).toLocaleString()}
                                   </td>
-                                  
-                                  {/* Previous Balance Column */}
-                                  <td style={{ ...styles.mainTd, textAlign: "right", ...styles.amountText }}>
-                                    ₹{r.previousBalance}
+                                  <td
+                                    data-label="Previous Balance"
+                                    style={{
+                                      textAlign: "right",
+                                      fontWeight: 700,
+                                      color: "var(--ink)",
+                                    }}
+                                  >
+                                    {formatINR(r.previousBalance)}
                                   </td>
-                                  
-                                  {/* Allocation Tracking Badge Column */}
-                                  <td style={{ ...styles.mainTd, textAlign: "center" }}>
-                                    <span style={styles.rechargeBadgeSuccess}>
-                                      + ₹{r.amount}
-                                    </span>
+                                  <td
+                                    data-label="Amount Added"
+                                    style={{ textAlign: "center" }}
+                                  >
+                                    <Badge variant="success">
+                                      + {formatINR(r.amount)}
+                                    </Badge>
                                   </td>
-                                  
-                                  {/* Closing Balance Column */}
-                                  <td style={{ ...styles.mainTd, textAlign: "right", ...styles.amountText }}>
-                                    ₹{r.newBalance}
+                                  <td
+                                    data-label="Closing Balance"
+                                    style={{
+                                      textAlign: "right",
+                                      fontWeight: 700,
+                                      color: "var(--ink)",
+                                    }}
+                                  >
+                                    {formatINR(r.newBalance)}
                                   </td>
                                 </tr>
                               ))}
@@ -484,10 +367,10 @@ const RechargeHistory = () => {
                   )}
                 </div>
               );
-            })
-          )}
-        </div>
-      </div>
+            })}
+          </div>
+        )}
+      </Card>
     </div>
   );
 };

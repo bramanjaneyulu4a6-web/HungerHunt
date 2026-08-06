@@ -791,6 +791,66 @@
   background: var(--bg);
 }
 
+/* ---- accordion --------------------------------------------------------- */
+
+/* Expandable rows — a student's recharge ledger, a transaction's items. */
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accordion-item {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.2s ease;
+}
+
+.accordion-item--open {
+  border-color: var(--primary);
+}
+
+.accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 20px;
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.accordion-trigger:hover {
+  background: var(--bg);
+}
+
+.accordion-item--open .accordion-trigger {
+  background: var(--bg-subtle);
+}
+
+.accordion-chevron {
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.accordion-item--open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  padding: 20px;
+  border-top: 1px solid var(--border);
+}
+
 /* ---- modal ------------------------------------------------------------- */
 
 .modal-backdrop {

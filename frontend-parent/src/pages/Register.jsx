@@ -2,6 +2,12 @@ import { useState } from 'react';
 import API from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import {
+  PASSWORD_MIN_LENGTH,
+  emailProblem,
+  passwordProblem,
+  phoneProblem,
+} from '../utils/validation';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -19,6 +25,18 @@ export default function Register() {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Registration used to accept a one-character password, while the reset
+    // that replaces it demanded six. Checked here so the parent is told which
+    // field is wrong, and again on the server, which is what enforces it.
+    const problem =
+      (!formData.fatherName.trim() && "Please enter the father's name.") ||
+      phoneProblem(formData.parentPhoneNumber) ||
+      emailProblem(formData.email) ||
+      passwordProblem(formData.password);
+
+    if (problem) return setError(problem);
+
     setSubmitting(true);
 
     try {
@@ -78,6 +96,7 @@ export default function Register() {
           inputMode="numeric"
           autoComplete="tel"
           required
+          maxLength={10}
           placeholder="e.g. 9876543210"
           value={formData.parentPhoneNumber}
           onChange={update('parentPhoneNumber')}
@@ -96,10 +115,11 @@ export default function Register() {
 
         <AuthField
           id="password"
-          label="Set App Password"
+          label={`Set App Password (at least ${PASSWORD_MIN_LENGTH} characters)`}
           type="password"
           autoComplete="new-password"
           required
+          minLength={PASSWORD_MIN_LENGTH}
           placeholder="••••••••"
           value={formData.password}
           onChange={update('password')}

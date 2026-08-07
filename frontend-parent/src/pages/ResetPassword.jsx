@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../services/api';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { PASSWORD_MIN_LENGTH, passwordProblem } from '../utils/validation';
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -16,6 +17,10 @@ export default function ResetPassword() {
     e.preventDefault();
     setMsg('');
     setError('');
+
+    const problem = passwordProblem(password);
+    if (problem) return setError(problem);
+
     setSubmitting(true);
 
     try {
@@ -56,10 +61,11 @@ export default function ResetPassword() {
       <form onSubmit={handleSubmit} className="auth-form">
         <AuthField
           id="new-password"
-          label="New Password"
+          label={`New Password (at least ${PASSWORD_MIN_LENGTH} characters)`}
           type="password"
           autoComplete="new-password"
           required
+          minLength={PASSWORD_MIN_LENGTH}
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

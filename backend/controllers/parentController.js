@@ -7,6 +7,7 @@ import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
+import { passwordProblem, phoneProblem, emailProblem } from "../utils/validation.js";
 
 /* =========================================================
    ✅ REGISTER PARENT
@@ -15,14 +16,25 @@ export const registerParent = async (req, res) => {
   try {
     const { fatherName, parentPhoneNumber, password, email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+    if (!fatherName?.trim()) {
+      return res.status(400).json({ message: "Father's name is required" });
     }
+
+    const problem =
+      phoneProblem(parentPhoneNumber) ||
+      emailProblem(email) ||
+      passwordProblem(password);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
+    }
+
+    const phone = String(parentPhoneNumber).trim();
 
     // Find students (initial linking step)
     const kids = await Student.find({
       fatherName,
-      parentPhoneNumber,
+      parentPhoneNumber: phone,
     });
 
     if (kids.length === 0) {
@@ -31,9 +43,7 @@ export const registerParent = async (req, res) => {
       });
     }
 
-    const existingParent = await Parent.findOne({
-      phone: parentPhoneNumber,
-    });
+    const existingParent = await Parent.findOne({ phone });
 
     if (existingParent) {
       return res.status(400).json({
@@ -45,14 +55,14 @@ export const registerParent = async (req, res) => {
 
     await Parent.create({
       fatherName,
-      phone: parentPhoneNumber,
+      phone,
       email: email.toLowerCase().trim(),
       password: hashedPwd,
       studentIds: kids.map((k) => k._id),
     });
 
     await Student.updateMany(
-      { fatherName, parentPhoneNumber },
+      { fatherName, parentPhoneNumber: phone },
       { isParentRegistered: true }
     );
 
@@ -72,17 +82,20 @@ export const loginParent = async (req, res) => {
   try {
     const { parentPhoneNumber, password } = req.body;
 
-    const parent = await Parent.findOne({ phone: parentPhoneNumber });
+    const parent = await Parent.findOne({ phone: String(parentPhoneNumber ?? "").trim() });
 
-    if (!parent) {
-      return res.status(401).json({ message: "Parent not found" });
-    }
+    /* One answer for "no such number" and for "wrong password". Two different
+       ones let anybody discover which phone numbers have accounts by watching
+       which reply comes back — the same reason forgotPassword is deliberately
+       vague, undone here. */
+    const invalid = () =>
+      res.status(401).json({ message: "Invalid phone number or password" });
 
-    const isMatch = await bcrypt.compare(password, parent.password);
+    if (!parent) return invalid();
 
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
-    }
+    const isMatch = password && await bcrypt.compare(password, parent.password);
+
+    if (!isMatch) return invalid();
 
     const token = signParentToken(parent._id, parent.phone);
 
@@ -107,23 +120,22 @@ export const loginParent = async (req, res) => {
 ========================================================= */
 export const getParentDashboardDetails = async (req, res) => {
   try {
-    const parent = await Parent.findById(req.parent.id).populate("studentIds");
+    /* The dashboard lists children and their balances, and that is all it has
+       ever rendered. It was also sent every transaction any of them had ever
+       made — unread, unbounded, and growing for as long as the child is
+       enrolled — and full student documents carrying their whole
+       rechargeHistory alongside. Both are gone; what is left is the four
+       fields the cards actually show. */
+    const parent = await Parent.findById(req.parent.id).populate({
+      path: "studentIds",
+      select: "name grade hostelNumber pocketMoney"
+    });
 
     if (!parent) {
       return res.status(404).json({ message: "Parent not found" });
     }
 
-    const children = parent.studentIds; // ✅ ONLY LINKED STUDENTS
-
-    const childrenIds = children.map((c) => c._id);
-
-    const history = await Transaction.find({
-      studentId: { $in: childrenIds },
-    })
-      .populate("studentId", "name")
-      .sort({ createdAt: -1 });
-
-    res.json({ children, history });
+    res.json({ children: parent.studentIds });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -185,10 +197,10 @@ export const forgotPassword = async (req, res) => {
 ========================================================= */
 export const resetPassword = async (req, res) => {
   try {
-    if (!req.body.password || req.body.password.length < 6) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters",
-      });
+    const problem = passwordProblem(req.body.password);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
     }
 
     const parent = await Parent.findOne({
@@ -218,22 +230,45 @@ export const resetPassword = async (req, res) => {
 /* =========================================================
    ✅ CHILD DETAILS
 ========================================================= */
+/* One page of history, and never the whole of it. A child buying lunch daily
+   accumulates hundreds of transactions across a school year, and both screens
+   that read them show a list the parent scrolls. */
+const PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+const readPaging = (req) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit) || PAGE_SIZE, 1),
+    MAX_PAGE_SIZE
+  );
+
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+const paged = (total, page, limit) => ({
+  total,
+  page,
+  pages: Math.ceil(total / limit) || 1,
+  hasMore: page * limit < total
+});
+
+/* Who the child is, and nothing about what they have bought. The lists moved to
+   their own endpoints below: this response was carrying every transaction ever
+   made and the entire rechargeHistory, which the purchase-password screen also
+   downloaded in full in order to render a form with a name on it. */
 export const getChildDetails = async (req, res) => {
   try {
     if (!(await assertOwnsStudent(req, res, req.params.id))) return;
 
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findById(req.params.id).select("-rechargeHistory");
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const bills = await Transaction.find({
-      studentId: req.params.id,
-    }).sort({ createdAt: -1 });
-
     // Asked as a question about the document rather than by loading the hash,
-    // since the whole student is part of this response.
+    // which select: false keeps out of this query anyway.
     const hasPurchasePassword = await Student.exists({
       _id: req.params.id,
       purchasePassword: { $ne: null },
@@ -241,9 +276,55 @@ export const getChildDetails = async (req, res) => {
 
     res.json({
       student,
-      bills,
-      recharges: student.rechargeHistory || [],
       hasPurchasePassword: !!hasPurchasePassword,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getChildBills = async (req, res) => {
+  try {
+    if (!(await assertOwnsStudent(req, res, req.params.id))) return;
+
+    const { page, limit, skip } = readPaging(req);
+    const filter = { studentId: req.params.id };
+
+    const [bills, total] = await Promise.all([
+      Transaction.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Transaction.countDocuments(filter)
+    ]);
+
+    res.json({ bills, ...paged(total, page, limit) });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getChildRecharges = async (req, res) => {
+  try {
+    if (!(await assertOwnsStudent(req, res, req.params.id))) return;
+
+    const { page, limit, skip } = readPaging(req);
+
+    const student = await Student.findById(req.params.id).select("rechargeHistory");
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    /* Recharges are embedded in the student document rather than a collection
+       of their own, so the page is cut here rather than by the database. They
+       are counted in top-ups per term, not purchases per day, so the array is
+       small — and this is still the difference between sending twenty entries
+       and sending all of them. */
+    const all = (student.rechargeHistory || []).slice().reverse();
+
+    res.json({
+      recharges: all.slice(skip, skip + limit),
+      ...paged(all.length, page, limit)
     });
 
   } catch (error) {

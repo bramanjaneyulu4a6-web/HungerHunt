@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import API from '../services/api';
+import { PUSH_EVENT } from '../utils/events';
 import { formatINR } from '../utils/format';
 import {
   AnimateIn,
@@ -25,6 +26,12 @@ const DetailsSkeleton = () => (
       <Skeleton width="35%" height={32} style={{ marginTop: 20 }} />
     </Card>
     <Skeleton height={52} radius="var(--radius)" style={{ marginBottom: 32 }} />
+    <ListSkeleton />
+  </>
+);
+
+const ListSkeleton = () => (
+  <>
     {[0, 1, 2].map((i) => (
       <Card key={i} className="card--tight" style={{ marginBottom: 16 }}>
         <Skeleton width="55%" height={13} />
@@ -35,8 +42,74 @@ const DetailsSkeleton = () => (
   </>
 );
 
+/* Both history tabs page the same way, so they share one hook: fetch page one,
+   append each further page, and reload from the top when a push says the data
+   changed. Nothing is requested until its tab is opened. */
+const usePagedList = (path, key, enabled) => {
+  const [items, setItems] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(
+    async (nextPage) => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const res = await API.get(`${path}?page=${nextPage}`);
+
+        // Replaced on page one, appended after — so "load more" grows the list
+        // and a refresh resets it.
+        setItems((prev) =>
+          nextPage === 1 ? res.data[key] : [...prev, ...res.data[key]]
+        );
+        setHasMore(res.data.hasMore);
+        setPage(nextPage);
+      } catch (err) {
+        setError(
+          err.response?.data?.message || "Couldn't load this list. Try again."
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [path, key]
+  );
+
+  const reload = useCallback(() => load(1), [load]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    // Only the first visit fetches; switching back to an already-loaded tab
+    // keeps what it had.
+    if (page === 0) reload();
+
+    const refresh = () => reload();
+    window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+
+    return () => {
+      window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [enabled, page, reload]);
+
+  return {
+    items,
+    hasMore,
+    loading,
+    error,
+    loadMore: () => load(page + 1),
+    reload,
+  };
+};
+
 export default function ChildDetails() {
   const { id } = useParams();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -49,7 +122,7 @@ export default function ChildDetails() {
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   const [saving, setSaving] = useState(false);
 
-  const fetchChild = async () => {
+  const fetchChild = useCallback(async () => {
     setLoadError('');
 
     try {
@@ -75,12 +148,35 @@ export default function ChildDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    setLoading(true);
     fetchChild();
-  }, [id]);
+
+    // The balance shown here changes with every purchase and top-up made
+    // elsewhere, so it is refreshed on a push and on returning to the app —
+    // this screen used to sit on whatever it loaded on arrival.
+    const refresh = () => fetchChild();
+    window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+
+    return () => {
+      window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [fetchChild]);
+
+  const bills = usePagedList(
+    `/parent/child/${id}/bills`,
+    'bills',
+    activeTab === 'purchases'
+  );
+
+  const recharges = usePagedList(
+    `/parent/child/${id}/recharges`,
+    'recharges',
+    activeTab === 'recharges'
+  );
 
   const saveWalletControl = async () => {
     setWalletBanner({ type: '', message: '' });
@@ -159,8 +255,43 @@ export default function ChildDetails() {
   }
 
   const student = data.student;
-  const bills = data.bills || [];
-  const recharges = data.recharges || [];
+
+  /* Shared by both history tabs: the first load shows skeletons, a failure
+     offers to retry, and a full page offers the next one. */
+  const renderList = (list, { empty, children }) => {
+    if (list.loading && list.items.length === 0) return <ListSkeleton />;
+
+    if (list.error && list.items.length === 0) {
+      return (
+        <Banner variant="alert" icon="⚠️">
+          {list.error}{' '}
+          <button type="button" className="link-button" onClick={list.reload}>
+            Try again
+          </button>
+        </Banner>
+      );
+    }
+
+    if (list.items.length === 0) return empty;
+
+    return (
+      <>
+        {children}
+
+        {list.hasMore && (
+          <Button
+            variant="ghost"
+            block
+            onClick={list.loadMore}
+            disabled={list.loading}
+            style={{ marginTop: 8 }}
+          >
+            {list.loading ? 'Loading…' : 'Load older entries'}
+          </Button>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="page">
@@ -214,12 +345,13 @@ export default function ChildDetails() {
         <div role="tabpanel">
           <h2 className="section-title">Transaction &amp; Purchase History</h2>
 
-          {bills.length === 0 ? (
-            <EmptyState icon="🧾" title="No purchases yet">
-              Nothing has been bought on this account so far.
-            </EmptyState>
-          ) : (
-            bills.map((bill, i) => (
+          {renderList(bills, {
+            empty: (
+              <EmptyState icon="🧾" title="No purchases yet">
+                Nothing has been bought on this account so far.
+              </EmptyState>
+            ),
+            children: bills.items.map((bill, i) => (
               <AnimateIn key={bill._id} index={i}>
                 <Card className="card--tight" style={{ marginBottom: 16 }}>
                   <div className="ledger-head">
@@ -263,8 +395,8 @@ export default function ChildDetails() {
                   </div>
                 </Card>
               </AnimateIn>
-            ))
-          )}
+            )),
+          })}
         </div>
       )}
 
@@ -272,40 +404,40 @@ export default function ChildDetails() {
         <div role="tabpanel">
           <h2 className="section-title">Recharge History</h2>
 
-          {recharges.length === 0 ? (
-            <EmptyState icon="⚡" title="No recharges yet">
-              Top-ups made at the school accounts counter will appear here.
-            </EmptyState>
-          ) : (
-            recharges
-              .slice()
-              .reverse()
-              .map((r, i) => (
-                <AnimateIn key={i} index={i}>
-                  <Card className="card--tight" style={{ marginBottom: 16 }}>
-                    <div className="ledger-head">
-                      <span>Wallet Deposit</span>
-                      <span>{new Date(r.date).toLocaleDateString()}</span>
-                    </div>
+          {renderList(recharges, {
+            empty: (
+              <EmptyState icon="⚡" title="No recharges yet">
+                Top-ups made at the school accounts counter will appear here.
+              </EmptyState>
+            ),
+            // Already newest-first from the server, which is what the reversed
+            // client-side copy was approximating.
+            children: recharges.items.map((r, i) => (
+              <AnimateIn key={`${r.date}-${i}`} index={i}>
+                <Card className="card--tight" style={{ marginBottom: 16 }}>
+                  <div className="ledger-head">
+                    <span>Wallet Deposit</span>
+                    <span>{new Date(r.date).toLocaleDateString()}</span>
+                  </div>
 
-                    <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
-                      <span>Recharge Amount</span>
-                      <span className="amount-in">+{formatINR(r.amount)}</span>
-                    </div>
+                  <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
+                    <span>Recharge Amount</span>
+                    <span className="amount-in">+{formatINR(r.amount)}</span>
+                  </div>
 
-                    <div className="ledger-row">
-                      <span>Previous Wallet Balance</span>
-                      <span>{formatINR(r.previousBalance)}</span>
-                    </div>
+                  <div className="ledger-row">
+                    <span>Previous Wallet Balance</span>
+                    <span>{formatINR(r.previousBalance)}</span>
+                  </div>
 
-                    <div className="ledger-row">
-                      <span>Closing Updated Balance</span>
-                      <span>{formatINR(r.newBalance)}</span>
-                    </div>
-                  </Card>
-                </AnimateIn>
-              ))
-          )}
+                  <div className="ledger-row">
+                    <span>Closing Updated Balance</span>
+                    <span>{formatINR(r.newBalance)}</span>
+                  </div>
+                </Card>
+              </AnimateIn>
+            )),
+          })}
         </div>
       )}
 

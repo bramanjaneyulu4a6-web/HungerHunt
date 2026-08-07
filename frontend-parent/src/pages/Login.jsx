@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth';
 import API from '../services/api';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';

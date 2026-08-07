@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
@@ -48,44 +48,97 @@ const ListSkeleton = () => (
 const usePagedList = (path, key, enabled) => {
   const [items, setItems] = useState([]);
   const [hasMore, setHasMore] = useState(false);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(
-    async (nextPage) => {
-      setLoading(true);
-      setError('');
+  /* A click, a push and a return to the foreground all only record which page
+     the list wants; the effect below is the one thing that fetches. That keeps
+     the request tied to the screen — it is abandoned when the screen goes —
+     and leaves one copy of the loading and error handling instead of one per
+     caller. `attempt` rises on every ask, so requesting page one again while
+     already showing page one still counts as a new request. */
+  const [request, setRequest] = useState({ page: 1, attempt: 0 });
 
-      try {
-        const res = await API.get(`${path}?page=${nextPage}`);
+  // The last page that actually arrived. "Load older entries" asks for the one
+  // after it, so a page that failed is retried rather than skipped over.
+  const [loadedPage, setLoadedPage] = useState(0);
 
-        // Replaced on page one, appended after — so "load more" grows the list
-        // and a refresh resets it.
-        setItems((prev) =>
-          nextPage === 1 ? res.data[key] : [...prev, ...res.data[key]]
-        );
-        setHasMore(res.data.hasMore);
-        setPage(nextPage);
-      } catch (err) {
-        setError(
-          err.response?.data?.message || "Couldn't load this list. Try again."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [path, key]
+  const reload = useCallback(
+    () => setRequest((prev) => ({ page: 1, attempt: prev.attempt + 1 })),
+    []
   );
 
-  const reload = useCallback(() => load(1), [load]);
+  const loadMore = useCallback(
+    () =>
+      setRequest((prev) => ({
+        page: loadedPage + 1,
+        attempt: prev.attempt + 1,
+      })),
+    [loadedPage]
+  );
+
+  // Which request has already been sent. Opening a tab, leaving it and coming
+  // back re-runs the effect, and without this the list would ask for the page
+  // it is already showing.
+  const fetched = useRef('');
 
   useEffect(() => {
     if (!enabled) return;
 
-    // Only the first visit fetches; switching back to an already-loaded tab
-    // keeps what it had.
-    if (page === 0) reload();
+    const token = `${path}|${request.page}|${request.attempt}`;
+    if (fetched.current === token) return;
+    fetched.current = token;
+
+    let ignore = false;
+    let settled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const res = await API.get(`${path}?page=${request.page}`);
+        settled = true;
+        if (ignore) return;
+
+        // Replaced on page one, appended after — so "load more" grows the list
+        // and a refresh resets it.
+        setItems((prev) =>
+          request.page === 1 ? res.data[key] : [...prev, ...res.data[key]]
+        );
+        setHasMore(res.data.hasMore);
+        setLoadedPage(request.page);
+      } catch (err) {
+        settled = true;
+        if (ignore) return;
+
+        // Forget the token as well, so the same page can be asked for again.
+        fetched.current = '';
+        setError(
+          err.response?.data?.message || "Couldn't load this list. Try again."
+        );
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      ignore = true;
+
+      // Leaving the tab before the reply arrives throws that reply away, so
+      // the request does not count as sent: without this the list would come
+      // back to a skeleton it never stops showing, waiting on an answer that
+      // was already discarded.
+      if (!settled) fetched.current = '';
+    };
+  }, [enabled, path, key, request]);
+
+  // Only while the tab is open: an unopened tab has nothing on screen to keep
+  // up to date, and fetching for it would undo the point of loading on demand.
+  useEffect(() => {
+    if (!enabled) return;
 
     const refresh = () => reload();
     window.addEventListener(PUSH_EVENT, refresh);
@@ -95,16 +148,9 @@ const usePagedList = (path, key, enabled) => {
       window.removeEventListener(PUSH_EVENT, refresh);
       window.removeEventListener('focus', refresh);
     };
-  }, [enabled, page, reload]);
+  }, [enabled, reload]);
 
-  return {
-    items,
-    hasMore,
-    loading,
-    error,
-    loadMore: () => load(page + 1),
-    reload,
-  };
+  return { items, hasMore, loading, error, loadMore, reload };
 };
 
 export default function ChildDetails() {
@@ -122,49 +168,61 @@ export default function ChildDetails() {
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   const [saving, setSaving] = useState(false);
 
-  const fetchChild = useCallback(async () => {
-    setLoadError('');
-
-    try {
-      const res = await API.get(`/parent/child/${id}`);
-      const control = res.data.student?.walletControl;
-
-      if (control) {
-        setWalletEnabled(control.enabled);
-        setWalletLimit(control.limitAmount || 500);
-        setWalletType(control.limitType || 'WEEKLY');
-      }
-
-      setData(res.data);
-    } catch (err) {
-      // A failed request used to fall through to the "records not found"
-      // screen, so a dropped connection read as a missing student.
-      console.error('Error fetching purchase records:', err);
-      setLoadError(
-        err.response
-          ? err.response.data?.message || 'Could not load this account.'
-          : "Couldn't reach the server. Check your connection."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  // "Try again" bumps this to run the effect below again, which keeps the one
+  // copy of the request inside the effect that owns and cancels it.
+  const [attempt, setAttempt] = useState(0);
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
-    fetchChild();
+    // A reply for a child this screen has already left must not land on it.
+    let ignore = false;
+
+    const load = async () => {
+      setLoadError('');
+
+      try {
+        const res = await API.get(`/parent/child/${id}`);
+        if (ignore) return;
+
+        const control = res.data.student?.walletControl;
+
+        if (control) {
+          setWalletEnabled(control.enabled);
+          setWalletLimit(control.limitAmount || 500);
+          setWalletType(control.limitType || 'WEEKLY');
+        }
+
+        setData(res.data);
+      } catch (err) {
+        if (ignore) return;
+
+        // A failed request used to fall through to the "records not found"
+        // screen, so a dropped connection read as a missing student.
+        console.error('Error fetching purchase records:', err);
+        setLoadError(
+          err.response
+            ? err.response.data?.message || 'Could not load this account.'
+            : "Couldn't reach the server. Check your connection."
+        );
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+
+    load();
 
     // The balance shown here changes with every purchase and top-up made
     // elsewhere, so it is refreshed on a push and on returning to the app —
     // this screen used to sit on whatever it loaded on arrival.
-    const refresh = () => fetchChild();
-    window.addEventListener(PUSH_EVENT, refresh);
-    window.addEventListener('focus', refresh);
+    window.addEventListener(PUSH_EVENT, load);
+    window.addEventListener('focus', load);
 
     return () => {
-      window.removeEventListener(PUSH_EVENT, refresh);
-      window.removeEventListener('focus', refresh);
+      ignore = true;
+      window.removeEventListener(PUSH_EVENT, load);
+      window.removeEventListener('focus', load);
     };
-  }, [fetchChild]);
+  }, [id, attempt]);
 
   const bills = usePagedList(
     `/parent/child/${id}/bills`,
@@ -234,7 +292,7 @@ export default function ChildDetails() {
         {backLink}
         <Banner variant="alert" icon="⚠️">
           {loadError}{' '}
-          <button type="button" className="link-button" onClick={fetchChild}>
+          <button type="button" className="link-button" onClick={retry}>
             Try again
           </button>
         </Banner>

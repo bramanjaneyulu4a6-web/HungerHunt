@@ -32,29 +32,45 @@ export default function SetPurchasePassword() {
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
 
-  const fetchStudent = async () => {
-    setLoadError('');
-
-    try {
-      const res = await API.get(`/parent/child/${id}`);
-      setStudent(res.data.student);
-      setHasPassword(res.data.hasPurchasePassword);
-    } catch (err) {
-      console.error(err);
-      setLoadError(
-        err.response
-          ? err.response.data?.message || 'Unable to load student.'
-          : "Couldn't reach the server. Check your connection."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  // "Try again" bumps this to run the effect below again, so the request has a
+  // single home and is abandoned with the screen that asked for it.
+  const [attempt, setAttempt] = useState(0);
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
-    setLoading(true);
-    fetchStudent();
-  }, [id]);
+    // A reply for the student this screen has moved on from must not land.
+    let ignore = false;
+
+    const load = async () => {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const res = await API.get(`/parent/child/${id}`);
+        if (ignore) return;
+
+        setStudent(res.data.student);
+        setHasPassword(res.data.hasPurchasePassword);
+      } catch (err) {
+        if (ignore) return;
+
+        console.error(err);
+        setLoadError(
+          err.response
+            ? err.response.data?.message || 'Unable to load student.'
+            : "Couldn't reach the server. Check your connection."
+        );
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [id, attempt]);
 
   // Every submit here shares the same shape: validate, POST, report, go back.
   // Returns a form submit handler, so each flow is driven by its own <form>
@@ -165,11 +181,7 @@ export default function SetPurchasePassword() {
           <Banner variant="alert" icon="⚠️">
             {loadError}
           </Banner>
-          <Button
-            variant="ghost"
-            onClick={fetchStudent}
-            style={{ marginTop: 16 }}
-          >
+          <Button variant="ghost" onClick={retry} style={{ marginTop: 16 }}>
             Try again
           </Button>
         </div>

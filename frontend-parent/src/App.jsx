@@ -6,7 +6,8 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/auth";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";

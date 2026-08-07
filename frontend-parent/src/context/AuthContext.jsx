@@ -1,9 +1,8 @@
-import { createContext, useState, useContext } from 'react';
+import { useState } from 'react';
 
+import { AuthContext } from './auth';
 import { authBypassEnabled, bypassParent } from '../utils/authBypass';
 import { stopPush } from '../utils/push';
-
-const AuthContext = createContext(null);
 
 /* Read once, at module scope, rather than in an effect after the first render.
    The session is already in localStorage when the app starts — there is nothing
@@ -50,5 +49,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

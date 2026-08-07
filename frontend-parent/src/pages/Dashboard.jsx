@@ -47,34 +47,48 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchDashboard = async () => {
-    try {
-      const res = await API.get('/parent/dashboard');
-      setChildren(res.data.children || []);
-      setError('');
-    } catch (err) {
-      // Previously this only reached the console, so a failed load was
-      // indistinguishable from a parent with no children linked.
-      console.error('Error loading linked students:', err);
-      setError("Couldn't load your children's accounts. Check your connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // "Try again" bumps this to run the effect below again. The request lives in
+  // the effect that owns it rather than beside it, so there is one copy of the
+  // fetch and it is always torn down with the screen that started it.
+  const [attempt, setAttempt] = useState(0);
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
-    fetchDashboard();
+    // A reply that arrives after this effect is cleaned up belongs to a screen
+    // that is already gone, and must not set state on it.
+    let ignore = false;
+
+    const load = async () => {
+      try {
+        const res = await API.get('/parent/dashboard');
+        if (ignore) return;
+
+        setChildren(res.data.children || []);
+        setError('');
+      } catch (err) {
+        if (ignore) return;
+
+        // Previously this only reached the console, so a failed load was
+        // indistinguishable from a parent with no children linked.
+        console.error('Error loading linked students:', err);
+        setError("Couldn't load your children's accounts. Check your connection.");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+
+    load();
 
     // Balances change from recharges and purchases made elsewhere.
-    const refresh = () => fetchDashboard();
-    window.addEventListener(PUSH_EVENT, refresh);
-    window.addEventListener('focus', refresh);
+    window.addEventListener(PUSH_EVENT, load);
+    window.addEventListener('focus', load);
 
     return () => {
-      window.removeEventListener(PUSH_EVENT, refresh);
-      window.removeEventListener('focus', refresh);
+      ignore = true;
+      window.removeEventListener(PUSH_EVENT, load);
+      window.removeEventListener('focus', load);
     };
-  }, []);
+  }, [attempt]);
 
   return (
     <div className="page">
@@ -88,7 +102,7 @@ const Dashboard = () => {
       {!loading && error && (
         <Banner variant="alert" icon="⚠️">
           {error}{' '}
-          <button type="button" className="link-button" onClick={fetchDashboard}>
+          <button type="button" className="link-button" onClick={retry}>
             Try again
           </button>
         </Banner>

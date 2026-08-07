@@ -84,13 +84,23 @@ const Purchased = () => {
     setCompletingId(purchase._id);
 
     try {
-      await api.put(`/purchases/complete/${purchase._id}`, {
-        items: purchase.items.map((item) => ({
-          productId: item.productId?._id,
+      // A product deleted after the order was raised leaves item.productId
+      // null. Serialising that sent an item with no product reference at all,
+      // since JSON.stringify drops an undefined value.
+      const items = purchase.items
+        .filter((item) => item.productId?._id)
+        .map((item) => ({
+          productId: item.productId._id,
           quantity: item.receivedQuantity,
           purchasePrice: item.purchasePrice,
-        })),
-      });
+        }));
+
+      if (items.length === 0) {
+        toast.error("Every product on this order has been deleted");
+        return;
+      }
+
+      await api.put(`/purchases/complete/${purchase._id}`, { items });
 
       await loadData();
       toast.success("Purchase order completed and stock applied");
@@ -195,6 +205,7 @@ const Purchased = () => {
                     <tbody>
                       {purchase.items.map((item, index) => {
                         const name = item.productId?.name || "Unlinked product";
+                        const dangling = !item.productId?._id;
                         const productTotal =
                           (item.receivedQuantity || 0) *
                           (item.purchasePrice || 0);
@@ -213,6 +224,12 @@ const Purchased = () => {
                                 className="input"
                                 style={{ width: 110 }}
                                 aria-label={`Received quantity for ${name}`}
+                                disabled={dangling}
+                                title={
+                                  dangling
+                                    ? "This product no longer exists"
+                                    : undefined
+                                }
                                 value={item.receivedQuantity ?? ""}
                                 onChange={(e) => {
                                   if (!item.productId) return;
@@ -233,6 +250,12 @@ const Purchased = () => {
                                 className="input"
                                 style={{ width: 110 }}
                                 aria-label={`Unit cost for ${name}`}
+                                disabled={dangling}
+                                title={
+                                  dangling
+                                    ? "This product no longer exists"
+                                    : undefined
+                                }
                                 value={item.purchasePrice ?? ""}
                                 onChange={(e) => {
                                   if (!item.productId) return;

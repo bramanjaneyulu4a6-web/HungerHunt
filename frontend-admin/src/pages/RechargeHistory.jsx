@@ -62,6 +62,9 @@ const RechargeHistory = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    // The blob is held in memory until this is revoked; an admin exporting
+    // repeatedly would otherwise accumulate them for the life of the tab.
+    URL.revokeObjectURL(url);
   };
 
   const esc = (value) =>

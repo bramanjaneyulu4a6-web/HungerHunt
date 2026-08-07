@@ -64,6 +64,9 @@ const Purchase = () => {
 
   const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
+    // Without the empty-query guard, a product with no name returns undefined
+    // here and vanishes from the list even when nothing is being searched.
+    if (!query) return true;
     return p.name?.toLowerCase().includes(query);
   });
 

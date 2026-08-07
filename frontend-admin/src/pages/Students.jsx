@@ -430,7 +430,6 @@ const Students = () => {
                     {SORTABLE_COLUMNS.map(({ key, label }) => (
                       <th
                         key={key}
-                        onClick={() => handleSort(key)}
                         aria-sort={
                           sortConfig.key === key
                             ? sortConfig.direction === 'asc'
@@ -439,16 +438,25 @@ const Students = () => {
                             : undefined
                         }
                         style={{
-                          cursor: 'pointer',
-                          userSelect: 'none',
+                          padding: 0,
                           background:
                             sortConfig.key === key
                               ? 'var(--border)'
                               : undefined,
                         }}
                       >
-                        {label}
-                        {getSortIndicator(key)}
+                        {/* A real button, so the sort can be reached by Tab and
+                            fired by Enter or Space. The click handler used to
+                            sit on the <th>, which nothing but a mouse can
+                            operate. */}
+                        <button
+                          type="button"
+                          className="th-sort"
+                          onClick={() => handleSort(key)}
+                        >
+                          {label}
+                          {getSortIndicator(key)}
+                        </button>
                       </th>
                     ))}
                     <th>Actions</th>

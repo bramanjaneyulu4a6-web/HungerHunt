@@ -115,17 +115,18 @@ const Billing = () => {
     }
   };
 
+  // Decisions and toasts happen here rather than inside the updater: React
+  // double-invokes updaters under StrictMode, which fired every warning twice.
   const updateStagedQuantity = (productId, amount, maxStock) => {
-    setStagedQuantities((prev) => {
-      const current = parseInt(prev[productId], 10) || 0;
-      const updated = current + amount;
-      if (updated < 1) return prev;
-      if (updated > maxStock) {
-        toast.error(`Only ${maxStock} in stock`);
-        return prev;
-      }
-      return { ...prev, [productId]: updated };
-    });
+    const updated = (parseInt(stagedQuantities[productId], 10) || 0) + amount;
+
+    if (updated < 1) return;
+    if (updated > maxStock) {
+      toast.error(`Only ${maxStock} in stock`);
+      return;
+    }
+
+    setStagedQuantities((prev) => ({ ...prev, [productId]: updated }));
   };
 
   const handleManualQuantityChange = (productId, value, maxStock) => {
@@ -181,24 +182,23 @@ const Billing = () => {
     const targetProduct = products.find((p) => p._id === productId);
     const maxStock = targetProduct ? targetProduct.stock : 999;
 
-    setCart((prevCart) =>
-      prevCart
-        .map((item) => {
-          if (item._id !== productId) return item;
+    const item = cart.find((i) => i._id === productId);
+    if (!item) return;
 
-          const currentQty = parseInt(item.quantity, 10) || 0;
-          const updatedQty = currentQty + amount;
+    const updatedQty = (parseInt(item.quantity, 10) || 0) + amount;
 
-          if (updatedQty > maxStock) {
-            toast.error(`Only ${maxStock} in stock`);
-            return item;
-          }
+    if (updatedQty > maxStock) {
+      toast.error(`Only ${maxStock} in stock`);
+      return;
+    }
 
-          if (updatedQty < 1) return null;
+    if (updatedQty < 1) {
+      setCart((prev) => prev.filter((i) => i._id !== productId));
+      return;
+    }
 
-          return { ...item, quantity: updatedQty };
-        })
-        .filter(Boolean)
+    setCart((prev) =>
+      prev.map((i) => (i._id === productId ? { ...i, quantity: updatedQty } : i))
     );
   };
 
@@ -218,17 +218,17 @@ const Billing = () => {
 
     if (isNaN(parsed)) return;
 
-    setCart((prevCart) =>
-      prevCart.map((item) => {
-        if (item._id !== productId) return item;
+    let next = parsed;
 
-        if (parsed < 1) return { ...item, quantity: 1 };
-        if (parsed > maxStock) {
-          toast.error(`Only ${maxStock} in stock`);
-          return { ...item, quantity: maxStock };
-        }
-        return { ...item, quantity: parsed };
-      })
+    if (parsed < 1) {
+      next = 1;
+    } else if (parsed > maxStock) {
+      toast.error(`Only ${maxStock} in stock`);
+      next = maxStock;
+    }
+
+    setCart((prev) =>
+      prev.map((i) => (i._id === productId ? { ...i, quantity: next } : i))
     );
   };
 

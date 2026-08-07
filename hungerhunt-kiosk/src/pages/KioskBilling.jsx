@@ -195,15 +195,17 @@ const fetchCatalog = async () => {
     }
   };
 
+  // Decisions and toasts happen before the setState call: React double-invokes
+  // updaters under StrictMode, which fired every warning twice in development.
   const updateStagedQuantity = (productId, amount, maxStock) => {
+    const wanted = (parseInt(stagedQuantities[productId], 10) || 0) + amount;
+    if (wanted > maxStock) toast.error(`Only ${maxStock} items available in stock!`);
+
     setStagedQuantities(prev => {
       const current = parseInt(prev[productId], 10) || 0;
       const updated = current + amount;
       if (updated < 1) return prev;
-      if (updated > maxStock) {
-        toast.error(`Only ${maxStock} items available in stock!`);
-        return prev;
-      }
+      if (updated > maxStock) return prev;
       return { ...prev, [productId]: updated };
     });
   };
@@ -262,26 +264,24 @@ const fetchCatalog = async () => {
     const targetProduct = products.find(p => p._id === productId);
     const maxStock = targetProduct ? targetProduct.stock : 999;
 
-    setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item._id === productId) {
-          const currentQty = parseInt(item.quantity, 10) || 0;
-          const updatedQty = currentQty + amount;
-          
-          if (updatedQty > maxStock) {
-            toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
-            return item;
-          }
-          
-          if (updatedQty < 1) {
-            return null;
-          }
-          
-          return { ...item, quantity: updatedQty };
-        }
-        return item;
-      }).filter(Boolean);
-    });
+    const item = cart.find(i => i._id === productId);
+    if (!item) return;
+
+    const updatedQty = (parseInt(item.quantity, 10) || 0) + amount;
+
+    if (updatedQty > maxStock) {
+      toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
+      return;
+    }
+
+    if (updatedQty < 1) {
+      setCart(prev => prev.filter(i => i._id !== productId));
+      return;
+    }
+
+    setCart(prev =>
+      prev.map(i => (i._id === productId ? { ...i, quantity: updatedQty } : i))
+    );
   };
 
   const handleCartManualQuantityChange = (productId, value) => {
@@ -298,25 +298,46 @@ const fetchCatalog = async () => {
 
     if (isNaN(parsed)) return;
 
-    setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item._id === productId) {
-          if (parsed < 1) {
-            return { ...item, quantity: 1 };
-          }
-          if (parsed > maxStock) {
-            toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
-            return { ...item, quantity: maxStock };
-          }
-          return { ...item, quantity: parsed };
-        }
-        return item;
-      });
-    });
+    let next = parsed;
+
+    if (parsed < 1) {
+      next = 1;
+    } else if (parsed > maxStock) {
+      toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
+      next = maxStock;
+    }
+
+    setCart(prev =>
+      prev.map(i => (i._id === productId ? { ...i, quantity: next } : i))
+    );
   };
 
   const removeFromCart = (productId) => {
     setCart(prevCart => prevCart.filter(item => item._id !== productId));
+  };
+
+  const verifyAndPay = async () => {
+    // Without this guard a second tap during the verify round-trip re-enters
+    // from the same closure and bills the student twice.
+    if (paying) return;
+    setPaying(true);
+
+    try {
+      await api.post("/transactions/verify-payment", {
+        studentId: selectedStudent._id,
+        phone: selectedStudent.parentPhoneNumber,
+        password: purchasePassword,
+      });
+
+      setShowVerifyModal(false);
+      setPurchasePassword("");
+
+      await handleCheckout();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Verification Failed");
+    } finally {
+      setPaying(false);
+    }
   };
 
   const handleCancelPayment = () => {
@@ -383,10 +404,11 @@ setShowWelcome(true);
     selectedCategory === "All" ||
     p.stockGroup?.name === selectedCategory;
 
-  const matchesSearch =
-    p.name
-      .toLowerCase()
-      .includes(productSearchQuery.toLowerCase());
+  // A row whose product lost its name would otherwise throw here and take the
+  // whole till down mid-sale.
+  const matchesSearch = (p.name || "")
+    .toLowerCase()
+    .includes(productSearchQuery.toLowerCase());
 
   return matchesCategory && matchesSearch;
 });
@@ -1152,6 +1174,7 @@ if (showWelcome) {
       </h2>
 
       <label
+        htmlFor="verify-phone"
         style={{
           display: "block",
           marginBottom: 8,
@@ -1162,6 +1185,7 @@ if (showWelcome) {
       </label>
 
       <input
+        id="verify-phone"
         readOnly
         value={selectedStudent?.parentPhoneNumber || ""}
         style={{
@@ -1174,6 +1198,7 @@ if (showWelcome) {
       />
 
       <label
+        htmlFor="verify-password"
         style={{
           display: "block",
           marginBottom: 8,
@@ -1184,12 +1209,19 @@ if (showWelcome) {
       </label>
 
       <input
+        id="verify-password"
         type="password"
         placeholder="Enter Purchase Password"
+        autoComplete="off"
         value={purchasePassword}
         onChange={(e) =>
           setPurchasePassword(e.target.value)
         }
+        onKeyDown={(e) => {
+          // Enter is the natural gesture on a till keypad; without this the
+          // cashier had to reach for the button every time.
+          if (e.key === "Enter" && !paying) verifyAndPay();
+        }}
         style={{
           width: "100%",
           padding: 14,
@@ -1233,39 +1265,7 @@ if (showWelcome) {
             cursor: "pointer"
           }}
           disabled={paying}
-          onClick={async () => {
-            // Without this guard a second tap during the verify round-trip
-            // re-enters from the same closure and bills the student twice.
-            if (paying) return;
-            setPaying(true);
-
-            try {
-
-              await api.post(
-                "/transactions/verify-payment",
-                {
-                  studentId: selectedStudent._id,
-                  phone: selectedStudent.parentPhoneNumber,
-                  password: purchasePassword
-                }
-              );
-
-              setShowVerifyModal(false);
-              setPurchasePassword("");
-
-              await handleCheckout();
-
-            } catch (err) {
-
-              toast.error(
-                err.response?.data?.message ||
-                "Verification Failed"
-              );
-
-            } finally {
-              setPaying(false);
-            }
-          }}
+          onClick={verifyAndPay}
         >
           {paying ? "Processing…" : "Verify & Pay"}
         </button>

@@ -797,6 +797,28 @@
   }
 }
 
+/* Sortable column header. Fills its cell so the whole header stays clickable,
+   while being a real button for keyboard and screen-reader users. */
+.th-sort {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.th-sort:hover {
+  color: var(--ink);
+}
+
 /* Rows that carry row-level actions highlight under the pointer. */
 .table--hover tbody tr:hover {
   background: var(--bg);

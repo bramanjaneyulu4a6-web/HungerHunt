@@ -57,7 +57,11 @@ export default function SetPurchasePassword() {
   }, [id]);
 
   // Every submit here shares the same shape: validate, POST, report, go back.
-  const submit = async (endpoint, body, validate) => {
+  // Returns a form submit handler, so each flow is driven by its own <form>
+  // and Enter works the same as the button.
+  const submit = (endpoint, body, validate) => async (e) => {
+    e.preventDefault();
+
     setError('');
     setSuccess('');
 
@@ -76,17 +80,19 @@ export default function SetPurchasePassword() {
     }
   };
 
-  const savePassword = () =>
-    submit('/parent/set-purchase-password', { password }, () => {
+  const savePassword = submit(
+    '/parent/set-purchase-password',
+    { password },
+    () => {
       if (!password) return 'Please enter a password.';
       if (password.length < MIN_LENGTH)
         return `Password must be at least ${MIN_LENGTH} characters.`;
       if (password !== confirmPassword) return 'Passwords do not match.';
       return null;
-    });
+    }
+  );
 
-  const changePassword = () =>
-    submit(
+  const changePassword = submit(
       '/parent/change-purchase-password',
       { currentPassword, newPassword },
       () => {
@@ -98,8 +104,7 @@ export default function SetPurchasePassword() {
       }
     );
 
-  const resetPassword = () =>
-    submit(
+  const resetPassword = submit(
       '/parent/reset-purchase-password',
       { parentPassword: resetParentPassword, newPassword: resetPasswordValue },
       () => {
@@ -118,21 +123,27 @@ export default function SetPurchasePassword() {
     setSuccess('');
   };
 
-  const field = (label, value, onChange, autoComplete = 'new-password') => (
-    <div>
-      <label className="field-label" htmlFor={label}>
-        {label}
-      </label>
-      <input
-        id={label}
-        className="input"
-        type="password"
-        autoComplete={autoComplete}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
+  const field = (label, value, onChange, autoComplete = 'new-password') => {
+    // The label doubled as the id, which put spaces in it — legal enough that
+    // browsers still pair them, but not a valid HTML id.
+    const fieldId = label.toLowerCase().replace(/\s+/g, '-');
+
+    return (
+      <div>
+        <label className="field-label" htmlFor={fieldId}>
+          {label}
+        </label>
+        <input
+          id={fieldId}
+          className="input"
+          type="password"
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -223,14 +234,17 @@ export default function SetPurchasePassword() {
           )}
 
           {!hasPassword ? (
-            <div style={{ display: 'grid', gap: 16, marginTop: 24 }}>
+            <form
+              onSubmit={savePassword}
+              style={{ display: 'grid', gap: 16, marginTop: 24 }}
+            >
               {field('Purchase Password', password, setPassword)}
               {field('Confirm Password', confirmPassword, setConfirmPassword)}
 
-              <Button onClick={savePassword} disabled={saving} block>
+              <Button type="submit" disabled={saving} block>
                 {saving ? 'Saving…' : 'Save Password'}
               </Button>
-            </div>
+            </form>
           ) : (
             <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
               <Button
@@ -243,7 +257,10 @@ export default function SetPurchasePassword() {
               </Button>
 
               {openForm === 'change' && (
-                <div style={{ display: 'grid', gap: 16, marginBottom: 4 }}>
+                <form
+                  onSubmit={changePassword}
+                  style={{ display: 'grid', gap: 16, marginBottom: 4 }}
+                >
                   {field(
                     'Current Password',
                     currentPassword,
@@ -257,10 +274,10 @@ export default function SetPurchasePassword() {
                     setConfirmNewPassword
                   )}
 
-                  <Button onClick={changePassword} disabled={saving} block>
+                  <Button type="submit" disabled={saving} block>
                     {saving ? 'Saving…' : 'Save Changes'}
                   </Button>
-                </div>
+                </form>
               )}
 
               <Button
@@ -273,7 +290,10 @@ export default function SetPurchasePassword() {
               </Button>
 
               {openForm === 'reset' && (
-                <div style={{ display: 'grid', gap: 16 }}>
+                <form
+                  onSubmit={resetPassword}
+                  style={{ display: 'grid', gap: 16 }}
+                >
                   <p style={{ fontSize: 13, color: 'var(--muted)' }}>
                     Confirm with your own account password to set a new purchase
                     password.
@@ -293,14 +313,14 @@ export default function SetPurchasePassword() {
                   )}
 
                   <Button
+                    type="submit"
                     variant="alert"
-                    onClick={resetPassword}
                     disabled={saving}
                     block
                   >
                     {saving ? 'Resetting…' : 'Reset Password'}
                   </Button>
-                </div>
+                </form>
               )}
             </div>
           )}

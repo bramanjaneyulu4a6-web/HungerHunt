@@ -24,14 +24,8 @@ export const registerAdmin = async (req, res) => {
     const adminCount = await Admin.countDocuments();
     const limit = parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3;
 
-    // Open only to bootstrap the very first account; after that an existing
-    // admin must be signed in, otherwise anyone could claim a free slot.
-    if (adminCount > 0 && !req.adminId) {
-      return res.status(401).json({
-        message: "Only a signed-in admin can create additional admin accounts."
-      });
-    }
-
+    // Who may call this is settled by protectAdminUnlessBootstrap on the route:
+    // open while no admin exists, signed-in admins only thereafter.
     if (adminCount >= limit) {
       return res.status(400).json({
         message: `Registration limited. Max ${limit} admins allowed.`

@@ -233,7 +233,7 @@ const Purchased = () => {
                                 className="input"
                                 style={{ width: 110 }}
                                 aria-label={`Unit cost for ${name}`}
-                                value={item.purchasePrice || ""}
+                                value={item.purchasePrice ?? ""}
                                 onChange={(e) => {
                                   if (!item.productId) return;
                                   handleItemChange(

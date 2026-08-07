@@ -27,6 +27,7 @@ const [showCart, setShowCart] = useState(false);
  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
 const [purchasePassword, setPurchasePassword] = useState("");
+const [paying, setPaying] = useState(false);
 const [inventoryError, setInventoryError] = useState("");
 
 const refreshPage = async () => {
@@ -80,13 +81,12 @@ const inventoryProducts = data
         })
         .filter(item => item && item.stock > 0)
     );
-// Refresh selected student details
-// Clear student details
+// Drop the selected student so their balance is re-read on the next lookup.
+// The cart survives — it was just reconciled against fresh stock above.
 setSelectedStudent(null);
 setSearchResults([]);
 setSearchQuery("");
 setIsSearched(false);
-setCart([]);
   } catch (err) {
     console.error(err);
     toast.error("Failed to refresh products.");
@@ -96,8 +96,10 @@ setCart([]);
 };
 
   useEffect(() => {
+    // A cleared quantity box prices as 1, which is what checkout posts and what
+    // the steppers clamp to. Treating it as 0 here understated the bill.
     const total = cart.reduce(
-      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 0),
+      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
       0
     );
     setInvoiceTotal(total);
@@ -145,6 +147,14 @@ const fetchCatalog = async () => {
 
 
 
+  // The cart belongs to whoever is selected. Switching to a different student
+  // must not carry the previous one's goods onto their bill; re-selecting the
+  // same student leaves the cart alone.
+  const selectStudent = (student) => {
+    if (selectedStudent && selectedStudent._id !== student._id) setCart([]);
+    setSelectedStudent(student);
+  };
+
   const handleStudentSearch = async () => {
     if (!searchQuery.trim()) {
       toast.error("Please enter student name or hostel number");
@@ -163,26 +173,22 @@ const fetchCatalog = async () => {
 
       setIsSearched(true);
 
+      // A search that finds nothing, or that needs the cashier to pick from a
+      // list, has not changed who is being served — so it leaves both the
+      // selected student and the cart alone.
       if (res.data.length === 0) {
-        setSelectedStudent(null);
         setSearchResults([]);
-        // setProducts([]);
-        setCart([]);
         toast.error("No student found matching that name or hostel number");
         return;
       }
 
       if (res.data.length === 1) {
-  setSelectedStudent(res.data[0]);
-  setSearchResults([]);
-  return;
-}
+        selectStudent(res.data[0]);
+        setSearchResults([]);
+        return;
+      }
 
-      // Multiple students found
-      setSelectedStudent(null);
       setSearchResults(res.data);
-      // setProducts([]);
-      setCart([]);
     } catch (error) {
       console.error(error);
       toast.error("Student search failed");
@@ -610,7 +616,7 @@ if (showWelcome) {
               }}
             />
 
-            <div className="product-scroll-panel" className="kiosk-scroll">
+            <div className="product-scroll-panel kiosk-scroll">
               {loadingProducts ? (
   <div
     style={{
@@ -854,7 +860,7 @@ if (showWelcome) {
               <button
                 className="btn btn--primary btn--sm"
                 onClick={() => {
-                  setSelectedStudent(student);
+                  selectStudent(student);
                   setSearchResults([]);
                 }}
               >
@@ -1032,7 +1038,7 @@ if (showWelcome) {
 
       {/* Total */}
       <td>
-        {formatINR(item.price * item.quantity)}
+        {formatINR(item.price * (parseInt(item.quantity, 10) || 1))}
       </td>
 
       {/* Remove */}
@@ -1207,6 +1213,7 @@ if (showWelcome) {
             border: "1px solid var(--border-strong)",
             cursor: "pointer"
           }}
+          disabled={paying}
           onClick={() => {
             setShowVerifyModal(false);
             setPurchasePassword("");
@@ -1225,7 +1232,13 @@ if (showWelcome) {
             color: "var(--on-dark)",
             cursor: "pointer"
           }}
+          disabled={paying}
           onClick={async () => {
+            // Without this guard a second tap during the verify round-trip
+            // re-enters from the same closure and bills the student twice.
+            if (paying) return;
+            setPaying(true);
+
             try {
 
               await api.post(
@@ -1249,10 +1262,12 @@ if (showWelcome) {
                 "Verification Failed"
               );
 
+            } finally {
+              setPaying(false);
             }
           }}
         >
-          Verify & Pay
+          {paying ? "Processing…" : "Verify & Pay"}
         </button>
       </div>
     </div>

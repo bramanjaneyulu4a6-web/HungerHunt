@@ -501,6 +501,8 @@ const Products = () => {
                 <label className="field-label" htmlFor="product-price">
                   Selling Price (₹)
                 </label>
+                {/* Required like its siblings: the backend falls back to
+                    price: 0 on a blank, which the till would then sell free. */}
                 <input
                   id="product-price"
                   type="number"
@@ -508,6 +510,7 @@ const Products = () => {
                   step="0.01"
                   className="input"
                   placeholder="0.00"
+                  required
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                 />

@@ -23,8 +23,10 @@ const Billing = () => {
   const [stagedQuantities, setStagedQuantities] = useState({});
 
   useEffect(() => {
+    // A cleared quantity box prices as 1, which is what checkout posts and what
+    // the steppers clamp to. Treating it as 0 here understated the bill.
     const total = cart.reduce(
-      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 0),
+      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
       0
     );
     setInvoiceTotal(total);
@@ -58,6 +60,15 @@ const Billing = () => {
     }
   };
 
+  // The cart belongs to whoever is selected. Switching to a different student
+  // must not carry the previous one's goods onto their bill; re-selecting the
+  // same student leaves the cart alone.
+  const selectStudent = (student) => {
+    if (selectedStudent && selectedStudent._id !== student._id) setCart([]);
+    setSelectedStudent(student);
+    fetchCatalog();
+  };
+
   const handleStudentSearch = async () => {
     if (!searchQuery.trim()) {
       toast.error("Enter a student name or hostel number");
@@ -80,26 +91,22 @@ const Billing = () => {
 
       setIsSearched(true);
 
+      // A search that finds nothing, or that needs the cashier to pick from a
+      // list, has not changed who is being served — so it leaves both the
+      // selected student and the cart alone.
       if (res.data.length === 0) {
-        setSelectedStudent(null);
         setSearchResults([]);
-        setProducts([]);
-        setCart([]);
         toast.error("No student found matching that name or hostel number");
         return;
       }
 
       if (res.data.length === 1) {
-        setSelectedStudent(res.data[0]);
+        selectStudent(res.data[0]);
         setSearchResults([]);
-        fetchCatalog();
         return;
       }
 
-      setSelectedStudent(null);
       setSearchResults(res.data);
-      setProducts([]);
-      setCart([]);
     } catch (error) {
       console.error(error);
       toast.error("Student search failed — check your connection and retry");
@@ -372,9 +379,8 @@ const Billing = () => {
                         <Button
                           className="btn--sm"
                           onClick={() => {
-                            setSelectedStudent(student);
+                            selectStudent(student);
                             setSearchResults([]);
-                            fetchCatalog();
                           }}
                         >
                           Select Profile
@@ -757,7 +763,7 @@ const Billing = () => {
                             }}
                           >
                             {formatINR(
-                              item.price * (parseInt(item.quantity, 10) || 0)
+                              item.price * (parseInt(item.quantity, 10) || 1)
                             )}
                           </td>
                           <td style={{ padding: "10px 4px", textAlign: "center" }}>

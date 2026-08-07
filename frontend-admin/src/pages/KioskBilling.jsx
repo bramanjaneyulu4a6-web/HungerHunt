@@ -3,6 +3,7 @@ import { ShoppingCart, X } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
+import { formatINR } from "../utils/format";
 import hungerLogo from "../assets/Logo.png";
 
 const KioskBilling = ({ onLogout }) => {
@@ -677,7 +678,7 @@ if (showWelcome) {
         color: "var(--ink)",
       }}
     >
-      ₹{p.price}
+      {formatINR(p.price)}
     </div>
   </div>
 
@@ -939,7 +940,7 @@ if (showWelcome) {
           fontWeight: 700,
         }}
       >
-        ₹{selectedStudent.pocketMoney}
+        {formatINR(selectedStudent.pocketMoney)}
       </div>
     </div>
   </div>
@@ -986,7 +987,7 @@ if (showWelcome) {
 
       {/* Unit Price */}
       <td>
-        ₹{item.price}
+        {formatINR(item.price)}
       </td>
 
       {/* Quantity */}
@@ -1031,7 +1032,7 @@ if (showWelcome) {
 
       {/* Total */}
       <td>
-        ₹{item.price * item.quantity}
+        {formatINR(item.price * item.quantity)}
       </td>
 
       {/* Remove */}
@@ -1049,11 +1050,6 @@ if (showWelcome) {
 </tbody>
   </table>
 )}
-       {/* <div className="kiosk-checkout">
-                <div className="kiosk-total-row">
-                  <span className="kiosk-total-label">Total Bill</span>
-                  <span className="kiosk-total-amount">₹{invoiceTotal}</span>
-           </div> */}
 <div className="kiosk-checkout">
   <div className="kiosk-total-row">
     <span className="kiosk-total-label">
@@ -1061,7 +1057,7 @@ if (showWelcome) {
     </span>
 
     <span className="kiosk-total-amount">
-      ₹{invoiceTotal}
+      {formatINR(invoiceTotal)}
     </span>
   </div>
                 {selectedStudent && (
@@ -1073,8 +1069,8 @@ if (showWelcome) {
     }`}
   >
                    {selectedStudent.pocketMoney - invoiceTotal < 0
-                    ? `Overdraft Limit Exceeded by ₹${Math.abs(selectedStudent.pocketMoney - invoiceTotal)}`
-                     : `Remaining Balance: ₹${selectedStudent.pocketMoney - invoiceTotal}`}
+                    ? `Balance short by ${formatINR(Math.abs(selectedStudent.pocketMoney - invoiceTotal))}`
+                     : `Remaining Balance: ${formatINR(selectedStudent.pocketMoney - invoiceTotal)}`}
                  </div>)}
 
                  <div className="kiosk-actions">

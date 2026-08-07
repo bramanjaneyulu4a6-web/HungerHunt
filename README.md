@@ -43,6 +43,8 @@ npm install --prefix hungerhunt-kiosk  && npm run dev --prefix hungerhunt-kiosk
 
 **backend** — `MONGO_URI`, `JWT_SECRET`, `PORT`, `MAX_ADMIN_ACCOUNTS`, `PARENT_CLIENT_URL` and `ADMIN_CLIENT_URL` (used to build password-reset links in emails), `EMAIL_USER` / `EMAIL_PASS` (Gmail app password), `CLOUDINARY_*`, and `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`. Firebase is optional — leave it unset and push notifications simply switch off instead of crashing the server.
 
+Set `TRUST_PROXY` when deploying behind a proxy or managed host (usually `1`, the number of hops in front of the server). Without it every request appears to come from the proxy's IP, so all clients share one rate-limit bucket and a handful of failed logins locks out everyone. Setting it to `true` is refused at boot — it would let any client spoof `X-Forwarded-For` and skip the limiter altogether.
+
 **frontends** — `VITE_API_BASE_URL` pointing at the backend's `/api`. The parent app additionally needs `VITE_VAPID_KEY` for web push.
 
 ## Authentication

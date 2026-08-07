@@ -96,7 +96,13 @@ const Purchased = () => {
       toast.success("Purchase order completed and stock applied");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to complete the purchase order");
+      toast.error(
+        err.response?.data?.message || "Failed to complete the purchase order"
+      );
+
+      // The order was completed elsewhere, so this list is showing a stale
+      // pending row.
+      if (err.response?.status === 409) await loadData();
     } finally {
       setCompletingId(null);
     }

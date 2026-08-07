@@ -38,7 +38,7 @@ const SHARED = [
   },
   {
     file: 'src/utils/format.js',
-    apps: ['frontend-parent', 'frontend-admin'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
   },
   {
     file: 'src/components/RefreshButton.jsx',

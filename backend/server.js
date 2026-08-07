@@ -21,6 +21,25 @@ import { authBypassEnabled } from './middleware/devBypass.js';
 
 const app = express();
 
+// Behind a hosting proxy, req.ip is the proxy's own address unless Express is
+// told how many hops to trust — which would put every client in a single
+// rate-limit bucket, so ten failed logins from anyone would lock out everyone.
+// TRUST_PROXY is the number of proxies in front of this server (most managed
+// hosts: 1). Leave it unset when the app is reached directly.
+const trustProxy = process.env.TRUST_PROXY?.trim();
+
+if (trustProxy === 'true') {
+  // Trusting every hop lets a client set X-Forwarded-For themselves and skip
+  // the limiter entirely, so this one value is refused rather than honoured.
+  console.warn(
+    'TRUST_PROXY=true is unsafe — any client could then spoof its IP and bypass rate limiting.' +
+    ' Set it to the number of proxies in front of this server instead. Ignoring it for now.'
+  );
+} else if (trustProxy) {
+  const hops = Number(trustProxy);
+  app.set('trust proxy', Number.isInteger(hops) ? hops : trustProxy);
+}
+
 if (authBypassEnabled) {
   console.warn(
     '\n*** AUTH_BYPASS IS ON — every admin and parent route is unauthenticated. ***' +

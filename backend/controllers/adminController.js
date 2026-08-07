@@ -1,6 +1,6 @@
 import Admin from '../models/Admin.js';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { signAdminToken } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
 
@@ -61,8 +61,7 @@ export const loginAdmin = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: admin._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, email: admin.email });
+    res.json({ token: signAdminToken(admin._id), email: admin.email });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

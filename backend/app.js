@@ -18,6 +18,7 @@ import inventoryRoutes from './routes/inventoryRoutes.js';
 import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
+import { parentSecretIsShared } from './utils/tokens.js';
 
 const app = express();
 
@@ -44,6 +45,14 @@ if (authBypassEnabled) {
   console.warn(
     '\n*** AUTH_BYPASS IS ON — every admin and parent route is unauthenticated. ***' +
     '\n*** Local development only. Unset AUTH_BYPASS before deploying. ***\n'
+  );
+}
+
+if (parentSecretIsShared()) {
+  console.warn(
+    'PARENT_JWT_SECRET is not set, so parent tokens are signed with JWT_SECRET.' +
+    ' The role claim still separates them; setting a second secret makes an' +
+    ' admin token unusable on a parent route at the signature instead.'
   );
 }
 

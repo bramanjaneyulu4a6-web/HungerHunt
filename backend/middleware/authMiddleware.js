@@ -1,22 +1,25 @@
-import jwt from 'jsonwebtoken';
-
 import Admin from '../models/Admin.js';
+import { verifyToken } from '../utils/tokens.js';
 import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './devBypass.js';
 
 const readToken = (req) => req.headers.authorization?.split(' ')[1];
 
-// Verifying the signature is not enough to call someone an admin. Admin and
-// parent tokens are signed with the same JWT_SECRET and both carry a bare
-// { id }, so a parent's token satisfies jwt.verify on an admin route just as
-// well as an admin's does. Confirming the subject is an Admin document is what
-// actually tells the two apart — and it is also the only thing that stops a
-// deleted admin's unexpired token from continuing to work.
+// Two independent checks stand between a token and admin access.
 //
-// This mirrors assertOwnsStudent, which is why the reverse attack — an admin
-// token on a parent route — already fails.
+// verifyToken settles what the token is: signed with the admin key, and
+// claiming the admin role. Tokens predating the role claim have none, and are
+// accepted until the grace date in utils/tokens.js.
+//
+// The lookup below settles who it is for. It is what makes a parent's token
+// useless here during that grace period, when the claim cannot distinguish
+// them, and it is the only thing that revokes a deleted admin's unexpired
+// token at any time. It mirrors assertOwnsStudent, which is why the reverse
+// attack — an admin token on a parent route — has always failed.
 const resolveAdminId = async (token) => {
-  const { id } = jwt.verify(token, process.env.JWT_SECRET);
-  return (await Admin.exists({ _id: id })) ? id : null;
+  const payload = verifyToken(token, 'admin');
+  if (!payload) return null;
+
+  return (await Admin.exists({ _id: payload.id })) ? payload.id : null;
 };
 
 export const protectAdmin = async (req, res, next) => {
@@ -87,14 +90,13 @@ export const protectParent = async (req, res, next) => {
   const token = readToken(req);
   if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.parent = {
-      id: decoded.id,
-      phone: decoded.phone
-    };
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Token failed, invalid authorization' });
-  }
+  const payload = verifyToken(token, 'parent');
+  if (!payload) return res.status(401).json({ message: 'Not authorized' });
+
+  req.parent = {
+    id: payload.id,
+    phone: payload.phone
+  };
+
+  next();
 };

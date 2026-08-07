@@ -3,7 +3,7 @@ import Transaction from "../models/Transaction.js";
 import Parent from "../models/Parent.js";
 
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
@@ -84,11 +84,7 @@ export const loginParent = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    const token = jwt.sign(
-      { id: parent._id, phone: parent.phone },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signParentToken(parent._id, parent.phone);
 
     res.json({
       token,

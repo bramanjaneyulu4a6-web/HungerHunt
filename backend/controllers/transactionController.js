@@ -3,7 +3,7 @@ import Transaction from '../models/Transaction.js';
 import Parent from "../models/Parent.js";
 import Inventory from "../models/Inventory.js";
 import bcrypt from "bcryptjs";
-import { sendNotification } from "../utils/sendNotification.js";
+import { sendToParent } from "../utils/sendNotification.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -185,9 +185,11 @@ export const generateBill = async (req, res) => {
 
     const parent = await Parent.findOne({ studentIds: studentId });
 
-    if (parent?.fcmToken) {
-      await sendNotification(
-        parent.fcmToken,
+    if (parent) {
+      // Not awaited: the till gets its response now, and the notification goes
+      // out on its own. sendToParent never rejects.
+      sendToParent(
+        parent,
         "🛒 Purchase Alert",
         `Spent ₹${totalAmount}. Balance ₹${debited.pocketMoney}`,
         {

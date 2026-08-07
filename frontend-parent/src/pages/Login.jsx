@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import API from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
-import { requestNotificationPermission } from '../utils/notification';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
 
 export default function Login() {
@@ -25,12 +24,9 @@ export default function Login() {
 
       login(res.data.token, res.data.parent);
 
-      // Asking for push permission is deliberately not awaited — the prompt
-      // should not stand between a parent and their dashboard.
-      setTimeout(() => {
-        requestNotificationPermission().catch(console.error);
-      }, 500);
-
+      // Push registration is not kicked off here: App watches for a signed-in
+      // parent and starts it, which covers this login and every later start
+      // that restores the session.
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials');

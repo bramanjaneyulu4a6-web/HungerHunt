@@ -1,4 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./pages/Login";
@@ -10,8 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SetPurchasePassword from "./pages/SetPurchasePassword";
 
 import Navbar from "./components/Navbar";
-import { useEffect } from "react";
-import { listenForMessages } from "./utils/notification";
+import { startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
 
 const ProtectedRoute = ({ children }) => {
@@ -20,13 +26,27 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function AppContent() {
-  useEffect(() => {
-    listenForMessages((payload) => {
-      window.dispatchEvent(new CustomEvent(PUSH_EVENT, { detail: payload }));
-    });
-  }, []);
-
   const { parent } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Registering before login would ask for the notification permission on a
+    // screen that cannot explain why, and would have no account to attach the
+    // device to. This runs once a parent is signed in — on login, and on every
+    // later start that restores their session.
+    if (!parent) return;
+
+    startPush(({ data, tapped }) => {
+      // Screens listen for this to refresh balances that changed elsewhere.
+      window.dispatchEvent(new CustomEvent(PUSH_EVENT, { detail: data }));
+
+      // Tapping a notification should open what it was about, the way any
+      // other app behaves.
+      if (tapped && data.studentId) {
+        navigate(`/child/${data.studentId}`);
+      }
+    });
+  }, [parent, navigate]);
 
   return (
     <>
@@ -58,16 +78,14 @@ function AppContent() {
           }
         />
 
-        {/* NEW PAGE */}
-        {/* Purchase Password Page */}
-<Route
-  path="/purchase-password/:id"
-  element={
-    <ProtectedRoute>
-      <SetPurchasePassword />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/purchase-password/:id"
+          element={
+            <ProtectedRoute>
+              <SetPurchasePassword />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />

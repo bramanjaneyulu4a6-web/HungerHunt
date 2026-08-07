@@ -9,12 +9,13 @@ import {
   resetPurchasePassword,
   updateWalletControl,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  savePushToken,
+  removePushToken
 } from "../controllers/parentController.js";
 
 import { protectParent } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/rateLimit.js';
-import Parent from "../models/Parent.js";
 
 const router = express.Router();
 
@@ -26,22 +27,8 @@ router.post('/reset-password/:token', authLimiter, resetPassword);
 router.get('/dashboard', protectParent, getParentDashboardDetails);
 router.get('/child/:id', protectParent, getChildDetails);
 
-router.post('/save-fcm-token', protectParent, async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ message: "FCM token is required" });
-    }
-
-    await Parent.findByIdAndUpdate(req.parent.id, { fcmToken: token });
-
-    res.json({ message: "FCM token saved successfully" });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+router.post('/save-fcm-token', protectParent, savePushToken);
+router.post('/remove-fcm-token', protectParent, removePushToken);
 
 router.post('/set-purchase-password', protectParent, setPurchasePassword);
 router.post('/change-purchase-password', protectParent, changePurchasePassword);

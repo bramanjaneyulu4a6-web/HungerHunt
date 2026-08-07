@@ -385,6 +385,72 @@ export const resetPurchasePassword = async (req, res) => {
 };
 
 /* =========================================================
+   ✅ PUSH TOKEN REGISTRATION
+========================================================= */
+const PLATFORMS = new Set(["ios", "android", "web"]);
+
+export const savePushToken = async (req, res) => {
+  try {
+    const { token, platform } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Push token is required" });
+    }
+
+    // A device is one physical phone or browser, and FCM issues it one token.
+    // Detaching it from everyone first covers two cases at once: a shared
+    // family phone whose previous parent would otherwise keep receiving
+    // notifications about a child who is not theirs, and this same parent
+    // re-registering on every app start, which would otherwise stack duplicates.
+    await Parent.updateMany(
+      { "pushTokens.token": token },
+      { $pull: { pushTokens: { token } } }
+    );
+
+    // Same device, recorded in the field that predates pushTokens. Matched on
+    // the token rather than cleared outright: a parent whose legacy token is a
+    // *different* device still needs it until that device re-registers.
+    await Parent.updateMany({ fcmToken: token }, { $set: { fcmToken: null } });
+
+    await Parent.updateOne(
+      { _id: req.parent.id },
+      {
+        $push: {
+          pushTokens: {
+            token,
+            platform: PLATFORMS.has(platform) ? platform : "web",
+            updatedAt: new Date()
+          }
+        }
+      }
+    );
+
+    res.json({ message: "Device registered for notifications" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const removePushToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Push token is required" });
+    }
+
+    await Parent.updateOne(
+      { _id: req.parent.id },
+      { $pull: { pushTokens: { token } } }
+    );
+
+    res.json({ message: "Device unregistered" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================================================
    ✅ WALLET CONTROL
 ========================================================= */
 export const updateWalletControl = async (req, res) => {

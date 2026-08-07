@@ -6,8 +6,9 @@ export default function Navbar() {
   const { parent, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // Awaited so the device is unregistered before the token it needs is gone.
+    await logout();
     navigate('/login');
   };
 

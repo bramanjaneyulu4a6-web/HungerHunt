@@ -1,6 +1,6 @@
 import Student from '../models/Student.js';
 import Parent from "../models/Parent.js";
-import { sendNotification } from "../utils/sendNotification.js";
+import { sendToParent } from "../utils/sendNotification.js";
 
 // The fields describing who a student is, and the only ones any admin route
 // will write. The rest of the document belongs to a flow with rules of its own:
@@ -22,6 +22,7 @@ const pickWritable = (body) => {
 export const addStudent = async (req, res) => {
   try {
     const student = await Student.create(pickWritable(req.body));
+
     res.status(201).json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -52,6 +53,7 @@ export const getStudents = async (req, res) => {
 export const updateStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(req.params.id, pickWritable(req.body), { new: true });
+
     res.json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -61,6 +63,7 @@ export const updateStudent = async (req, res) => {
 export const deleteStudent = async (req, res) => {
   try {
     await Student.findByIdAndDelete(req.params.id);
+
     res.json({ message: 'Student removed successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -188,9 +191,9 @@ export const topUpWallet = async (req, res) => {
       studentIds: studentId,
     });
 
-    if (parent?.fcmToken) {
-      await sendNotification(
-        parent.fcmToken,
+    if (parent) {
+      sendToParent(
+        parent,
         "💰 Wallet Recharge",
         `₹${amount} added. New balance ₹${newBalance}`,
         {

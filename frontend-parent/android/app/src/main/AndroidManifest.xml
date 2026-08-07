@@ -38,4 +38,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 13 and later ask the user before any notification can be shown.
+         The push plugin merges this in as well; naming it here keeps the app's
+         own manifest honest about what it requests. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

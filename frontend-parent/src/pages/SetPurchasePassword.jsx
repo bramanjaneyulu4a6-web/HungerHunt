@@ -93,29 +93,29 @@ export default function SetPurchasePassword() {
   );
 
   const changePassword = submit(
-      '/parent/change-purchase-password',
-      { currentPassword, newPassword },
-      () => {
-        if (!currentPassword) return 'Please enter the current password.';
-        if (newPassword.length < MIN_LENGTH)
-          return `Password must be at least ${MIN_LENGTH} characters.`;
-        if (newPassword !== confirmNewPassword) return 'Passwords do not match.';
-        return null;
-      }
-    );
+    '/parent/change-purchase-password',
+    { currentPassword, newPassword },
+    () => {
+      if (!currentPassword) return 'Please enter the current password.';
+      if (newPassword.length < MIN_LENGTH)
+        return `Password must be at least ${MIN_LENGTH} characters.`;
+      if (newPassword !== confirmNewPassword) return 'Passwords do not match.';
+      return null;
+    }
+  );
 
   const resetPassword = submit(
-      '/parent/reset-purchase-password',
-      { parentPassword: resetParentPassword, newPassword: resetPasswordValue },
-      () => {
-        if (!resetParentPassword) return 'Please enter your account password.';
-        if (resetPasswordValue.length < MIN_LENGTH)
-          return `Password must be at least ${MIN_LENGTH} characters.`;
-        if (resetPasswordValue !== confirmResetPassword)
-          return 'Passwords do not match.';
-        return null;
-      }
-    );
+    '/parent/reset-purchase-password',
+    { parentPassword: resetParentPassword, newPassword: resetPasswordValue },
+    () => {
+      if (!resetParentPassword) return 'Please enter your account password.';
+      if (resetPasswordValue.length < MIN_LENGTH)
+        return `Password must be at least ${MIN_LENGTH} characters.`;
+      if (resetPasswordValue !== confirmResetPassword)
+        return 'Passwords do not match.';
+      return null;
+    }
+  );
 
   const toggle = (form) => {
     setOpenForm(openForm === form ? null : form);

@@ -85,12 +85,15 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
   );
 }
 
-/* Shell shared by login, register, forgot-password and reset-password. */
-export function AuthLayout({ title, subtitle, children, footer }) {
+/* Shell shared by login, register, forgot-password and reset-password.
+   `logo` is optional — only the kiosk brands its sign-in, since that screen
+   faces a counter rather than a browser tab the staff member already trusts. */
+export function AuthLayout({ logo, title, subtitle, children, footer }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
         <header className="auth-header">
+          {logo && <img className="auth-logo" src={logo} alt="" />}
           <h1 className="auth-title">{title}</h1>
           {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         </header>

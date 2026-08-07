@@ -511,6 +511,14 @@
   text-align: center;
 }
 
+.auth-logo {
+  display: block;
+  width: 160px;
+  max-width: 70%;
+  height: auto;
+  margin: 0 auto 20px;
+}
+
 .auth-title {
   font-size: 32px;
   font-weight: 800;

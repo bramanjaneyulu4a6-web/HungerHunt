@@ -34,11 +34,15 @@ const SHARED = [
   },
   {
     file: 'src/components/ui/index.jsx',
-    apps: ['frontend-parent', 'frontend-admin'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
   },
   {
     file: 'src/utils/format.js',
     apps: ['frontend-parent', 'frontend-admin'],
+  },
+  {
+    file: 'src/components/RefreshButton.jsx',
+    apps: ['frontend-admin', 'hungerhunt-kiosk'],
   },
 ];
 

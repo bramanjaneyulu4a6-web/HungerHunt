@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { formatINR } from '../utils/format';
 import {
   AnimateIn,
   Badge,
@@ -87,19 +88,7 @@ const Dashboard = () => {
       {!loading && error && (
         <Banner variant="alert" icon="⚠️">
           {error}{' '}
-          <button
-            onClick={fetchDashboard}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: 'inherit',
-              font: 'inherit',
-              fontWeight: 700,
-              textDecoration: 'underline',
-              cursor: 'pointer',
-            }}
-          >
+          <button type="button" className="link-button" onClick={fetchDashboard}>
             Try again
           </button>
         </Banner>
@@ -150,7 +139,7 @@ const Dashboard = () => {
                         <span aria-hidden="true">
                           {balance > LOW_BALANCE ? '✓' : '!'}
                         </span>
-                        ₹{balance}
+                        {formatINR(balance)}
                       </Badge>
                     </div>
 

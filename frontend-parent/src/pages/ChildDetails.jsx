@@ -138,19 +138,7 @@ export default function ChildDetails() {
         {backLink}
         <Banner variant="alert" icon="⚠️">
           {loadError}{' '}
-          <button
-            onClick={fetchChild}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: 'inherit',
-              font: 'inherit',
-              fontWeight: 700,
-              textDecoration: 'underline',
-              cursor: 'pointer',
-            }}
-          >
+          <button type="button" className="link-button" onClick={fetchChild}>
             Try again
           </button>
         </Banner>
@@ -330,7 +318,7 @@ export default function ChildDetails() {
 
             {walletBanner.message && (
               <Banner
-                variant={walletBanner.type === 'error' ? 'alert' : 'warn'}
+                variant={walletBanner.type === 'error' ? 'alert' : 'success'}
                 icon={walletBanner.type === 'error' ? '⚠️' : '✅'}
                 style={{ marginBottom: 20 }}
               >

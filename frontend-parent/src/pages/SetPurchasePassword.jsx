@@ -286,7 +286,7 @@ export default function SetPurchasePassword() {
                 aria-expanded={openForm === 'reset'}
                 onClick={() => toggle('reset')}
               >
-                Forgot Password / Reset
+                Forgot Purchase Password?
               </Button>
 
               {openForm === 'reset' && (

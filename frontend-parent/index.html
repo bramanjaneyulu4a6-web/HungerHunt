@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/jpeg" href="Logo.jpeg" />
+    <!-- The logo cropped to its mark and scaled down: 6 KB against the 114 KB
+         of Logo.jpeg, which the tab was loading in full to draw it 16px wide.
+         The JPEG stays for the notification icon, which wants the full square. -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to the
          real notch and home-indicator sizes inside the Capacitor shell. -->
     <meta
@@ -10,7 +13,11 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#f8fafc" />
-    <title>HungerHunt-parent</title>
+    <meta
+      name="description"
+      content="Check your child's canteen balance, purchases and recharges, and set the password used at the counter."
+    />
+    <title>Hunger Hunt — Parent</title>
   </head>
   <body>
     <div id="root"></div>

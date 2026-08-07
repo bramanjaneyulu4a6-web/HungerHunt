@@ -13,9 +13,9 @@ import {
 } from '../components/ui';
 
 const TABS = [
-  { id: 'purchases', icon: '🛒', label: 'Purchase History' },
-  { id: 'recharges', icon: '⚡', label: 'Recharge Logs' },
-  { id: 'wallet', icon: '💳', label: 'Wallet Control' },
+  { id: 'purchases', icon: '🛒', label: 'Purchases' },
+  { id: 'recharges', icon: '⚡', label: 'Recharges' },
+  { id: 'wallet', icon: '💳', label: 'Wallet' },
 ];
 
 const DetailsSkeleton = () => (
@@ -312,13 +312,13 @@ export default function ChildDetails() {
             {student.name}
           </h1>
           <p className="card-meta" style={{ fontSize: 14 }}>
-            Hostel Room Ref: {student.hostelNumber || 'N/A'} | Standard Grade:{' '}
-            {student.grade || 'N/A'}
+            Grade: {student.grade || 'N/A'} | Room:{' '}
+            {student.hostelNumber || 'N/A'}
           </p>
         </div>
 
         <div>
-          <p className="stat-label">Available Smart-Wallet Balance</p>
+          <p className="stat-label">Wallet Balance</p>
           <p className="stat-value">{formatINR(student.pocketMoney)}</p>
         </div>
       </Card>
@@ -343,7 +343,7 @@ export default function ChildDetails() {
 
       {activeTab === 'purchases' && (
         <div role="tabpanel">
-          <h2 className="section-title">Transaction &amp; Purchase History</h2>
+          <h2 className="section-title">Purchase History</h2>
 
           {renderList(bills, {
             empty: (
@@ -416,7 +416,7 @@ export default function ChildDetails() {
               <AnimateIn key={`${r.date}-${i}`} index={i}>
                 <Card className="card--tight" style={{ marginBottom: 16 }}>
                   <div className="ledger-head">
-                    <span>Wallet Deposit</span>
+                    <span>Wallet Recharge</span>
                     <span>{new Date(r.date).toLocaleDateString()}</span>
                   </div>
 
@@ -426,12 +426,12 @@ export default function ChildDetails() {
                   </div>
 
                   <div className="ledger-row">
-                    <span>Previous Wallet Balance</span>
+                    <span>Previous Balance</span>
                     <span>{formatINR(r.previousBalance)}</span>
                   </div>
 
                   <div className="ledger-row">
-                    <span>Closing Updated Balance</span>
+                    <span>New Balance</span>
                     <span>{formatINR(r.newBalance)}</span>
                   </div>
                 </Card>

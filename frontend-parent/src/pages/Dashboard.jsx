@@ -80,7 +80,7 @@ const Dashboard = () => {
     <div className="page">
       <PageHeader
         title="Linked Children Accounts"
-        subtitle="Monitor student account balances, digital smart-wallet transactions, and purchase logs"
+        subtitle="Check the balance, purchases and recharges on each account"
       />
 
       {loading && <DashboardSkeleton />}
@@ -97,7 +97,7 @@ const Dashboard = () => {
       {!loading && !error && children.length === 0 && (
         <EmptyState icon="🎒" title="No students linked yet">
           We couldn&apos;t find any students registered to your phone number.
-          Please contact the school office to link your ward&apos;s records.
+          Please contact the school office to link your child&apos;s records.
         </EmptyState>
       )}
 

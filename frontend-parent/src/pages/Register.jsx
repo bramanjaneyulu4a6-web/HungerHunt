@@ -58,7 +58,7 @@ export default function Register() {
   return (
     <AuthLayout
       title="Create Account"
-      subtitle="Use the Father Name & Phone Number registered with the school office"
+      subtitle="Use the father's name and phone number registered with the school office"
       footer={
         <>
           Already registered? <Link to="/login">Login here</Link>
@@ -80,7 +80,7 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="auth-form">
         <AuthField
           id="father-name"
-          label="Father's Name (e.g., Stephen)"
+          label="Father's Name"
           type="text"
           autoComplete="name"
           required

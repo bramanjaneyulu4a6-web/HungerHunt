@@ -105,9 +105,16 @@ const Students = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
 
-        await api.post('/students/bulk', { students: jsonData });
+        const res = await api.post('/students/bulk', { students: jsonData });
 
         toast.success('Bulk upload successful');
+
+        // Columns the server would not import — say so, or the sheet looks
+        // like it applied in full.
+        const ignored = res.data?.ignoredColumns;
+        if (ignored?.length) {
+          toast.error(`Not imported: ${ignored.join(', ')}. Only name, father's name, hostel, grade and phone are read from the sheet.`);
+        }
         setExcelFile(null);
         e.target.reset?.();
         fetchStudents();

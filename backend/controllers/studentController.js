@@ -2,9 +2,26 @@ import Student from '../models/Student.js';
 import Parent from "../models/Parent.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
+// The fields describing who a student is, and the only ones any admin route
+// will write. The rest of the document belongs to a flow with rules of its own:
+// pocketMoney to topUpWallet, which records the movement in rechargeHistory;
+// purchasePassword and walletControl to the parent. Handing a request body
+// straight to the driver let these routes quietly set any of them.
+const WRITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber'];
+
+const pickWritable = (body) => {
+  const source = body ?? {};
+
+  return Object.fromEntries(
+    WRITABLE_FIELDS
+      .filter((field) => source[field] !== undefined)
+      .map((field) => [field, source[field]])
+  );
+};
+
 export const addStudent = async (req, res) => {
   try {
-    const student = await Student.create(req.body);
+    const student = await Student.create(pickWritable(req.body));
     res.status(201).json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -32,23 +49,9 @@ export const getStudents = async (req, res) => {
   }
 };
 
-// The fields the student form edits, and the only ones this route will write.
-// The rest of the document belongs to a flow with rules of its own: pocketMoney
-// to topUpWallet, which records the movement in rechargeHistory; purchasePassword
-// and walletControl to the parent. Handing req.body straight to the driver let
-// this route quietly overwrite any of them.
-const EDITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber'];
-
-const pickEditable = (body = {}) =>
-  Object.fromEntries(
-    EDITABLE_FIELDS
-      .filter((field) => body[field] !== undefined)
-      .map((field) => [field, body[field]])
-  );
-
 export const updateStudent = async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, pickEditable(req.body), { new: true });
+    const student = await Student.findByIdAndUpdate(req.params.id, pickWritable(req.body), { new: true });
     res.json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -71,9 +74,24 @@ export const bulkImportStudents = async (req, res) => {
     if (!Array.isArray(students) || students.length === 0) {
       return res.status(400).json({ message: 'Invalid or empty dataset received.' });
     }
-    
-    await Student.insertMany(students, { ordered: false }); 
-    res.status(201).json({ message: 'Bulk entry successful!' });
+
+    // Sheet column headings arrive as keys verbatim, so a column called
+    // pocketMoney or purchasePassword would land on the new record as-is.
+    const rows = students.map(pickWritable);
+
+    // Dropping a column the uploader meant to import should not be silent —
+    // otherwise the sheet looks like it applied and only the balances disagree.
+    const ignoredColumns = [
+      ...new Set(students.flatMap((row) => Object.keys(row ?? {}))),
+    ].filter((column) => !WRITABLE_FIELDS.includes(column));
+
+    await Student.insertMany(rows, { ordered: false });
+
+    res.status(201).json({
+      message: 'Bulk entry successful!',
+      imported: rows.length,
+      ...(ignoredColumns.length ? { ignoredColumns } : {}),
+    });
   } catch (error) {
     res.status(400).json({ message: 'Some records might be duplicate entries.', error: error.message });
   }

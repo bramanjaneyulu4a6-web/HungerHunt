@@ -2,8 +2,9 @@
   "appId": "com.hungerhunt.parent",
   "appName": "Hunger Hunt Parent",
   "webDir": "dist",
-  "server": {
-    "url": "http://localhost:5173",
-    "cleartext": true
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
   }
 }

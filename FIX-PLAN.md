@@ -93,6 +93,20 @@ Additionally: `helmet` security headers, rate limiting on credential endpoints (
 
 ---
 
+## Deploy notes
+
+Settings that change behaviour at a deploy boundary. All three live in the environment, never in a tracked file; `backend/.env.example` lists them with the same explanation and no values.
+
+**`PARENT_JWT_SECRET` — set it.** Parent tokens are signed with this key and admin tokens with `JWT_SECRET`. It is optional and falls back to `JWT_SECRET`, so a deploy that omits it keeps working: the `role` claim on every token still separates the two sides, and the backend says which of the two it is doing at startup. Setting it to a *different* long random string is better. An admin token presented on a parent route then fails at the signature, before any claim is read, rather than depending on the role check being applied by whatever middleware is written next. It is currently unset in the local `.env`, so the startup warning appears on every boot.
+
+**`LEGACY_TOKEN_GRACE_UNTIL` — expires 2026-08-14.** Tokens issued before they carried a `role` claim are accepted until this date, so deploying that change did not sign every parent and admin out mid-session. One parent-token lifetime, by which point every such token has expired on its own. After the date the whole branch in `backend/utils/tokens.js` is dead and should be deleted along with the tests that pin a grace date.
+
+**`PURCHASE_AUTH_GRACE_UNTIL` — expires 2026-08-21.** A bill must carry the single-use token `verify-payment` returns once the purchase password is accepted; bills sent without one are still charged until this date. The window exists because the backend and the three frontends deploy separately and the till is a screen that stays open all day on the bundle it loaded that morning — requiring the token immediately would fail every sale from a tab nobody had reloaded.
+
+Order of deployment does not matter, which is the point of the window: the backend is safe to ship first and old clients keep selling. Each un-upgraded bill logs a line naming the student, so whether any client is still stale is something to read in the logs rather than guess at. Once those lines stop, bring the date forward to close the gap early. Bills that *do* carry a token are checked in full from the first day, whatever the date says.
+
+---
+
 ## ⚠️ Action required (cannot be done from here)
 
 **Rotate every credential that was committed to git.** Removing the files from tracking does not remove them from history — anyone with repo access can still read them. Rotate:

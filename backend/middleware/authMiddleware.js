@@ -4,6 +4,15 @@ import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './de
 
 const readToken = (req) => req.headers.authorization?.split(' ')[1];
 
+// Marks the 401s that mean "this session is no longer good", as opposed to the
+// ones a controller returns for a password typed into a form — resetPurchase-
+// Password answers a wrong account password with 401 too. The clients sign out
+// on this code, so it must appear on exactly the token failures.
+const AUTH_REQUIRED = 'AUTH_REQUIRED';
+
+const denied = (res, message) =>
+  res.status(401).json({ message, code: AUTH_REQUIRED });
+
 // Two independent checks stand between a token and admin access.
 //
 // verifyToken settles what the token is: signed with the admin key, and
@@ -36,16 +45,16 @@ export const protectAdmin = async (req, res, next) => {
   }
 
   const token = readToken(req);
-  if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
+  if (!token) return denied(res, 'Not authorized, no token');
 
   try {
     const adminId = await resolveAdminId(token);
-    if (!adminId) return res.status(401).json({ message: 'Not authorized' });
+    if (!adminId) return denied(res, 'Not authorized');
 
     req.adminId = adminId;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token failed, invalid authorization' });
+    denied(res, 'Token failed, invalid authorization');
   }
 };
 
@@ -66,9 +75,7 @@ export const protectAdminUnlessBootstrap = async (req, res, next) => {
   // Answer the common case in the caller's own terms; protectAdmin's generic
   // "no token" would not explain why a registration form stopped accepting.
   if (!authBypassEnabled && !readToken(req)) {
-    return res.status(401).json({
-      message: 'Only a signed-in admin can create additional admin accounts.'
-    });
+    return denied(res, 'Only a signed-in admin can create additional admin accounts.');
   }
 
   return protectAdmin(req, res, next);
@@ -88,10 +95,10 @@ export const protectParent = async (req, res, next) => {
   }
 
   const token = readToken(req);
-  if (!token) return res.status(401).json({ message: 'Not authorized, no token' });
+  if (!token) return denied(res, 'Not authorized, no token');
 
   const payload = verifyToken(token, 'parent');
-  if (!payload) return res.status(401).json({ message: 'Not authorized' });
+  if (!payload) return denied(res, 'Not authorized');
 
   req.parent = {
     id: payload.id,

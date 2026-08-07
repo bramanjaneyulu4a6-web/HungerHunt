@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import API from '../services/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
 
 export default function Login() {
@@ -13,6 +13,11 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Set by the 401 interceptor, so an expired session says so instead of
+  // dropping the parent on a bare login screen with no explanation.
+  const expired = searchParams.get('expired') === '1';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,6 +49,12 @@ export default function Login() {
         </>
       }
     >
+      {expired && !error && (
+        <Banner variant="warn" icon="🔒" style={{ marginBottom: 28 }}>
+          Your session has expired. Please sign in again.
+        </Banner>
+      )}
+
       {error && (
         <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
           {error}

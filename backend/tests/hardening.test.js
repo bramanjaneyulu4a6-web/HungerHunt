@@ -18,6 +18,7 @@ process.env.NODE_ENV = 'test';
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Student = (await import('../models/Student.js')).default;
+const Parent = (await import('../models/Parent.js')).default;
 const { signAdminToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -84,11 +85,25 @@ const assertOnlyIdentity = (written, label) => {
   assert.equal(written.name, IDENTITY.name, `${label} dropped a field it should keep`);
 };
 
+/* Every route that writes a student now also links them to the parent whose
+   name and number match. That is a handful of queries, and this suite runs
+   without a database — unstubbed they would each sit until mongoose's buffer
+   timeout and fail the route. Stubbed to "no such parent", which exercises the
+   linking path without making these tests about it. */
+const stubLinking = () => {
+  mock.method(Parent, 'findOne', () => ({ select: async () => null }));
+  mock.method(Parent, 'updateMany', async () => ({ modifiedCount: 0 }));
+  mock.method(Parent, 'updateOne', async () => ({ modifiedCount: 0 }));
+  mock.method(Student, 'updateOne', async () => ({ modifiedCount: 0 }));
+  mock.method(Student, 'find', () => ({ select: async () => [] }));
+};
+
 describe('only the five identity fields are writable', () => {
   before(() => {});
 
   test('addStudent ignores everything else in the body', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubLinking();
 
     let written;
     mock.method(Student, 'create', async (doc) => {
@@ -104,6 +119,7 @@ describe('only the five identity fields are writable', () => {
 
   test('updateStudent ignores everything else in the body', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubLinking();
 
     let written;
     mock.method(Student, 'findByIdAndUpdate', async (id, update) => {
@@ -119,6 +135,7 @@ describe('only the five identity fields are writable', () => {
 
   test('the bulk importer ignores extra columns on every row', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubLinking();
 
     let written;
     mock.method(Student, 'insertMany', async (rows) => {
@@ -143,6 +160,7 @@ describe('only the five identity fields are writable', () => {
   // applied — the sheet reports success and only the balances disagree.
   test('the importer names the columns it dropped', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubLinking();
     mock.method(Student, 'insertMany', async (rows) => rows);
 
     const res = await call('/api/students/bulk', 'POST', {
@@ -159,6 +177,7 @@ describe('only the five identity fields are writable', () => {
 
   test('a clean sheet reports nothing ignored', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubLinking();
     mock.method(Student, 'insertMany', async (rows) => rows);
 
     const res = await call('/api/students/bulk', 'POST', { students: [IDENTITY] });

@@ -1,6 +1,11 @@
 import Student from '../models/Student.js';
 import Parent from "../models/Parent.js";
 import { sendToParent } from "../utils/sendNotification.js";
+import {
+  linkQuietly,
+  findStudentsByIdentity,
+  unlinkStudent
+} from "../utils/studentLinks.js";
 
 // The fields describing who a student is, and the only ones any admin route
 // will write. The rest of the document belongs to a flow with rules of its own:
@@ -22,6 +27,10 @@ const pickWritable = (body) => {
 export const addStudent = async (req, res) => {
   try {
     const student = await Student.create(pickWritable(req.body));
+
+    // A child enrolled after their parent registered used to be linked to
+    // nobody, and so was invisible in the parent app forever.
+    await linkQuietly([student]);
 
     res.status(201).json(student);
   } catch (error) {
@@ -54,6 +63,10 @@ export const updateStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(req.params.id, pickWritable(req.body), { new: true });
 
+    // Correcting a phone number or surname can move a child to a different
+    // parent — or to none.
+    if (student) await linkQuietly([student]);
+
     res.json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -63,6 +76,7 @@ export const updateStudent = async (req, res) => {
 export const deleteStudent = async (req, res) => {
   try {
     await Student.findByIdAndDelete(req.params.id);
+    await unlinkStudent(req.params.id);
 
     res.json({ message: 'Student removed successfully' });
   } catch (error) {
@@ -90,9 +104,14 @@ export const bulkImportStudents = async (req, res) => {
 
     await Student.insertMany(rows, { ordered: false });
 
+    // Looked up by identity rather than from the insert result, so rows that
+    // landed alongside a rejected duplicate are linked too.
+    const linked = await linkQuietly(await findStudentsByIdentity(rows));
+
     res.status(201).json({
       message: 'Bulk entry successful!',
       imported: rows.length,
+      linkedToParents: linked,
       ...(ignoredColumns.length ? { ignoredColumns } : {}),
     });
   } catch (error) {

@@ -32,9 +32,23 @@ export const getStudents = async (req, res) => {
   }
 };
 
+// The fields the student form edits, and the only ones this route will write.
+// The rest of the document belongs to a flow with rules of its own: pocketMoney
+// to topUpWallet, which records the movement in rechargeHistory; purchasePassword
+// and walletControl to the parent. Handing req.body straight to the driver let
+// this route quietly overwrite any of them.
+const EDITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber'];
+
+const pickEditable = (body = {}) =>
+  Object.fromEntries(
+    EDITABLE_FIELDS
+      .filter((field) => body[field] !== undefined)
+      .map((field) => [field, body[field]])
+  );
+
 export const updateStudent = async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const student = await Student.findByIdAndUpdate(req.params.id, pickEditable(req.body), { new: true });
     res.json(student);
   } catch (error) {
     res.status(400).json({ error: error.message });

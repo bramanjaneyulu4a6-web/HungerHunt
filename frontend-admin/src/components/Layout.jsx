@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { path: "/purchased", label: "Purchased", icon: "✅" },
   { path: "/inventory", label: "Inventory", icon: "📈" },
   { path: "/recharge-history", label: "Recharge History", icon: "💰" },
-  { path: "/kiosk", label: "Kiosk", icon: "🖥️" },
 ];
 
 const Layout = () => {

@@ -1,10 +1,64 @@
-import { useState, useEffect } from "react";
-import { ShoppingCart, X } from "lucide-react";
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import { formatINR } from "../utils/format";
+import { Button } from "../components/ui";
 import hungerLogo from "../assets/Logo.png";
+
+const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
+
+// Stock group names arrive however they were typed into the admin console
+// ("CHIPS", "biscuits"), so they are title-cased for display only. Filtering
+// still compares against the stored value.
+const titleCase = (s) =>
+  String(s)
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+// Nutrition is optional: the product schema has no field for it yet, so every
+// item renders without a strip until one is added. Anything incomplete counts
+// as absent rather than showing as a row of zeroes.
+const readNutrition = (product) => {
+  const n = product?.nutrition;
+  if (!n) return null;
+
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const calories = num(n.calories);
+  const protein = num(n.protein);
+  const carbs = num(n.carbs);
+  const fat = num(n.fat);
+
+  if (calories === null || protein === null || carbs === null || fat === null) {
+    return null;
+  }
+
+  return { calories, protein, carbs, fat, serving: n.serving || "" };
+};
+
+// Share of an item's energy from each macro — protein and carbohydrate at
+// 4 kcal per gram, fat at 9.
+const energySplit = ({ protein, carbs, fat }) => {
+  const kcal = { protein: protein * 4, carbs: carbs * 4, fat: fat * 9 };
+  const total = kcal.protein + kcal.carbs + kcal.fat;
+  const pct = (v) => (total > 0 ? Math.round((v / total) * 100) : 0);
+
+  return {
+    protein: { kcal: Math.round(kcal.protein), pct: pct(kcal.protein) },
+    carbs: { kcal: Math.round(kcal.carbs), pct: pct(kcal.carbs) },
+    fat: { kcal: Math.round(kcal.fat), pct: pct(kcal.fat) },
+  };
+};
+
+const toProduct = (item) => ({
+  _id: item.productId?._id,
+  name: item.productId?.name,
+  price: item.productId?.price,
+  image: item.productId?.image,
+  stock: item.stock,
+  stockGroup: item.productId?.stockGroup,
+  nutrition: readNutrition(item.productId),
+});
 
 const KioskBilling = ({ onLogout }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -14,148 +68,133 @@ const KioskBilling = ({ onLogout }) => {
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [cart, setCart] = useState([]);
-  const [invoiceTotal, setInvoiceTotal] = useState(0);
-  const [, setIsSearched] = useState(false); // Tracks if a search has been executed
- 
-  // Track configurations for staging quantities before appending to cart
-  // Format: { [productId]: quantity }
-  const [stagedQuantities, setStagedQuantities] = useState({});
 
-const [loadingProducts, setLoadingProducts] = useState(false);
-const [showWelcome, setShowWelcome] = useState(true);
-const [showCart, setShowCart] = useState(false);
- const [showVerifyModal, setShowVerifyModal] = useState(false);
+  // Starts true: the catalogue is fetched on mount, and seeding the flag here
+  // keeps that effect free of a synchronous setState.
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [inventoryError, setInventoryError] = useState("");
 
-const [purchasePassword, setPurchasePassword] = useState("");
-const [paying, setPaying] = useState(false);
-const [inventoryError, setInventoryError] = useState("");
+  const [ticketFolded, setTicketFolded] = useState(false);
+  const [nutritionFor, setNutritionFor] = useState(null);
+  const [confirmVoid, setConfirmVoid] = useState(false);
 
-const refreshPage = async () => {
-  try {
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [purchasePassword, setPurchasePassword] = useState("");
+  const [paying, setPaying] = useState(false);
+
+  // `paying` drives the disabled state and the label, but it cannot be the
+  // lock: setPaying does not apply until the next render, so taps landing in
+  // the same tick all read false and every one of them posts. A ref flips
+  // synchronously, so the second tap bails no matter how fast it arrives.
+  const payingRef = useRef(false);
+
+  // Fetching and applying are kept apart so the mount effect can await before
+  // it touches state — no synchronous setState, no cascading render.
+  const loadInventory = async () => {
+    try {
+      const res = await api.get("/inventory");
+
+      if (!Array.isArray(res.data)) {
+        return {
+          products: [],
+          error: "Inventory data could not be loaded. Please try refreshing.",
+        };
+      }
+
+      return {
+        products: res.data
+          .filter((item) => item.stock > 0 && item.productId)
+          .map(toProduct)
+          .filter((item) => item._id),
+        error: "",
+      };
+    } catch (err) {
+      console.error(err);
+      return {
+        products: [],
+        error: "Failed to load inventory. Please try refreshing.",
+      };
+    }
+  };
+
+  const applyInventory = useCallback(({ products: next, error }) => {
+    // A failed load keeps whatever is already on screen rather than blanking
+    // the wall mid-service; the banner says what happened.
+    if (!error) setProducts(next);
+    setInventoryError(error);
+    setLoadingProducts(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const result = await loadInventory();
+      if (!cancelled) applyInventory(result);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyInventory]);
+
+  // A cleared quantity box prices as 1, which is what checkout posts and what
+  // the steppers clamp to. Treating it as 0 here understated the bill.
+  const invoiceTotal = cart.reduce(
+    (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
+    0
+  );
+
+  const refreshPage = async () => {
     setLoadingProducts(true);
+    const result = await loadInventory();
+    applyInventory(result);
 
-   const res = await api.get("/inventory");
+    // A failed refresh must leave the ticket alone. Reconciling against the
+    // empty list an error returns would silently clear every line the moment
+    // the network hiccuped, mid-sale.
+    if (result.error) return;
 
-const data = Array.isArray(res.data) ? res.data : [];
-
-const inventoryProducts = data
-  .filter(item => item.stock > 0 && item.productId)
-  .map(item => ({
-    _id: item.productId?._id,
-    name: item.productId?.name,
-    price: item.productId?.price,
-    image: item.productId?.image,
-    stock: item.stock,
-    stockGroup: item.productId?.stockGroup,
-  }))
-  .filter(item => item._id);
-
-    // Refresh product list
-    setProducts(inventoryProducts);
-    setInventoryError("");
-
-    // Reset staged quantities
-    const initialQuantities = {};
-    inventoryProducts.forEach(product => {
-      initialQuantities[product._id] = 1;
-    });
-    setStagedQuantities(initialQuantities);
-
-    // ✅ Refresh cart items too
-    setCart(prevCart =>
+    // Reconcile the ticket against fresh stock rather than dropping it.
+    setCart((prevCart) =>
       prevCart
-        .map(cartItem => {
-          const latest = inventoryProducts.find(
-            p => p._id === cartItem._id
-          );
-
-          // Product removed from stock
+        .map((cartItem) => {
+          const latest = result.products.find((p) => p._id === cartItem._id);
           if (!latest) return null;
 
           return {
             ...cartItem,
             price: latest.price,
             stock: latest.stock,
-            quantity: Math.min(cartItem.quantity, latest.stock),
+            quantity: Math.min(
+              parseInt(cartItem.quantity, 10) || 1,
+              latest.stock
+            ),
           };
         })
-        .filter(item => item && item.stock > 0)
+        .filter((item) => item && item.stock > 0)
     );
-// Drop the selected student so their balance is re-read on the next lookup.
-// The cart survives — it was just reconciled against fresh stock above.
-setSelectedStudent(null);
-setSearchResults([]);
-setSearchQuery("");
-setIsSearched(false);
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to refresh products.");
-  } finally {
-    setLoadingProducts(false);
-  }
-};
 
-  useEffect(() => {
-    // A cleared quantity box prices as 1, which is what checkout posts and what
-    // the steppers clamp to. Treating it as 0 here understated the bill.
-    const total = cart.reduce(
-      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
-      0
-    );
-    setInvoiceTotal(total);
-  }, [cart]);
+    // Drop the selected student so their balance is re-read on the next lookup.
+    setSelectedStudent(null);
+    setSearchResults([]);
+    setSearchQuery("");
+  };
 
-useEffect(() => {
-  fetchCatalog();
-}, []);
-
-
-const fetchCatalog = async () => {
-  try {
-    setLoadingProducts(true);
-
-    const res = await api.get("/inventory");
-
-    if (!Array.isArray(res.data)) {
-      setInventoryError("Inventory data could not be loaded. Please try refreshing.");
-      setProducts([]);
-      return;
-    }
-
-    const inventoryProducts = res.data
-      .filter(item => item.stock > 0 && item.productId)
-      .map(item => ({
-        _id: item.productId?._id,
-        name: item.productId?.name,
-        price: item.productId?.price,
-        image: item.productId?.image,
-        stock: item.stock,
-        stockGroup: item.productId?.stockGroup,
-      }))
-      .filter(item => item._id);
-
-    setProducts(inventoryProducts);
-    setInventoryError("");
-
-  } catch (err) {
-    console.error(err);
-    setInventoryError("Failed to load inventory. Please try refreshing.");
-  } finally {
-    setLoadingProducts(false);
-  }
-};
-
-
-
-  // The cart belongs to whoever is selected. Switching to a different student
+  // The ticket belongs to whoever is selected. Switching to a different student
   // must not carry the previous one's goods onto their bill; re-selecting the
-  // same student leaves the cart alone.
+  // same student leaves the ticket alone.
   const selectStudent = (student) => {
     if (selectedStudent && selectedStudent._id !== student._id) setCart([]);
     setSelectedStudent(student);
+    setSearchResults([]);
+    setSearchQuery("");
   };
 
-  const handleStudentSearch = async () => {
+  const handleStudentSearch = async (e) => {
+    e?.preventDefault();
+
     if (!searchQuery.trim()) {
       toast.error("Please enter student name or hostel number");
       return;
@@ -167,15 +206,13 @@ const fetchCatalog = async () => {
     }
 
     try {
-     const res = await api.get(
-  `/students/search?q=${encodeURIComponent(searchQuery)}`
-);
-
-      setIsSearched(true);
+      const res = await api.get(
+        `/students/search?q=${encodeURIComponent(searchQuery)}`
+      );
 
       // A search that finds nothing, or that needs the cashier to pick from a
       // list, has not changed who is being served — so it leaves both the
-      // selected student and the cart alone.
+      // selected student and the ticket alone.
       if (res.data.length === 0) {
         setSearchResults([]);
         toast.error("No student found matching that name or hostel number");
@@ -184,7 +221,6 @@ const fetchCatalog = async () => {
 
       if (res.data.length === 1) {
         selectStudent(res.data[0]);
-        setSearchResults([]);
         return;
       }
 
@@ -195,1094 +231,836 @@ const fetchCatalog = async () => {
     }
   };
 
-  // Decisions and toasts happen before the setState call: React double-invokes
-  // updaters under StrictMode, which fired every warning twice in development.
-  const updateStagedQuantity = (productId, amount, maxStock) => {
-    const wanted = (parseInt(stagedQuantities[productId], 10) || 0) + amount;
-    if (wanted > maxStock) toast.error(`Only ${maxStock} items available in stock!`);
-
-    setStagedQuantities(prev => {
-      const current = parseInt(prev[productId], 10) || 0;
-      const updated = current + amount;
-      if (updated < 1) return prev;
-      if (updated > maxStock) return prev;
-      return { ...prev, [productId]: updated };
-    });
-  };
-
-  const handleManualQuantityChange = (productId, value, maxStock) => {
-    if (value === "") {
-      setStagedQuantities(prev => ({ ...prev, [productId]: "" }));
-      return;
-    }
-
-    const parsed = parseInt(value, 10);
-    if (isNaN(parsed)) return;
-
-    if (parsed < 1) {
-      setStagedQuantities(prev => ({ ...prev, [productId]: 1 }));
-      return;
-    }
-    if (parsed > maxStock) {
-      toast.error(`Only ${maxStock} items available in stock!`);
-      setStagedQuantities(prev => ({ ...prev, [productId]: maxStock }));
-      return;
-    }
-    setStagedQuantities(prev => ({ ...prev, [productId]: parsed }));
-  };
-
   const addToCart = (product) => {
-    const qtyToAdd = parseInt(stagedQuantities[product._id], 10) || 1;
-    const exists = cart.find((item) => item._id === product._id);
-    const currentCartQty = exists ? parseInt(exists.quantity, 10) || 0 : 0;
+    if (product.stock < 1) return;
 
-    if (currentCartQty + qtyToAdd > product.stock) {
-      return toast.error(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
-    }
+    setCart((prev) =>
+      prev.some((item) => item._id === product._id)
+        ? prev
+        : [...prev, { ...product, quantity: 1 }]
+    );
+  };
 
-    if (exists) {
-      setCart(
-        cart.map((item) =>
-          item._id === product._id
-            ? { ...item, quantity: (parseInt(item.quantity, 10) || 0) + qtyToAdd }
-            : item
+  const stepQuantity = (productId, amount) => {
+    setCart((prevCart) =>
+      prevCart
+        .map((item) => {
+          if (item._id !== productId) return item;
+
+          const maxStock =
+            products.find((p) => p._id === productId)?.stock ?? item.stock;
+          const next = (parseInt(item.quantity, 10) || 0) + amount;
+
+          if (next > maxStock) {
+            toast.error(`Only ${maxStock} in stock.`);
+            return item;
+          }
+
+          // Stepping below one takes the line off the ticket.
+          if (next < 1) return null;
+
+          return { ...item, quantity: next };
+        })
+        .filter(Boolean)
+    );
+  };
+
+  const setQuantity = (productId, value) => {
+    if (value === "") {
+      setCart((prev) =>
+        prev.map((item) =>
+          item._id === productId ? { ...item, quantity: "" } : item
         )
       );
-    } else {
-      setCart([...cart, { ...product, quantity: qtyToAdd }]);
-    }
-    
-   if (!cart.find(item => item._id === product._id)) {
-  setStagedQuantities(prev => ({
-    ...prev,
-    [product._id]: 1,
-  }));
-}
-  };
-
-  const updateCartItemQuantity = (productId, amount) => {
-    const targetProduct = products.find(p => p._id === productId);
-    const maxStock = targetProduct ? targetProduct.stock : 999;
-
-    const item = cart.find(i => i._id === productId);
-    if (!item) return;
-
-    const updatedQty = (parseInt(item.quantity, 10) || 0) + amount;
-
-    if (updatedQty > maxStock) {
-      toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
       return;
     }
 
-    if (updatedQty < 1) {
-      setCart(prev => prev.filter(i => i._id !== productId));
-      return;
-    }
-
-    setCart(prev =>
-      prev.map(i => (i._id === productId ? { ...i, quantity: updatedQty } : i))
-    );
-  };
-
-  const handleCartManualQuantityChange = (productId, value) => {
-    if (value === "") {
-      setCart(prevCart => prevCart.map(item => 
-        item._id === productId ? { ...item, quantity: "" } : item
-      ));
-      return;
-    }
-
-    const targetProduct = products.find(p => p._id === productId);
-    const maxStock = targetProduct ? targetProduct.stock : 999;
     const parsed = parseInt(value, 10);
-
     if (isNaN(parsed)) return;
 
-    let next = parsed;
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        if (item._id !== productId) return item;
 
-    if (parsed < 1) {
-      next = 1;
-    } else if (parsed > maxStock) {
-      toast.error(`Cannot exceed available warehouse stock of ${maxStock}!`);
-      next = maxStock;
-    }
+        const maxStock =
+          products.find((p) => p._id === productId)?.stock ?? item.stock;
 
-    setCart(prev =>
-      prev.map(i => (i._id === productId ? { ...i, quantity: next } : i))
+        if (parsed < 1) return { ...item, quantity: 1 };
+        if (parsed > maxStock) {
+          toast.error(`Only ${maxStock} in stock.`);
+          return { ...item, quantity: maxStock };
+        }
+
+        return { ...item, quantity: parsed };
+      })
     );
   };
 
-  const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item._id !== productId));
+  const removeFromCart = (productId) =>
+    setCart((prev) => prev.filter((item) => item._id !== productId));
+
+  const voidTicket = () => {
+    setCart([]);
+    setSelectedStudent(null);
+    setSearchResults([]);
+    setSearchQuery("");
+    setProductSearchQuery("");
+    setConfirmVoid(false);
   };
 
-  const verifyAndPay = async () => {
-    // Without this guard a second tap during the verify round-trip re-enters
-    // from the same closure and bills the student twice.
-    if (paying) return;
-    setPaying(true);
-
-    try {
-      await api.post("/transactions/verify-payment", {
-        studentId: selectedStudent._id,
-        phone: selectedStudent.parentPhoneNumber,
-        password: purchasePassword,
-      });
-
-      setShowVerifyModal(false);
-      setPurchasePassword("");
-
-      await handleCheckout();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Verification Failed");
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  const handleCancelPayment = () => {
-    if (window.confirm("Are you sure you want to cancel payment? This will reset the terminal.")) {
-      setCart([]);
-      setSelectedStudent(null);
-      setSearchResults([]);
-      setSearchQuery("");
-      setProductSearchQuery("");
-      setIsSearched(false);
-    }
-  };
-
-  const handleCheckout = async () => {
-   if (!selectedStudent) {
-  toast.error("Please search and select a student first.");
-  return;
-}
-
-    const calibratedCart = cart.map(item => ({
-      ...item,
-      quantity: parseInt(item.quantity, 10) || 1
+  // The ticket priced as lines the server can charge. A cleared quantity box
+  // bills as 1, the same way it prices.
+  const billedItems = () =>
+    cart.map((item) => ({
+      productId: item._id,
+      quantity: parseInt(item.quantity, 10) || 1,
     }));
 
+  // The token comes from verify-payment and is bound to exactly the lines that
+  // were sent with it, so those same lines are passed in here rather than read
+  // off the cart again — anything re-derived in between would not match, and
+  // the server would refuse the charge.
+  const handleCheckout = async (items, purchaseToken) => {
+    if (!selectedStudent) {
+      toast.error("Please search and select a student first.");
+      return;
+    }
+
     if (invoiceTotal > selectedStudent.pocketMoney) {
-      return toast.error("Insufficient wallet balance!");
+      toast.error("Insufficient wallet balance!");
+      return;
     }
 
     try {
       await api.post("/transactions/bill", {
         studentId: selectedStudent._id,
-        items: calibratedCart.map((item) => ({
-          productId: item._id,
-          quantity: item.quantity,
-        })),
+        items,
         totalAmount: invoiceTotal,
+        purchaseToken,
       });
 
       toast.success("Payment successful!");
 
-await fetchCatalog();
+      applyInventory(await loadInventory());
 
-setCart([]);
-setSelectedStudent(null);
-setSearchQuery("");
-setProductSearchQuery("");
-setIsSearched(false);
-setShowCart(false);
-setShowWelcome(true);
+      setCart([]);
+      setSelectedStudent(null);
+      setSearchQuery("");
+      setProductSearchQuery("");
+      setTicketFolded(false);
+      setShowWelcome(true);
     } catch (err) {
-
-  console.error("Checkout Error:", err);
-
-  toast.error(
-    err.response?.data?.message ||
-    err.response?.data?.error ||
-    "Checkout failed"
-  );
-}
+      console.error("Checkout Error:", err);
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Checkout failed"
+      );
+    }
   };
+
+  const handleVerifyAndPay = async () => {
+    // Without this guard a second tap during the verify round-trip re-enters
+    // from the same closure and bills the student twice.
+    if (payingRef.current) return;
+    payingRef.current = true;
+    setPaying(true);
+
+    try {
+      const items = billedItems();
+
+      const { data } = await api.post("/transactions/verify-payment", {
+        studentId: selectedStudent._id,
+        phone: selectedStudent.parentPhoneNumber,
+        password: purchasePassword,
+        items,
+      });
+
+      setShowVerifyModal(false);
+      setPurchasePassword("");
+
+      await handleCheckout(items, data?.purchaseToken);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Verification Failed");
+    } finally {
+      payingRef.current = false;
+      setPaying(false);
+    }
+  };
+
+  // Inert while the charge is in flight — including the backdrop, which used to
+  // stay clickable and could dismiss the modal mid-request.
+  const closeVerify = () => {
+    if (payingRef.current) return;
+    setShowVerifyModal(false);
+    setPurchasePassword("");
+  };
+
+  const categories = [
+    "All",
+    ...new Set(products.map((p) => p.stockGroup?.name).filter(Boolean)),
+  ];
+
   const filteredProducts = products.filter((p) => {
+    const matchesCategory =
+      selectedCategory === "All" || p.stockGroup?.name === selectedCategory;
 
-  const matchesCategory =
-    selectedCategory === "All" ||
-    p.stockGroup?.name === selectedCategory;
+    const matchesSearch = p.name
+      ?.toLowerCase()
+      .includes(productSearchQuery.toLowerCase());
 
-  // A row whose product lost its name would otherwise throw here and take the
-  // whole till down mid-sale.
-  const matchesSearch = (p.name || "")
-    .toLowerCase()
-    .includes(productSearchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
-  return matchesCategory && matchesSearch;
-});
-const categories = [
-  "All",
-  ...new Set(
-    products.map(p => p.stockGroup?.name).filter(Boolean)
-  ),
-];
-if (showWelcome) {
-  return (
-    <div className="kiosk-welcome">
-      
-     <img
-  src={hungerLogo}
-  alt="Hunger Hunt"
-  style={{
-    width: "420px",
-    maxWidth: "85%",
-    height: "auto",
-    marginBottom: "20px",
-  }}
-/>
+  // The segmented lens is measured from the live segment rather than hardcoded,
+  // so it stays correct whatever the stock groups turn out to be called.
+  const segRef = useRef(null);
+  const [lens, setLens] = useState({ x: 0, w: 0 });
+  const categoryKey = categories.join("|");
 
-{/* <h1 className="kiosk-welcome-title">
-  HUNGER HUNT
-</h1> */}
+  useLayoutEffect(() => {
+    const seat = () => {
+      const active = segRef.current?.querySelector('[data-on="true"]');
+      if (!active) return;
+      setLens({ x: active.offsetLeft, w: active.offsetWidth });
+    };
 
-<div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0px", // No gap between text and button
-  }}
->
-  <button className="kiosk-start" onClick={() => setShowWelcome(false)}>
-    START ORDER
-  </button>
-</div>
-    </div>
-  );
-}
-  return (
-    <div className="page">
-      <style>{`
-        ::-webkit-scrollbar {
-          width: 10px;
-          height: 10px;
-        }
-        ::-webkit-scrollbar-track {
-          background: var(--bg-subtle);
-          border-radius: 8px;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: var(--primary);
-          border-radius: 8px;
-          border: 2px solid var(--bg-subtle);
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: var(--primary-hover);
-        }
-        .product-scroll-panel::-webkit-scrollbar {
-          width: 6px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-track {
-          background: var(--bg);
-          border-radius: 4px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-thumb {
-          background: var(--primary-light);
-          border-radius: 4px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-          background: var(--primary);
-        }
-      `}</style>
+    seat();
+    window.addEventListener("resize", seat);
+    return () => window.removeEventListener("resize", seat);
+  }, [selectedCategory, categoryKey]);
 
-      
+  const itemCount = cart.length;
+  const remaining = selectedStudent
+    ? selectedStudent.pocketMoney - invoiceTotal
+    : 0;
+  const short = Boolean(selectedStudent) && remaining < 0;
+  const canPay = Boolean(selectedStudent) && cart.length > 0 && !short;
 
-      {/* BOTTOM SECTION - DUAL SIDE-BY-SIDE PANEL */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
-          {/* LEFT SIDE: AVAILABLE PRODUCTS */}
-          <div className="card">
-            <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  }}
->
-  <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  }}
->
-  <h3 className="kiosk-title" style={{ marginBottom: 0 }}>
-    Hunger Hunt
-  </h3>
-
-  
-</div>
-
-  <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-    <button
-      onClick={() => setShowCart(true)}
-      style={{
-        border: "none",
-        background: "transparent",
-        cursor: "pointer",
-        position: "relative",
-      }}
-    >
-      <ShoppingCart size={34} />
-
-      {cart.length > 0 && (
-        <span
-          style={{
-            position: "absolute",
-            top: -6,
-            right: -8,
-            background: "var(--danger-light)",
-            color: "var(--on-dark)",
-            width: 20,
-            height: 20,
-            borderRadius: "50%",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            fontSize: 12,
-            fontWeight: "bold",
-          }}
-        >
-          {cart.length}
-        </span>
-      )}
-    </button>
-
-    {onLogout && (
-    <button
-      onClick={onLogout}
-      style={{
-        padding: "10px 18px",
-        background: "var(--danger)",
-        color: "var(--on-dark)",
-        border: "none",
-        borderRadius: "8px",
-        fontWeight: "600",
-        fontSize: "13px",
-        cursor: "pointer",
-      }}
-    >
-      Logout
-    </button>
-    )}
-  </div>
-</div>
-            <div
-  style={{
-    display: "flex",
-    gap: 12,
-    overflowX: "auto",
-    marginBottom: 20,
-    paddingBottom: 6,
-  }}
->
-  {categories.map(category => (
-    <button
-      key={category}
-      onClick={() => setSelectedCategory(category)}
-      style={{
-        padding: "12px 22px",
-        borderRadius: 30,
-        border: "none",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        fontWeight: 700,
-        fontSize: 15,
-
-        background:
-          selectedCategory === category
-            ? "var(--primary)"
-            : "var(--border)",
-
-        color:
-          selectedCategory === category
-            ? "var(--surface)"
-            : "var(--ink)",
-      }}
-    >
-      {category}
-    </button>
-  ))}
-</div>
-            {inventoryError && (
-              <div
-                style={{
-                  background: "var(--danger-bg-strong)",
-                  color: "var(--danger)",
-                  padding: "12px 14px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  marginBottom: "16px",
-                }}
-              >
-                {inventoryError}
-              </div>
-            )}
-
-            <input
-              className="kiosk-search"
-              placeholder="🔍 Quick filter products by name..."
-              value={productSearchQuery}
-              onChange={(e) => setProductSearchQuery(e.target.value)}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "var(--primary)";
-                e.currentTarget.style.backgroundColor = "var(--surface)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.backgroundColor = "var(--bg)";
-              }}
-            />
-
-            <div className="product-scroll-panel kiosk-scroll">
-              {loadingProducts ? (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      height: 250,
-      fontSize: 18,
-      fontWeight: 600,
-    }}
-  >
-    Loading Products...
-  </div>
-) : filteredProducts.length === 0 ? (
-  <p className="kiosk-empty" style={{ textAlign: "center", padding: "20px 0" }}>
-    No active items match your product filters.
-  </p>
-) : (
-                <div className="kiosk-grid">
-  {filteredProducts.map((p) => {
-
-    const cartItem = cart.find(item => item._id === p._id);
-
-    const currentQty =
-      cartItem
-        ? cartItem.quantity
-        : (stagedQuantities[p._id] ?? 1);
-
+  if (showWelcome) {
     return (
+      <div className="kiosk-welcome">
+        <img className="kiosk-welcome-logo" src={hungerLogo} alt="Hunger Hunt" />
+        <button className="kiosk-start" onClick={() => setShowWelcome(false)}>
+          START ORDER
+        </button>
+      </div>
+    );
+  }
 
-      <div key={p._id} className="kiosk-product">
+  const ticketVisible = cart.length > 0 && !ticketFolded;
+  const stubVisible = cart.length > 0 && ticketFolded;
 
-        <img
-          src={p.image || "https://placehold.co/400x300?text=No+Image"}
-          alt={p.name}
-          className="kiosk-product-img"
-        />
+  return (
+    <>
+      <div
+        className={`till${cart.length === 0 ? " till--bare" : ""}${
+          stubVisible ? " till--folded" : ""
+        }`}
+      >
+        {ticketVisible && (
+          <aside className="ticket-col">
+            <div className="ticket-brand">
+              <img src={hungerLogo} alt="" />
+              <span>Counter 1</span>
+            </div>
 
-        <div className="kiosk-product-body">
-<div
-  style={{
-    fontSize: "18px",
-    fontWeight: "700",
-    color: "var(--ink-soft)",
-    marginBottom: "8px",
-    textAlign: "left",
-  }}
->
-  {p.name}
-</div>
+            <div className="ticket">
+              <div className="ticket-slip">
+                <h2>Order Ticket</h2>
+                <p>
+                  {itemCount} {itemCount === 1 ? "item" : "items"}
+                </p>
+              </div>
 
-<div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "12px",
-  }}
->
-  <div>
-    <div
-      style={{
-        fontSize: "18px",
-        fontWeight: "700",
-        color: "var(--ink)",
-      }}
-    >
-      {formatINR(p.price)}
-    </div>
-  </div>
+              <div className="ticket-who">
+                {selectedStudent ? (
+                  <>
+                    <div className="ticket-who-row">
+                      <span>Student</span>
+                      <b>{selectedStudent.name}</b>
+                    </div>
+                    <div className="ticket-who-row">
+                      <span>Hostel</span>
+                      <b>{selectedStudent.hostelNumber}</b>
+                    </div>
+                    <div className="ticket-who-row">
+                      <span>Father</span>
+                      <b>{selectedStudent.fatherName}</b>
+                    </div>
+                    <div className="ticket-wallet">
+                      <span>Wallet</span>
+                      <b className="money">
+                        {formatINR(selectedStudent.pocketMoney)}
+                      </b>
+                    </div>
+                  </>
+                ) : (
+                  <div className="ticket-who-row">
+                    <span>Student</span>
+                    <b>Not selected yet</b>
+                  </div>
+                )}
+              </div>
 
-  <div
-    style={{
-      fontSize: "15px",
-      fontWeight: "500",
-      color: "var(--ink-soft)",
-    }}
-  >
-    {p.stock} Stock
-  </div>
-</div>
+              <div className="ticket-lines">
+                <div className="ticket-lhead">
+                  <span />
+                  <span>Item</span>
+                  <span>Qty</span>
+                  <span>Amount</span>
+                  <span />
+                </div>
 
-          <div className="kiosk-card-footer">
+                {cart.map((item) => (
+                  <div className="ticket-line" key={item._id}>
+                    <img src={item.image || PLACEHOLDER} alt="" />
 
-            <div className="kiosk-qty">
+                    <div className="ticket-line-name">
+                      {item.name}
+                      <em className="money">{formatINR(item.price)} each</em>
+                    </div>
 
-              <button
-                className="kiosk-qty-btn"
-                onClick={() => {
-                  if (cartItem)
-                    updateCartItemQuantity(p._id, -1);
-                  else
-                    updateStagedQuantity(p._id, -1, p.stock);
-                }}
-              >
-                -
-              </button>
+                    <div className="ticket-line-qty money">{item.quantity}</div>
 
-              <input
-                value={currentQty}
-                className="kiosk-qty-input"
-                onChange={(e) => {
-                  if (cartItem)
-                    handleCartManualQuantityChange(
-                      p._id,
-                      e.target.value
-                    );
-                  else
-                    handleManualQuantityChange(
-                      p._id,
-                      e.target.value,
-                      p.stock
-                    );
-                }}
-              />
+                    <div className="ticket-line-amt money">
+                      {formatINR(
+                        item.price * (parseInt(item.quantity, 10) || 1)
+                      )}
+                    </div>
 
-              <button
-                className="kiosk-qty-btn"
-                onClick={() => {
-                  if (cartItem)
-                    updateCartItemQuantity(p._id, 1);
-                  else
-                    updateStagedQuantity(p._id, 1, p.stock);
-                }}
-              >
-                +
-              </button>
+                    <button
+                      type="button"
+                      className="ticket-line-drop"
+                      onClick={() => removeFromCart(item._id)}
+                      aria-label={`Remove ${item.name} from the ticket`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
 
+              <div className="ticket-tot">
+                <div className="ticket-tot-row">
+                  <span>Items</span>
+                  <b className="money">{itemCount}</b>
+                </div>
+
+                {selectedStudent && (
+                  <div
+                    className={`ticket-tot-row${
+                      short ? " ticket-tot-row--short" : ""
+                    }`}
+                  >
+                    <span>{short ? "Short by" : "Balance after"}</span>
+                    <b className="money">{formatINR(Math.abs(remaining))}</b>
+                  </div>
+                )}
+
+                <div className="ticket-grand">
+                  <span>Total</span>
+                  <b className="money" key={invoiceTotal}>
+                    {formatINR(invoiceTotal)}
+                  </b>
+                </div>
+
+                <Button
+                  className="btn--place"
+                  disabled={!canPay}
+                  onClick={() => setShowVerifyModal(true)}
+                >
+                  Place Order
+                </Button>
+
+                <Button
+                  className="btn--void"
+                  onClick={() => setConfirmVoid(true)}
+                >
+                  Void ticket
+                </Button>
+              </div>
             </div>
 
             <button
-              className="btn btn--primary btn--sm"
-              onClick={() => addToCart(p)}
+              type="button"
+              className="ticket-handle"
+              onClick={() => setTicketFolded(true)}
+              aria-label="Hide the order ticket"
             >
-              Add
+              &lsaquo;
             </button>
+          </aside>
+        )}
 
+        {stubVisible && (
+          <aside className="ticket-stub">
+            <div
+              className="ticket-stub-paper"
+              role="button"
+              tabIndex={0}
+              onClick={() => setTicketFolded(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setTicketFolded(false);
+              }}
+              aria-label="Show the order ticket"
+            >
+              <span className="ticket-stub-n money">{itemCount}</span>
+              <span className="ticket-stub-rot">Order ticket</span>
+              <span className="ticket-stub-tot">
+                <span>Total</span>
+                <b className="money">{formatINR(invoiceTotal)}</b>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="ticket-handle"
+              onClick={() => setTicketFolded(false)}
+              aria-label="Show the order ticket"
+            >
+              &rsaquo;
+            </button>
+          </aside>
+        )}
+
+        <section className="wall">
+          <div className="wall-top">
+            {cart.length === 0 && (
+              <img className="wall-logo" src={hungerLogo} alt="Hunger Hunt" />
+            )}
+
+            {selectedStudent ? (
+              <div className="serving glass">
+                <span className="serving-avatar" aria-hidden="true">
+                  {selectedStudent.name?.charAt(0).toUpperCase()}
+                </span>
+
+                <div className="serving-who">
+                  <div className="serving-name">{selectedStudent.name}</div>
+                  <div className="serving-meta">
+                    Hostel {selectedStudent.hostelNumber}
+                  </div>
+                </div>
+
+                <span className="serving-wallet money">
+                  {formatINR(selectedStudent.pocketMoney)}
+                </span>
+
+                <Button
+                  className="btn--switch"
+                  onClick={() => {
+                    setSelectedStudent(null);
+                    setSearchResults([]);
+                  }}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <form className="wall-lookup glass" onSubmit={handleStudentSearch}>
+                <span aria-hidden="true">⌕</span>
+                <input
+                  className="wall-lookup-input"
+                  placeholder="Search students by name or hostel number…"
+                  aria-label="Search students by name or hostel number"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Button type="submit" className="btn--lookup">
+                  Search
+                </Button>
+              </form>
+            )}
+
+            {onLogout && (
+              <Button className="btn--signout glass" onClick={onLogout}>
+                Sign out
+              </Button>
+            )}
           </div>
 
-        </div>
+          {searchResults.length > 0 && (
+            <div className="lookup-results">
+              {searchResults.map((student) => (
+                <button
+                  type="button"
+                  key={student._id}
+                  className="btn lookup-result"
+                  onClick={() => selectStudent(student)}
+                >
+                  <span className="lookup-result-name">
+                    {student.name}
+                    <em>
+                      Hostel {student.hostelNumber} · {student.fatherName}
+                    </em>
+                  </span>
+                  <span className="lookup-result-wallet money">
+                    {formatINR(student.pocketMoney)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
+          {inventoryError && (
+            <div className="banner banner--alert" role="status">
+              <span aria-hidden="true">⚠️</span>
+              <span>{inventoryError}</span>
+            </div>
+          )}
+
+          <div className="wall-scroll">
+            <div className="filterbar">
+              <div className="seg" ref={segRef} role="tablist">
+                <span
+                  className="seg-lens"
+                  aria-hidden="true"
+                  style={{ "--x": `${lens.x}px`, "--w": `${lens.w}px` }}
+                />
+
+                {categories.map((category) => (
+                  <button
+                    type="button"
+                    key={category}
+                    role="tab"
+                    className="seg-item"
+                    data-on={selectedCategory === category}
+                    aria-selected={selectedCategory === category}
+                    onClick={() => setSelectedCategory(category)}
+                  >
+                    {category === "All" ? "All" : titleCase(category)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="wall-filter glass">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  className="wall-filter-input"
+                  placeholder="Find an item…"
+                  aria-label="Find an item by name"
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {loadingProducts ? (
+              <div className="wall-state">
+                <b>Loading products…</b>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="wall-state">
+                <b>Nothing matches</b>
+                <span>No items in stock match that category or search.</span>
+              </div>
+            ) : (
+              <div className="wall-grid">
+                {filteredProducts.map((p, i) => {
+                  const line = cart.find((item) => item._id === p._id);
+                  const atCeiling =
+                    (parseInt(line?.quantity, 10) || 0) >= p.stock;
+
+                  return (
+                    <article className="tile" key={p._id} style={{ "--i": i }}>
+                      <figure>
+                        <img src={p.image || PLACEHOLDER} alt="" />
+                      </figure>
+
+                      {p.nutrition && (
+                        <Button
+                          className="tile-info"
+                          onClick={() => setNutritionFor(p)}
+                          aria-label={`Nutrition information for ${p.name}`}
+                        >
+                          i
+                        </Button>
+                      )}
+
+                      <span className="tile-price money">
+                        {formatINR(p.price)}
+                      </span>
+
+                      <div className="tile-body">
+                        <h3 className="tile-name">{p.name}</h3>
+
+                        <p className="tile-meta">
+                          {p.stockGroup?.name
+                            ? `${titleCase(p.stockGroup.name)} · `
+                            : ""}
+                          {p.stock} left
+                        </p>
+
+                        {p.nutrition && (
+                          <div className="tile-macros">
+                            <div className="tile-macro">
+                              <b className="money">{p.nutrition.calories}</b>
+                              <span>kcal</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">{p.nutrition.protein}g</b>
+                              <span>Prot</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">{p.nutrition.carbs}g</b>
+                              <span>Carb</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">{p.nutrition.fat}g</b>
+                              <span>Fat</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {line ? (
+                          <div className="tile-step">
+                            <button
+                              type="button"
+                              className="tile-step-btn"
+                              onClick={() => stepQuantity(p._id, -1)}
+                              aria-label={`One fewer ${p.name}`}
+                            >
+                              &minus;
+                            </button>
+
+                            <input
+                              className="tile-step-input money"
+                              inputMode="numeric"
+                              value={line.quantity}
+                              aria-label={`Quantity of ${p.name}`}
+                              onChange={(e) => setQuantity(p._id, e.target.value)}
+                            />
+
+                            <button
+                              type="button"
+                              className="tile-step-btn"
+                              disabled={atCeiling}
+                              onClick={() => stepQuantity(p._id, 1)}
+                              aria-label={`One more ${p.name}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <Button
+                            className="btn--add"
+                            onClick={() => addToCart(p)}
+                          >
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-    );
+      {nutritionFor && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setNutritionFor(null)}
+        >
+          <div
+            className="modal till-modal nutrition"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Nutrition information for ${nutritionFor.name}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="nutrition-head">
+              <img src={nutritionFor.image || PLACEHOLDER} alt="" />
 
-  })}
-</div>
-              )}
+              <div className="nutrition-head-t">
+                <div className="nutrition-kicker">Nutrition</div>
+                <h3>{nutritionFor.name}</h3>
+                <p className="nutrition-serving">
+                  {nutritionFor.nutrition.serving || "Per unit as sold"}
+                  {nutritionFor.stockGroup?.name
+                    ? ` · ${titleCase(nutritionFor.stockGroup.name)}`
+                    : ""}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn nutrition-close"
+                onClick={() => setNutritionFor(null)}
+                aria-label="Close nutrition information"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="nutrition-energy">
+              <span>Energy</span>
+              <b className="money">
+                {nutritionFor.nutrition.calories}
+                <i>kcal</i>
+              </b>
+            </div>
+
+            <div className="nutrition-body">
+              {(() => {
+                const split = energySplit(nutritionFor.nutrition);
+
+                return [
+                  {
+                    key: "protein",
+                    label: "Protein",
+                    grams: nutritionFor.nutrition.protein,
+                    modifier: "",
+                  },
+                  {
+                    key: "carbs",
+                    label: "Carbohydrate",
+                    grams: nutritionFor.nutrition.carbs,
+                    modifier: " nutrition-bar--carb",
+                  },
+                  {
+                    key: "fat",
+                    label: "Fat",
+                    grams: nutritionFor.nutrition.fat,
+                    modifier: " nutrition-bar--fat",
+                  },
+                ].map((row) => (
+                  <div className="nutrition-row" key={row.key}>
+                    <div className="nutrition-row-t">
+                      <span>
+                        {row.label}
+                        <em className="money">
+                          {split[row.key].kcal} kcal · {split[row.key].pct}%
+                        </em>
+                      </span>
+                      <b className="money">{row.grams} g</b>
+                    </div>
+
+                    <div className={`nutrition-bar${row.modifier}`}>
+                      <i style={{ width: `${split[row.key].pct}%` }} />
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <p className="nutrition-foot">
+              Bars show the share of this item&rsquo;s energy from each macro —
+              protein and carbohydrate at 4&nbsp;kcal per gram, fat at 9.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {confirmVoid && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setConfirmVoid(false)}
+        >
+          <div
+            className="modal till-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="void-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title" id="void-title">
+              Void this ticket?
+            </h2>
+
+            <p className="verify-line">
+              The {itemCount} {itemCount === 1 ? "item" : "items"} on the ticket
+              and the selected student will be cleared. Nothing is charged.
+            </p>
+
+            <div className="modal-actions">
+              <Button
+                className="btn--quiet"
+                onClick={() => setConfirmVoid(false)}
+              >
+                Keep ticket
+              </Button>
+              <Button className="btn--confirm btn--destroy" onClick={voidTicket}>
+                Void ticket
+              </Button>
             </div>
           </div>
-
         </div>
-      {showCart && (
-  <>
-    <div
-      onClick={() => setShowCart(false)}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        backdropFilter: "blur(5px)",
-        zIndex: 998,
-      }}
-    />
+      )}
 
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "90%",
-        maxWidth: "900px",
-        height: "85vh",
-        background: "var(--surface)",
-        borderRadius: "18px",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-        zIndex: 999,
-        padding: 25,
-        overflowY: "auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <h2>My Cart</h2>
-
-        <button
-          onClick={() => setShowCart(false)}
-          style={{
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-          }}
-        >
-          <X size={28} />
-        </button>
-      </div>
-
-      <div className="kiosk-lookup">
-  <input
-    className="kiosk-input"
-    placeholder="Search Student Name / Hostel Number"
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
-  />
-
-  <button
-    className="btn btn--brand"
-    onClick={handleStudentSearch}
-  >
-    Search
-  </button>
-</div>
-{searchResults.length > 0 && (
-  <div className="kiosk-results">
-    <table className="kiosk-table">
-      <thead>
-        <tr>
-          <th>Student</th>
-          <th>Hostel</th>
-          <th></th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {searchResults.map((student) => (
-          <tr key={student._id}>
-            <td>{student.name}</td>
-
-            <td>
-              {student.hostelNumber}
-            </td>
-
-            <td>
-              <button
-                className="btn btn--primary btn--sm"
-                onClick={() => {
-                  selectStudent(student);
-                  setSearchResults([]);
-                }}
-              >
-                Select
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-    {selectedStudent && (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 18,
-      padding: "16px 20px",
-      margin: "18px 0",
-      border: "1px solid var(--border)",
-      borderRadius: 12,
-      background: "var(--bg)",
-    }}
-  >
-    <div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>
-        Student
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.name}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>
-        Father
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.fatherName}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>
-        Hostel No
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.hostelNumber}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>
-        Phone
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.parentPhoneNumber}
-      </div>
-    </div>
-
-    <div
-      style={{
-        marginLeft: "auto",
-        background: "var(--warn-bg)",
-        color: "var(--warn-ink)",
-        padding: "12px 18px",
-        borderRadius: 10,
-        textAlign: "center",
-        minWidth: 180,
-      }}
-    >
-      <div style={{ fontSize: 12 }}>
-        Wallet Balance
-      </div>
-
-      <div
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-        }}
-      >
-        {formatINR(selectedStudent.pocketMoney)}
-      </div>
-    </div>
-  </div>
-)}
-
-      {cart.length === 0 ? (
-  <p className="kiosk-empty">Cart is empty.</p>
-) : (
-  <table className="kiosk-table">
-    <thead>
-  <tr>
-    <th>Image</th>
-    <th>Product Name</th>
-    <th>Unit Price</th>
-    <th>Quantity</th>
-    <th>Total Price</th>
-    <th></th>
-  </tr>
-</thead>
-
-    <tbody>
-  {cart.map((item) => (
-    <tr key={item._id}>
-
-      {/* Product Image */}
-      <td>
-        <img
-          src={item.image || "https://placehold.co/80x80?text=No+Image"}
-          alt={item.name}
-          style={{
-            width: 70,
-            height: 70,
-            objectFit: "cover",
-            borderRadius: 8,
-            border: "1px solid var(--border-strong)",
-          }}
-        />
-      </td>
-
-      {/* Product Name */}
-      <td>
-        <strong>{item.name}</strong>
-      </td>
-
-      {/* Unit Price */}
-      <td>
-        {formatINR(item.price)}
-      </td>
-
-      {/* Quantity */}
-      <td>
+      {showVerifyModal && selectedStudent && (
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
+          className="modal-backdrop till-modal-backdrop"
+          onClick={closeVerify}
         >
-          <button
-            className="kiosk-cart-qty-btn"
-            onClick={() =>
-              updateCartItemQuantity(item._id, -1)
-            }
+          <div
+            className="modal till-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-title"
+            aria-busy={paying}
+            onClick={(e) => e.stopPropagation()}
           >
-            -
-          </button>
+            <h2 className="modal-title" id="verify-title">
+              Parent verification
+            </h2>
 
-          <input
-            value={item.quantity}
-            className="kiosk-cart-qty"
-            onChange={(e) =>
-              handleCartManualQuantityChange(
-                item._id,
-                e.target.value
-              )
-            }
-          />
+            <p className="verify-line">
+              Confirm with <b>{selectedStudent.fatherName}</b> on{" "}
+              <b>{selectedStudent.parentPhoneNumber}</b> before charging{" "}
+              <b>{selectedStudent.name}</b>&rsquo;s wallet.
+            </p>
 
-          <button
-            className="kiosk-cart-qty-btn"
-            onClick={() =>
-              updateCartItemQuantity(item._id, 1)
-            }
-          >
-            +
-          </button>
+            <div className="verify-amount">
+              <span>To charge</span>
+              <b>{formatINR(invoiceTotal)}</b>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleVerifyAndPay();
+              }}
+            >
+              <label className="field-label" htmlFor="purchase-password">
+                Purchase password
+              </label>
+
+              <input
+                id="purchase-password"
+                className="input"
+                type="password"
+                autoComplete="off"
+                autoFocus
+                placeholder="Enter purchase password"
+                value={purchasePassword}
+                onChange={(e) => setPurchasePassword(e.target.value)}
+                disabled={paying}
+              />
+
+              <div className="modal-actions">
+                <Button
+                  className="btn--quiet"
+                  disabled={paying}
+                  onClick={closeVerify}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="btn--confirm" disabled={paying}>
+                  {paying ? "Processing…" : "Verify & Pay"}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
-      </td>
+      )}
 
-      {/* Total */}
-      <td>
-        {formatINR(item.price * (parseInt(item.quantity, 10) || 1))}
-      </td>
-
-      {/* Remove */}
-      <td>
-        <button
-          className="kiosk-remove"
-          onClick={() => removeFromCart(item._id)}
-        >
-          ×
-        </button>
-      </td>
-
-    </tr>
-  ))}
-</tbody>
-  </table>
-)}
-<div className="kiosk-checkout">
-  <div className="kiosk-total-row">
-    <span className="kiosk-total-label">
-      Total Bill
-    </span>
-
-    <span className="kiosk-total-amount">
-      {formatINR(invoiceTotal)}
-    </span>
-  </div>
-                {selectedStudent && (
-  <div
-    className={`kiosk-balance${
-      selectedStudent.pocketMoney - invoiceTotal < 0
-        ? " kiosk-balance--negative"
-        : ""
-    }`}
-  >
-                   {selectedStudent.pocketMoney - invoiceTotal < 0
-                    ? `Balance short by ${formatINR(Math.abs(selectedStudent.pocketMoney - invoiceTotal))}`
-                     : `Remaining Balance: ${formatINR(selectedStudent.pocketMoney - invoiceTotal)}`}
-                 </div>)}
-
-                 <div className="kiosk-actions">
-                  <button
-                     className="btn btn--danger"
-                    onClick={handleCancelPayment}
-                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-strong)")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--danger)")}
-                  >
-                     Cancel Payment
-                  </button>
-                  <button
-                    className="btn btn--success" style={{ flex: 1 }}
-                    onClick={() => {
-  if (!selectedStudent) {
-    toast.error("Please select a student.");
-    return;
-  }
-
-  setShowVerifyModal(true);
-}}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "var(--success-strong)")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "var(--success)")}
-                     disabled={
-   !selectedStudent ||
-  cart.length === 0 ||
-  selectedStudent.pocketMoney - invoiceTotal < 0
- }
-                  >
-                     Complete Payment
-                  </button>
-             </div>
-             </div>
-         </div>
+      <RefreshButton onRefresh={refreshPage} loading={loadingProducts} />
     </>
-)}
-
-{/* ===== Parent Verification Popup ===== */}
-
-{/* ===== Parent Verification Popup ===== */}
-
-{showVerifyModal && (
-  <>
-    <div
-      onClick={() => {
-        setShowVerifyModal(false);
-        setPurchasePassword("");
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.45)",
-        zIndex: 1000
-      }}
-    />
-
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%,-50%)",
-        width: 430,
-        background: "var(--surface)",
-        borderRadius: 18,
-        padding: 30,
-        zIndex: 1001,
-        boxShadow: "0 20px 50px rgba(0,0,0,.3)"
-      }}
-    >
-      <h2 style={{ marginBottom: 25 }}>
-        Parent Verification
-      </h2>
-
-      <label
-        htmlFor="verify-phone"
-        style={{
-          display: "block",
-          marginBottom: 8,
-          fontWeight: 600
-        }}
-      >
-        Father's Mobile Number
-      </label>
-
-      <input
-        id="verify-phone"
-        readOnly
-        value={selectedStudent?.parentPhoneNumber || ""}
-        style={{
-          width: "100%",
-          padding: 14,
-          border: "1px solid var(--border-strong)",
-          borderRadius: 8,
-          marginBottom: 20
-        }}
-      />
-
-      <label
-        htmlFor="verify-password"
-        style={{
-          display: "block",
-          marginBottom: 8,
-          fontWeight: 600
-        }}
-      >
-        Purchase Password
-      </label>
-
-      <input
-        id="verify-password"
-        type="password"
-        placeholder="Enter Purchase Password"
-        autoComplete="off"
-        value={purchasePassword}
-        onChange={(e) =>
-          setPurchasePassword(e.target.value)
-        }
-        onKeyDown={(e) => {
-          // Enter is the natural gesture on a till keypad; without this the
-          // cashier had to reach for the button every time.
-          if (e.key === "Enter" && !paying) verifyAndPay();
-        }}
-        style={{
-          width: "100%",
-          padding: 14,
-          border: "1px solid var(--border-strong)",
-          borderRadius: 8
-        }}
-      />
-
-      <div
-        style={{
-          display: "flex",
-          gap: 15,
-          marginTop: 30
-        }}
-      >
-        <button
-          style={{
-            flex: 1,
-            padding: 14,
-            borderRadius: 10,
-            border: "1px solid var(--border-strong)",
-            cursor: "pointer"
-          }}
-          disabled={paying}
-          onClick={() => {
-            setShowVerifyModal(false);
-            setPurchasePassword("");
-          }}
-        >
-          Cancel
-        </button>
-
-        <button
-          style={{
-            flex: 1,
-            padding: 14,
-            borderRadius: 10,
-            border: "none",
-            background: "var(--success)",
-            color: "var(--on-dark)",
-            cursor: "pointer"
-          }}
-          disabled={paying}
-          onClick={verifyAndPay}
-        >
-          {paying ? "Processing…" : "Verify & Pay"}
-        </button>
-      </div>
-    </div>
-  </>
-)}
-
-<RefreshButton
-  onRefresh={refreshPage}
-  loading={loadingProducts}
-/>
-    </div>
   );
 };
 
 export default KioskBilling;
-
-
-

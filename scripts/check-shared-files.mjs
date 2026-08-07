@@ -8,6 +8,16 @@
  * into two versions, one of which reached for `item.productId._id` without a
  * guard and used blocking alert() calls the other had replaced.
  *
+ * That file is no longer listed. The kiosk redesign gave the till a look of its
+ * own, built on hungerhunt-kiosk/src/kiosk.css, which the admin console does not
+ * load — so the two copies could not be reconciled. The admin console's /kiosk
+ * route was retired instead: it duplicated /billing, which does the same job in
+ * the console's own styling. The till now has one owner, which is a better
+ * answer than a check asserting two copies match.
+ *
+ * Anything still on the list below is genuinely meant to be byte-identical.
+ * Before adding a file, ask whether it should have one owner instead.
+ *
  * Run: node scripts/check-shared-files.mjs
  * Exits non-zero on drift, so it can gate a commit or CI step.
  */
@@ -27,10 +37,6 @@ const SHARED = [
   {
     file: 'src/ui.css',
     apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
-  },
-  {
-    file: 'src/pages/KioskBilling.jsx',
-    apps: ['frontend-admin', 'hungerhunt-kiosk'],
   },
   {
     file: 'src/components/ui/index.jsx',

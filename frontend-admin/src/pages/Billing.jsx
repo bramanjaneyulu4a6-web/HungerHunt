@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
@@ -18,6 +18,12 @@ const Billing = () => {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [purchasePassword, setPurchasePassword] = useState("");
   const [paying, setPaying] = useState(false);
+
+  // `paying` drives the disabled state and the label, but it cannot be the
+  // lock: setPaying does not apply until the next render, so submits landing in
+  // the same tick all read false and every one of them charges the wallet. A
+  // ref flips synchronously, so the second one bails however fast it arrives.
+  const payingRef = useRef(false);
 
   // Staged quantities before appending to cart: { [productId]: quantity }
   const [stagedQuantities, setStagedQuantities] = useState({});
@@ -246,13 +252,20 @@ const Billing = () => {
     setIsSearched(false);
   };
 
-  const handleCheckout = async () => {
-    if (!selectedStudent) return;
-
-    const calibratedCart = cart.map((item) => ({
-      ...item,
+  // The cart priced as lines the server can charge. A cleared quantity box
+  // bills as 1, the same way it prices.
+  const billedItems = () =>
+    cart.map((item) => ({
+      productId: item._id,
       quantity: parseInt(item.quantity, 10) || 1,
     }));
+
+  // The token comes from verify-payment and is bound to exactly the lines that
+  // were sent with it, so those same lines are passed in here rather than read
+  // off the cart again — anything re-derived in between would not match, and
+  // the server would refuse the charge.
+  const handleCheckout = async (items, purchaseToken) => {
+    if (!selectedStudent) return;
 
     if (invoiceTotal > selectedStudent.pocketMoney) {
       toast.error("Insufficient wallet balance");
@@ -261,11 +274,9 @@ const Billing = () => {
 
     await api.post("/transactions/bill", {
       studentId: selectedStudent._id,
-      items: calibratedCart.map((item) => ({
-        productId: item._id,
-        quantity: item.quantity,
-      })),
+      items,
       totalAmount: invoiceTotal,
+      purchaseToken,
     });
 
     toast.success("Payment successful");
@@ -278,16 +289,26 @@ const Billing = () => {
 
   const handleVerifyAndPay = async (e) => {
     e.preventDefault();
+
+    if (payingRef.current) return;
+    payingRef.current = true;
     setPaying(true);
 
+    const items = billedItems();
+    let purchaseToken;
+
     try {
-      await api.post("/transactions/verify-payment", {
+      const { data } = await api.post("/transactions/verify-payment", {
         studentId: selectedStudent._id,
         phone: selectedStudent.parentPhoneNumber,
         password: purchasePassword,
+        items,
       });
+
+      purchaseToken = data?.purchaseToken;
     } catch (err) {
       toast.error(err.response?.data?.message || "Verification failed");
+      payingRef.current = false;
       setPaying(false);
       return;
     }
@@ -295,7 +316,7 @@ const Billing = () => {
     try {
       setShowVerifyModal(false);
       setPurchasePassword("");
-      await handleCheckout();
+      await handleCheckout(items, purchaseToken);
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
@@ -303,6 +324,7 @@ const Billing = () => {
           "Checkout failed"
       );
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   };
@@ -855,7 +877,7 @@ const Billing = () => {
         <div
           className="modal-backdrop"
           onClick={() => {
-            if (paying) return;
+            if (payingRef.current) return;
             setShowVerifyModal(false);
             setPurchasePassword("");
           }}

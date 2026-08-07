@@ -16,9 +16,15 @@ const studentSchema = new mongoose.Schema({
   }
 ],
   isParentRegistered: { type: Boolean, default: false },
+ // select: false keeps the bcrypt hash out of every query that does not ask
+ // for it by name — the admin roster, the parent dashboard's populated
+ // children and getChildDetails all returned the whole document and carried it
+ // along. The three places that genuinely compare it opt back in with
+ // .select('+purchasePassword').
  purchasePassword: {
   type: String,
-  default: null
+  default: null,
+  select: false
 },
 
 walletControl: {

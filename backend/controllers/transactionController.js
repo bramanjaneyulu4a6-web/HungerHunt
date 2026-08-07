@@ -194,7 +194,7 @@ export const verifyPayment = async (req, res) => {
   try {
     const { studentId, phone, password } = req.body;
 
-    const student = await Student.findById(studentId);
+    const student = await Student.findById(studentId).select('+purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });

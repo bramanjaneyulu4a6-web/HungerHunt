@@ -236,11 +236,18 @@ export const getChildDetails = async (req, res) => {
       studentId: req.params.id,
     }).sort({ createdAt: -1 });
 
+    // Asked as a question about the document rather than by loading the hash,
+    // since the whole student is part of this response.
+    const hasPurchasePassword = await Student.exists({
+      _id: req.params.id,
+      purchasePassword: { $ne: null },
+    });
+
     res.json({
       student,
       bills,
       recharges: student.rechargeHistory || [],
-      hasPurchasePassword: !!student.purchasePassword,
+      hasPurchasePassword: !!hasPurchasePassword,
     });
 
   } catch (error) {
@@ -263,7 +270,7 @@ export const setPurchasePassword = async (req, res) => {
       });
     }
 
-    const student = await Student.findById(studentId);
+    const student = await Student.findById(studentId).select('+purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: "Student not found." });
@@ -306,7 +313,7 @@ export const changePurchasePassword = async (req, res) => {
       });
     }
 
-    const student = await Student.findById(studentId);
+    const student = await Student.findById(studentId).select('+purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: "Student not found." });

@@ -58,36 +58,65 @@ signed in on both their phone and a browser is notified on both.
 ### Setup that cannot be done from the repo
 
 Web push works as soon as the `VITE_FIREBASE_*` and `VITE_VAPID_KEY` values in
-`.env` are filled in. **Native push additionally needs all of the following**,
-and silently delivers nothing until they are done:
+`.env` are filled in.
 
-1. **Android — `google-services.json`**
-   Firebase Console → Project settings → *Your apps* → add an Android app with
-   package name `com.hungerhunt.parent`. Download and place at
-   `android/app/google-services.json`. (`android/app/build.gradle` already
-   applies the plugin when this file exists.)
-
-2. **iOS — `GoogleService-Info.plist`**
-   Same screen, add an iOS app with bundle id `com.hungerhunt.parent`.
-   Download, then drag into `ios/App/App/` **in Xcode** so it joins the target —
-   copying it in Finder is not enough.
-
-3. **iOS — APNs key**
-   Apple Developer → Certificates, Identifiers & Profiles → Keys → new key with
-   *Apple Push Notifications service* enabled. Upload the `.p8` to Firebase
-   Console → Project settings → Cloud Messaging → *Apple app configuration*,
-   with your Key ID and Team ID. Without this, Firebase has no way to reach
-   Apple and iOS devices get nothing.
-
-4. **iOS — capabilities in Xcode**
-   Target *App* → Signing & Capabilities → add **Push Notifications**, and add
-   **Background Modes** with *Remote notifications* ticked.
-
-5. **A physical iPhone.** The simulator cannot register with APNs.
-
-`AppDelegate.swift` already forwards the APNs device token to the plugin, and
+**Android** needs one file: Firebase Console → Project settings → *Your apps* →
+add an Android app with package name `com.hungerhunt.parent`, download
+`google-services.json`, place it at `android/app/google-services.json`.
+`android/app/build.gradle` already applies the plugin when that file exists, and
 `AndroidManifest.xml` already declares `POST_NOTIFICATIONS` (required from
-Android 13). Neither needs editing.
+Android 13). Nothing else.
+
+**iOS** needs four, and delivers nothing at all until every one of them is done:
+
+1. **`GoogleService-Info.plist`** — same Firebase screen, add an iOS app with
+   bundle id `com.hungerhunt.parent`. Download, then drag it into
+   `ios/App/App/` **in Xcode**, with *Add to targets: App* ticked. Copying it
+   in Finder is not enough; it has to be in the target to be in the bundle.
+
+2. **The Firebase iOS SDK** — Xcode → File → Add Package Dependencies →
+   `https://github.com/firebase/firebase-ios-sdk` → add the **FirebaseMessaging**
+   product to the *App* target.
+
+   It goes in the Xcode project and not in `CapApp-SPM/Package.swift`, which
+   `npx cap sync` regenerates — a dependency added there disappears at the next
+   sync. `AppDelegate.swift` compiles with or without it (`#if canImport`), so
+   before this step the app builds and reports why push is not working rather
+   than failing to compile.
+
+3. **An APNs key** — Apple Developer → Certificates, Identifiers & Profiles →
+   Keys → new key with *Apple Push Notifications service* enabled. Upload the
+   `.p8` to Firebase Console → Project settings → Cloud Messaging → *Apple app
+   configuration*, with its Key ID and your Team ID. Without it Firebase has no
+   way to reach Apple.
+
+4. **The Push Notifications capability** — Xcode → target *App* → Signing &
+   Capabilities → **+ Capability** → *Push Notifications*. This also registers
+   the entitlement against the App ID on Apple's developer portal, which is why
+   it has to be done through Xcode rather than by committing an entitlements
+   file. *Background Modes → Remote notifications* is already set in
+   `Info.plist`.
+
+Then test on **a physical iPhone** — the simulator cannot register with APNs.
+
+#### Why iOS needs the Firebase SDK at all
+
+The backend sends every notification through Firebase, which addresses a device
+by its FCM registration token. APNs issues something different: a device token,
+64 hex characters, which FCM does not recognise. Left alone,
+`@capacitor/push-notifications` publishes that APNs token, the backend stores
+it, the first send is rejected as an unknown registration, and the token is
+dropped as dead — silently, and identically to a parent who uninstalled the app.
+
+`AppDelegate.swift` closes that gap: it hands the APNs token to Firebase and
+publishes the FCM token Firebase exchanges it for. Android needs none of this —
+the plugin talks to Firebase directly there and already returns an FCM token.
+
+`Info.plist` also sets `FirebaseAppDelegateProxyEnabled` to `false`. Left on,
+the Firebase SDK swizzles the app delegate and the notification-centre delegate
+out from under Capacitor, and the symptom is notifications that arrive but fire
+no `pushNotificationReceived` or tap handler. The token exchange above is
+explicit precisely so that swizzling is not needed.
 
 ### Checking it works
 

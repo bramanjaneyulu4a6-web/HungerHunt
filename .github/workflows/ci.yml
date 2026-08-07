@@ -5,6 +5,12 @@ on:
     branches: [main, Ashok-work]
   pull_request:
 
+# A second push supersedes the first; nothing is learned from finishing a run
+# against a commit that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     name: Backend tests
@@ -13,11 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci || npm install
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
         working-directory: backend
       # The auth tests stub the model calls they depend on, so no MongoDB
-      # service is needed. JWT_SECRET only has to exist and be consistent.
+      # service is needed and no .env has to exist. JWT_SECRET only has to be
+      # set and consistent; the tests supply their own values for the rest.
       - run: npm test
         working-directory: backend
         env:
@@ -30,14 +39,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      # Guards the six files deliberately duplicated across the three apps.
+          node-version: 22
+      # Guards the files deliberately duplicated across apps. No dependencies —
+      # the script uses only node builtins, so there is nothing to install.
       - run: node scripts/check-shared-files.mjs
 
   build:
     name: Build ${{ matrix.app }}
     runs-on: ubuntu-latest
     strategy:
+      # One app failing to build should not hide whether the other two do.
       fail-fast: false
       matrix:
         app: [frontend-parent, frontend-admin, hungerhunt-kiosk]
@@ -45,8 +56,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci || npm install
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
         working-directory: ${{ matrix.app }}
       - run: npx vite build
         working-directory: ${{ matrix.app }}

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Ashok-work]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci || npm install
+        working-directory: backend
+      # The auth tests stub the model calls they depend on, so no MongoDB
+      # service is needed. JWT_SECRET only has to exist and be consistent.
+      - run: npm test
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-test-secret
+
+  shared-files:
+    name: Shared files in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Guards the six files deliberately duplicated across the three apps.
+      - run: node scripts/check-shared-files.mjs
+
+  build:
+    name: Build ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci || npm install
+        working-directory: ${{ matrix.app }}
+      - run: npx vite build
+        working-directory: ${{ matrix.app }}

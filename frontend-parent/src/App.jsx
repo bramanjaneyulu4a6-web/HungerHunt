@@ -17,6 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SetPurchasePassword from "./pages/SetPurchasePassword";
 
 import Navbar from "./components/Navbar";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
 
@@ -96,10 +97,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    /* Outermost, so it also covers a failure in the provider or the router
+       itself — anything it does not wrap has nothing left to catch it. */
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

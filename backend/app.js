@@ -19,6 +19,7 @@ import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
 import { parentSecretIsShared } from './utils/tokens.js';
+import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
 const app = express();
 
@@ -53,6 +54,15 @@ if (parentSecretIsShared()) {
     'PARENT_JWT_SECRET is not set, so parent tokens are signed with JWT_SECRET.' +
     ' The role claim still separates them; setting a second secret makes an' +
     ' admin token unusable on a parent route at the signature instead.'
+  );
+}
+
+if (unverifiedBillsAccepted()) {
+  console.warn(
+    `Bills carrying no purchase authorization are still accepted until ${graceUntil().toISOString()},` +
+    ' so tills running a build from before verify-payment issued one keep working.' +
+    ' Each such bill is logged; once none appear, close the window early with' +
+    ' PURCHASE_AUTH_GRACE_UNTIL.'
   );
 }
 

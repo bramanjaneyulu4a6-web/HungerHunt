@@ -4,6 +4,13 @@ import Parent from "../models/Parent.js";
 import Inventory from "../models/Inventory.js";
 import bcrypt from "bcryptjs";
 import { sendNotification } from "../utils/sendNotification.js";
+import {
+  AUTHORIZATION_MESSAGES,
+  consumeAuthorization,
+  graceUntil,
+  issueAuthorization,
+  unverifiedBillsAccepted,
+} from "../utils/purchaseAuthorization.js";
 
 const periodStart = (limitType) => {
   const now = new Date();
@@ -34,7 +41,7 @@ const restoreStock = async (applied) => {
 };
 
 export const generateBill = async (req, res) => {
-  const { studentId, items } = req.body;
+  const { studentId, items, purchaseToken } = req.body;
 
   if (!studentId || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'A student and at least one item are required.' });
@@ -47,6 +54,37 @@ export const generateBill = async (req, res) => {
   const applied = [];
 
   try {
+    // The parent's purchase password is checked by verifyPayment, which hands
+    // back a token bound to this student and this exact cart. Spending it here
+    // is what makes that check part of the charge instead of a step the client
+    // is trusted to have taken.
+    //
+    // It is spent before anything else happens, so a bill that fails later
+    // cannot leave a live token behind. That does cost the cashier a second
+    // password when a sale loses a stock race — but that path already asks
+    // them to review the cart, and a different cart needs its own token.
+    const authorization = await consumeAuthorization({
+      token: purchaseToken,
+      studentId,
+      items,
+    });
+
+    if (!authorization.ok) {
+      const grace = authorization.reason === 'missing' && unverifiedBillsAccepted();
+
+      if (!grace) {
+        // Not 401: the kiosk signs itself out on one, and this cashier is
+        // properly signed in — it is this charge that is unauthorised.
+        return res.status(403).json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
+      }
+
+      console.warn(
+        `Charged student ${studentId} on a bill carrying no purchase authorization.` +
+        ` Accepted until ${graceUntil().toISOString()} — this client is running a build` +
+        ` from before verify-payment issued a token.`
+      );
+    }
+
     const student = await Student.findById(studentId);
     if (!student) return res.status(404).json({ message: 'Student record not found.' });
 
@@ -192,7 +230,7 @@ export const getAllTransactions = async (req, res) => {
 
 export const verifyPayment = async (req, res) => {
   try {
-    const { studentId, phone, password } = req.body;
+    const { studentId, phone, password, items } = req.body;
 
     const student = await Student.findById(studentId).select('+purchasePassword');
 
@@ -220,7 +258,28 @@ export const verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Wrong purchase password" });
     }
 
-    res.json({ success: true });
+    // The token is bound to a cart, so it can only be issued to a client that
+    // says what it is paying for. One that sends no items is a build from
+    // before this existed: it gets the bare answer it expects, and its bill is
+    // carried by the grace window in utils/purchaseAuthorization.js until that
+    // date passes. Sending items but getting them wrong is a bug worth seeing.
+    let purchaseToken;
+
+    if (items !== undefined) {
+      if (
+        !Array.isArray(items) ||
+        items.length === 0 ||
+        items.some((i) => !i.productId || !Number.isInteger(i.quantity) || i.quantity <= 0)
+      ) {
+        return res.status(400).json({
+          message: 'Every item needs a product and a positive whole quantity.'
+        });
+      }
+
+      purchaseToken = await issueAuthorization({ studentId: student._id, items });
+    }
+
+    res.json({ success: true, purchaseToken });
 
   } catch (err) {
     res.status(500).json({ message: err.message });

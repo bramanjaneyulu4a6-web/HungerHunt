@@ -44,6 +44,33 @@ jobs:
       # the script uses only node builtins, so there is nothing to install.
       - run: node scripts/check-shared-files.mjs
 
+  lint:
+    name: Lint ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # frontend-admin is absent on purpose: `eslint .` reports 10 errors
+        # there today, mostly react-hooks rules. A job parked on red teaches
+        # people to skim past the whole workflow, so it joins this list in the
+        # commit that clears them rather than before. The backend has no eslint
+        # config at all and so has nothing to run.
+        app: [frontend-parent, hungerhunt-kiosk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      # --max-warnings 0 because a warning that fails nothing is a warning that
+      # accumulates. Both apps are at zero errors and zero warnings today, so
+      # the bar this holds is the one they already meet.
+      - run: npm run lint -- --max-warnings 0
+        working-directory: ${{ matrix.app }}
+
   build:
     name: Build ${{ matrix.app }}
     runs-on: ubuntu-latest

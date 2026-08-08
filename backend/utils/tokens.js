@@ -25,13 +25,19 @@ export const signParentToken = (id, phone) =>
 // Tokens issued before this change carry no role and were signed with
 // JWT_SECRET. Rejecting them outright would sign out every parent and admin the
 // moment this deploys, including the till mid-sale, so they stay acceptable
-// until the date below — one parent-token lifetime, by which point every one of
-// them has expired on its own.
+// until the date below, by which point every one of them has expired on its own.
+//
+// The date has to be one parent-token lifetime past the *deploy*, not past the
+// change: until this reaches production, production is still handing out
+// roleless tokens, and the clock has not started. It was originally 2026-08-14,
+// seven days after the change was written. That assumed a same-day deploy, which
+// did not happen — so it is the 20th, and it should move again if the deploy
+// does. LEGACY_TOKEN_GRACE_UNTIL is how, without a release.
 //
 // This is a scheduled cutover, not a flag: it ends by itself, and nothing has
-// to be remembered. Set LEGACY_TOKEN_GRACE_UNTIL to move it if the deploy slips.
-// Once the date has passed, this whole branch and legacyAccepted can be deleted.
-const DEFAULT_GRACE_UNTIL = '2026-08-14T00:00:00Z';
+// to be remembered. Once the date has passed, this whole branch and
+// legacyAccepted can be deleted.
+const DEFAULT_GRACE_UNTIL = '2026-08-20T00:00:00Z';
 
 export const legacyGraceUntil = () =>
   new Date(process.env.LEGACY_TOKEN_GRACE_UNTIL || DEFAULT_GRACE_UNTIL);

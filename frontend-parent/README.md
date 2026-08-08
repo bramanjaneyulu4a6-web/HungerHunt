@@ -7,6 +7,13 @@ Parents sign in with the phone number the school holds, see each child's wallet
 balance, purchase and recharge history, set the purchase password used at the
 counter, and set a spending limit.
 
+A parent can also ask to approve each purchase before it is paid for. With that
+on, the counter takes the purchase password as usual but raises a request rather
+than charging: it arrives as a notification, and the parent approves it — or
+trims it down first — from **Requests** in the app. Nothing is deducted until
+they do. A request that goes unanswered expires after three days, and the
+student cannot place another until it is answered or lapses.
+
 ## Running it
 
 ```bash

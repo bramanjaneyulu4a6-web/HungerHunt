@@ -10,6 +10,7 @@ import {
   changePurchasePassword,
   resetPurchasePassword,
   updateWalletControl,
+  updatePurchaseApproval,
   forgotPassword,
   resetPassword,
   savePushToken,
@@ -39,5 +40,6 @@ router.post('/change-purchase-password', protectParent, changePurchasePassword);
 router.post('/reset-purchase-password', protectParent, resetPurchasePassword);
 
 router.put('/wallet-control/:studentId', protectParent, updateWalletControl);
+router.put('/purchase-approval/:studentId', protectParent, updatePurchaseApproval);
 
 export default router;

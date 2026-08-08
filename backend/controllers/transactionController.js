@@ -1,9 +1,9 @@
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import Parent from "../models/Parent.js";
-import Inventory from "../models/Inventory.js";
 import bcrypt from "bcryptjs";
 import { sendToParent } from "../utils/sendNotification.js";
+import { chargeCart } from "../utils/checkout.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -11,34 +11,6 @@ import {
   issueAuthorization,
   unverifiedBillsAccepted,
 } from "../utils/purchaseAuthorization.js";
-
-const periodStart = (limitType) => {
-  const now = new Date();
-
-  if (limitType === "DAILY") {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  }
-
-  if (limitType === "WEEKLY") {
-    const start = new Date(now);
-    start.setDate(now.getDate() - now.getDay());
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-};
-
-// Puts stock back after a partially-applied checkout.
-const restoreStock = async (applied) => {
-  for (const { productId, quantity } of applied) {
-    try {
-      await Inventory.updateOne({ productId }, { $inc: { stock: quantity } });
-    } catch (err) {
-      console.error("Stock rollback failed for product", productId, err);
-    }
-  }
-};
 
 export const generateBill = async (req, res) => {
   const { studentId, items, purchaseToken } = req.body;
@@ -50,8 +22,6 @@ export const generateBill = async (req, res) => {
   if (items.some((i) => !i.productId || !Number.isInteger(i.quantity) || i.quantity <= 0)) {
     return res.status(400).json({ message: 'Every item needs a product and a positive whole quantity.' });
   }
-
-  const applied = [];
 
   try {
     // The parent's purchase password is checked by verifyPayment, which hands
@@ -85,103 +55,16 @@ export const generateBill = async (req, res) => {
       );
     }
 
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ message: 'Student record not found.' });
+    // Pricing, the limit check, the conditional stock and wallet writes and
+    // their rollbacks all live in chargeCart, which the approval flow charges
+    // through as well. Both routes end at the same money.
+    const charge = await chargeCart({ studentId, items });
 
-    let totalAmount = 0;
-    const transactionItems = [];
-
-    for (const orderItem of items) {
-      const inventory = await Inventory.findOne({
-        productId: orderItem.productId
-      }).populate("productId");
-
-      if (!inventory || !inventory.productId) {
-        return res.status(404).json({ message: "Inventory record not found." });
-      }
-
-      if (inventory.stock < orderItem.quantity) {
-        return res.status(400).json({
-          message: `Insufficient stock for ${inventory.productId.name}`
-        });
-      }
-
-      totalAmount += inventory.productId.price * orderItem.quantity;
-
-      transactionItems.push({
-        productId: inventory.productId._id,
-        name: inventory.productId.name,
-        quantity: orderItem.quantity,
-        price: inventory.productId.price
-      });
+    if (!charge.ok) {
+      return res.status(charge.status).json({ message: charge.message });
     }
 
-    if (student.walletControl?.enabled) {
-      const spent = await Transaction.aggregate([
-        {
-          $match: {
-            studentId: student._id,
-            createdAt: { $gte: periodStart(student.walletControl.limitType) }
-          }
-        },
-        { $group: { _id: null, total: { $sum: "$totalAmount" } } }
-      ]);
-
-      const alreadySpent = spent.length > 0 ? spent[0].total : 0;
-      const remainingLimit = Math.max(0, student.walletControl.limitAmount - alreadySpent);
-
-      if (totalAmount > remainingLimit) {
-        return res.status(400).json({
-          message: `${student.walletControl.limitType} limit exceeded. Remaining limit ₹${remainingLimit}`
-        });
-      }
-    }
-
-    // Decrement conditionally so two simultaneous kiosks can never oversell.
-    // Anything already applied is restored if a later step fails.
-    for (const orderItem of items) {
-      const updated = await Inventory.findOneAndUpdate(
-        { productId: orderItem.productId, stock: { $gte: orderItem.quantity } },
-        { $inc: { stock: -orderItem.quantity } },
-        { new: true }
-      );
-
-      if (!updated) {
-        await restoreStock(applied);
-        return res.status(409).json({
-          message: "Stock changed while checking out. Please review the cart and try again."
-        });
-      }
-
-      applied.push({ productId: orderItem.productId, quantity: orderItem.quantity });
-    }
-
-    // Same guard on the wallet: the balance must still cover the bill.
-    const debited = await Student.findOneAndUpdate(
-      { _id: studentId, pocketMoney: { $gte: totalAmount } },
-      { $inc: { pocketMoney: -totalAmount } },
-      { new: true }
-    );
-
-    if (!debited) {
-      await restoreStock(applied);
-      return res.status(400).json({ message: 'Insufficient pocket money balance!' });
-    }
-
-    let transaction;
-    try {
-      transaction = await Transaction.create({
-        studentId,
-        items: transactionItems,
-        totalAmount,
-        previousBalance: debited.pocketMoney + totalAmount,
-        remainingBalance: debited.pocketMoney
-      });
-    } catch (err) {
-      await restoreStock(applied);
-      await Student.updateOne({ _id: studentId }, { $inc: { pocketMoney: totalAmount } });
-      throw err;
-    }
+    const { transaction, student } = charge;
 
     const parent = await Parent.findOne({ studentIds: studentId });
 
@@ -191,7 +74,7 @@ export const generateBill = async (req, res) => {
       sendToParent(
         parent,
         "🛒 Purchase Alert",
-        `Spent ₹${totalAmount}. Balance ₹${debited.pocketMoney}`,
+        `Spent ₹${transaction.totalAmount}. Balance ₹${student.pocketMoney}`,
         {
           type: "TRANSACTION",
           studentId: studentId.toString(),
@@ -281,7 +164,15 @@ export const verifyPayment = async (req, res) => {
       purchaseToken = await issueAuthorization({ studentId: student._id, items });
     }
 
-    res.json({ success: true, purchaseToken });
+    // The till asks for the password the same way either way; what changes is
+    // where it takes the answer next. Reporting it here rather than making the
+    // till look the student up again keeps the two in step — the flag is read
+    // from the same document whose password was just accepted.
+    res.json({
+      success: true,
+      purchaseToken,
+      requiresApproval: Boolean(student.requiresParentApproval),
+    });
 
   } catch (err) {
     res.status(500).json({ message: err.message });

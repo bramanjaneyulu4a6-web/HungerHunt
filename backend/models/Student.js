@@ -27,6 +27,16 @@ const studentSchema = new mongoose.Schema({
   select: false
 },
 
+// When on, the till cannot charge this student at the counter. The purchase
+// password still has to be entered — that is what proves the order is theirs —
+// but it only raises a request, and the parent approving it in the app is what
+// spends the money. Off by default: turning it on is the parent's decision, and
+// a school where nobody has chosen keeps the counter working as it did.
+requiresParentApproval: {
+  type: Boolean,
+  default: false
+},
+
 walletControl: {
   enabled: {
     type: Boolean,

@@ -56,6 +56,8 @@ Two separate identities share one JWT secret:
 
 Purchases are additionally gated by a per-student **purchase password** that the parent sets. Resetting it requires the parent's own account password.
 
+A parent can also switch on **purchase approval** for a child. The password is still taken at the counter — it is what proves the order is that student's — but it now raises a request instead of charging: nothing leaves the wallet until the parent approves it in the app, and they can drop lines from the order first. Requests expire after three days, and a student may only have one open at a time. The two gates answer different questions, which is why both exist: the password says *whose* order this is, the approval says the money may be spent.
+
 ## Security notes
 
 - `.env` files and `backend/firebase-service-account.json` are gitignored. They were committed in earlier history, so **the credentials in that history must be treated as compromised and rotated**.

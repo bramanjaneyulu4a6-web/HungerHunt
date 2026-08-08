@@ -564,3 +564,47 @@ export const updateWalletControl = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+/* =========================================================
+   ✅ PURCHASE APPROVAL
+========================================================= */
+// Turning this on stops the counter charging this student directly: their
+// purchases become requests this parent answers in the app. It is deliberately
+// its own route rather than a field on wallet control — a spending limit and
+// having to approve every packet of biscuits are different decisions, and a
+// parent changing one should not have to restate the other.
+export const updatePurchaseApproval = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!(await assertOwnsStudent(req, res, studentId))) return;
+
+    const { required } = req.body;
+
+    if (typeof required !== "boolean") {
+      return res.status(400).json({
+        message: "required must be true or false",
+      });
+    }
+
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    student.requiresParentApproval = required;
+
+    await student.save();
+
+    res.json({
+      message: required
+        ? "Purchases will now wait for your approval"
+        : "Purchases no longer need your approval",
+      requiresParentApproval: student.requiresParentApproval,
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

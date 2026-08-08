@@ -343,18 +343,52 @@ const KioskBilling = ({ onLogout }) => {
 
       applyInventory(await loadInventory());
 
-      setCart([]);
-      setSelectedStudent(null);
-      setSearchQuery("");
-      setProductSearchQuery("");
-      setTicketFolded(false);
-      setShowWelcome(true);
+      resetTerminal();
     } catch (err) {
       console.error("Checkout Error:", err);
       toast.error(
         err.response?.data?.message ||
           err.response?.data?.error ||
           "Checkout failed"
+      );
+    }
+  };
+
+  // Clears the counter for the next customer. Both endings need it; only one of
+  // them has changed any stock.
+  const resetTerminal = () => {
+    setCart([]);
+    setSelectedStudent(null);
+    setSearchQuery("");
+    setProductSearchQuery("");
+    setTicketFolded(false);
+    setShowWelcome(true);
+  };
+
+  /* The other ending. When a parent has asked to approve their child's
+     purchases, the same password buys a request rather than the food: nothing
+     is charged and no stock moves until they say yes in the app. The counter
+     does not wait for that — it prints this and serves the next person — so the
+     message has to be unambiguous that nothing has been paid for yet. */
+  const requestApproval = async (items, purchaseToken) => {
+    try {
+      await api.post("/pending-orders", {
+        studentId: selectedStudent._id,
+        items,
+        purchaseToken,
+      });
+
+      toast.success(
+        `Order placed for ${selectedStudent.name}. Awaiting parent approval — nothing has been charged yet.`,
+        { duration: 8000 }
+      );
+
+      resetTerminal();
+    } catch (err) {
+      console.error("Approval request error:", err);
+      toast.error(
+        err.response?.data?.message || "Could not send the order for approval",
+        { duration: 8000 }
       );
     }
   };
@@ -379,7 +413,14 @@ const KioskBilling = ({ onLogout }) => {
       setShowVerifyModal(false);
       setPurchasePassword("");
 
-      await handleCheckout(items, data?.purchaseToken);
+      // The password was right either way. Which of the two endings follows is
+      // the parent's standing choice, reported by verify-payment so the till
+      // does not have to look the student up a second time to find out.
+      if (data?.requiresApproval) {
+        await requestApproval(items, data?.purchaseToken);
+      } else {
+        await handleCheckout(items, data?.purchaseToken);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Verification Failed");
     } finally {

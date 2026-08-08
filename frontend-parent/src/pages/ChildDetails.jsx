@@ -168,6 +168,10 @@ export default function ChildDetails() {
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   const [saving, setSaving] = useState(false);
 
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [approvalSaving, setApprovalSaving] = useState(false);
+  const [approvalBanner, setApprovalBanner] = useState({ type: '', message: '' });
+
   // "Try again" bumps this to run the effect below again, which keeps the one
   // copy of the request inside the effect that owns and cancels it.
   const [attempt, setAttempt] = useState(0);
@@ -183,6 +187,8 @@ export default function ChildDetails() {
       try {
         const res = await API.get(`/parent/child/${id}`);
         if (ignore) return;
+
+        setApprovalRequired(Boolean(res.data.student?.requiresParentApproval));
 
         const control = res.data.student?.walletControl;
 
@@ -235,6 +241,35 @@ export default function ChildDetails() {
     'recharges',
     activeTab === 'recharges'
   );
+
+  /* Saved on the switch rather than behind a button. There is one thing to
+     decide and no second field to get right first, and a toggle that looks set
+     but was never saved is the worst outcome for this particular setting. */
+  const toggleApproval = async (required) => {
+    setApprovalRequired(required);
+    setApprovalBanner({ type: '', message: '' });
+    setApprovalSaving(true);
+
+    try {
+      await API.put(`/parent/purchase-approval/${id}`, { required });
+
+      setApprovalBanner({
+        type: 'success',
+        message: required
+          ? 'Purchases will now wait for your approval.'
+          : 'Purchases no longer need your approval.',
+      });
+    } catch (err) {
+      // Put the switch back: it should never show a state the server rejected.
+      setApprovalRequired(!required);
+      setApprovalBanner({
+        type: 'error',
+        message: err.response?.data?.message || 'Could not change that setting.',
+      });
+    } finally {
+      setApprovalSaving(false);
+    }
+  };
 
   const saveWalletControl = async () => {
     setWalletBanner({ type: '', message: '' });
@@ -501,6 +536,45 @@ export default function ChildDetails() {
 
       {activeTab === 'wallet' && (
         <div role="tabpanel">
+          <Card style={{ maxWidth: 460, marginBottom: 24 }}>
+            <h2 className="section-title" style={{ fontSize: 20 }}>
+              Purchase Approval
+            </h2>
+
+            {approvalBanner.message && (
+              <Banner
+                variant={approvalBanner.type === 'error' ? 'alert' : 'success'}
+                icon={approvalBanner.type === 'error' ? '⚠️' : '✅'}
+                style={{ marginBottom: 20 }}
+              >
+                {approvalBanner.message}
+              </Banner>
+            )}
+
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={approvalRequired}
+                disabled={approvalSaving}
+                onChange={(e) => toggleApproval(e.target.checked)}
+              />
+              Ask me before each purchase
+            </label>
+
+            <p
+              style={{
+                marginTop: 12,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: 'var(--muted)',
+              }}
+            >
+              {approvalRequired
+                ? `The counter can no longer charge ${student.name} directly. Each purchase is sent here for your approval, and nothing is taken from the wallet until you agree. Requests expire after three days.`
+                : `${student.name} can buy at the counter with their purchase password, and the wallet is charged there and then.`}
+            </p>
+          </Card>
+
           <Card style={{ maxWidth: 460 }}>
             <h2 className="section-title" style={{ fontSize: 20 }}>
               Wallet Control

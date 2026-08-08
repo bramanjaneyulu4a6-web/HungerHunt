@@ -131,6 +131,11 @@ On a real device, against production, signed in as a real parent:
 - [ ] Open a child: purchases and recharges both load, and "Load older entries"
       fetches another page.
 - [ ] Set or change a purchase password, then have the counter accept it.
+- [ ] Switch on "Ask me before each purchase" for one child, ring up a sale at
+      the counter, and check that the till says the order is awaiting approval
+      and that **no money has left the wallet**. Approve it in the app and
+      confirm the balance drops by the right amount exactly once. Then switch
+      the setting back off and confirm the counter charges directly again.
 - [ ] Recharge that child's wallet from the admin app — the notification should
       arrive with the app backgrounded, appear with it open, and open that
       child's page when tapped. This is the one path that only works if the

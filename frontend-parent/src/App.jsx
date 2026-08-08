@@ -16,6 +16,7 @@ import ChildDetails from "./pages/ChildDetails";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetPurchasePassword from "./pages/SetPurchasePassword";
+import PendingOrders from "./pages/PendingOrders";
 
 import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -43,8 +44,14 @@ function AppContent() {
       window.dispatchEvent(new CustomEvent(PUSH_EVENT, { detail: data }));
 
       // Tapping a notification should open what it was about, the way any
-      // other app behaves.
-      if (tapped && data.studentId) {
+      // other app behaves. An approval request is the one that is asking for
+      // something, so it opens the list it has to be answered from rather than
+      // the child's page, which cannot answer it.
+      if (!tapped) return;
+
+      if (data.type === "PENDING_ORDER") {
+        navigate("/pending-orders");
+      } else if (data.studentId) {
         navigate(`/child/${data.studentId}`);
       }
     });
@@ -76,6 +83,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ChildDetails />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/pending-orders"
+          element={
+            <ProtectedRoute>
+              <PendingOrders />
             </ProtectedRoute>
           }
         />

@@ -26,6 +26,13 @@ export default function Navbar() {
             Welcome, {parent.fatherName || 'Parent'}
           </span>
 
+          {/* No unanswered count: it would mean this bar polling on every
+              screen. A request announces itself with a notification, and this
+              is the way back to one that was dismissed. */}
+          <Button variant="ghost" to="/pending-orders">
+            <span aria-hidden="true">🛒</span> Requests
+          </Button>
+
           <Button variant="alert" onClick={handleLogout}>
             Logout
           </Button>

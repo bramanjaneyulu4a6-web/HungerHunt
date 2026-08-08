@@ -76,6 +76,14 @@ backend/
 
 Each frontend follows the standard Vite layout: `src/pages`, `src/components`, `src/utils/api.js` (axios instance that attaches the token).
 
+## Checks and releases
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, `eslint` for `frontend-parent` and `hungerhunt-kiosk`, a build of all three frontends, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps. `frontend-admin` is built but not yet linted — it has 10 outstanding eslint errors.
+
+Shipping the parent app to the App Store or Play has its own list, including the credential rotation and push setup still outstanding: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+
 ## Known gaps
 
-Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, native push via `@capacitor/push-notifications`, refunds and voids, manual inventory adjustments, cost/margin reporting, and automated tests.
+Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, refunds and voids, manual inventory adjustments, and cost/margin reporting.
+
+Native push is written but delivers nothing until the manual Firebase and Xcode steps are done — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo). The 71 backend tests cover the parent API surface and auth; the frontends have no automated tests.

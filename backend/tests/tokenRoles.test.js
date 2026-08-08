@@ -9,7 +9,9 @@ import jwt from 'jsonwebtoken';
 process.env.JWT_SECRET = 'admin-test-secret';
 process.env.PARENT_JWT_SECRET = 'parent-test-secret';
 
-const { signAdminToken, signParentToken, verifyToken } = await import('../utils/tokens.js');
+const {
+  signAdminToken, signParentToken, verifyToken, parentSecretChangeover,
+} = await import('../utils/tokens.js');
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';
 const PARENT_ID = '507f191e810c19729de860ea';
@@ -100,5 +102,50 @@ describe('when PARENT_JWT_SECRET is not set', () => {
       assert.equal(verifyToken(parentToken, 'admin'), null, 'role must still separate them');
       assert.equal(verifyToken(signAdminToken(ADMIN_ID), 'parent'), null);
     });
+  });
+
+  // The two settings are ordered: introducing the second key invalidates every
+  // parent token signed with the first, and the legacy window is the only thing
+  // that carries them across. So the window is a deadline for setting the key,
+  // and which side of it you are on is what the startup warning reports.
+  describe('the changeover it reports', () => {
+    test('is free while the legacy window is open', () => {
+      setGrace(FUTURE);
+      withSharedSecret(() => {
+        const { pending, free } = parentSecretChangeover();
+        assert.equal(pending, true, 'the key is not set, so a changeover is outstanding');
+        assert.equal(free, true, 'inside the window, old-key parent tokens still verify');
+      });
+    });
+
+    test('costs every parent their session once it has closed', () => {
+      setGrace(PAST);
+      withSharedSecret(() => {
+        const { pending, free } = parentSecretChangeover();
+        assert.equal(pending, true);
+        assert.equal(free, false, 'outside the window nothing carries the old key');
+      });
+    });
+
+    // Not a hypothetical: it is exactly what these two report either side of
+    // the date, and it is the reason to set the key before it rather than after.
+    test('and that is what actually happens to a token signed with the old key', () => {
+      const oldKeyParentToken = jwt.sign(
+        { id: PARENT_ID, phone: '9', role: 'parent' },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      setGrace(FUTURE);
+      assert.ok(verifyToken(oldKeyParentToken, 'parent'), 'free: still accepted');
+
+      setGrace(PAST);
+      assert.equal(verifyToken(oldKeyParentToken, 'parent'), null, 'costly: refused');
+    });
+  });
+
+  test('reports nothing outstanding once the key is set', () => {
+    setGrace(FUTURE);
+    assert.equal(parentSecretChangeover().pending, false);
   });
 });

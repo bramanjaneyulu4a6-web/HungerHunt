@@ -50,11 +50,26 @@ if (authBypassEnabled) {
   );
 }
 
-if (parentSecretIsShared()) {
+const parentSecret = parentSecretChangeover();
+
+if (parentSecret.pending) {
   console.warn(
     'PARENT_JWT_SECRET is not set, so parent tokens are signed with JWT_SECRET.' +
     ' The role claim still separates them; setting a second secret makes an' +
     ' admin token unusable on a parent route at the signature instead.'
+  );
+
+  // Which of these two it is decides whether setting the key is free or costs
+  // every parent their session. See parentSecretChangeover in utils/tokens.js.
+  console.warn(
+    parentSecret.free
+      ? `Set it before ${parentSecret.deadline.toISOString()}. Until then parent tokens` +
+        ' signed with the old key are still accepted, so the changeover signs nobody' +
+        ' out. After that date it invalidates every parent token in circulation.'
+      : `The window that would have carried that changeover closed on` +
+        ` ${parentSecret.deadline.toISOString()}, so setting it now signs out every` +
+        ' parent holding a live token — up to seven days of them. Still worth doing;' +
+        ' pick a quiet hour rather than a lunch service.'
   );
 }
 

@@ -14,6 +14,20 @@ export const passwordProblem = (password) => {
   return null;
 };
 
+/* The code the child types at the counter. Four digits, checked here so the
+   keypad can refuse a fifth rather than the save failing after it. */
+export const PURCHASE_CODE_LENGTH = 4;
+
+export const purchaseCodeProblem = (code) => {
+  if (!code) return 'Please enter a 4-digit code.';
+
+  if (!/^\d{4}$/.test(code)) {
+    return `The code must be ${PURCHASE_CODE_LENGTH} digits, numbers only.`;
+  }
+
+  return null;
+};
+
 /* The number has to match what the school holds, character for character, so a
    country code or a space is not a formatting preference — it is the difference
    between finding the child's record and being told there isn't one. */

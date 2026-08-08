@@ -130,7 +130,9 @@ On a real device, against production, signed in as a real parent:
 - [ ] Log in; the dashboard lists the right children with the right balances.
 - [ ] Open a child: purchases and recharges both load, and "Load older entries"
       fetches another page.
-- [ ] Set or change a purchase password, then have the counter accept it.
+- [ ] Set or change the four-digit purchase code, then have the counter accept
+      it. Check the field brings up a number pad on the phone and refuses a
+      fifth digit.
 - [ ] Switch on "Ask me before each purchase" for one child, ring up a sale at
       the counter, and check that the till says the order is awaiting approval
       and that **no money has left the wallet**. Approve it in the app and

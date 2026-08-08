@@ -4,6 +4,10 @@ import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import { Banner, Button, Card, PageHeader } from "../components/ui";
 
+// Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
+// actually enforces it. Here it only shapes the field.
+const PURCHASE_CODE_LENGTH = 4;
+
 const Billing = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [productSearchQuery, setProductSearchQuery] = useState("");
@@ -901,16 +905,22 @@ const Billing = () => {
             />
 
             <label className="field-label" htmlFor="verify-password">
-              Purchase Password
+              Purchase Code
             </label>
             <input
               id="verify-password"
               type="password"
+              inputMode="numeric"
               className="input"
-              placeholder="Enter purchase password"
+              placeholder="4-digit code"
               autoComplete="off"
+              maxLength={PURCHASE_CODE_LENGTH}
               value={purchasePassword}
-              onChange={(e) => setPurchasePassword(e.target.value)}
+              onChange={(e) =>
+                setPurchasePassword(
+                  e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
+                )
+              }
             />
 
             <div className="modal-actions">
@@ -929,7 +939,7 @@ const Billing = () => {
                 type="submit"
                 variant="success"
                 style={{ flex: 1 }}
-                disabled={paying}
+                disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
               >
                 {paying ? "Processing…" : "Verify & Pay"}
               </Button>

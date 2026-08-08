@@ -7,7 +7,12 @@ import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
-import { passwordProblem, phoneProblem, emailProblem } from "../utils/validation.js";
+import {
+  passwordProblem,
+  phoneProblem,
+  emailProblem,
+  purchaseCodeProblem,
+} from "../utils/validation.js";
 
 /* =========================================================
    ✅ REGISTER PARENT
@@ -341,10 +346,10 @@ export const setPurchasePassword = async (req, res) => {
 
     if (!(await assertOwnsStudent(req, res, studentId))) return;
 
-    if (!password || password.length < 4) {
-      return res.status(400).json({
-        message: "Password must be at least 4 characters.",
-      });
+    const problem = purchaseCodeProblem(password);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
     }
 
     const student = await Student.findById(studentId).select('+purchasePassword');
@@ -384,10 +389,13 @@ export const changePurchasePassword = async (req, res) => {
       });
     }
 
-    if (newPassword.length < 4) {
-      return res.status(400).json({
-        message: "Password must be at least 4 characters.",
-      });
+    // Only the new code is held to the rule. A student set up before it was
+    // four digits still has whatever they were given, and has to be able to
+    // type it here — refusing it is refusing them the way out.
+    const problem = purchaseCodeProblem(newPassword);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
     }
 
     const student = await Student.findById(studentId).select('+purchasePassword');
@@ -430,10 +438,10 @@ export const resetPurchasePassword = async (req, res) => {
 
     if (!(await assertOwnsStudent(req, res, studentId))) return;
 
-    if (!newPassword || newPassword.length < 4) {
-      return res.status(400).json({
-        message: "Password must be at least 4 characters.",
-      });
+    const problem = purchaseCodeProblem(newPassword);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
     }
 
     if (!parentPassword) {

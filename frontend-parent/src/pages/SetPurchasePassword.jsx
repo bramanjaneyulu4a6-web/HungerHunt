@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { Banner, Button, Card, EmptyState, Skeleton } from '../components/ui';
-
-const MIN_LENGTH = 4;
+import { PURCHASE_CODE_LENGTH, purchaseCodeProblem } from '../utils/validation';
 
 export default function SetPurchasePassword() {
   const { id } = useParams();
@@ -88,10 +87,10 @@ export default function SetPurchasePassword() {
 
     try {
       await API.post(endpoint, { studentId: id, ...body });
-      setSuccess('Purchase password updated successfully.');
+      setSuccess('Purchase code updated successfully.');
       setTimeout(() => navigate(`/child/${id}`), 1200);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save password.');
+      setError(err.response?.data?.message || 'Failed to save the code.');
       setSaving(false);
     }
   };
@@ -99,38 +98,32 @@ export default function SetPurchasePassword() {
   const savePassword = submit(
     '/parent/set-purchase-password',
     { password },
-    () => {
-      if (!password) return 'Please enter a password.';
-      if (password.length < MIN_LENGTH)
-        return `Password must be at least ${MIN_LENGTH} characters.`;
-      if (password !== confirmPassword) return 'Passwords do not match.';
-      return null;
-    }
+    () =>
+      purchaseCodeProblem(password) ||
+      (password !== confirmPassword ? 'The two codes do not match.' : null)
   );
 
   const changePassword = submit(
     '/parent/change-purchase-password',
     { currentPassword, newPassword },
-    () => {
-      if (!currentPassword) return 'Please enter the current password.';
-      if (newPassword.length < MIN_LENGTH)
-        return `Password must be at least ${MIN_LENGTH} characters.`;
-      if (newPassword !== confirmNewPassword) return 'Passwords do not match.';
-      return null;
-    }
+    () =>
+      // The current code is not held to the four-digit rule: a student set up
+      // before it existed still has the code they were given, and this form is
+      // how they leave it behind.
+      (!currentPassword ? 'Please enter the current code.' : null) ||
+      purchaseCodeProblem(newPassword) ||
+      (newPassword !== confirmNewPassword ? 'The two codes do not match.' : null)
   );
 
   const resetPassword = submit(
     '/parent/reset-purchase-password',
     { parentPassword: resetParentPassword, newPassword: resetPasswordValue },
-    () => {
-      if (!resetParentPassword) return 'Please enter your account password.';
-      if (resetPasswordValue.length < MIN_LENGTH)
-        return `Password must be at least ${MIN_LENGTH} characters.`;
-      if (resetPasswordValue !== confirmResetPassword)
-        return 'Passwords do not match.';
-      return null;
-    }
+    () =>
+      (!resetParentPassword ? 'Please enter your account password.' : null) ||
+      purchaseCodeProblem(resetPasswordValue) ||
+      (resetPasswordValue !== confirmResetPassword
+        ? 'The two codes do not match.'
+        : null)
   );
 
   const toggle = (form) => {
@@ -139,7 +132,7 @@ export default function SetPurchasePassword() {
     setSuccess('');
   };
 
-  const field = (label, value, onChange, autoComplete = 'new-password') => {
+  const field = (label, inputProps) => {
     // The label doubled as the id, which put spaces in it — legal enough that
     // browsers still pair them, but not a valid HTML id.
     const fieldId = label.toLowerCase().replace(/\s+/g, '-');
@@ -149,17 +142,38 @@ export default function SetPurchasePassword() {
         <label className="field-label" htmlFor={fieldId}>
           {label}
         </label>
-        <input
-          id={fieldId}
-          className="input"
-          type="password"
-          autoComplete={autoComplete}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <input id={fieldId} className="input" {...inputProps} />
       </div>
     );
   };
+
+  /* A code the parent is setting. The field says digits-only to the phone, so
+     the number pad comes up instead of a keyboard, and non-digits are dropped
+     as they are typed rather than rejected on save. Still masked: it is typed
+     at a counter with a queue behind it. */
+  const codeField = (label, value, onChange) =>
+    field(label, {
+      type: 'password',
+      inputMode: 'numeric',
+      autoComplete: 'new-password',
+      maxLength: PURCHASE_CODE_LENGTH,
+      placeholder: '••••',
+      value,
+      onChange: (e) =>
+        onChange(e.target.value.replace(/\D/g, '').slice(0, PURCHASE_CODE_LENGTH)),
+    });
+
+  /* A secret being checked rather than chosen — the current code, or the
+     parent's own account password. Deliberately unrestricted: a student set up
+     before codes were four digits has whatever they were given, and a field
+     that will not accept it locks them out of the form that replaces it. */
+  const secretField = (label, value, onChange) =>
+    field(label, {
+      type: 'password',
+      autoComplete: 'current-password',
+      value,
+      onChange: (e) => onChange(e.target.value),
+    });
 
   if (loading) {
     return (
@@ -215,7 +229,7 @@ export default function SetPurchasePassword() {
 
         <Card>
           <h1 className="page-title" style={{ fontSize: 24 }}>
-            Purchase Password
+            Purchase Code
           </h1>
           <p className="card-meta" style={{ fontSize: 14 }}>
             {student.name} · Grade {student.grade} · Room {student.hostelNumber}
@@ -229,8 +243,9 @@ export default function SetPurchasePassword() {
               color: 'var(--muted)',
             }}
           >
-            This password is entered at the counter to authorise a purchase from{' '}
-            {student.name}&apos;s wallet.
+            A {PURCHASE_CODE_LENGTH}-digit code {student.name} types at the
+            counter to authorise a purchase from their wallet. Choose something
+            they can remember without writing it down.
           </p>
 
           {error && (
@@ -250,11 +265,11 @@ export default function SetPurchasePassword() {
               onSubmit={savePassword}
               style={{ display: 'grid', gap: 16, marginTop: 24 }}
             >
-              {field('Purchase Password', password, setPassword)}
-              {field('Confirm Password', confirmPassword, setConfirmPassword)}
+              {codeField('Purchase Code', password, setPassword)}
+              {codeField('Confirm Code', confirmPassword, setConfirmPassword)}
 
               <Button type="submit" disabled={saving} block>
-                {saving ? 'Saving…' : 'Save Password'}
+                {saving ? 'Saving…' : 'Save Code'}
               </Button>
             </form>
           ) : (
@@ -265,7 +280,7 @@ export default function SetPurchasePassword() {
                 aria-expanded={openForm === 'change'}
                 onClick={() => toggle('change')}
               >
-                Change Password
+                Change Code
               </Button>
 
               {openForm === 'change' && (
@@ -273,15 +288,10 @@ export default function SetPurchasePassword() {
                   onSubmit={changePassword}
                   style={{ display: 'grid', gap: 16, marginBottom: 4 }}
                 >
-                  {field(
-                    'Current Password',
-                    currentPassword,
-                    setCurrentPassword,
-                    'current-password'
-                  )}
-                  {field('New Password', newPassword, setNewPassword)}
-                  {field(
-                    'Confirm New Password',
+                  {secretField('Current Code', currentPassword, setCurrentPassword)}
+                  {codeField('New Code', newPassword, setNewPassword)}
+                  {codeField(
+                    'Confirm New Code',
                     confirmNewPassword,
                     setConfirmNewPassword
                   )}
@@ -298,7 +308,7 @@ export default function SetPurchasePassword() {
                 aria-expanded={openForm === 'reset'}
                 onClick={() => toggle('reset')}
               >
-                Forgot Purchase Password?
+                Forgot Purchase Code?
               </Button>
 
               {openForm === 'reset' && (
@@ -308,18 +318,17 @@ export default function SetPurchasePassword() {
                 >
                   <p style={{ fontSize: 13, color: 'var(--muted)' }}>
                     Confirm with your own account password to set a new purchase
-                    password.
+                    code.
                   </p>
 
-                  {field(
+                  {secretField(
                     'Your Account Password',
                     resetParentPassword,
-                    setResetParentPassword,
-                    'current-password'
+                    setResetParentPassword
                   )}
-                  {field('New Password', resetPasswordValue, setResetPasswordValue)}
-                  {field(
-                    'Confirm New Password',
+                  {codeField('New Code', resetPasswordValue, setResetPasswordValue)}
+                  {codeField(
+                    'Confirm New Code',
                     confirmResetPassword,
                     setConfirmResetPassword
                   )}
@@ -330,7 +339,7 @@ export default function SetPurchasePassword() {
                     disabled={saving}
                     block
                   >
-                    {saving ? 'Resetting…' : 'Reset Password'}
+                    {saving ? 'Resetting…' : 'Reset Code'}
                   </Button>
                 </form>
               )}

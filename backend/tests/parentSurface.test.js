@@ -224,3 +224,108 @@ describe('login does not say which phone numbers have accounts', () => {
     );
   });
 });
+
+describe('the purchase code is four digits', () => {
+  // post() above is deliberately signed out — it serves the register and login
+  // tests. These routes are behind protectParent, so they need the token.
+  const postSignedIn = (path, body) =>
+    fetch(base + path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${parentToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+  // Every one of these routes hangs off assertOwnsStudent, so the parent has
+  // to own the student before the rule is even reached.
+  const setCode = (password) =>
+    postSignedIn('/api/parent/set-purchase-password', {
+      studentId: STUDENT_ID,
+      password,
+    });
+
+  const authorized = () => {
+    ownsTheStudent();
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({
+        _id: STUDENT_ID,
+        purchasePassword: null,
+        save: async () => {},
+      }),
+    }));
+  };
+
+  test('four digits is accepted', async () => {
+    authorized();
+
+    const res = await setCode('4821');
+
+    assert.equal(res.status, 200);
+  });
+
+  for (const [description, code] of [
+    ['three digits', '482'],
+    ['five digits', '48210'],
+    ['letters', 'abcd'],
+    ['digits with a letter', '48a1'],
+    ['a decimal point', '4.82'],
+    ['spaces around it', ' 482'],
+    ['nothing at all', ''],
+  ]) {
+    test(`${description} is refused`, async () => {
+      authorized();
+
+      const res = await setCode(code);
+      const body = await res.json();
+
+      assert.equal(res.status, 400);
+      assert.match(body.message, /4 digits|code is required/i);
+    });
+  }
+
+  test('a code that is only long is no longer good enough', async () => {
+    // The old rule was "at least 4 characters", so this used to pass. It is
+    // the case that tells the two rules apart.
+    authorized();
+
+    const res = await setCode('correct-horse');
+
+    assert.equal(res.status, 400);
+  });
+
+  test('changing a code is held to the rule, and the old one is not', async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const hash = await bcrypt.hash('legacy-long-password', 4);
+
+    ownsTheStudent();
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({
+        _id: STUDENT_ID,
+        purchasePassword: hash,
+        save: async () => {},
+      }),
+    }));
+
+    // A student set up before the rule can still type what they were given,
+    // which is the only way they ever get off it.
+    const accepted = await postSignedIn('/api/parent/change-purchase-password', {
+      studentId: STUDENT_ID,
+      currentPassword: 'legacy-long-password',
+      newPassword: '1234',
+    });
+
+    assert.equal(accepted.status, 200);
+
+    ownsTheStudent();
+
+    const refused = await postSignedIn('/api/parent/change-purchase-password', {
+      studentId: STUDENT_ID,
+      currentPassword: 'legacy-long-password',
+      newPassword: 'another-long-one',
+    });
+
+    assert.equal(refused.status, 400);
+  });
+});

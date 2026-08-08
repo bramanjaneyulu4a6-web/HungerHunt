@@ -571,7 +571,7 @@ export default function ChildDetails() {
             >
               {approvalRequired
                 ? `The counter can no longer charge ${student.name} directly. Each purchase is sent here for your approval, and nothing is taken from the wallet until you agree. Requests expire after three days.`
-                : `${student.name} can buy at the counter with their purchase password, and the wallet is charged there and then.`}
+                : `${student.name} can buy at the counter with their purchase code, and the wallet is charged there and then.`}
             </p>
           </Card>
 

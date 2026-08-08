@@ -170,7 +170,7 @@ const Dashboard = () => {
                       View Details
                     </Button>
                     <Button to={`/purchase-password/${child._id}`} block>
-                      Set Password
+                      Set Code
                     </Button>
                   </div>
                 </Card>

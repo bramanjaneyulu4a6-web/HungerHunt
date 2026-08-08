@@ -15,6 +15,31 @@ export const passwordProblem = (password) => {
   return null;
 };
 
+/* The code a student types at the counter is four digits, and is kept apart
+   from passwordProblem above on purpose — they guard different things, and the
+   day one of them changes is not the day the other should.
+ *
+ * It is entered on a touch screen, by a child, with a queue behind them, and it
+ * is only ever compared against a hash. Four digits is what that situation can
+ * carry; the wallet limit and the parent's approval are what actually bound
+ * what it can spend. Digits rather than characters so the till can put a number
+ * pad under it and there is no shift key to fumble. */
+export const PURCHASE_CODE_LENGTH = 4;
+
+const FOUR_DIGITS = /^\d{4}$/;
+
+export const purchaseCodeProblem = (code) => {
+  if (code === undefined || code === null || code === "") {
+    return "A purchase code is required.";
+  }
+
+  if (!FOUR_DIGITS.test(String(code))) {
+    return `The purchase code must be ${PURCHASE_CODE_LENGTH} digits.`;
+  }
+
+  return null;
+};
+
 /* A parent is matched to their children by comparing this against the number
    the school holds, character for character. So the useful check is not which
    numbers exist but which ones can possibly match: a country code, a space or a

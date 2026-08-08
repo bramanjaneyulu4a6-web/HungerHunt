@@ -8,6 +8,10 @@ import hungerLogo from "../assets/Logo.png";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
+// Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
+// actually enforces it. Here it only shapes the field.
+const PURCHASE_CODE_LENGTH = 4;
+
 // Stock group names arrive however they were typed into the admin console
 // ("CHIPS", "biscuits"), so they are title-cased for display only. Filtering
 // still compares against the stored value.
@@ -1067,18 +1071,27 @@ const KioskBilling = ({ onLogout }) => {
               }}
             >
               <label className="field-label" htmlFor="purchase-password">
-                Purchase password
+                Purchase code
               </label>
 
+              {/* Four digits, so the field asks the terminal for a number pad
+                  and refuses a fifth character rather than sending a code the
+                  server will only reject. Non-digits are dropped as typed. */}
               <input
                 id="purchase-password"
                 className="input"
                 type="password"
+                inputMode="numeric"
                 autoComplete="off"
                 autoFocus
-                placeholder="Enter purchase password"
+                maxLength={PURCHASE_CODE_LENGTH}
+                placeholder="4-digit code"
                 value={purchasePassword}
-                onChange={(e) => setPurchasePassword(e.target.value)}
+                onChange={(e) =>
+                  setPurchasePassword(
+                    e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
+                  )
+                }
                 disabled={paying}
               />
 
@@ -1090,7 +1103,11 @@ const KioskBilling = ({ onLogout }) => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="btn--confirm" disabled={paying}>
+                <Button
+                  type="submit"
+                  className="btn--confirm"
+                  disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
+                >
                   {paying ? "Processing…" : "Verify & Pay"}
                 </Button>
               </div>

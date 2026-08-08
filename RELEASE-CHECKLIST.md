@@ -39,15 +39,18 @@ These are open items, not formalities. Each one is a real gap today.
       hygiene rather than an emergency. Do it anyway: the fences are the last
       line, not the plan.
 
-- [ ] **Watch the purchase codes migrate.** Codes are four digits now, and
-      nothing can read an existing one back out of its hash to check. Each
-      student carries `purchaseCodeIsPin`, set when a parent saves a code and
-      when a four-digit one is accepted at the counter, so a student who always
-      had four digits clears themselves on their next purchase. Until they do,
-      the counter shows a field that still accepts an older code — so nobody is
-      turned away. Run `node scripts/purchaseCodeAudit.js` from `backend/`
-      (read-only) to see how many are left; at zero, the lenient field can come
-      out of `KioskBilling.jsx` and `Billing.jsx`.
+- [ ] **Size the purchase-code migration before you deploy, not after.** A
+      student's only secret is a four-digit code, and the counter takes nothing
+      else — so a code set before that rule stops working the moment this ships.
+      Nothing can read one back out of its hash to find them first. Run
+      `node scripts/purchaseCodeAudit.js` from `backend/` (read-only): the
+      number that matters is *with a purchase code set*, not the roster size,
+      and only the parent app ever sets one. If it is zero there is nothing to
+      migrate. Anything else is the list of families who may need to set a new
+      code, which they can do themselves — Forgot Purchase Code asks for their
+      own account password, not the old code. Re-run it after a few days of
+      trading: students who always used four digits record themselves on their
+      next purchase, and the remainder is the real number to chase.
 
 - [ ] **Decide what the store listings say.** Screenshots, description, privacy
       policy URL, and a support contact. An app that reads a child's spending

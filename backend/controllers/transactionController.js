@@ -4,6 +4,7 @@ import Parent from "../models/Parent.js";
 import bcrypt from "bcryptjs";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
+import { purchaseCodeProblem } from "../utils/validation.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -117,6 +118,17 @@ export const verifyPayment = async (req, res) => {
   try {
     const { studentId, phone, password, items } = req.body;
 
+    /* A student has one secret and it is four digits. Anything else is not a
+       code anyone could have been given, so it is turned away before the
+       database is touched, let alone bcrypt. That includes a code set before
+       this rule: the counter no longer accepts one, and the way off it is the
+       parent's account password — the only other secret in the system. */
+    const problem = purchaseCodeProblem(password);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
+    }
+
     const student = await Student.findById(studentId).select('+purchasePassword');
 
     if (!student) {
@@ -129,28 +141,38 @@ export const verifyPayment = async (req, res) => {
 
     if (!student.purchasePassword) {
       return res.status(400).json({
-        message: "No purchase password has been set for this student yet."
+        message: "No purchase code has been set for this student yet."
       });
-    }
-
-    if (!password) {
-      return res.status(400).json({ message: "Purchase password is required" });
     }
 
     const matched = await bcrypt.compare(password, student.purchasePassword);
 
     if (!matched) {
-      return res.status(400).json({ message: "Wrong purchase code" });
+      /* A student never confirmed to have a four-digit code may not be typing
+         the wrong one — they may be on a code from before the rule, which
+         nothing here can accept and no query can identify, since all that is
+         stored is a hash. Same refusal either way, but the cashier is told
+         what else it might be so the family is sent somewhere useful instead
+         of trying again. */
+      return res.status(400).json({
+        message: student.purchaseCodeIsPin
+          ? "Wrong purchase code"
+          : "Wrong purchase code. If this student's code was set before codes" +
+            " became 4 digits, their parent needs to set a new one in the app.",
+      });
     }
 
-    /* The one moment the stored code is in plain sight. A student set up before
-       codes were four digits is not known to have one, and nothing can ask the
-       hash — so if what just worked is four digits, that is recorded here and
-       the counter shows them a number pad from now on. Most students never had
-       anything else and heal on their first purchase.
+    /* The one moment the stored code is in plain sight, and the only way to
+       learn that it is four digits — which is worth writing down, because a
+       failure above reads differently once we know. Most students never had
+       anything else and settle this on their first purchase.
        purchaseCodeAudit.js counts the ones that have not. */
-    if (!student.purchaseCodeIsPin && /^\d{4}$/.test(password)) {
-      await Student.updateOne({ _id: student._id }, { purchaseCodeIsPin: true });
+    // Not awaited: this is bookkeeping, and the counter should not wait on it.
+    // Losing one costs nothing — the next accepted code records it again.
+    if (!student.purchaseCodeIsPin) {
+      Student.updateOne({ _id: student._id }, { purchaseCodeIsPin: true }).catch(
+        (err) => console.error("Could not record the purchase code format:", err)
+      );
     }
 
     // The token is bound to a cart, so it can only be issued to a client that

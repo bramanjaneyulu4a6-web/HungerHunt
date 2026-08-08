@@ -46,6 +46,26 @@ export const legacyTokensAccepted = () => Date.now() < legacyGraceUntil().getTim
 
 const legacyAccepted = legacyTokensAccepted;
 
+// The second key and the legacy window are ordered, and the order is easy to
+// get wrong because neither setting mentions the other.
+//
+// Setting PARENT_JWT_SECRET invalidates every parent token signed with
+// JWT_SECRET — which, while it is unset, is all of them. The legacy window is
+// the only thing that carries those across: inside it verifyToken also tries
+// the admin key for parent tokens, so the changeover costs nobody their
+// session. Outside it, the same change signs out every parent at once.
+//
+// That makes the grace date a deadline for setting the key, not only a date for
+// deleting dead code. So "PARENT_JWT_SECRET is not set" means two different
+// things either side of it, and the startup warning has to say which — a note
+// in a document is read when somebody goes looking, which is not the moment
+// this matters.
+export const parentSecretChangeover = () => ({
+  pending: parentSecretIsShared(),
+  free: legacyTokensAccepted(),
+  deadline: legacyGraceUntil(),
+});
+
 // Returns the payload when the token is a valid token *for this role*, and null
 // otherwise. Callers treat null as "not authorized" and never see why.
 export const verifyToken = (token, role) => {

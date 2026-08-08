@@ -19,7 +19,7 @@ import inventoryRoutes from './routes/inventoryRoutes.js';
 import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
-import { parentSecretIsShared } from './utils/tokens.js';
+import { parentSecretChangeover } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
 const app = express();

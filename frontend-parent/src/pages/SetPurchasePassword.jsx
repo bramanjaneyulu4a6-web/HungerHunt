@@ -107,9 +107,10 @@ export default function SetPurchasePassword() {
     '/parent/change-purchase-password',
     { currentPassword, newPassword },
     () =>
-      // The current code is not held to the four-digit rule: a student set up
-      // before it existed still has the code they were given, and this form is
-      // how they leave it behind.
+      // Both ends are four digits: a child's only secret is their code, and
+      // there is no other shape of one to change from. A code predating the
+      // rule cannot be entered here — Forgot Purchase Code is that route, and
+      // it asks for the parent's own password instead.
       (!currentPassword ? 'Please enter the current code.' : null) ||
       purchaseCodeProblem(newPassword) ||
       (newPassword !== confirmNewPassword ? 'The two codes do not match.' : null)
@@ -163,11 +164,10 @@ export default function SetPurchasePassword() {
         onChange(e.target.value.replace(/\D/g, '').slice(0, PURCHASE_CODE_LENGTH)),
     });
 
-  /* A secret being checked rather than chosen — the current code, or the
-     parent's own account password. Deliberately unrestricted: a student set up
-     before codes were four digits has whatever they were given, and a field
-     that will not accept it locks them out of the form that replaces it. */
-  const secretField = (label, value, onChange) =>
+  /* The parent's own account password — the only other secret in the system,
+     and the one that recovers a child's code. Unrestricted, because it is a
+     password and not a code; nothing a student holds looks like this. */
+  const accountPasswordField = (label, value, onChange) =>
     field(label, {
       type: 'password',
       autoComplete: 'current-password',
@@ -255,10 +255,12 @@ export default function SetPurchasePassword() {
               doing a thing. */}
           {hasPassword && !student.purchaseCodeIsPin && (
             <Banner variant="warn" icon="🔢" style={{ marginTop: 20 }}>
-              Purchase codes are now {PURCHASE_CODE_LENGTH} digits. If{' '}
-              {student.name} already uses a {PURCHASE_CODE_LENGTH}-digit code
-              there is nothing to do. If theirs is longer or has letters in it,
-              set a new one below — the counter cannot take the old kind.
+              Purchase codes are now {PURCHASE_CODE_LENGTH} digits, and the
+              counter takes nothing else. If {student.name} already uses a{' '}
+              {PURCHASE_CODE_LENGTH}-digit code there is nothing to do. If
+              theirs is longer or has letters in it, use{' '}
+              <strong>Forgot Purchase Code</strong> below — it asks for your own
+              account password, so you do not need the old one.
             </Banner>
           )}
 
@@ -302,7 +304,7 @@ export default function SetPurchasePassword() {
                   onSubmit={changePassword}
                   style={{ display: 'grid', gap: 16, marginBottom: 4 }}
                 >
-                  {secretField('Current Code', currentPassword, setCurrentPassword)}
+                  {codeField('Current Code', currentPassword, setCurrentPassword)}
                   {codeField('New Code', newPassword, setNewPassword)}
                   {codeField(
                     'Confirm New Code',
@@ -335,7 +337,7 @@ export default function SetPurchasePassword() {
                     code.
                   </p>
 
-                  {secretField(
+                  {accountPasswordField(
                     'Your Account Password',
                     resetParentPassword,
                     setResetParentPassword

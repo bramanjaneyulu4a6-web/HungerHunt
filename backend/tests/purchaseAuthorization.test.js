@@ -42,7 +42,8 @@ const PRODUCT_ID = '507f191e810c19729de860ec';
 const OTHER_PRODUCT_ID = '507f191e810c19729de860ed';
 
 const PHONE = '9999999999';
-const PASSWORD = 'parent-purchase-password';
+// Four digits: verify-payment refuses anything else before it reaches bcrypt.
+const PASSWORD = '4821';
 
 const adminToken = signAdminToken(ADMIN_ID);
 

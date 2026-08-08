@@ -441,11 +441,6 @@ const KioskBilling = ({ onLogout }) => {
     setPurchasePassword("");
   };
 
-  // False means "not known to be a four-digit code", not "known not to be":
-  // it is recorded when a parent saves one and when one is accepted here, so a
-  // student who always had four digits flips on their first purchase.
-  const codeIsPin = Boolean(selectedStudent?.purchaseCodeIsPin);
-
   const categories = [
     "All",
     ...new Set(products.map((p) => p.stockGroup?.name).filter(Boolean)),
@@ -1076,40 +1071,31 @@ const KioskBilling = ({ onLogout }) => {
               }}
             >
               <label className="field-label" htmlFor="purchase-password">
-                {codeIsPin ? "Purchase code" : "Purchase code or old password"}
+                Purchase code
               </label>
 
-              {/* A student known to have a four-digit code gets a number pad
-                  that refuses a fifth character. One who might still be on an
-                  older code gets a field that will accept it — capping this at
-                  four would lock them out of the counter, and the only way off
-                  an old code is for the parent to set a new one in the app. */}
+              {/* A student has one secret and it is four digits, so this is a
+                  number pad and nothing else: non-digits are dropped as typed
+                  and a fifth character is refused. A code from before that rule
+                  cannot be entered here on purpose — the parent sets a new one
+                  in the app, which needs only their own account password. */}
               <input
                 id="purchase-password"
                 className="input"
                 type="password"
-                inputMode={codeIsPin ? "numeric" : "text"}
+                inputMode="numeric"
                 autoComplete="off"
                 autoFocus
-                maxLength={codeIsPin ? PURCHASE_CODE_LENGTH : undefined}
-                placeholder={codeIsPin ? "4-digit code" : "Enter purchase code"}
+                maxLength={PURCHASE_CODE_LENGTH}
+                placeholder="4-digit code"
                 value={purchasePassword}
                 onChange={(e) =>
                   setPurchasePassword(
-                    codeIsPin
-                      ? e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
-                      : e.target.value
+                    e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
                   )
                 }
                 disabled={paying}
               />
-
-              {!codeIsPin && (
-                <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                  This student has not used a 4-digit code yet. Ask their parent
-                  to set one in the app.
-                </p>
-              )}
 
               <div className="modal-actions">
                 <Button
@@ -1122,11 +1108,7 @@ const KioskBilling = ({ onLogout }) => {
                 <Button
                   type="submit"
                   className="btn--confirm"
-                  disabled={
-                    paying ||
-                    purchasePassword.length <
-                      (codeIsPin ? PURCHASE_CODE_LENGTH : 1)
-                  }
+                  disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
                 >
                   {paying ? "Processing…" : "Verify & Pay"}
                 </Button>

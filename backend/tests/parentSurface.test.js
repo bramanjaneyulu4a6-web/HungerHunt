@@ -299,38 +299,42 @@ describe('the purchase code is four digits', () => {
     assert.equal(res.status, 400);
   });
 
-  test('changing a code is held to the rule, and the old one is not', async () => {
+  test('the account password is the way off a code from before the rule', async () => {
     const bcrypt = (await import('bcryptjs')).default;
-    const hash = await bcrypt.hash('legacy-long-password', 4);
+    const parentHash = await bcrypt.hash('the-parent-password', 4);
+    const saved = { _id: STUDENT_ID, save: async () => {} };
 
-    ownsTheStudent();
-    mock.method(Student, 'findById', () => ({
-      select: async () => ({
-        _id: STUDENT_ID,
-        purchasePassword: hash,
-        save: async () => {},
-      }),
-    }));
+    mock.method(Parent, 'findById', (id) =>
+      String(id) === PARENT_ID
+        ? {
+            select: async () => ({ _id: PARENT_ID, studentIds: [STUDENT_ID] }),
+            then: undefined,
+          }
+        : null
+    );
 
-    // A student set up before the rule can still type what they were given,
-    // which is the only way they ever get off it.
-    const accepted = await postSignedIn('/api/parent/change-purchase-password', {
+    // resetPurchasePassword awaits Parent.findById directly for the password
+    // check, and through .select() for the ownership check.
+    mock.method(Parent, 'findById', () => {
+      const doc = {
+        _id: PARENT_ID,
+        studentIds: [STUDENT_ID],
+        password: parentHash,
+        select: async () => ({ _id: PARENT_ID, studentIds: [STUDENT_ID] }),
+      };
+      return Object.assign(Promise.resolve(doc), doc);
+    });
+
+    mock.method(Student, 'findById', async () => saved);
+
+    const res = await postSignedIn('/api/parent/reset-purchase-password', {
       studentId: STUDENT_ID,
-      currentPassword: 'legacy-long-password',
+      parentPassword: 'the-parent-password',
       newPassword: '1234',
     });
 
-    assert.equal(accepted.status, 200);
-
-    ownsTheStudent();
-
-    const refused = await postSignedIn('/api/parent/change-purchase-password', {
-      studentId: STUDENT_ID,
-      currentPassword: 'legacy-long-password',
-      newPassword: 'another-long-one',
-    });
-
-    assert.equal(refused.status, 400);
+    assert.equal(res.status, 200);
+    assert.equal(saved.purchaseCodeIsPin, true);
   });
 });
 
@@ -361,21 +365,12 @@ describe('a code is recorded as four digits so the counter can tell', () => {
     assert.equal(saved.purchaseCodeIsPin, true);
   });
 
-  test('an old code accepted at the counter does not mark the student', async () => {
-    const bcrypt = (await import('bcryptjs')).default;
-    const hash = await bcrypt.hash('legacy-long-password', 4);
-
+  test('a code that is not four digits is refused before bcrypt', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
-    mock.method(Student, 'findById', () => ({
-      select: async () => ({
-        _id: STUDENT_ID,
-        parentPhoneNumber: '9876543210',
-        purchasePassword: hash,
-        purchaseCodeIsPin: false,
-      }),
-    }));
 
-    const marked = mock.method(Student, 'updateOne', async () => ({}));
+    const looked = mock.method(Student, 'findById', () => ({
+      select: async () => ({ _id: STUDENT_ID }),
+    }));
 
     const res = await fetch(base + '/api/transactions/verify-payment', {
       method: 'POST',
@@ -390,8 +385,40 @@ describe('a code is recorded as four digits so the counter can tell', () => {
       }),
     });
 
-    assert.equal(res.status, 200);
-    assert.equal(marked.mock.callCount(), 0);
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).message, /4 digits/i);
+    assert.equal(looked.mock.callCount(), 0, 'refused before the student is even read');
+  });
+
+  test('a wrong code says what else it might be when the format is unknown', async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const hash = await bcrypt.hash('9999', 4);
+
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({
+        _id: STUDENT_ID,
+        parentPhoneNumber: '9876543210',
+        purchasePassword: hash,
+        purchaseCodeIsPin: false,
+      }),
+    }));
+
+    const res = await fetch(base + '/api/transactions/verify-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        studentId: STUDENT_ID,
+        phone: '9876543210',
+        password: '1234',
+      }),
+    });
+
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).message, /before codes became 4 digits/i);
   });
 
   test('a four-digit code accepted at the counter marks the student', async () => {

@@ -54,7 +54,9 @@ Two separate identities share one JWT secret:
 - **Admin** (`protectAdmin`) — the office dashboard *and* the kiosk. The kiosk signs in with staff admin credentials; everything it calls (student search, payment verification, billing) requires that token.
 - **Parent** (`protectParent`) — the parent app. Parents may only act on students linked to their own account; the server enforces this on every child-scoped endpoint rather than trusting the ID in the request.
 
-Purchases are additionally gated by a per-student **purchase code** — four digits, set by the parent and typed by the student at the counter. Resetting it requires the parent's own account password. It is four digits because of where it is used: on a touch screen, by a child, with a queue behind them. What bounds the spending is the wallet balance, the spending limit and the approval flow below, not the length of the code.
+There are exactly two secrets in the system, and they belong to different people. A student has a **purchase code**: four digits, set by the parent, typed at the counter, and nothing else — the counter refuses anything that is not four digits before it reaches the database. A parent has their **account password**, which signs them into the app and is also what resets a child's code when it is forgotten. A student never has a password; a parent never types a code to buy anything.
+
+Four digits because of where it is used: on a touch screen, by a child, with a queue behind them. What bounds the spending is the wallet balance, the spending limit and the approval flow below — not the length of the code.
 
 A parent can also switch on **purchase approval** for a child. The code is still taken at the counter — it is what proves the order is that student's — but it now raises a request instead of charging: nothing leaves the wallet until the parent approves it in the app, and they can drop lines from the order first. Requests expire after three days, and a student may only have one open at a time. The two gates answer different questions, which is why both exist: the code says *whose* order this is, the approval says the money may be spent.
 

@@ -333,10 +333,6 @@ const Billing = () => {
     }
   };
 
-  // False means "not known to be a four-digit code", not "known not to be" —
-  // see the field's comment below and Student.purchaseCodeIsPin.
-  const codeIsPin = Boolean(selectedStudent?.purchaseCodeIsPin);
-
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(productSearchQuery.toLowerCase())
   );
@@ -909,25 +905,23 @@ const Billing = () => {
             />
 
             <label className="field-label" htmlFor="verify-password">
-              {codeIsPin ? "Purchase Code" : "Purchase Code or Old Password"}
+              Purchase Code
             </label>
-            {/* Capped at four only for a student known to have a four-digit
-                code. One who may still be on an older one needs a field that
-                accepts it, or the counter cannot serve them at all. */}
+            {/* Four digits and nothing else — a student has one secret and this
+                is it. A code predating the rule cannot be typed here; the
+                parent replaces it in the app with their account password. */}
             <input
               id="verify-password"
               type="password"
-              inputMode={codeIsPin ? "numeric" : "text"}
+              inputMode="numeric"
               className="input"
-              placeholder={codeIsPin ? "4-digit code" : "Enter purchase code"}
+              placeholder="4-digit code"
               autoComplete="off"
-              maxLength={codeIsPin ? PURCHASE_CODE_LENGTH : undefined}
+              maxLength={PURCHASE_CODE_LENGTH}
               value={purchasePassword}
               onChange={(e) =>
                 setPurchasePassword(
-                  codeIsPin
-                    ? e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
-                    : e.target.value
+                  e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
                 )
               }
             />
@@ -948,10 +942,7 @@ const Billing = () => {
                 type="submit"
                 variant="success"
                 style={{ flex: 1 }}
-                disabled={
-                  paying ||
-                  purchasePassword.length < (codeIsPin ? PURCHASE_CODE_LENGTH : 1)
-                }
+                disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
               >
                 {paying ? "Processing…" : "Verify & Pay"}
               </Button>

@@ -10,9 +10,10 @@
  *
  * Do not be alarmed by a large "not yet known" on the first run. It means
  * exactly that — not known — and most of it will be students whose code always
- * was four digits, clearing itself the next time they buy something. What the
- * number is for is watching it fall, and knowing when the counter's lenient
- * field can be removed.
+ * was four digits, clearing itself the next time they buy something. What is
+ * left after that are the students whose parent has to set a new code before
+ * the counter can serve them, which is what this number is for: knowing how
+ * many families to warn, and watching it reach zero.
  *
  *   node scripts/purchaseCodeAudit.js
  */
@@ -50,15 +51,14 @@ const run = async () => {
   if (withCode === 0) {
     console.log('\nNobody has set a purchase code yet, so there is nothing to migrate.');
   } else if (unknown === 0) {
-    console.log(
-      '\nEvery code in use is a four-digit one. The counter no longer needs the' +
-      '\nlenient field — see codeIsPin in KioskBilling.jsx and Billing.jsx.'
-    );
+    console.log('\nEvery code in use is a four-digit one. Nothing left to migrate.');
   } else {
     console.log(
       `\n${unknown} student(s) have not used a four-digit code yet. Most will clear` +
-      '\nthemselves on their next purchase. Any that stay put need their parent to' +
-      '\nset a new code — Forgot Purchase Code asks only for the account password.'
+      '\nthemselves on their next purchase, since a code that always was four digits' +
+      '\nis recorded the first time it is accepted. Any that remain cannot be served' +
+      '\nat the counter until their parent sets a new code — Forgot Purchase Code' +
+      '\nasks only for the account password, so the old code is not needed.'
     );
   }
 

@@ -27,6 +27,22 @@ const studentSchema = new mongoose.Schema({
   select: false
 },
 
+/* Whether purchasePassword is known to be a four-digit code.
+ *
+ * It cannot be asked of the hash, so it is recorded instead: set whenever a
+ * parent saves a code, which is validated, and set at the counter the first
+ * time a four-digit code is accepted. Everything predating the rule starts
+ * false and means "not known to be" rather than "known not to be" — a student
+ * whose code always was four digits flips the first time they buy anything.
+ *
+ * The counter reads it to decide whether to show a number pad or a field that
+ * will accept whatever the old code was. scripts/purchaseCodeAudit.js reports
+ * how many are left; when that reaches zero the lenient path can go. */
+purchaseCodeIsPin: {
+  type: Boolean,
+  default: false
+},
+
 // When on, the till cannot charge this student at the counter. The purchase
 // password still has to be entered — that is what proves the order is theirs —
 // but it only raises a request, and the parent approving it in the app is what

@@ -365,6 +365,7 @@ export const setPurchasePassword = async (req, res) => {
     }
 
     student.purchasePassword = await bcrypt.hash(password, 10);
+    student.purchaseCodeIsPin = true;
 
     await student.save();
 
@@ -417,6 +418,7 @@ export const changePurchasePassword = async (req, res) => {
     }
 
     student.purchasePassword = await bcrypt.hash(newPassword, 10);
+    student.purchaseCodeIsPin = true;
 
     await student.save();
 
@@ -463,6 +465,7 @@ export const resetPurchasePassword = async (req, res) => {
     }
 
     student.purchasePassword = await bcrypt.hash(newPassword, 10);
+    student.purchaseCodeIsPin = true;
 
     await student.save();
 

@@ -14,10 +14,11 @@ process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;
+const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
-const { signParentToken } = await import('../utils/tokens.js');
+const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
 mongoose.set('bufferTimeoutMS', 1000);
@@ -25,6 +26,9 @@ mongoose.set('bufferTimeoutMS', 1000);
 const PARENT_ID = '507f1f77bcf86cd799439011';
 const STUDENT_ID = '507f191e810c19729de860ea';
 
+const ADMIN_ID = '507f1f77bcf86cd799439012';
+
+const adminToken = signAdminToken(ADMIN_ID);
 const parentToken = signParentToken(PARENT_ID, '9876543210');
 
 let base;
@@ -327,5 +331,100 @@ describe('the purchase code is four digits', () => {
     });
 
     assert.equal(refused.status, 400);
+  });
+});
+
+describe('a code is recorded as four digits so the counter can tell', () => {
+  // Nothing can ask a bcrypt hash whether it is four digits, so the answer is
+  // written down when it is known. These are the two moments it is known.
+  const postSignedIn = (path, body) =>
+    fetch(base + path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${parentToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+  test('saving a code marks the student', async () => {
+    const saved = { _id: STUDENT_ID, purchasePassword: null, save: async () => {} };
+
+    ownsTheStudent();
+    mock.method(Student, 'findById', () => ({ select: async () => saved }));
+
+    await postSignedIn('/api/parent/set-purchase-password', {
+      studentId: STUDENT_ID,
+      password: '4821',
+    });
+
+    assert.equal(saved.purchaseCodeIsPin, true);
+  });
+
+  test('an old code accepted at the counter does not mark the student', async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const hash = await bcrypt.hash('legacy-long-password', 4);
+
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({
+        _id: STUDENT_ID,
+        parentPhoneNumber: '9876543210',
+        purchasePassword: hash,
+        purchaseCodeIsPin: false,
+      }),
+    }));
+
+    const marked = mock.method(Student, 'updateOne', async () => ({}));
+
+    const res = await fetch(base + '/api/transactions/verify-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        studentId: STUDENT_ID,
+        phone: '9876543210',
+        password: 'legacy-long-password',
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(marked.mock.callCount(), 0);
+  });
+
+  test('a four-digit code accepted at the counter marks the student', async () => {
+    const bcrypt = (await import('bcryptjs')).default;
+    const hash = await bcrypt.hash('4821', 4);
+
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({
+        _id: STUDENT_ID,
+        parentPhoneNumber: '9876543210',
+        purchasePassword: hash,
+        purchaseCodeIsPin: false,
+      }),
+    }));
+
+    const marked = mock.method(Student, 'updateOne', async () => ({}));
+
+    const res = await fetch(base + '/api/transactions/verify-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        studentId: STUDENT_ID,
+        phone: '9876543210',
+        password: '4821',
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(marked.mock.callCount(), 1);
+    assert.deepEqual(marked.mock.calls[0].arguments[1], { purchaseCodeIsPin: true });
   });
 });

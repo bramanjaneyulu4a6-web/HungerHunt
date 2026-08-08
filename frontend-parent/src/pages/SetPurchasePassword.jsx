@@ -248,6 +248,20 @@ export default function SetPurchasePassword() {
             they can remember without writing it down.
           </p>
 
+          {/* Shown until this child is known to have a four-digit code — which
+              they may already have, since nothing can read it back from the
+              stored hash. Buying anything at the counter with four digits
+              settles it, so this clears itself for most families without them
+              doing a thing. */}
+          {hasPassword && !student.purchaseCodeIsPin && (
+            <Banner variant="warn" icon="🔢" style={{ marginTop: 20 }}>
+              Purchase codes are now {PURCHASE_CODE_LENGTH} digits. If{' '}
+              {student.name} already uses a {PURCHASE_CODE_LENGTH}-digit code
+              there is nothing to do. If theirs is longer or has letters in it,
+              set a new one below — the counter cannot take the old kind.
+            </Banner>
+          )}
+
           {error && (
             <Banner variant="alert" icon="⚠️" style={{ marginTop: 20 }}>
               {error}

@@ -39,6 +39,16 @@ These are open items, not formalities. Each one is a real gap today.
       hygiene rather than an emergency. Do it anyway: the fences are the last
       line, not the plan.
 
+- [ ] **Watch the purchase codes migrate.** Codes are four digits now, and
+      nothing can read an existing one back out of its hash to check. Each
+      student carries `purchaseCodeIsPin`, set when a parent saves a code and
+      when a four-digit one is accepted at the counter, so a student who always
+      had four digits clears themselves on their next purchase. Until they do,
+      the counter shows a field that still accepts an older code — so nobody is
+      turned away. Run `node scripts/purchaseCodeAudit.js` from `backend/`
+      (read-only) to see how many are left; at zero, the lenient field can come
+      out of `KioskBilling.jsx` and `Billing.jsx`.
+
 - [ ] **Decide what the store listings say.** Screenshots, description, privacy
       policy URL, and a support contact. An app that reads a child's spending
       will be asked what it collects and who sees it.

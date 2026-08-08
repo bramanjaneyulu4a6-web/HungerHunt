@@ -140,7 +140,17 @@ export const verifyPayment = async (req, res) => {
     const matched = await bcrypt.compare(password, student.purchasePassword);
 
     if (!matched) {
-      return res.status(400).json({ message: "Wrong purchase password" });
+      return res.status(400).json({ message: "Wrong purchase code" });
+    }
+
+    /* The one moment the stored code is in plain sight. A student set up before
+       codes were four digits is not known to have one, and nothing can ask the
+       hash — so if what just worked is four digits, that is recorded here and
+       the counter shows them a number pad from now on. Most students never had
+       anything else and heal on their first purchase.
+       purchaseCodeAudit.js counts the ones that have not. */
+    if (!student.purchaseCodeIsPin && /^\d{4}$/.test(password)) {
+      await Student.updateOne({ _id: student._id }, { purchaseCodeIsPin: true });
     }
 
     // The token is bound to a cart, so it can only be issued to a client that

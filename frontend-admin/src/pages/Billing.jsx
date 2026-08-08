@@ -333,6 +333,10 @@ const Billing = () => {
     }
   };
 
+  // False means "not known to be a four-digit code", not "known not to be" —
+  // see the field's comment below and Student.purchaseCodeIsPin.
+  const codeIsPin = Boolean(selectedStudent?.purchaseCodeIsPin);
+
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(productSearchQuery.toLowerCase())
   );
@@ -905,20 +909,25 @@ const Billing = () => {
             />
 
             <label className="field-label" htmlFor="verify-password">
-              Purchase Code
+              {codeIsPin ? "Purchase Code" : "Purchase Code or Old Password"}
             </label>
+            {/* Capped at four only for a student known to have a four-digit
+                code. One who may still be on an older one needs a field that
+                accepts it, or the counter cannot serve them at all. */}
             <input
               id="verify-password"
               type="password"
-              inputMode="numeric"
+              inputMode={codeIsPin ? "numeric" : "text"}
               className="input"
-              placeholder="4-digit code"
+              placeholder={codeIsPin ? "4-digit code" : "Enter purchase code"}
               autoComplete="off"
-              maxLength={PURCHASE_CODE_LENGTH}
+              maxLength={codeIsPin ? PURCHASE_CODE_LENGTH : undefined}
               value={purchasePassword}
               onChange={(e) =>
                 setPurchasePassword(
-                  e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
+                  codeIsPin
+                    ? e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
+                    : e.target.value
                 )
               }
             />
@@ -939,7 +948,10 @@ const Billing = () => {
                 type="submit"
                 variant="success"
                 style={{ flex: 1 }}
-                disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
+                disabled={
+                  paying ||
+                  purchasePassword.length < (codeIsPin ? PURCHASE_CODE_LENGTH : 1)
+                }
               >
                 {paying ? "Processing…" : "Verify & Pay"}
               </Button>

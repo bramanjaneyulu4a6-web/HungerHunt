@@ -15,6 +15,7 @@ process.env.LEGACY_TOKEN_GRACE_UNTIL = '2999-01-01T00:00:00Z';
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
+const Supplier = (await import('../models/Supplier.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -45,6 +46,7 @@ const accountIs = accountMatcher(Admin, STAFF_ID);
 beforeEach(() => {
   accountIs('warehouse');
   mock.method(Inventory, 'find', () => ({ populate: async () => [] }));
+  mock.method(Supplier, 'find', () => ({ sort: async () => [] }));
 });
 
 const send = (method, path, token, body) =>
@@ -60,6 +62,7 @@ const send = (method, path, token, body) =>
 // Routes the storeroom needs. Tasks 2–4 append theirs.
 const WAREHOUSE_ROUTES = [
   ['GET', '/api/inventory'],
+  ['GET', '/api/suppliers'],
 ];
 
 // A sample of everything else, which no storeroom has ever needed.
@@ -69,6 +72,7 @@ const CLOSED_ROUTES = [
   ['POST', '/api/transactions/bill', 'This action needs a till account.'],
   ['GET', '/api/students/search?q=as', 'This action needs a till account.'],
   ['POST', '/api/admin/register', 'This action needs a full admin account.'],
+  ['POST', '/api/suppliers', 'This action needs a full admin account.'],
 ];
 
 describe('a warehouse account works the storeroom', () => {

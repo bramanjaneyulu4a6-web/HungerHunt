@@ -55,8 +55,16 @@ beforeEach(() => {
     return chain;
   });
   mock.method(Purchase, 'create', async (doc) => ({ _id: 'x', ...doc }));
+  // Two different callers terminate this chain differently:
+  // getReceiptsForPurchase ends on .sort(), getRecentReceipts ends on
+  // .limit(). Both — and a bare await of the chain itself — have to resolve.
   mock.method(GoodsReceipt, 'find', () => {
-    const chain = { populate: () => chain, sort: () => chain, limit: async () => [] };
+    const chain = {
+      populate: () => chain,
+      sort: () => chain,
+      limit: async () => [],
+      then: (resolve) => resolve([]),
+    };
     return chain;
   });
   // findById's chain is awaited directly (no terminal .sort()/.exec()), unlike

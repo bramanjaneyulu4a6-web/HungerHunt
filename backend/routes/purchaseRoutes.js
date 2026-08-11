@@ -6,7 +6,8 @@ import {
   getCompletedPurchases,
   getOpenPurchases,
   getPurchase,
-  completePurchase
+  completePurchase,
+  cancelPurchase
 } from "../controllers/purchaseController.js";
 
 import {
@@ -29,6 +30,7 @@ router.get("/open", protectWarehouse, getOpenPurchases);
 router.get("/new", protectAdmin, getNewPurchases);
 router.get("/completed", protectAdmin, getCompletedPurchases);
 router.put("/complete/:id", protectAdmin, completePurchase);
+router.put("/cancel/:id", protectAdmin, cancelPurchase);
 
 router.post("/:id/receipts", protectWarehouse, receiveDelivery);
 router.get("/:id/receipts", protectWarehouse, getReceiptsForPurchase);

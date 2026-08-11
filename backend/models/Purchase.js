@@ -33,7 +33,7 @@ const purchaseSchema = new mongoose.Schema(
 
   status: {
     type: String,
-    enum: ["NEW", "PARTIAL", "COMPLETED"],
+    enum: ["NEW", "PARTIAL", "COMPLETED", "CANCELLED"],
     default: "NEW"
   },
 
@@ -49,7 +49,18 @@ const purchaseSchema = new mongoose.Schema(
     ref: "Admin"
   },
 
-  completedAt: Date
+  completedAt: Date,
+
+  // A cancel is a statement about the order's future, not its past: receipts,
+  // stock and received counts already booked all stand, and the remainder is
+  // simply never coming. Admin-only — the storeroom's honest exit for an
+  // abandoned order is closing it short at what actually arrived.
+  cancelledAt: Date,
+
+  cancelledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Admin"
+  }
 },
 { timestamps: true }
 );

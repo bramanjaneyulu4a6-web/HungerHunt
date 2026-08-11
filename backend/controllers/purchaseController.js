@@ -134,7 +134,7 @@ export const getCompletedPurchases = async (req, res) => {
   try {
 
     const purchases = await Purchase.find({
-      status: "COMPLETED"
+      status: { $in: ["COMPLETED", "CANCELLED"] }
     })
       .populate("items.productId")
       .populate("supplierId")
@@ -388,6 +388,42 @@ export const getPurchase = async (req, res) => {
     if (!purchase) return res.status(404).json({ message: "Purchase not found" });
     res.json(purchase);
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* The exit for an order raised by mistake. Guarded the same way completion
+   is — only a still-open order transitions, so two tabs cannot both cancel
+   and a completed order cannot be un-completed by the back door. Nothing is
+   compensated because nothing is undone: whatever receipts already booked
+   stays booked, and the shortfall stays readable as ordered minus received. */
+export const cancelPurchase = async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ message: "Purchase not found" });
+  }
+
+  try {
+    const cancelled = await Purchase.findOneAndUpdate(
+      { _id: id, status: { $in: ["NEW", "PARTIAL"] } },
+      { status: "CANCELLED", cancelledAt: new Date(), cancelledBy: req.adminId },
+      { new: true, runValidators: true }
+    );
+
+    if (!cancelled) {
+      const exists = await Purchase.exists({ _id: id });
+
+      return exists
+        ? res.status(409).json({
+            message: "This order is already closed — completed or cancelled elsewhere."
+          })
+        : res.status(404).json({ message: "Purchase not found" });
+    }
+
+    res.json(cancelled);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };

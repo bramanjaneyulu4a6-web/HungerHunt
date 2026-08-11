@@ -32,23 +32,23 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SHARED = [
   {
     file: 'src/theme.css',
-    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
   {
     file: 'src/ui.css',
-    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
   {
     file: 'src/components/ui/index.jsx',
-    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
   {
     file: 'src/utils/format.js',
-    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk'],
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
   {
     file: 'src/components/RefreshButton.jsx',
-    apps: ['frontend-admin', 'hungerhunt-kiosk'],
+    apps: ['frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
 ];
 

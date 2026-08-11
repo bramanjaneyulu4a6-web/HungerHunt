@@ -1,0 +1,57 @@
+/* Base styles for the kiosk.
+   This runs full-screen on a till, so the root fills the display rather than
+   sitting in a fixed desktop column. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  /* Page styles are all light; without this the OS would darken form controls
+     against them in dark mode. */
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  width: 100%;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pages size their own headings inline; drop the UA margins that would
+   otherwise punch gaps into the card layouts. */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: inherit;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}

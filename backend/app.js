@@ -90,6 +90,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
+  "http://localhost:5176", // hungerhunt-warehouse (port pinned in its vite.config)
   "http://localhost:3000",
 
   "https://hunger-hunt-beta.vercel.app",

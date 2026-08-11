@@ -55,7 +55,7 @@ jobs:
         # people to skim past the whole workflow, so it joins this list in the
         # commit that clears them rather than before. The backend has no eslint
         # config at all and so has nothing to run.
-        app: [frontend-parent, hungerhunt-kiosk]
+        app: [frontend-parent, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -78,7 +78,7 @@ jobs:
       # One app failing to build should not hide whether the other two do.
       fail-fast: false
       matrix:
-        app: [frontend-parent, frontend-admin, hungerhunt-kiosk]
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

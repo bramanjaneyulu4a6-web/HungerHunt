@@ -1,0 +1,151 @@
+/* The storeroom's own skin, loaded after the shared ui.css. Identity:
+   industrial clipboard — slate ground, safety-amber accent, big tap targets
+   for a standing thumb, tabular figures wherever counts align. */
+
+:root {
+  --wh-bg: #171a1e;
+  --wh-panel: #1f242a;
+  --wh-panel-raised: #262c33;
+  --wh-line: #333a42;
+  --wh-ink: #e8eaed;
+  --wh-muted: #98a2ad;
+  --wh-amber: #f5a623;
+  --wh-amber-ink: #1a1206;
+  --wh-green: #3fb27f;
+  --wh-red: #e5604c;
+}
+
+.wh-app {
+  min-height: 100vh;
+  background: var(--wh-bg);
+  color: var(--wh-ink);
+  padding-bottom: 84px; /* room for the tab bar */
+}
+
+.wh-page { padding: 16px; max-width: 720px; margin: 0 auto; }
+
+.wh-title { font-size: 22px; font-weight: 700; margin: 4px 0 2px; }
+.wh-subtitle { color: var(--wh-muted); font-size: 14px; margin: 0 0 16px; }
+
+.wh-card {
+  background: var(--wh-panel);
+  border: 1px solid var(--wh-line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.wh-card--tappable { cursor: pointer; transition: background 0.12s ease; }
+.wh-card--tappable:active { background: var(--wh-panel-raised); }
+
+.wh-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.wh-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.wh-badge--new { background: rgba(245, 166, 35, 0.16); color: var(--wh-amber); }
+.wh-badge--partial { background: rgba(63, 178, 127, 0.16); color: var(--wh-green); }
+.wh-badge--short { background: rgba(229, 96, 76, 0.16); color: var(--wh-red); }
+
+.wh-num { font-variant-numeric: tabular-nums; }
+
+.wh-line-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--wh-line);
+}
+.wh-line-item:last-child { border-bottom: none; }
+
+.wh-product { font-weight: 600; font-size: 16px; }
+.wh-remaining { color: var(--wh-muted); font-size: 13px; }
+
+.wh-stepper { display: flex; align-items: center; gap: 0; }
+.wh-stepper button {
+  width: 52px; height: 52px;
+  font-size: 24px; font-weight: 700;
+  background: var(--wh-panel-raised);
+  color: var(--wh-ink);
+  border: 1px solid var(--wh-line);
+  cursor: pointer;
+}
+.wh-stepper button:first-child { border-radius: 12px 0 0 12px; }
+.wh-stepper button:last-child { border-radius: 0 12px 12px 0; }
+.wh-stepper button:disabled { opacity: 0.35; cursor: default; }
+.wh-stepper input {
+  width: 64px; height: 52px;
+  text-align: center;
+  font-size: 18px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--wh-bg);
+  color: var(--wh-ink);
+  border: 1px solid var(--wh-line);
+  border-left: none; border-right: none;
+}
+
+.wh-field-label {
+  display: block;
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--wh-muted);
+  margin: 14px 0 6px;
+}
+
+.wh-input {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  background: var(--wh-panel);
+  color: var(--wh-ink);
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+}
+
+.wh-cta {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  margin-top: 16px;
+  font-size: 17px; font-weight: 800;
+  background: var(--wh-amber);
+  color: var(--wh-amber-ink);
+  border: none; border-radius: 14px;
+  cursor: pointer;
+}
+.wh-cta:disabled { opacity: 0.45; cursor: default; }
+
+.wh-summary {
+  background: var(--wh-panel-raised);
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--wh-muted);
+}
+.wh-summary strong { color: var(--wh-ink); }
+
+.wh-tabbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  background: var(--wh-panel);
+  border-top: 1px solid var(--wh-line);
+  padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+}
+.wh-tab {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 0;
+  font-size: 11px; font-weight: 700;
+  color: var(--wh-muted);
+  text-decoration: none;
+}
+.wh-tab.active { color: var(--wh-amber); }
+.wh-tab .wh-tab-icon { font-size: 20px; line-height: 1; }

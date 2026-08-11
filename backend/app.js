@@ -21,7 +21,7 @@ import unitRoutes from './routes/unitRoutes.js';
 import supplierRoutes from './routes/supplierRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
-import { parentSecretChangeover } from './utils/tokens.js';
+import { parentSecretChangeover, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
 const app = express();
@@ -72,6 +72,27 @@ if (parentSecret.pending) {
         ` ${parentSecret.deadline.toISOString()}, so setting it now signs out every` +
         ' parent holding a live token — up to seven days of them. Still worth doing;' +
         ' pick a quiet hour rather than a lunch service.'
+  );
+}
+
+/* The same warning for the third key, and deliberately without the parent
+   one's arithmetic. A student session lasts 450 seconds, so there is no window
+   to be inside or outside of: setting this costs at most seven and a half
+   minutes of kiosk sessions, at any hour, on any day. Nothing is ever gained
+   by putting it off, which is worth saying plainly — a warning that offers no
+   reason to act today is a warning people learn to scroll past. */
+if (studentSecretIsShared()) {
+  console.warn(
+    'STUDENT_JWT_SECRET is not set, so kiosk sessions are signed with JWT_SECRET.' +
+    ' The role claim still separates them, but /students/kiosk-session is open —' +
+    ' anyone who can reach it mints a token signed with the key that also signs' +
+    ' staff, and only that claim stands between the two.'
+  );
+
+  console.warn(
+    'Setting it is free and always will be: a student session lasts 450 seconds,' +
+    ' so the worst it costs is a few kiosk logins. There is no deadline to beat' +
+    ' and no quiet hour to wait for.'
   );
 }
 

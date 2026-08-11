@@ -12,7 +12,7 @@ process.env.STUDENT_JWT_SECRET = 'student-test-secret';
 
 const {
   signAdminToken, signParentToken, signStudentToken, signStaffToken, verifyToken,
-  parentSecretChangeover,
+  parentSecretChangeover, studentSecretIsShared,
 } = await import('../utils/tokens.js');
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';
@@ -228,5 +228,41 @@ describe('cashier is no longer a role', () => {
   test('the roles that remain still sign', () => {
     assert.ok(signStaffToken(ADMIN_ID, 'admin'));
     assert.ok(signStaffToken(ADMIN_ID, 'warehouse'));
+  });
+});
+
+/* The student key has none of the parent key's timing problem, and the boot
+   warning has to be able to say so. A student session lasts 450 seconds, so
+   introducing the key costs at most seven and a half minutes of sessions —
+   there is no window to be inside or outside of, and no reason to wait for a
+   quiet hour. */
+describe('the student secret reports whether it is still shared', () => {
+  const withoutStudentKey = (fn) => {
+    const saved = process.env.STUDENT_JWT_SECRET;
+    delete process.env.STUDENT_JWT_SECRET;
+    try { fn(); } finally { process.env.STUDENT_JWT_SECRET = saved; }
+  };
+
+  test('says so when it is unset and falling back to the admin key', () => {
+    withoutStudentKey(() => {
+      assert.equal(studentSecretIsShared(), true);
+    });
+  });
+
+  test('and says nothing is outstanding once it is set', () => {
+    assert.equal(studentSecretIsShared(), false);
+  });
+
+  // The reason it is worth warning about at all: while the key is shared, the
+  // open kiosk route hands out tokens signed with the key that also signs
+  // staff. The role claim is what keeps them apart, and that is exactly the
+  // single point of failure a second key exists to remove.
+  test('a student token is still refused as staff while the key is shared', () => {
+    withoutStudentKey(() => {
+      setGrace(FUTURE);
+      const token = signStudentToken('507f191e810c19729de860ff', 'ADM-1042');
+      assert.equal(verifyToken(token, 'staff'), null);
+      assert.equal(verifyToken(token, 'admin'), null);
+    });
   });
 });

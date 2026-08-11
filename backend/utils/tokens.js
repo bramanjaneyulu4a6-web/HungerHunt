@@ -22,6 +22,20 @@ export const parentSecretIsShared = () => !process.env.PARENT_JWT_SECRET;
 // still holds while it is shared.
 const studentSecret = () => process.env.STUDENT_JWT_SECRET || adminSecret();
 
+/* Whether student sessions are still being signed with the admin key.
+ *
+ * Reported at boot, because this one is easy to leave undone forever: unlike
+ * the parent key there is no date to miss and nothing visibly breaks, so the
+ * only thing that ever raises it is a warning nobody has silenced.
+ *
+ * And it matters more here than for parents, because of where student tokens
+ * come from. /students/kiosk-session is open — an admission number and no
+ * secret — so while the key is shared, a route anyone on the internet can
+ * reach is minting tokens signed with the key that also signs staff. The role
+ * claim is what keeps them apart today. A second key is what stops that being
+ * the only thing keeping them apart. */
+export const studentSecretIsShared = () => !process.env.STUDENT_JWT_SECRET;
+
 // 7 minutes 30 seconds — the kiosk session's hard cap. The terminal counts it
 // down on screen, but this is what enforces it: the session cannot be extended
 // by reloading the page, because a reload does not mint a new token.

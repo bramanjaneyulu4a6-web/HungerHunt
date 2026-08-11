@@ -1,6 +1,6 @@
 import express from "express";
-import { getInventory } from "../controllers/inventoryController.js";
-import { orStudent, protectAnyStaff } from "../middleware/authMiddleware.js";
+import { getInventory, adjustStock, getAdjustments } from "../controllers/inventoryController.js";
+import { orStudent, protectAdmin, protectAnyStaff } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -9,5 +9,10 @@ const router = express.Router();
 // the same tiles from it. Changing stock is done through products and
 // purchases, which keep their own narrower gates.
 router.get("/", orStudent(protectAnyStaff), getInventory);
+
+// Manual movements are the office's alone — the storeroom's stock changes
+// arrive as goods receipts, and a student obviously never writes the shelf.
+router.post("/:productId/adjust", protectAdmin, adjustStock);
+router.get("/:productId/adjustments", protectAdmin, getAdjustments);
 
 export default router;

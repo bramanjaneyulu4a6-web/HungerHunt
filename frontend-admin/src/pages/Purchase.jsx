@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
-import { Banner, Button, EmptyState, PageHeader, Skeleton } from "../components/ui";
+import { Badge, Banner, Button, EmptyState, PageHeader, Skeleton } from "../components/ui";
 
 const Purchase = () => {
   const [products, setProducts] = useState([]);
@@ -28,8 +28,26 @@ const Purchase = () => {
     setLoadError(false);
 
     try {
-      const res = await api.get("/products");
-      setProducts(res.data.map((product) => ({ ...product, quantity: 0 })));
+      const [productsRes, inventoryRes] = await Promise.all([
+        api.get("/products"),
+        api.get("/inventory"),
+      ]);
+
+      // Stock keyed by product so each order line can show the shelf it is
+      // reordering for. A product with no row yet reads as 0.
+      const stockByProduct = {};
+      (Array.isArray(inventoryRes.data) ? inventoryRes.data : []).forEach((row) => {
+        if (row.productId?._id) stockByProduct[row.productId._id] = row.stock || 0;
+      });
+
+      setProducts(
+        productsRes.data.map((product) => ({
+          ...product,
+          quantity: 0,
+          purchasePrice: "",
+          currentStock: stockByProduct[product._id] ?? 0,
+        }))
+      );
     } catch (err) {
       console.error(err);
       setLoadError(true);
@@ -46,10 +64,27 @@ const Purchase = () => {
     );
   };
 
+  const updatePurchasePrice = (id, value) => {
+    setProducts((prev) =>
+      prev.map((product) =>
+        product._id === id ? { ...product, purchasePrice: value } : product
+      )
+    );
+  };
+
   const createPurchase = async () => {
     const selectedItems = products
       .filter((p) => p.quantity > 0)
-      .map((p) => ({ productId: p._id, quantity: p.quantity }));
+      .map((p) => {
+        const cost = parseFloat(p.purchasePrice);
+        return {
+          productId: p._id,
+          quantity: p.quantity,
+          ...(p.purchasePrice !== "" && !isNaN(cost) && cost >= 0
+            ? { purchasePrice: cost }
+            : {}),
+        };
+      });
 
     if (selectedItems.length === 0) {
       toast.error("Select at least one product with a quantity greater than 0");
@@ -64,7 +99,7 @@ const Purchase = () => {
         ...(supplierId ? { supplierId } : {}),
       });
       toast.success("Purchase request created");
-      setProducts((prev) => prev.map((p) => ({ ...p, quantity: 0 })));
+      setProducts((prev) => prev.map((p) => ({ ...p, quantity: 0, purchasePrice: "" })));
     } catch (err) {
       console.error(err);
       toast.error("Failed to create purchase request");
@@ -153,7 +188,9 @@ const Purchase = () => {
                 <th>Product</th>
                 <th>Stock Group</th>
                 <th>Unit</th>
+                <th style={{ width: 130 }}>Current Stock</th>
                 <th style={{ width: 160 }}>Purchase Quantity</th>
+                <th style={{ width: 160 }}>Expected Unit Cost (₹)</th>
               </tr>
             </thead>
             <tbody>
@@ -178,6 +215,16 @@ const Purchase = () => {
                       <span style={{ color: "var(--muted-soft)" }}>None</span>
                     )}
                   </td>
+                  <td data-label="Current Stock">
+                    {product.currentStock < (product.reorderLevel ?? 5) ? (
+                      <Badge variant="alert">
+                        <span aria-hidden="true">⚠︎</span>
+                        {product.currentStock} left
+                      </Badge>
+                    ) : (
+                      <span>{product.currentStock}</span>
+                    )}
+                  </td>
                   <td data-label="Quantity">
                     <input
                       type="number"
@@ -191,6 +238,19 @@ const Purchase = () => {
                       aria-label={`Purchase quantity for ${product.name}`}
                       value={product.quantity}
                       onChange={(e) => updateQuantity(product._id, e.target.value)}
+                    />
+                  </td>
+                  <td data-label="Unit Cost">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="—"
+                      className="input"
+                      style={{ width: 120, textAlign: "center" }}
+                      aria-label={`Expected unit cost for ${product.name}`}
+                      value={product.purchasePrice}
+                      onChange={(e) => updatePurchasePrice(product._id, e.target.value)}
                     />
                   </td>
                 </tr>

@@ -20,6 +20,8 @@ const Purchased = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [completingId, setCompletingId] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [openReceipts, setOpenReceipts] = useState({}); // purchaseId -> rows | "loading"
 
   useEffect(() => {
     loadData();
@@ -56,7 +58,9 @@ const Purchased = () => {
 
       setCompletedPurchases(
         completedRes.data.sort(
-          (a, b) => new Date(b.completedAt) - new Date(a.completedAt)
+          (a, b) =>
+            new Date(b.completedAt ?? b.cancelledAt ?? 0) -
+            new Date(a.completedAt ?? a.cancelledAt ?? 0)
         )
       );
     } catch (err) {
@@ -139,6 +143,120 @@ const Purchased = () => {
     }
   };
 
+  const cancelOrder = async (purchase) => {
+    const started = purchase.items.some((item) => (item.received || 0) > 0);
+
+    if (
+      !window.confirm(
+        started
+          ? "Cancel the rest of this order? Deliveries already booked stay booked — only what is still outstanding is voided."
+          : "Cancel this order? Nothing has been received against it."
+      )
+    )
+      return;
+
+    setCancellingId(purchase._id);
+
+    try {
+      await api.put(`/purchases/cancel/${purchase._id}`);
+      await loadData();
+      toast.success("Order cancelled");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to cancel the order");
+      // Closed elsewhere — this list is stale.
+      if (err.response?.status === 409) await loadData();
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const toggleReceipts = async (purchaseId) => {
+    if (openReceipts[purchaseId]) {
+      setOpenReceipts((prev) => {
+        const next = { ...prev };
+        delete next[purchaseId];
+        return next;
+      });
+      return;
+    }
+
+    setOpenReceipts((prev) => ({ ...prev, [purchaseId]: "loading" }));
+
+    try {
+      const res = await api.get(`/purchases/${purchaseId}/receipts`);
+      setOpenReceipts((prev) => ({
+        ...prev,
+        [purchaseId]: Array.isArray(res.data) ? res.data : [],
+      }));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load the deliveries for this order");
+      setOpenReceipts((prev) => {
+        const next = { ...prev };
+        delete next[purchaseId];
+        return next;
+      });
+    }
+  };
+
+  const receiptsBlock = (purchase) => {
+    const rows = openReceipts[purchase._id];
+
+    return (
+      <div style={{ marginTop: 12 }}>
+        <Button variant="ghost" className="btn--sm" onClick={() => toggleReceipts(purchase._id)}>
+          {rows ? "Hide deliveries" : "View deliveries"}
+        </Button>
+
+        {rows === "loading" ? (
+          <Skeleton height={16} style={{ marginTop: 10 }} />
+        ) : Array.isArray(rows) && rows.length === 0 ? (
+          <p style={{ marginTop: 10, color: "var(--muted-soft)" }}>
+            No deliveries have been booked against this order.
+          </p>
+        ) : Array.isArray(rows) ? (
+          rows.map((receipt) => (
+            <div key={receipt._id} className="card" style={{ marginTop: 10, padding: 14 }}>
+              <p className="card-meta" style={{ marginBottom: 8 }}>
+                {new Date(receipt.createdAt).toLocaleString()}
+                {receipt.receivedBy?.email ? ` · received by ${receipt.receivedBy.email}` : ""}
+                {receipt.invoiceNumber ? ` · invoice ${receipt.invoiceNumber}` : ""}
+              </p>
+              {receipt.note && (
+                <p style={{ marginBottom: 8, color: "var(--muted-soft)" }}>{receipt.note}</p>
+              )}
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th style={{ width: 110 }}>Received</th>
+                      <th style={{ width: 110 }}>Damaged</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receipt.lines.map((line, i) => (
+                      <tr key={line.productId?._id || i}>
+                        <td>{line.productId?.name || "Unlinked product"}</td>
+                        <td>{line.received || 0}</td>
+                        <td style={{ color: line.damaged > 0 ? "var(--danger)" : undefined }}>
+                          {line.damaged || 0}
+                        </td>
+                        <td>{line.reason || ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <div className="page">
       <PageHeader
@@ -159,7 +277,7 @@ const Purchased = () => {
           className={`tab${activeTab === "completed" ? " tab--active" : ""}`}
           onClick={() => setActiveTab("completed")}
         >
-          Completed
+          Closed
         </button>
       </div>
 
@@ -320,20 +438,30 @@ const Purchased = () => {
                   </table>
                 </div>
 
-                <Button
-                  variant="success"
-                  onClick={() => completePurchase(purchase)}
-                  disabled={completingId !== null}
-                >
-                  {completing ? "Completing…" : "Complete & Apply Stock"}
-                </Button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <Button
+                    variant="success"
+                    onClick={() => completePurchase(purchase)}
+                    disabled={completingId !== null || cancellingId !== null}
+                  >
+                    {completing ? "Completing…" : "Complete & Apply Stock"}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => cancelOrder(purchase)}
+                    disabled={completingId !== null || cancellingId !== null}
+                  >
+                    {cancellingId === purchase._id ? "Cancelling…" : "Cancel order"}
+                  </Button>
+                </div>
+                {receiptsBlock(purchase)}
               </Card>
             );
           })
         )
       ) : completedPurchases.length === 0 ? (
         <EmptyState icon="🗂️" title="No completed orders yet">
-          Orders you complete will be archived here.
+          Orders you complete or cancel are archived here.
         </EmptyState>
       ) : (
         completedPurchases.map((purchase) => {
@@ -341,6 +469,7 @@ const Purchased = () => {
             (acc, item) => acc + receivedOf(item) * (item.purchasePrice || 0),
             0
           );
+          const cancelled = purchase.status === "CANCELLED";
 
           return (
             <Card key={purchase._id} style={{ marginBottom: 24 }}>
@@ -359,12 +488,15 @@ const Purchased = () => {
                     Invoice #{purchase._id.slice(-6).toUpperCase()}
                   </h3>
                   <p className="card-meta">
-                    Closed on {new Date(purchase.completedAt).toLocaleString()}
+                    {cancelled
+                      ? `Cancelled on ${new Date(purchase.cancelledAt).toLocaleString()}`
+                      : `Closed on ${new Date(purchase.completedAt).toLocaleString()}`}
                     {purchase.supplierId?.name ? ` · ${purchase.supplierId.name}` : ""}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  {shortfall(purchase) > 0 && (
+                  {cancelled && <Badge variant="alert">Cancelled</Badge>}
+                  {!cancelled && shortfall(purchase) > 0 && (
                     <Badge variant="alert">{shortfall(purchase)} short</Badge>
                   )}
                   <Badge variant="success">
@@ -426,6 +558,7 @@ const Purchased = () => {
                   </tbody>
                 </table>
               </div>
+              {receiptsBlock(purchase)}
             </Card>
           );
         })

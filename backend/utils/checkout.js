@@ -68,6 +68,17 @@ export const chargeCart = async ({ studentId, items }) => {
       return { ok: false, status: 404, message: "Inventory record not found." };
     }
 
+    // Archived is off sale everywhere, including a till that loaded its menu
+    // this morning and still shows the product. Absent means active — rows
+    // from before the flag never carried one.
+    if (inventory.productId.active === false) {
+      return {
+        ok: false,
+        status: 400,
+        message: `${inventory.productId.name} is no longer sold.`
+      };
+    }
+
     if (inventory.stock < orderItem.quantity) {
       return {
         ok: false,

@@ -734,9 +734,14 @@
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid rgba(233, 225, 213, 0.9);
+  /* Only a hairline underneath, matching the search box beside it. This
+     carried a card-sized drop shadow (0 14px 32px -12px at 0.34), which on the
+     white ground pooled into a 30px grey smudge hanging off the bottom of the
+     pill and darkening the tiles scrolling under it — a bleed under half the
+     bar, since the search box next to it casts nothing. The float is carried
+     by the backdrop blur, as the note above says; it does not need the drop. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 3px rgba(120, 95, 65, 0.1), 0 2px 5px rgba(90, 70, 45, 0.08),
-    0 14px 32px -12px rgba(90, 70, 45, 0.34);
+    inset 0 -1px 3px rgba(120, 95, 65, 0.1), 0 1px 2px rgba(90, 70, 45, 0.06);
 }
 
 .seg::-webkit-scrollbar {

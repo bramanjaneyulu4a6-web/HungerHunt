@@ -533,7 +533,7 @@ const Purchased = () => {
                           <td data-label="Ordered">{item.quantity}</td>
                           <td data-label="Received">
                             {received}
-                            {short > 0 && (
+                            {!cancelled && short > 0 && (
                               <span style={{ color: "var(--danger)" }}>
                                 {" "}
                                 ({short} short)

@@ -117,7 +117,6 @@ const BACK_OFFICE_ROUTES = [
   ['PUT', `/api/students/${OTHER_ID}/topup`, { amount: 5000 }],
   ['GET', '/api/students/count'],
   ['GET', '/api/transactions/history'],
-  ['GET', '/api/products'],
   ['GET', '/api/purchases/new'],
   ['GET', '/api/stock-groups'],
   ['GET', '/api/units'],
@@ -171,6 +170,13 @@ describe('and nothing else', () => {
   test('POST /api/purchases is closed to a cashier — storeroom work', async () => {
     accountIs('cashier');
     const res = await send('POST', '/api/purchases', cashierToken, {});
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).message, 'This action needs a warehouse account.');
+  });
+
+  test('GET /api/products is closed to a cashier — storeroom and back office read the catalogue, the till does not', async () => {
+    accountIs('cashier');
+    const res = await send('GET', '/api/products', cashierToken);
     assert.equal(res.status, 403);
     assert.equal((await res.json()).message, 'This action needs a warehouse account.');
   });

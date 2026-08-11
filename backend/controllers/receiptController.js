@@ -225,3 +225,20 @@ export const getReceiptsForPurchase = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// The storeroom's logbook: the latest deliveries across every order, newest
+// first. Capped — the full ledger lives in the back office.
+export const getRecentReceipts = async (req, res) => {
+  try {
+    const receipts = await GoodsReceipt.find()
+      .populate("lines.productId")
+      .populate("receivedBy", "email role")
+      .populate({ path: "purchaseId", populate: { path: "supplierId" } })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json(receipts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

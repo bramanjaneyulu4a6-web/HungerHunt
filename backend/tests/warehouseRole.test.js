@@ -18,6 +18,7 @@ const Inventory = (await import('../models/Inventory.js')).default;
 const Supplier = (await import('../models/Supplier.js')).default;
 const Purchase = (await import('../models/Purchase.js')).default;
 const GoodsReceipt = (await import('../models/GoodsReceipt.js')).default;
+const Product = (await import('../models/Product.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -55,7 +56,7 @@ beforeEach(() => {
   });
   mock.method(Purchase, 'create', async (doc) => ({ _id: 'x', ...doc }));
   mock.method(GoodsReceipt, 'find', () => {
-    const chain = { populate: () => chain, sort: async () => [] };
+    const chain = { populate: () => chain, sort: () => chain, limit: async () => [] };
     return chain;
   });
   // findById's chain is awaited directly (no terminal .sort()/.exec()), unlike
@@ -65,6 +66,12 @@ beforeEach(() => {
       populate: () => chain,
       then: (resolve) => resolve({ _id: 'x', items: [] }),
     };
+    return chain;
+  });
+  // getProducts awaits Product.find().populate("stockGroup").populate("unit"),
+  // so the chain has to be thenable at every link.
+  mock.method(Product, 'find', () => {
+    const chain = { populate: () => chain, then: (resolve) => resolve([]) };
     return chain;
   });
 });
@@ -87,6 +94,8 @@ const WAREHOUSE_ROUTES = [
   ['POST', '/api/purchases', { items: [{ productId: '507f191e810c19729de860ec', quantity: 1 }] }],
   ['GET', '/api/purchases/507f191e810c19729de860ed'],
   ['GET', '/api/purchases/507f191e810c19729de860ed/receipts'],
+  ['GET', '/api/products'],
+  ['GET', '/api/receipts'],
 ];
 
 // A sample of everything else, which no storeroom has ever needed.

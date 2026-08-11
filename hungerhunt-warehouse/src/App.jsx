@@ -4,9 +4,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Receive from "./pages/Receive";
-
-// Replaced by real pages in the next two tasks.
-const Placeholder = ({ name }) => <div className="wh-page"><h1 className="wh-title">{name}</h1></div>;
+import NewOrder from "./pages/NewOrder";
+import Stock from "./pages/Stock";
+import History from "./pages/History";
 
 const TABS = [
   { to: "/", icon: "📥", label: "Orders" },
@@ -45,9 +45,9 @@ const App = () => (
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Shell><Home /></Shell></ProtectedRoute>} />
       <Route path="/receive/:id" element={<ProtectedRoute><Shell><Receive /></Shell></ProtectedRoute>} />
-      <Route path="/new-order" element={<ProtectedRoute><Shell><Placeholder name="New order" /></Shell></ProtectedRoute>} />
-      <Route path="/stock" element={<ProtectedRoute><Shell><Placeholder name="Stock" /></Shell></ProtectedRoute>} />
-      <Route path="/history" element={<ProtectedRoute><Shell><Placeholder name="History" /></Shell></ProtectedRoute>} />
+      <Route path="/new-order" element={<ProtectedRoute><Shell><NewOrder /></Shell></ProtectedRoute>} />
+      <Route path="/stock" element={<ProtectedRoute><Shell><Stock /></Shell></ProtectedRoute>} />
+      <Route path="/history" element={<ProtectedRoute><Shell><History /></Shell></ProtectedRoute>} />
     </Routes>
   </BrowserRouter>
 );

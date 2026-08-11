@@ -19,6 +19,7 @@ import inventoryRoutes from './routes/inventoryRoutes.js';
 import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import supplierRoutes from './routes/supplierRoutes.js';
+import receiptRoutes from './routes/receiptRoutes.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
 import { parentSecretChangeover } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
@@ -137,6 +138,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/stock-groups', stockGroupRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/receipts', receiptRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

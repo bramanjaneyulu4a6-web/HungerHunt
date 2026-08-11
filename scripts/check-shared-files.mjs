@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Verifies the files that are deliberately duplicated across the three
+/* Verifies the files that are deliberately duplicated across the four
    frontends are still identical.
  *
  * The apps are separate Vite builds deployed independently, with no shared

@@ -107,6 +107,18 @@
   border-radius: 12px;
 }
 
+/* The unit cost on the receive screen. Deliberately smaller and quieter than
+   .wh-input: counting what arrived is the job, pricing it is a note taken off
+   the invoice while it happens. */
+.wh-price {
+  width: auto;
+  max-width: 180px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: var(--wh-bg);
+}
+
 .wh-cta {
   display: block;
   width: 100%;

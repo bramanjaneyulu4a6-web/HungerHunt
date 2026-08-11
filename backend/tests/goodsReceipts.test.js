@@ -57,6 +57,10 @@ const orderWith = (receivedA = 0, receivedB = 0, status = 'NEW') => {
     save: async function () { return this; },
   };
   mock.method(Purchase, 'findById', async () => doc);
+  // Every booking now asks whether this token has already been answered
+  // before it judges anything else. Nothing is booked by default; the tests
+  // about a replay say so themselves.
+  mock.method(GoodsReceipt, 'findOne', async () => null);
   return doc;
 };
 
@@ -172,6 +176,48 @@ describe('booking a delivery', () => {
     assert.equal(stock.mock.callCount(), 0, 'and it must not move stock again');
   });
 
+  /* The double-tap the unique index catches is two requests racing, both of
+     which read the order before either wrote. The other retry — the one the
+     token is actually minted for — arrives after the first attempt committed
+     and its response was lost on the way back. By then the order carries the
+     advanced counts, so every check would refuse the replay: it would be told
+     to raise a new order for extras, inventing a supplier debt out of a
+     dropped packet. */
+  test('a replayed token is recognised even after the first attempt advanced the order', async () => {
+    accountIs('warehouse');
+    orderWith(6, 0, 'PARTIAL'); // the lost confirm landed: only 4 of A remain
+
+    const existing = { _id: 'r1', clientToken: 'tap-1' };
+    mock.method(GoodsReceipt, 'findOne', async (filter) =>
+      filter.clientToken === 'tap-1' ? existing : null);
+
+    const created = mock.method(GoodsReceipt, 'create', async () => {
+      throw new Error('the replay was booked a second time');
+    });
+    const stock = mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+    // The same body the lost confirm carried: six, which no longer fits.
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 6 }] });
+
+    assert.equal(res.status, 200, 'the retry was judged instead of recognised');
+    assert.deepEqual((await res.json()).receipt, existing);
+    assert.equal(created.mock.callCount(), 0);
+    assert.equal(stock.mock.callCount(), 0, 'and nothing may reach the shelf twice');
+  });
+
+  test('and recognised even once the delivery it booked closed the order', async () => {
+    accountIs('warehouse');
+    orderWith(10, 4, 'COMPLETED');
+
+    const existing = { _id: 'r2', clientToken: 'tap-1' };
+    mock.method(GoodsReceipt, 'findOne', async () => existing);
+
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 10 }] });
+
+    assert.equal(res.status, 200, 'a closed order answered the retry with a 409');
+    assert.deepEqual((await res.json()).receipt, existing);
+  });
+
   test('two rows for the same product are one line, checked once', async () => {
     accountIs('warehouse');
     const order = orderWith();
@@ -273,6 +319,80 @@ describe('nothing at all in a receipt', () => {
   });
 });
 
+/* Nothing else in the system can set a unit cost on an order raised in the
+   warehouse app: the order screen does not ask for one and there is no screen
+   that can add one afterwards, so without this every such order would read as
+   ₹0.00 spent forever. The invoice is in the receiver's hand at exactly this
+   moment, which is why it is asked for here. */
+describe('the price off the invoice', () => {
+  // Everything a priced booking needs, with the writes it made handed back.
+  const bookingReaches = () => {
+    const order = orderWith();
+    const seen = { receipt: null, writes: [] };
+
+    mock.method(GoodsReceipt, 'create', async (doc) => { seen.receipt = doc; return { _id: 'r1', ...doc }; });
+    mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      seen.writes.push(update);
+      const item = order.items.find((i) => String(i.productId) === String(filter['items.productId']));
+      item.received += update.$inc['items.$.received'];
+      return { modifiedCount: 1 };
+    });
+
+    return seen;
+  };
+
+  test('lands on the order line and on the ledger row', async () => {
+    accountIs('warehouse');
+    const seen = bookingReaches();
+
+    // Fractional on purpose: this is money per kilo, not a count of tins.
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 6, purchasePrice: 12.5 }] });
+
+    assert.equal(res.status, 201);
+    assert.equal(seen.writes[0].$set['items.$.purchasePrice'], 12.5,
+      'the order must learn what its stock cost');
+    assert.equal(seen.receipt.lines[0].purchasePrice, 12.5,
+      'and the ledger must keep what this delivery was invoiced at');
+  });
+
+  test('left blank, it leaves the price the order already carries alone', async () => {
+    accountIs('warehouse');
+    const seen = bookingReaches();
+
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 6 }] });
+
+    assert.equal(res.status, 201);
+    assert.equal(seen.writes[0].$set, undefined,
+      'a delivery with no invoice to hand must not overwrite a price with nothing');
+    assert.equal(seen.receipt.lines[0].purchasePrice, undefined);
+  });
+
+  test('a zero is treated as blank against the order, and still recorded on the row', async () => {
+    accountIs('warehouse');
+    const seen = bookingReaches();
+
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 6, purchasePrice: 0 }] });
+
+    assert.equal(res.status, 201);
+    assert.equal(seen.writes[0].$set, undefined, 'an empty box coerces to zero; that is not a price');
+    assert.equal(seen.receipt.lines[0].purchasePrice, 0);
+  });
+
+  test('and something that is not an amount is refused rather than booked as one', async () => {
+    accountIs('warehouse');
+    const created = mock.method(GoodsReceipt, 'create', async (doc) => ({ _id: 'r1', ...doc }));
+
+    for (const purchasePrice of ['twelve', -1, true, []]) {
+      orderWith();
+      const res = await receive({ lines: [{ productId: PRODUCT_A, received: 6, purchasePrice }] });
+      assert.equal(res.status, 400, `${JSON.stringify(purchasePrice)} was accepted as money`);
+    }
+
+    assert.equal(created.mock.callCount(), 0);
+  });
+});
+
 describe('reading the ledger for one order', () => {
   test('is newest first, which is the whole point of a delivery history', async () => {
     accountIs('warehouse');
@@ -308,11 +428,14 @@ describe('the legacy one-step close', () => {
       body: JSON.stringify({ items }),
     });
 
-  // The claim and the ledger write, in the order every close performs them.
-  // Tests that want either to fail pass their own create. Returns the ids of
-  // the rows the compensation took back, so every failure path can be held to
-  // leaving none behind.
-  const closeReaches = (onCreate = async (doc) => ({ _id: 'r1', ...doc })) => {
+  /* The read, the claim and the ledger write, in the order every close
+     performs them. Tests that want either write to fail pass their own create;
+     `pre` is the order as it stands before the close, which the over-receipt
+     guard measures the posted quantities against and whose status the
+     compensation has to restore. Returns the ids of the rows the compensation
+     took back, so every failure path can be held to leaving none behind. */
+  const closeReaches = (onCreate = async (doc) => ({ _id: 'r1', ...doc }), pre = {}) => {
+    orderWith(pre.receivedA ?? 0, pre.receivedB ?? 0, pre.status ?? 'NEW');
     mock.method(Purchase, 'findOneAndUpdate', async () => ({ _id: PO_ID, status: 'COMPLETED' }));
     mock.method(GoodsReceipt, 'create', onCreate);
 
@@ -441,5 +564,94 @@ describe('the legacy one-step close', () => {
     assert.equal(res.status, 500);
     assert.deepEqual(stockMoves, [6, -6], 'stock that landed must come back even if the order write did not');
     assert.deepEqual(deleted, ['r1'], 'and the row it wrote must go with them');
+  });
+
+  /* The close claims NEW or PARTIAL, which is what lets an admin finish an
+     order the supplier abandoned. It is also what makes a stale tab dangerous:
+     the pending list is meant to be left open, and the six units the storeroom
+     booked while it sat there are already on the shelf and already counted. */
+  test('refuses to apply what a delivery has already brought in', async () => {
+    accountIs('admin');
+    const deleted = closeReaches(async (doc) => ({ _id: 'r1', ...doc }), {
+      receivedA: 6,
+      status: 'PARTIAL',
+    });
+
+    const stock = mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    const claim = mock.method(Purchase, 'findOneAndUpdate', async () => ({ _id: PO_ID }));
+    mock.method(Purchase, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+    // The stale tab still shows the ordered ten in the box.
+    const res = await close([{ productId: PRODUCT_A, quantity: 10, purchasePrice: 5 }]);
+
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).message, /more than remains/i);
+    assert.equal(claim.mock.callCount(), 0, 'the order must not be closed on a refused quantity');
+    assert.equal(stock.mock.callCount(), 0, 'and ten units must not reach a shelf owed four');
+    assert.deepEqual(deleted, []);
+  });
+
+  test('but closes it happily at what is genuinely still outstanding', async () => {
+    accountIs('admin');
+    closeReaches(async (doc) => ({ _id: 'r1', ...doc }), { receivedA: 6, status: 'PARTIAL' });
+
+    mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    const orderMoves = [];
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      orderMoves.push([String(filter['items.productId']), update.$inc?.['items.$.received']]);
+      return { modifiedCount: 1 };
+    });
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 4, purchasePrice: 5 }]);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(orderMoves, [[PRODUCT_A, 4]]);
+  });
+
+  test('a product that was never on the order cannot be smuggled in by the close', async () => {
+    accountIs('admin');
+    const order = orderWith();
+    order.items = order.items.slice(0, 1);
+    mock.method(Purchase, 'findOneAndUpdate', async () => ({ _id: PO_ID, status: 'COMPLETED' }));
+    const stock = mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+    const res = await close([{ productId: PRODUCT_B, quantity: 1, purchasePrice: 5 }]);
+
+    assert.equal(res.status, 400);
+    assert.equal(stock.mock.callCount(), 0);
+  });
+
+  // Reopening it as NEW would put it back in the pending list looking
+  // untouched, with its received counts already advanced — the same
+  // over-apply as above, reached from the other side.
+  test('a failed close puts a part-delivered order back as PARTIAL, not as NEW', async () => {
+    accountIs('admin');
+    mock.method(console, 'error', () => {});
+    closeReaches(async () => { throw new Error('ledger down'); }, {
+      receivedA: 6,
+      status: 'PARTIAL',
+    });
+
+    const reopened = [];
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      reopened.push(update.$set?.status);
+      return { modifiedCount: 1 };
+    });
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 4, purchasePrice: 5 }]);
+
+    assert.equal(res.status, 500);
+    assert.deepEqual(reopened, ['PARTIAL']);
+  });
+
+  test('an order already closed is a 409, not a second application of stock', async () => {
+    accountIs('admin');
+    orderWith(10, 4, 'COMPLETED');
+    const stock = mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 10, purchasePrice: 5 }]);
+
+    assert.equal(res.status, 409);
+    assert.equal(stock.mock.callCount(), 0);
   });
 });

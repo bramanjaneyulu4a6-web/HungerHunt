@@ -35,7 +35,11 @@ const Purchased = () => {
         api.get("/purchases/completed"),
       ]);
 
-      // Received quantity defaults to the ordered quantity until edited.
+      /* Received quantity defaults to what is still outstanding, not to what
+         was ordered. This list now carries part-delivered orders too, and a
+         line the storeroom has already booked six of ten against owes four —
+         prefilling ten would apply the six a second time and file a receipt
+         for a delivery that never came. */
       setNewPurchases(
         newRes.data.map((purchase) => ({
           ...purchase,
@@ -44,7 +48,7 @@ const Purchased = () => {
             receivedQuantity:
               item.receivedQuantity !== undefined
                 ? item.receivedQuantity
-                : item.quantity,
+                : Math.max(0, item.quantity - (item.received || 0)),
             purchasePrice: item.purchasePrice || 0,
           })),
         }))
@@ -80,11 +84,20 @@ const Purchased = () => {
     );
   };
 
+  /* What actually arrived on a closed order. `quantity` is what was asked for
+     and is never edited now, so reading it as "received" would print a full
+     delivery over the top of a shortfall badge and bill the school for units
+     that never came. The ?? fallback is for rows closed before receipts
+     existed, where the old code had already overwritten quantity with what
+     arrived — for those the two are the same number. It is deliberately not
+     ||: a genuine received of 0 on a new order means nothing arrived. */
+  const receivedOf = (item) => item.received ?? item.quantity;
+
   // ordered - received across the whole order; > 0 means the supplier
   // short-shipped and the gap is now permanent record, not edited history.
   const shortfall = (purchase) =>
     purchase.items.reduce(
-      (sum, item) => sum + Math.max(0, item.quantity - (item.received ?? item.quantity)),
+      (sum, item) => sum + Math.max(0, item.quantity - receivedOf(item)),
       0
     );
 
@@ -205,7 +218,7 @@ const Purchased = () => {
                       <tr>
                         <th>Product</th>
                         <th style={{ width: 100 }}>Ordered</th>
-                        <th style={{ width: 140 }}>Received</th>
+                        <th style={{ width: 140 }}>Receiving now</th>
                         <th style={{ width: 160 }}>Unit Cost (₹)</th>
                         <th style={{ width: 150 }}>Total</th>
                       </tr>
@@ -223,7 +236,19 @@ const Purchased = () => {
                             <td data-label="Product">
                               <strong>{name}</strong>
                             </td>
-                            <td data-label="Ordered">{item.quantity}</td>
+                            <td data-label="Ordered">
+                              {item.quantity}
+                              {item.received > 0 && (
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--muted-soft)",
+                                  }}
+                                >
+                                  {item.received} already received
+                                </div>
+                              )}
+                            </td>
                             <td data-label="Received">
                               <input
                                 type="number"
@@ -313,7 +338,7 @@ const Purchased = () => {
       ) : (
         completedPurchases.map((purchase) => {
           const completedGrandTotal = purchase.items.reduce(
-            (acc, item) => acc + (item.quantity || 0) * (item.purchasePrice || 0),
+            (acc, item) => acc + receivedOf(item) * (item.purchasePrice || 0),
             0
           );
 
@@ -353,6 +378,7 @@ const Purchased = () => {
                   <thead>
                     <tr>
                       <th>Product</th>
+                      <th style={{ width: 120 }}>Ordered</th>
                       <th style={{ width: 120 }}>Received</th>
                       <th style={{ width: 180 }}>Unit Cost</th>
                       <th style={{ width: 180 }}>Total</th>
@@ -360,8 +386,10 @@ const Purchased = () => {
                   </thead>
                   <tbody>
                     {purchase.items.map((item, index) => {
+                      const received = receivedOf(item);
                       const historicalProductTotal =
-                        (item.quantity || 0) * (item.purchasePrice || 0);
+                        received * (item.purchasePrice || 0);
+                      const short = Math.max(0, item.quantity - received);
 
                       return (
                         <tr key={item.productId?._id || index}>
@@ -370,7 +398,16 @@ const Purchased = () => {
                               {item.productId?.name || "Unlinked product"}
                             </strong>
                           </td>
-                          <td data-label="Received">{item.quantity}</td>
+                          <td data-label="Ordered">{item.quantity}</td>
+                          <td data-label="Received">
+                            {received}
+                            {short > 0 && (
+                              <span style={{ color: "var(--danger)" }}>
+                                {" "}
+                                ({short} short)
+                              </span>
+                            )}
+                          </td>
                           <td
                             data-label="Unit Cost"
                             style={{ color: "var(--ink-dim)" }}

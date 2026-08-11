@@ -3,14 +3,11 @@ import mongoose from "mongoose";
 import Purchase from "../models/Purchase.js";
 import GoodsReceipt from "../models/GoodsReceipt.js";
 import Inventory from "../models/Inventory.js";
+import { isNonNegativeNumber, isWholeNonNegative } from "../utils/quantities.js";
 
-// Numbers and numeric strings only. Left to plain coercion, null and a blank
-// field both read as 0 and a stray `true` reads as 1, so a garbled payload
-// would be quietly reinterpreted as a count rather than refused.
-const isWholeNonNegative = (v) =>
-  (typeof v === "number" || (typeof v === "string" && v.trim() !== "")) &&
-  Number.isInteger(Number(v)) &&
-  Number(v) >= 0;
+// A price the storeroom did not type is not a price of zero. Left out, it must
+// leave whatever the order already believes alone.
+const priceGiven = (v) => v !== undefined && v !== null && v !== "";
 
 // Returns cleaned lines, or null when anything is unusable. A receipt where
 // nothing arrived and nothing was damaged is not a receipt.
@@ -25,11 +22,18 @@ const normalizeLines = (lines) => {
   const byProduct = new Map();
 
   for (const line of lines) {
-    const { productId, received = 0, damaged = 0, reason = "" } = line ?? {};
+    const { productId, received = 0, damaged = 0, reason = "", purchasePrice } = line ?? {};
 
     if (!mongoose.Types.ObjectId.isValid(productId)) return null;
     if (!isWholeNonNegative(received) || !isWholeNonNegative(damaged)) return null;
 
+    /* Validated as money rather than as a count: a rate per kilo is fractional
+       and a free sample is zero, so only "not a number" and "less than
+       nothing" are wrong. Absent is fine and means the invoice was not to
+       hand. */
+    if (priceGiven(purchasePrice) && !isNonNegativeNumber(purchasePrice)) return null;
+
+    const price = priceGiven(purchasePrice) ? Number(purchasePrice) : undefined;
     const cleanReason = String(reason).slice(0, 200);
     const seen = byProduct.get(String(productId));
 
@@ -38,6 +42,9 @@ const normalizeLines = (lines) => {
       seen.damaged += Number(damaged);
       // Both explanations are kept — each one is about units that arrived.
       seen.reason = [seen.reason, cleanReason].filter(Boolean).join("; ").slice(0, 200);
+      if (seen.purchasePrice === undefined && price !== undefined) {
+        seen.purchasePrice = price;
+      }
       continue;
     }
 
@@ -46,6 +53,7 @@ const normalizeLines = (lines) => {
       received: Number(received),
       damaged: Number(damaged),
       reason: cleanReason,
+      ...(price === undefined ? {} : { purchasePrice: price }),
     });
   }
 
@@ -79,7 +87,7 @@ export const receiveDelivery = async (req, res) => {
   const lines = normalizeLines(req.body.lines);
   if (!lines) {
     return res.status(400).json({
-      message: "Every line needs a product and a whole received or damaged count, and something must have arrived.",
+      message: "Every line needs a product, a whole received or damaged count and a non-negative unit cost if one is given, and something must have arrived.",
     });
   }
 
@@ -96,6 +104,25 @@ export const receiveDelivery = async (req, res) => {
     const purchase = await Purchase.findById(id);
 
     if (!purchase) return res.status(404).json({ message: "Purchase not found" });
+
+    /* The token is looked up before anything is judged, because the retry it
+       exists for is precisely the one every check below would refuse. A
+       confirm whose response was eaten by the network committed: the order
+       this re-read carries the advanced received counts, so the replay asks
+       for units that no longer remain and would be told to raise a new order
+       for extras — advice that invents a supplier debt out of a dropped
+       packet. Finding the delivery already booked and answering with it is
+       the whole point of minting the token.
+
+       The 11000 catch further down stays as the backstop for the other case:
+       two genuinely simultaneous taps, both of which read the order before
+       either wrote. */
+    const alreadyBooked = await GoodsReceipt.findOne({
+      purchaseId: purchase._id,
+      clientToken,
+    });
+
+    if (alreadyBooked) return res.json({ receipt: alreadyBooked, purchase });
 
     if (purchase.status === "COMPLETED") {
       return res.status(409).json({ message: "This order is already fully received." });
@@ -155,9 +182,24 @@ export const receiveDelivery = async (req, res) => {
         }
 
         const coverage = line.received + line.damaged;
+
+        /* The unit cost rides along on the same positional write when, and
+           only when, the storeroom typed one. Nothing else in the system ever
+           sets it on an order raised here, so without this the back office
+           reports every warehouse-received order as ₹0.00 spent forever, with
+           no screen able to correct it after the fact. Absent — or zero, which
+           is what an empty box coerces to everywhere else in this system —
+           means leave it alone: a second delivery with no invoice to hand must
+           not wipe the price the first one recorded. The receipt row keeps the
+           figure either way, so a genuinely free delivery is still on record. */
         await Purchase.updateOne(
           { _id: purchase._id, "items.productId": line.productId },
-          { $inc: { "items.$.received": coverage } }
+          {
+            $inc: { "items.$.received": coverage },
+            ...(line.purchasePrice > 0
+              ? { $set: { "items.$.purchasePrice": line.purchasePrice } }
+              : {}),
+          }
         );
         appliedOrder.push({ productId: line.productId, coverage });
       }

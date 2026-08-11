@@ -17,7 +17,7 @@ const Receive = () => {
   const navigate = useNavigate();
 
   const [po, setPo] = useState(null);
-  const [lines, setLines] = useState({});      // lineKey -> {received, damaged, reason}
+  const [lines, setLines] = useState({});      // lineKey -> {received, damaged, reason, price}
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -37,7 +37,15 @@ const Receive = () => {
       const initial = {};
       for (const item of res.data.items) {
         const remaining = Math.max(0, item.quantity - (item.received || 0));
-        initial[lineKey(item)] = { received: remaining, damaged: 0, reason: "" };
+        initial[lineKey(item)] = {
+          received: remaining,
+          damaged: 0,
+          reason: "",
+          // Whatever the order already believes, so a second delivery does not
+          // ask again for a figure that is already on file. Blank when nobody
+          // has priced this line yet.
+          price: item.purchasePrice > 0 ? String(item.purchasePrice) : "",
+        };
       }
       setLines(initial);
     } catch (err) {
@@ -71,8 +79,27 @@ const Receive = () => {
     return { toShelf, damaged, short };
   }, [po, lines]);
 
+  /* The unit cost is money, not a count: fractional is normal and blank is
+     normal. Blank means "no invoice in hand", which the server reads as leave
+     the order's price alone — so it is never required and never blocks the
+     button. A figure that is there but is not a figure is the one case worth
+     stopping for, because booking it would silently drop what someone typed. */
+  const priceOf = (key) => String(lines[key]?.price ?? "").trim();
+
+  const badPrice = (key) => {
+    const raw = priceOf(key);
+    return raw !== "" && !(Number.isFinite(Number(raw)) && Number(raw) >= 0);
+  };
+
   const confirm = async () => {
     if (savingRef.current) return;
+
+    const wrong = po.items.find((item) => badPrice(lineKey(item)));
+    if (wrong) {
+      toast.error(`Unit cost for ${wrong.productId?.name || "that line"} is not an amount`);
+      return;
+    }
+
     savingRef.current = true;
     setSaving(true);
 
@@ -86,12 +113,15 @@ const Receive = () => {
         invoiceNumber,
         lines: po.items
           .map((item) => {
-            const line = clamp(item, lines[lineKey(item)] || { received: 0, damaged: 0 });
+            const key = lineKey(item);
+            const line = clamp(item, lines[key] || { received: 0, damaged: 0 });
+            const price = priceOf(key);
             return {
               productId: item.productId?._id,
               received: line.received,
               damaged: line.damaged,
               reason: line.reason || "",
+              ...(price === "" ? {} : { purchasePrice: Number(price) }),
             };
           })
           // A line with no product left to receive against can never be booked.
@@ -160,6 +190,18 @@ const Receive = () => {
                   )}
                   {" "}· expecting <span className="wh-num">{remaining}</span>
                 </div>
+
+                {/* The invoice is in hand now and nowhere else in the system
+                    can set this later, so it is asked for here — small, and
+                    below the count, because the count is the job. */}
+                <input
+                  className="wh-input wh-price"
+                  inputMode="decimal"
+                  placeholder="₹ / unit (optional)"
+                  aria-label={`Unit cost for ${item.productId?.name || "this line"}`}
+                  value={lines[key]?.price ?? ""}
+                  onChange={(e) => setLine(key, "price", e.target.value)}
+                />
 
                 {line.damaged > 0 && (
                   <input

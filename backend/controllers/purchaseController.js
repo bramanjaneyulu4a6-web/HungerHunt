@@ -3,35 +3,59 @@ import mongoose from "mongoose";
 import Purchase from "../models/Purchase.js";
 import Inventory from "../models/Inventory.js";
 import GoodsReceipt from "../models/GoodsReceipt.js";
+import { isNonNegativeNumber, isWholeNonNegative } from "../utils/quantities.js";
 
-// Accepts numbers and numeric strings; rejects null, blanks, NaN and negatives.
-// A quantity of zero is allowed — it records an ordered item that never arrived.
-const isNonNegativeNumber = (value) =>
-  value !== null && value !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
+/* Returns the cleaned item list, or null when anything about it is unusable.
+   Without this an unparseable quantity reached `stock` directly and corrupted it.
 
-// Returns the cleaned item list, or null when anything about it is unusable.
-// Without this an unparseable quantity reached `stock` directly and corrupted it.
-const normalizeItems = (items) => {
+   Folded by product, the same shape as normalizeLines in receiptController —
+   and for the same reason. Every write to items[].received uses the positional
+   "items.$" operator, which touches only the first array element that matches,
+   so a second line for a product already on the order is a line nothing can
+   ever receive against and the order sticks on PARTIAL forever.
+
+   `whole` is what separates raising an order from closing one. A new order has
+   to be in units a receipt can express — receipts are whole, so an order for
+   2.5 satisfies `received >= quantity` never and the over-receipt guard caps
+   the last delivery at 2. Rows raised before that rule existed may hold
+   fractions, and the one-step close below still has to be able to close them,
+   so it asks for the looser check. */
+const normalizeItems = (items, { whole }) => {
   if (!Array.isArray(items) || items.length === 0) return null;
 
-  const normalized = [];
+  const acceptable = whole ? isWholeNonNegative : isNonNegativeNumber;
+  const byProduct = new Map();
 
   for (const item of items) {
     const { productId, quantity, purchasePrice = 0 } = item ?? {};
 
     if (!mongoose.Types.ObjectId.isValid(productId)) return null;
-    if (!isNonNegativeNumber(quantity)) return null;
+    if (!acceptable(quantity)) return null;
     if (!isNonNegativeNumber(purchasePrice)) return null;
 
-    normalized.push({
+    const seen = byProduct.get(String(productId));
+
+    if (seen) {
+      seen.quantity += Number(quantity);
+      // A zero price is "nobody said", so a later row that does say wins over
+      // it; two rows that both name a price keep the first, which is the one
+      // the person filling the form saw.
+      if (!seen.purchasePrice) seen.purchasePrice = Number(purchasePrice);
+      continue;
+    }
+
+    byProduct.set(String(productId), {
       productId,
       quantity: Number(quantity),
       purchasePrice: Number(purchasePrice)
     });
   }
 
-  return normalized;
+  return [...byProduct.values()];
 };
+
+const ORDER_REJECTED =
+  "Every item needs a product, a whole quantity of zero or more, and a non-negative price.";
 
 const ITEMS_REJECTED =
   "Every item needs a product, a quantity of zero or more, and a non-negative price.";
@@ -39,10 +63,10 @@ const ITEMS_REJECTED =
 export const createPurchase = async (req, res) => {
   try {
 
-    const items = normalizeItems(req.body.items);
+    const items = normalizeItems(req.body.items, { whole: true });
 
     if (!items) {
-      return res.status(400).json({ message: ITEMS_REJECTED });
+      return res.status(400).json({ message: ORDER_REJECTED });
     }
 
     const supplierId = req.body.supplierId;
@@ -68,11 +92,17 @@ export const createPurchase = async (req, res) => {
   }
 };
 
+/* The back office's pending list. PARTIAL belongs here as much as NEW: a
+   supplier who never ships the last three units leaves an order that the
+   storeroom cannot receive to the end, and if this asked for NEW alone that
+   order would vanish from every screen with nothing anywhere able to close
+   it. The admin closes it at what actually arrived; the shortfall stays on
+   the record. */
 export const getNewPurchases = async (req, res) => {
   try {
 
     const purchases = await Purchase.find({
-      status: "NEW"
+      status: { $in: ["NEW", "PARTIAL"] }
     })
       .populate("items.productId")
       .populate("supplierId")
@@ -130,12 +160,16 @@ const removeReceived = async (id, applied) => {
   }
 };
 
-/* The one-step close the old back-office screen still calls. Reimplemented
-   over receipts so even legacy closes leave an audit row: what arrived is
+/* The one-step close the back-office screen calls, and the only way a part
+   delivered order the supplier abandoned ever gets finished. Reimplemented
+   over receipts so even these closes leave an audit row: what arrived is
    booked as a receipt (stamped with who), and the order is then closed
    whatever remains — which is exactly what the old overwrite did, except the
-   shortfall now stays visible instead of being edited away. Retired once the
-   screen moves to receipts in a later task. */
+   shortfall now stays visible instead of being edited away.
+
+   It posts quantities rather than deriving them, so it carries the same
+   over-receipt guard as receiveDelivery: the only thing it may apply is what
+   the order still has outstanding. */
 export const completePurchase = async (req, res) => {
   const { id } = req.params;
 
@@ -143,7 +177,9 @@ export const completePurchase = async (req, res) => {
     return res.status(404).json({ message: "Purchase not found" });
   }
 
-  const items = normalizeItems(req.body.items);
+  // Deliberately the looser check: this is the path that has to keep closing
+  // orders raised before whole quantities were required of them.
+  const items = normalizeItems(req.body.items, { whole: false });
 
   if (!items) {
     return res.status(400).json({ message: ITEMS_REJECTED });
@@ -151,6 +187,7 @@ export const completePurchase = async (req, res) => {
 
   let claimed = null;
   let receipt = null;
+  let reopenTo = "NEW";
   // Two lists rather than one, because the two writes per item can fail
   // between each other and the compensation has to take back exactly what
   // landed — no more, and nothing it never applied.
@@ -158,6 +195,56 @@ export const completePurchase = async (req, res) => {
   const appliedOrder = [];
 
   try {
+    /* Read before claiming, exactly as receiveDelivery does, because this
+       screen can be looked at for a long time. An order for ten that the
+       storeroom has already booked six against is PARTIAL with received: 6,
+       and a tab opened before that still shows ten in every box. Closing it
+       would add ten units of stock when four were owed, advance received to
+       sixteen against an ordered ten, and file a receipt claiming a delivery
+       that never came — after which the shortfall reads as zero and the
+       corruption is invisible. What remains is the only quantity this may
+       apply. */
+    const order = await Purchase.findById(id);
+
+    if (!order) return res.status(404).json({ message: "Purchase not found" });
+
+    if (order.status === "COMPLETED") {
+      return res.status(409).json({
+        message: "This purchase order has already been completed."
+      });
+    }
+
+    // What the catch has to put back. A PARTIAL order reopened as NEW would
+    // return to the pending list looking untouched with its received counts
+    // already advanced, which is the same over-apply from the other side.
+    reopenTo = order.status === "PARTIAL" ? "PARTIAL" : "NEW";
+
+    for (const item of items) {
+      /* Summed across every matching line rather than taken from the first,
+         because a legacy order may carry the same product twice and the
+         person closing it is looking at both rows. New orders are folded at
+         creation, so for them this is the single line's remainder. */
+      const lines = order.items.filter(
+        (i) => String(i.productId) === String(item.productId)
+      );
+
+      if (lines.length === 0) {
+        return res.status(400).json({ message: "That product is not on this order." });
+      }
+
+      const remaining = lines.reduce(
+        (sum, line) => sum + (line.quantity - (line.received || 0)),
+        0
+      );
+
+      if (item.quantity > remaining) {
+        return res.status(400).json({
+          message:
+            "That is more than remains on the order — a delivery has already been booked against it. Refresh and close it at what is still outstanding.",
+        });
+      }
+    }
+
     // Only a still-open order transitions, so a double-click or second tab
     // cannot add the same delivery to inventory twice.
     claimed = await Purchase.findOneAndUpdate(
@@ -238,7 +325,7 @@ export const completePurchase = async (req, res) => {
       try {
         await Purchase.updateOne(
           { _id: id },
-          { $set: { status: "NEW" }, $unset: { completedAt: 1 } }
+          { $set: { status: reopenTo }, $unset: { completedAt: 1 } }
         );
       } catch (reopenErr) {
         console.error("Could not reopen purchase", id, reopenErr);

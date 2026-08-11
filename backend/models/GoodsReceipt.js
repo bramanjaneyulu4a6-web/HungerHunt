@@ -16,6 +16,12 @@ const receiptLineSchema = new mongoose.Schema({
   // Arrived but unusable — counts against the order, never against stock.
   damaged: { type: Number, default: 0 },
   reason: { type: String, default: '' },
+  // What this delivery was invoiced at, per unit. No default on purpose:
+  // absent means nobody had the invoice in hand, which is not the same as a
+  // price of zero. The order carries the latest figure; this is what each
+  // delivery actually cost, which is the only place a price change between
+  // two part-deliveries of one order stays visible.
+  purchasePrice: { type: Number },
 });
 
 const goodsReceiptSchema = new mongoose.Schema(

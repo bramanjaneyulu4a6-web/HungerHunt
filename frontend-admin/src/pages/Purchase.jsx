@@ -182,6 +182,10 @@ const Purchase = () => {
                     <input
                       type="number"
                       min="0"
+                      /* Whole units only, because receipts are counted in
+                         whole units: an order for 2.5 could never be
+                         received to the end. The server refuses one too. */
+                      step="1"
                       className="input"
                       style={{ width: 120, textAlign: "center" }}
                       aria-label={`Purchase quantity for ${product.name}`}

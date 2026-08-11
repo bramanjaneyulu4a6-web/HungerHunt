@@ -17,6 +17,7 @@ const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Supplier = (await import('../models/Supplier.js')).default;
 const Purchase = (await import('../models/Purchase.js')).default;
+const GoodsReceipt = (await import('../models/GoodsReceipt.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -53,6 +54,10 @@ beforeEach(() => {
     return chain;
   });
   mock.method(Purchase, 'create', async (doc) => ({ _id: 'x', ...doc }));
+  mock.method(GoodsReceipt, 'find', () => {
+    const chain = { populate: () => chain, sort: async () => [] };
+    return chain;
+  });
   // findById's chain is awaited directly (no terminal .sort()/.exec()), unlike
   // find's above, so this is a separate stub rather than a shared one.
   mock.method(Purchase, 'findById', () => {
@@ -81,6 +86,7 @@ const WAREHOUSE_ROUTES = [
   ['GET', '/api/purchases/open'],
   ['POST', '/api/purchases', { items: [{ productId: '507f191e810c19729de860ec', quantity: 1 }] }],
   ['GET', '/api/purchases/507f191e810c19729de860ed'],
+  ['GET', '/api/purchases/507f191e810c19729de860ed/receipts'],
 ];
 
 // A sample of everything else, which no storeroom has ever needed.
@@ -92,6 +98,7 @@ const CLOSED_ROUTES = [
   ['POST', '/api/admin/register', 'This action needs a full admin account.'],
   ['POST', '/api/suppliers', 'This action needs a full admin account.'],
   ['GET', '/api/purchases/completed', 'This action needs a full admin account.'],
+  ['PUT', '/api/purchases/complete/507f191e810c19729de860ed', 'This action needs a full admin account.'],
 ];
 
 describe('a warehouse account works the storeroom', () => {

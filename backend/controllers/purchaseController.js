@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 import Purchase from "../models/Purchase.js";
 import Inventory from "../models/Inventory.js";
+import GoodsReceipt from "../models/GoodsReceipt.js";
 
 // Accepts numbers and numeric strings; rejects null, blanks, NaN and negatives.
 // A quantity of zero is allowed — it records an ordered item that never arrived.
@@ -110,6 +111,28 @@ const removeStock = async (applied) => {
   }
 };
 
+// And undoes the received counts it already advanced. Left behind, they would
+// eat into what the order still has remaining, so the retry of a failed close
+// would be refused as an over-receipt against a delivery that never landed.
+const removeReceived = async (id, applied) => {
+  for (const { productId, quantity } of applied) {
+    try {
+      await Purchase.updateOne(
+        { _id: id, "items.productId": productId },
+        { $inc: { "items.$.received": -quantity } }
+      );
+    } catch (err) {
+      console.error("Received rollback failed for product", productId, err);
+    }
+  }
+};
+
+/* The one-step close the old back-office screen still calls. Reimplemented
+   over receipts so even legacy closes leave an audit row: what arrived is
+   booked as a receipt (stamped with who), and the order is then closed
+   whatever remains — which is exactly what the old overwrite did, except the
+   shortfall now stays visible instead of being edited away. Retired once the
+   screen moves to receipts in a later task. */
 export const completePurchase = async (req, res) => {
   const { id } = req.params;
 
@@ -124,17 +147,19 @@ export const completePurchase = async (req, res) => {
   }
 
   let claimed = null;
-  const applied = [];
+  let receipt = null;
+  // Two lists rather than one, because the two writes per item can fail
+  // between each other and the compensation has to take back exactly what
+  // landed — no more, and nothing it never applied.
+  const appliedStock = [];
+  const appliedOrder = [];
 
   try {
-
-    // Claim the order and record the delivery in one step. Only a purchase
-    // still marked NEW is transitioned, so a double-click, a retry after a
-    // slow response, or a second open tab cannot add the same delivery to
-    // inventory twice.
+    // Only a still-open order transitions, so a double-click or second tab
+    // cannot add the same delivery to inventory twice.
     claimed = await Purchase.findOneAndUpdate(
-      { _id: id, status: "NEW" },
-      { items, status: "COMPLETED", completedAt: new Date() },
+      { _id: id, status: { $in: ["NEW", "PARTIAL"] } },
+      { status: "COMPLETED", completedAt: new Date() },
       { new: true, runValidators: true }
     );
 
@@ -148,16 +173,38 @@ export const completePurchase = async (req, res) => {
         : res.status(404).json({ message: "Purchase not found" });
     }
 
-    // Upsert so two products arriving at once cannot both try to create the
-    // same inventory row and trip its unique index.
-    for (const item of claimed.items) {
+    /* The audit row is a precondition of the close, not a footnote to it: an
+       order closed with no receipt behind it is the silent overwrite this
+       ledger exists to end. Written before anything is applied, so a failure
+       here falls into the catch below with nothing yet to compensate — the
+       order reopens and the screen can be retried. */
+    receipt = await GoodsReceipt.create({
+      purchaseId: claimed._id,
+      receivedBy: req.adminId,
+      invoiceNumber: "",
+      note: "Closed from the back office in one step.",
+      clientToken: `legacy-${id}-${Date.now()}`,
+      lines: items.map((i) => ({ productId: i.productId, received: i.quantity, damaged: 0 })),
+    });
+
+    for (const item of items) {
       await Inventory.updateOne(
         { productId: item.productId },
         { $inc: { stock: item.quantity } },
         { upsert: true }
       );
 
-      applied.push({ productId: item.productId, quantity: item.quantity });
+      appliedStock.push({ productId: item.productId, quantity: item.quantity });
+
+      await Purchase.updateOne(
+        { _id: id, "items.productId": item.productId },
+        {
+          $inc: { "items.$.received": item.quantity },
+          $set: { "items.$.purchasePrice": item.purchasePrice }
+        }
+      );
+
+      appliedOrder.push({ productId: item.productId, quantity: item.quantity });
     }
 
     res.json(claimed);
@@ -168,7 +215,22 @@ export const completePurchase = async (req, res) => {
     // Take back the stock already applied and reopen the order, otherwise the
     // delivery is stranded on a COMPLETED purchase that can never be received.
     if (claimed) {
-      await removeStock(applied);
+      await removeStock(appliedStock);
+      await removeReceived(id, appliedOrder);
+
+      /* And take back the ledger row, which the reopened order no longer has
+         a delivery to match. Left standing it would claim units that were
+         never applied, so the shortfall derived from ordered-minus-receipts
+         would understate what the supplier still owes — the same invariant
+         broken from the other side. Each failed attempt mints its own token,
+         so these accumulate rather than colliding. */
+      if (receipt) {
+        try {
+          await GoodsReceipt.deleteOne({ _id: receipt._id });
+        } catch (rollbackErr) {
+          console.error("Receipt rollback failed for purchase", id, rollbackErr);
+        }
+      }
 
       try {
         await Purchase.updateOne(

@@ -94,12 +94,12 @@ const Purchase = () => {
       />
 
       <div style={{ maxWidth: 420, marginBottom: 20 }}>
-        <label className="auth-label" htmlFor="po-supplier" style={{ display: "block", marginBottom: 6 }}>
+        <label className="field-label" htmlFor="po-supplier">
           Supplier
         </label>
         <select
           id="po-supplier"
-          className="auth-input"
+          className="select"
           value={supplierId}
           onChange={(e) => setSupplierId(e.target.value)}
         >

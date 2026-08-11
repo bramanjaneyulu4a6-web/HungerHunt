@@ -5,15 +5,18 @@ const adminSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 
-  // What this account may reach. 'cashier' is the till: find a student, take a
-  // payment, raise an approval request, and nothing else. 'warehouse' receives
-  // deliveries and raises purchase orders — no students, no wallets, no
-  // prices, no till. Everything that changes the shop or the money supply —
-  // the catalogue, top-ups, student records, other accounts — stays with
-  // 'admin'.
+  // What this account may reach. 'warehouse' receives deliveries and raises
+  // purchase orders — no students, no wallets, no prices. Everything else —
+  // the catalogue, top-ups, student records, billing, other accounts — is
+  // 'admin', which reaches all of it.
+  //
+  // There was a 'cashier' here for the till. Removed with the counter it
+  // belonged to: students ring themselves up at the kiosk now. Any row still
+  // carrying it fails the role check on its next request, which is correct —
+  // the account should be deleted or made an admin.
   role: {
     type: String,
-    enum: ['admin', 'cashier', 'warehouse'],
+    enum: ['admin', 'warehouse'],
     default: 'admin',
   },
 

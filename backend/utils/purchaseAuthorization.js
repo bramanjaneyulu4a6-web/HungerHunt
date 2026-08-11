@@ -14,7 +14,7 @@ import PurchaseAuthorization from '../models/PurchaseAuthorization.js';
 // The gap this has to cover is one HTTP round trip: the token is issued after
 // the password is accepted, and spent by the request the client sends next.
 // Two minutes is many times what that takes, which leaves room for a stalled
-// request or a cashier interrupted mid-sale, and is still short enough that a
+// request or a student interrupted mid-sale, and is still short enough that a
 // token is never sitting around. Length is not doing much security work here —
 // single use and the cart binding are — so it is set for the counter.
 export const TTL_SECONDS = 120;
@@ -67,8 +67,8 @@ export const consumeAuthorization = async ({ token, studentId, items }) => {
   return { ok: true };
 };
 
-// What the cashier is told. Every one of these ends the same way, because the
-// only thing they can do about any of them is ask for the password again.
+// What the terminal is told. Every one of these ends the same way, because the
+// only thing to do about any of them is take the code again.
 export const AUTHORIZATION_MESSAGES = {
   missing: 'This charge has not been verified. Please take the purchase password again.',
   unknown: 'That verification has already been used. Please take the purchase password again.',

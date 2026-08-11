@@ -1,6 +1,6 @@
 import Admin, { FULL_ADMIN } from '../models/Admin.js';
 import bcrypt from 'bcryptjs';
-import { signStaffToken } from '../utils/tokens.js';
+import { signStaffToken, STAFF_ROLES } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
 
@@ -28,11 +28,10 @@ export const registerAdmin = async (req, res) => {
     //
     // The bootstrap call is the exception that has to be forced rather than
     // trusted: it is the one unauthenticated path in here, and a deployment
-    // cannot be founded on a cashier or a storekeeper — there would be nobody
-    // left who could create the admin.
+    // cannot be founded on a storekeeper — there would be nobody left who
+    // could create the admin.
     const LIMITS = {
       admin: parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3,
-      cashier: parseInt(process.env.MAX_CASHIER_ACCOUNTS) || 10,
       warehouse: parseInt(process.env.MAX_WAREHOUSE_ACCOUNTS) || 5,
     };
 
@@ -81,12 +80,24 @@ export const loginAdmin = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Accounts created before cashiers existed have no role and are admins.
+    // Accounts created before roles existed have no role and are admins.
     const role = admin.role || 'admin';
 
-    // The role is returned as well as signed in, so the back office can turn a
-    // cashier away at its own front door rather than signing them in to a
-    // console where every screen answers 403.
+    /* A role that is no longer issued — a cashier row left over from before
+       the counter went self-serve. signStaffToken would throw on it and the
+       catch below would answer 500, which tells whoever is standing there
+       nothing. This is not a broken server; it is an account that no longer
+       means anything, and it says so. */
+    if (!STAFF_ROLES.includes(role)) {
+      return res.status(403).json({
+        message:
+          'This account type has been retired. Ask an admin to create you a new account.',
+      });
+    }
+
+    // The role is returned as well as signed in, so each front door can turn
+    // away an account that belongs at a different one, rather than signing it
+    // in to a console where every screen answers 403.
     res.json({ token: signStaffToken(admin._id, role), email: admin.email, role });
   } catch (error) {
     res.status(500).json({ error: error.message });

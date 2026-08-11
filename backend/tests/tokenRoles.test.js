@@ -11,7 +11,8 @@ process.env.PARENT_JWT_SECRET = 'parent-test-secret';
 process.env.STUDENT_JWT_SECRET = 'student-test-secret';
 
 const {
-  signAdminToken, signParentToken, signStudentToken, verifyToken, parentSecretChangeover,
+  signAdminToken, signParentToken, signStudentToken, signStaffToken, verifyToken,
+  parentSecretChangeover,
 } = await import('../utils/tokens.js');
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';
@@ -194,5 +195,38 @@ describe('student tokens', () => {
     } finally {
       process.env.STUDENT_JWT_SECRET = studentKey;
     }
+  });
+});
+
+/* Cashier is gone. It was a till account, and the till stopped being a place
+   somebody stands: students serve themselves at the kiosk with a session of
+   their own, and the console is an admin's. What is left is admin, warehouse,
+   student and parent.
+
+   No grace window for these. Every cashier token that exists was issued on an
+   unreleased branch, so there is nobody to sign out. */
+describe('cashier is no longer a role', () => {
+  test('a cashier token cannot be signed', () => {
+    assert.throws(
+      () => signStaffToken(ADMIN_ID, 'cashier'),
+      /Unknown staff role/
+    );
+  });
+
+  test('a token already claiming cashier opens nothing', () => {
+    setGrace(FUTURE);
+
+    // Signed directly with the staff key, standing in for one minted before
+    // the role was withdrawn.
+    const stale = jwt.sign({ id: ADMIN_ID, role: 'cashier' }, process.env.JWT_SECRET);
+
+    assert.equal(verifyToken(stale, 'staff'), null);
+    assert.equal(verifyToken(stale, 'admin'), null);
+    assert.equal(verifyToken(stale, 'warehouse'), null);
+  });
+
+  test('the roles that remain still sign', () => {
+    assert.ok(signStaffToken(ADMIN_ID, 'admin'));
+    assert.ok(signStaffToken(ADMIN_ID, 'warehouse'));
   });
 });

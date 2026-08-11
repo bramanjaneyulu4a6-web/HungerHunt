@@ -34,9 +34,9 @@ export const generateBill = async (req, res) => {
     // is trusted to have taken.
     //
     // It is spent before anything else happens, so a bill that fails later
-    // cannot leave a live token behind. That does cost the cashier a second
-    // password when a sale loses a stock race — but that path already asks
-    // them to review the cart, and a different cart needs its own token.
+    // cannot leave a live token behind. That does cost the student a second
+    // code entry when a sale loses a stock race — but that path already sends
+    // them back to the cart, and a different cart needs its own token.
     const authorization = await consumeAuthorization({
       token: purchaseToken,
       studentId,
@@ -47,8 +47,8 @@ export const generateBill = async (req, res) => {
       const grace = authorization.reason === 'missing' && unverifiedBillsAccepted();
 
       if (!grace) {
-        // Not 401: the kiosk signs itself out on one, and this cashier is
-        // properly signed in — it is this charge that is unauthorised.
+        // Not 401: the kiosk signs itself out on one, and this session is
+        // perfectly good — it is this charge that is unauthorised.
         return res.status(403).json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
       }
 

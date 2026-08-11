@@ -15,9 +15,9 @@ const AUTH_REQUIRED = 'AUTH_REQUIRED';
 const denied = (res, message) =>
   res.status(401).json({ message, code: AUTH_REQUIRED });
 
-// A signed-in cashier reaching an admin-only route is not a broken session, and
-// answering it with 401 would sign the till out mid-sale for doing nothing
-// wrong. 403 says the token is fine and the account simply does not reach here.
+// A signed-in warehouse account reaching an admin-only route is not a broken
+// session, and answering it with 401 would sign the storeroom out for doing
+// nothing wrong. 403 says the token is fine and the account does not reach here.
 const forbidden = (res, message) => res.status(403).json({ message });
 
 // One row filter per gate: the account's stored role must be in the gate's
@@ -72,17 +72,30 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
 // narrower audience rather than quietly gaining a wider one.
 export const protectAdmin = staffGate(['admin'], 'This action needs a full admin account.');
 
-// The till's routes: look a student up, verify their code, take the payment,
-// raise an approval request.
-export const protectStaff = staffGate(['admin', 'cashier'], 'This action needs a till account.');
+/* The till's routes: look a student up, verify a code, take the payment, raise
+   an approval request.
+ *
+ * These admitted cashiers as well until the counter went self-serve. With that
+ * role withdrawn the list is exactly protectAdmin's, and the two are the same
+ * gate under two names — kept apart because they answer different questions
+ * ("may this account run a till" against "may it run the back office") and a
+ * route that gains a role should gain it on the right one. If nothing ever
+ * takes the till but an admin, this should collapse into protectAdmin rather
+ * than sit here implying a wider audience than it has. */
+export const protectStaff = staffGate(['admin'], 'This action needs a till account.');
 
 // The storeroom's routes: see and raise purchase orders, receive deliveries,
 // read stock and suppliers.
 export const protectWarehouse = staffGate(['admin', 'warehouse'], 'This action needs a warehouse account.');
 
-// Read-only surfaces every kind of staff needs (live stock).
+/* Read-only surfaces every kind of staff needs (live stock).
+ *
+ * Now that cashier is gone this holds the same roles as protectWarehouse, by
+ * coincidence rather than by meaning: that one names who may work the
+ * storeroom, this one names everybody. They part again the moment a fourth
+ * staff role appears, so they stay separate. */
 export const protectAnyStaff = staffGate(
-  ['admin', 'cashier', 'warehouse'],
+  ['admin', 'warehouse'],
   'This action needs a staff account.'
 );
 

@@ -21,8 +21,9 @@ const Login = () => {
       /* A non-admin's credentials are good — just good for a different
          terminal. Saying so at the door beats a dashboard of empty panels. */
       if (response.data.role && response.data.role !== 'admin') {
-        const home = response.data.role === 'cashier' ? 'the kiosk' : 'the warehouse app';
-        setError(`This is a ${response.data.role} account. Sign in on ${home} instead.`);
+        setError(
+          `This is a ${response.data.role} account. Sign in on the warehouse app instead.`
+        );
         setSubmitting(false);
         return;
       }

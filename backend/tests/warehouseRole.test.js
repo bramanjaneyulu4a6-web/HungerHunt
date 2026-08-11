@@ -1,7 +1,6 @@
-// The storeroom's account, mirrored on cashierRole.test.js: a warehouse
-// account opens exactly the storeroom surface, and nothing else — no students,
-// no wallets, no till, no catalogue writes. Tasks 2–4 append their routes to
-// the two tables as they build them.
+// The storeroom's account: a warehouse account opens exactly the storeroom
+// surface, and nothing else — no students, no wallets, no billing, no
+// catalogue writes.
 import test, { before, beforeEach, afterEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
@@ -12,6 +11,7 @@ process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 process.env.LEGACY_TOKEN_GRACE_UNTIL = '2999-01-01T00:00:00Z';
 
+const jwt = (await import('jsonwebtoken')).default;
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
@@ -28,8 +28,14 @@ mongoose.set('bufferTimeoutMS', 200);
 const STAFF_ID = '507f1f77bcf86cd799439011';
 
 const adminToken = signStaffToken(STAFF_ID, 'admin');
-const cashierToken = signStaffToken(STAFF_ID, 'cashier');
 const warehouseToken = signStaffToken(STAFF_ID, 'warehouse');
+
+// Signed by hand because signStaffToken will not mint one any more. Stands in
+// for a token issued before the till went self-serve and the role was withdrawn.
+const retiredCashierToken = jwt.sign(
+  { id: STAFF_ID, role: 'cashier' },
+  process.env.JWT_SECRET
+);
 
 let base;
 
@@ -42,8 +48,7 @@ before(async () => {
 
 afterEach(() => mock.restoreAll());
 
-// Models the one account row the gate looks up. Shared with cashierRole.test.js
-// so the two stay in lockstep if a gate's filter shape ever changes.
+// Models the one account row the gate looks up.
 const accountIs = accountMatcher(Admin, STAFF_ID);
 
 beforeEach(() => {
@@ -55,6 +60,9 @@ beforeEach(() => {
     return chain;
   });
   mock.method(Purchase, 'create', async (doc) => ({ _id: 'x', ...doc }));
+  // receiveDelivery looks the {purchaseId, clientToken} pair up before it
+  // judges anything, so the reach check needs an answer for it.
+  mock.method(GoodsReceipt, 'findOne', async () => null);
   // Two different callers terminate this chain differently:
   // getReceiptsForPurchase ends on .sort(), getRecentReceipts ends on
   // .limit(). Both — and a bare await of the chain itself — have to resolve.
@@ -94,7 +102,7 @@ const send = (method, path, token, body) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-// Routes the storeroom needs. Tasks 2–4 append theirs.
+// Routes the storeroom needs.
 const WAREHOUSE_ROUTES = [
   ['GET', '/api/inventory'],
   ['GET', '/api/suppliers'],
@@ -104,6 +112,12 @@ const WAREHOUSE_ROUTES = [
   ['GET', '/api/purchases/507f191e810c19729de860ed/receipts'],
   ['GET', '/api/products'],
   ['GET', '/api/receipts'],
+  // The one the whole app exists for. The body only has to get past the
+  // payload checks far enough to prove the gate opened.
+  ['POST', '/api/purchases/507f191e810c19729de860ed/receipts', {
+    clientToken: 'reach-check',
+    lines: [{ productId: '507f191e810c19729de860ec', received: 1 }],
+  }],
 ];
 
 // A sample of everything else, which no storeroom has ever needed.
@@ -151,12 +165,22 @@ describe('and nothing else', () => {
     });
   }
 
-  test('a cashier cannot reach the storeroom-only surface either', async () => {
+  /* This used to check that a cashier was kept out of the storeroom while
+     still being let into the shared stock read. There is no cashier now, and
+     no staff role left that the storeroom excludes — admin reaches everything.
+
+     So what is worth pinning is the removal itself, at the HTTP layer: a token
+     from before the role was withdrawn opens nothing at all, shared surface
+     included. The legacy grace window is wide open in this file, which makes
+     it the sharper version of the test — the leniency that carries roleless
+     tokens across a deploy must not carry a withdrawn role with it. */
+  test('a token from the retired cashier role opens nothing', async () => {
     accountIs('cashier');
-    // /api/inventory is deliberately open to every staff role; the
-    // storeroom-only routes from Tasks 2–4 assert cashier exclusion when
-    // they append themselves here.
-    const res = await send('GET', '/api/inventory', cashierToken);
-    assert.ok(res.status !== 401 && res.status !== 403, 'inventory is any-staff');
+
+    const shared = await send('GET', '/api/inventory', retiredCashierToken);
+    assert.equal(shared.status, 401, 'a withdrawn role still read the shared surface');
+
+    const ledger = await send('GET', '/api/receipts', retiredCashierToken);
+    assert.equal(ledger.status, 401, 'a withdrawn role still reached the ledger');
   });
 });

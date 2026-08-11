@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 // model and no round trip. It lives in Mongo because the Map is only correct
 // while exactly one process serves the till: a second instance behind a load
 // balancer, or a restart between the two requests, would lose the token and
-// fail the sale with an error the cashier cannot act on. The assumption this
+// fail the sale with an error nobody at the terminal can act on. The assumption this
 // version depends on is much weaker — that every instance shares one database,
 // which they already must, since the wallet is in it.
 const purchaseAuthorizationSchema = new mongoose.Schema({

@@ -18,14 +18,10 @@ const Login = () => {
       setLoading(true);
       const res = await api.post("/admin/login", { email, password });
 
-      // A cashier's credentials are good — for the till. Admins outrank the
-      // storeroom and may sign in here.
-      if (res.data.role === "cashier") {
-        setError("This is a till account. Sign in on the kiosk instead.");
-        setLoading(false);
-        return;
-      }
-
+      // Only two staff roles remain and both belong here — a warehouse account
+      // because this is its app, an admin because admins outrank the storeroom.
+      // The server turns away anything else at the door, including a retired
+      // cashier row left over from before the till went self-serve.
       localStorage.setItem("warehouseToken", res.data.token);
       localStorage.setItem("staffRole", res.data.role || "admin");
       navigate("/", { replace: true });

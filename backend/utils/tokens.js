@@ -27,17 +27,19 @@ const studentSecret = () => process.env.STUDENT_JWT_SECRET || adminSecret();
 // by reloading the page, because a reload does not mint a new token.
 export const STUDENT_SESSION_SECONDS = 450;
 
-// Staff sign in on two terminals with very different reach. The back office
-// edits the catalogue, tops up wallets and creates accounts; the till only
-// needs to find a student and take their money. Both are staff and both are
-// signed with the admin key — the secret split is between staff and parents,
-// not within staff — so what separates them is the role claim, checked against
-// the account row on every request.
+// Staff sign in on terminals with very different reach. The back office edits
+// the catalogue, tops up wallets and creates accounts; the storeroom receives
+// deliveries and raises purchase orders, and touches no student and no money.
+// Both are staff and both are signed with the admin key — the secret split is
+// between staff and parents, not within staff — so what separates them is the
+// role claim, checked against the account row on every request.
 //
-// The till is the most physically exposed device in the system: it sits on a
-// counter, unattended between customers, with a token in its browser storage.
-// A cashier account is what that token is worth.
-export const STAFF_ROLES = ['admin', 'cashier', 'warehouse'];
+// There was a third, 'cashier', for the till. The till is not a place anybody
+// stands any more: students serve themselves at the kiosk holding a session of
+// their own, and the admin console raises orders for parents to approve. An
+// account for a counter with nobody behind it protects nothing, and the most
+// physically exposed device in the system no longer holds a staff token at all.
+export const STAFF_ROLES = ['admin', 'warehouse'];
 
 const isStaffRole = (role) => STAFF_ROLES.includes(role);
 

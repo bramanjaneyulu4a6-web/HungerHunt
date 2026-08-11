@@ -1557,6 +1557,76 @@
   transform: none;
 }
 
+/* ---- session clocks ----------------------------------------------------- */
+
+/* The cap's warning. Amber rather than red: the session ending is the normal
+   course of things, not a fault, and a child being told in red that something
+   is about to happen reads as having done something wrong. */
+.kiosk-cap-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 11px 24px;
+  border-radius: var(--r-pill);
+  background: #fff3e2;
+  border: 1px solid #f0ddc0;
+  color: #b06a10;
+  font-size: 14.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 2px rgba(90, 70, 45, 0.06),
+    0 10px 24px -14px rgba(90, 70, 45, 0.45);
+}
+
+/* Over everything, including the code modal — a session that is thirty seconds
+   from ending matters more than the field underneath it. */
+.kiosk-idle-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 17, 10, 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.kiosk-idle-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 38px 48px;
+  border-radius: 24px;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 24px 60px -20px rgba(23, 17, 10, 0.55);
+}
+
+.kiosk-idle-card h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: #17110a;
+}
+
+.kiosk-idle-card p {
+  margin: 0 0 10px;
+  font-size: 16px;
+  color: #6d6152;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The gate's button, scaled down: this one sits in a card rather than filling
+   a splash screen. */
+.kiosk-idle-card .kiosk-start {
+  padding: 16px 52px;
+  font-size: 21px;
+}
+
 /* ---- the ending --------------------------------------------------------- */
 
 /* Two endings, and the difference between them is the whole message: one means

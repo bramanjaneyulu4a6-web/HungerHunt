@@ -4,9 +4,15 @@ import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import { formatINR } from "../utils/format";
 import { Button } from "../components/ui";
+import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
+
+// How long the ending is held before the screen returns to the gate. Long
+// enough to read twice, short enough that the next person in the queue is not
+// waiting on somebody else's receipt — and a touch skips it anyway.
+const RESULT_SECONDS = 5;
 
 // Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
 // actually enforces it. Here it only shapes the field.
@@ -410,6 +416,30 @@ const KioskBilling = ({ student, onLogout }) => {
     window.addEventListener("resize", seat);
     return () => window.removeEventListener("resize", seat);
   }, [selectedCategory, categoryKey]);
+
+  /* The session's clocks. They stop once the sale has ended — the result
+     screen is not part of the session, and asking "still there?" over
+     somebody's receipt would be asking about something already finished.
+
+     isBusy is read through the ref rather than the state so the cap sees the
+     charge that is in flight right now, not the one the last render knew
+     about. */
+  const { capRemaining, capWarning, idlePrompt, idleRemaining, dismissIdle } =
+    useSessionTimers({
+      active: !result,
+      onExpire: onLogout,
+      isBusy: () => payingRef.current,
+    });
+
+  /* The result screen's own clock. Declared up here with the other hooks
+     rather than beside the screen it belongs to, because that screen is an
+     early return and a hook after it would not run on every render. */
+  useEffect(() => {
+    if (!result) return undefined;
+
+    const exit = setTimeout(onLogout, RESULT_SECONDS * 1000);
+    return () => clearTimeout(exit);
+  }, [result, onLogout]);
 
   // A session always has its student, so none of this is conditional any more.
   const itemCount = cart.length;
@@ -923,6 +953,36 @@ const KioskBilling = ({ student, onLogout }) => {
                 Void ticket
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* The last thirty seconds. Not a prompt — there is nothing to answer,
+          the session is ending either way — so it states it and stays out of
+          the way of a student trying to finish. Hidden while the idle prompt
+          is up, which is the more urgent of the two. */}
+      {capWarning && !idlePrompt && (
+        <div className="kiosk-cap-banner" role="status">
+          Session ending in {capRemaining}s
+        </div>
+      )}
+
+      {/* Thirty quiet seconds. Almost always a terminal somebody walked away
+          from; occasionally a child deciding. Ten seconds and a visible count
+          is enough for the second case and quick enough for the first. Any
+          touch anywhere dismisses it, including on this backdrop. */}
+      {idlePrompt && (
+        <div
+          className="kiosk-idle-veil"
+          role="alertdialog"
+          aria-label="Are you still there?"
+        >
+          <div className="kiosk-idle-card">
+            <h2>Still there?</h2>
+            <p>Your session ends in {idleRemaining}s.</p>
+            <button type="button" className="kiosk-start" onClick={dismissIdle}>
+              I&rsquo;m here
+            </button>
           </div>
         </div>
       )}

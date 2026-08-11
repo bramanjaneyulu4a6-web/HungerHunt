@@ -7,7 +7,7 @@
 //
 // No database: every model call is stubbed. What is under test is the rules
 // applied before and around the queries, not the queries.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, beforeEach, afterEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -47,6 +47,14 @@ before(async () => {
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   server.unref();
+});
+
+// protectParent asks whether the session is still live: the account exists and
+// its tokenVersion still matches the one stamped into the token. Every test
+// here is about something else, so the answer is always yes. What happens when
+// it is no is in parentSessions.test.js.
+beforeEach(() => {
+  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
 });
 
 afterEach(() => mock.restoreAll());

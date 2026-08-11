@@ -21,8 +21,11 @@ api.interceptors.response.use(
   (error) => {
     // With the bypass on there is no token to clear and no login to return to,
     // so a stray 401 must not eject the kiosk.
+    // A 403 is a cashier reaching past the till, not a dead session, so it must
+    // not eject anyone — the till's own routes never answer with one.
     if (error.response?.status === 401 && !authBypassEnabled) {
       localStorage.removeItem("adminToken");
+      localStorage.removeItem("staffRole");
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

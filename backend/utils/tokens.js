@@ -16,11 +16,35 @@ const parentSecret = () => process.env.PARENT_JWT_SECRET || adminSecret();
 
 export const parentSecretIsShared = () => !process.env.PARENT_JWT_SECRET;
 
-export const signAdminToken = (id) =>
-  jwt.sign({ id, role: 'admin' }, adminSecret(), { expiresIn: '1d' });
+// Staff sign in on two terminals with very different reach. The back office
+// edits the catalogue, tops up wallets and creates accounts; the till only
+// needs to find a student and take their money. Both are staff and both are
+// signed with the admin key — the secret split is between staff and parents,
+// not within staff — so what separates them is the role claim, checked against
+// the account row on every request.
+//
+// The till is the most physically exposed device in the system: it sits on a
+// counter, unattended between customers, with a token in its browser storage.
+// A cashier account is what that token is worth.
+export const STAFF_ROLES = ['admin', 'cashier'];
 
-export const signParentToken = (id, phone) =>
-  jwt.sign({ id, phone, role: 'parent' }, parentSecret(), { expiresIn: '7d' });
+const isStaffRole = (role) => STAFF_ROLES.includes(role);
+
+export const signStaffToken = (id, role = 'admin') => {
+  if (!isStaffRole(role)) {
+    throw new Error(`Unknown staff role: ${role}`);
+  }
+
+  return jwt.sign({ id, role }, adminSecret(), { expiresIn: '1d' });
+};
+
+export const signAdminToken = (id) => signStaffToken(id, 'admin');
+
+// v carries the account's tokenVersion, which is what makes a parent session
+// revocable before its seven days are up. See atTokenVersion in the auth
+// middleware for what it is compared against and why 0 is the quiet default.
+export const signParentToken = (id, phone, tokenVersion = 0) =>
+  jwt.sign({ id, phone, role: 'parent', v: tokenVersion }, parentSecret(), { expiresIn: '7d' });
 
 // Tokens issued before this change carry no role and were signed with
 // JWT_SECRET. Rejecting them outright would sign out every parent and admin the
@@ -68,15 +92,23 @@ export const parentSecretChangeover = () => ({
 
 // Returns the payload when the token is a valid token *for this role*, and null
 // otherwise. Callers treat null as "not authorized" and never see why.
+//
+// `role` is one of the concrete roles, or 'staff' for "either kind of staff" —
+// the till's routes do not care which of the two is standing at it, only that
+// the token is not a parent's.
 export const verifyToken = (token, role) => {
-  const secrets = [role === 'admin' ? adminSecret() : parentSecret()];
+  const wantsStaff = role === 'staff' || isStaffRole(role);
+  const secrets = [wantsStaff ? adminSecret() : parentSecret()];
 
   // A legacy parent token was signed with JWT_SECRET, which is a different key
   // from the parent one once PARENT_JWT_SECRET is set. Nothing equivalent is
-  // needed for admins: their secret has not changed.
+  // needed for staff: their secret has not changed.
   if (role === 'parent' && legacyAccepted() && parentSecret() !== adminSecret()) {
     secrets.push(adminSecret());
   }
+
+  const accepts = (claimed) =>
+    role === 'staff' ? isStaffRole(claimed) : claimed === role;
 
   for (const secret of secrets) {
     let payload;
@@ -87,10 +119,13 @@ export const verifyToken = (token, role) => {
       continue;
     }
 
-    if (payload.role === role) return payload;
+    if (accepts(payload.role)) return payload;
 
     // Signed correctly but claiming to be something else, or issued before the
     // claim existed. Either way the answer is settled — do not try the next key.
+    //
+    // A roleless staff token is a full admin's: cashiers did not exist when any
+    // of them was issued, so there is no reading of one that grants less.
     return payload.role === undefined && legacyAccepted() ? payload : null;
   }
 

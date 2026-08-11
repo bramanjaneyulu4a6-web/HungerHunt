@@ -1,4 +1,5 @@
-import Admin from '../models/Admin.js';
+import Admin, { FULL_ADMIN } from '../models/Admin.js';
+import Parent from '../models/Parent.js';
 import { verifyToken } from '../utils/tokens.js';
 import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './devBypass.js';
 
@@ -13,25 +14,26 @@ const AUTH_REQUIRED = 'AUTH_REQUIRED';
 const denied = (res, message) =>
   res.status(401).json({ message, code: AUTH_REQUIRED });
 
-// Two independent checks stand between a token and admin access.
+// A signed-in cashier reaching an admin-only route is not a broken session, and
+// answering it with 401 would sign the till out mid-sale for doing nothing
+// wrong. 403 says the token is fine and the account simply does not reach here.
+const forbidden = (res, message) => res.status(403).json({ message });
+
+// Two independent checks stand between a token and staff access, and a third
+// between a token and the admin-only half of it.
 //
 // verifyToken settles what the token is: signed with the admin key, and
-// claiming the admin role. Tokens predating the role claim have none, and are
-// accepted until the grace date in utils/tokens.js.
+// claiming a staff role. Tokens predating the role claim have none, and are
+// accepted as full admins until the grace date in utils/tokens.js.
 //
-// The lookup below settles who it is for. It is what makes a parent's token
-// useless here during that grace period, when the claim cannot distinguish
-// them, and it is the only thing that revokes a deleted admin's unexpired
-// token at any time. It mirrors assertOwnsStudent, which is why the reverse
-// attack — an admin token on a parent route — has always failed.
-const resolveAdminId = async (token) => {
-  const payload = verifyToken(token, 'admin');
-  if (!payload) return null;
-
-  return (await Admin.exists({ _id: payload.id })) ? payload.id : null;
-};
-
-export const protectAdmin = async (req, res, next) => {
+// The lookup below settles who it is for, and what that account is *now*. It is
+// what makes a parent's token useless here during that grace period, when the
+// claim cannot distinguish them; it is the only thing that revokes a deleted
+// admin's unexpired token at any time; and by asking whether the row is still a
+// full admin rather than merely present, it is what makes demoting someone in
+// the back office take effect on their next request instead of whenever their
+// token happens to expire.
+const staffGate = (required) => async (req, res, next) => {
   if (authBypassEnabled) {
     const adminId = await resolveBypassAdmin();
     if (!adminId) {
@@ -41,6 +43,7 @@ export const protectAdmin = async (req, res, next) => {
     }
 
     req.adminId = adminId;
+    req.staff = { id: adminId, role: 'admin' };
     return next();
   }
 
@@ -48,15 +51,37 @@ export const protectAdmin = async (req, res, next) => {
   if (!token) return denied(res, 'Not authorized, no token');
 
   try {
-    const adminId = await resolveAdminId(token);
-    if (!adminId) return denied(res, 'Not authorized');
+    const payload = verifyToken(token, 'staff');
+    if (!payload) return denied(res, 'Not authorized');
 
-    req.adminId = adminId;
+    const role = payload.role || 'admin';
+
+    if (required === 'admin' && role !== 'admin') {
+      return forbidden(res, 'This action needs a full admin account.');
+    }
+
+    const filter = required === 'admin'
+      ? { _id: payload.id, ...FULL_ADMIN }
+      : { _id: payload.id };
+
+    if (!(await Admin.exists(filter))) return denied(res, 'Not authorized');
+
+    req.adminId = payload.id;
+    req.staff = { id: payload.id, role };
     next();
   } catch (error) {
     denied(res, 'Token failed, invalid authorization');
   }
 };
+
+// The back office: everything that changes the shop, the money supply, or who
+// may sign in. This is the strict one on purpose — a route that nobody thought
+// about keeps the narrower audience rather than quietly gaining a wider one.
+export const protectAdmin = staffGate('admin');
+
+// The till's routes, open to both kinds of staff. Deliberately few: look a
+// student up, verify their code, take the payment, raise an approval request.
+export const protectStaff = staffGate('staff');
 
 // Admin registration is open only long enough to create the very first account.
 // Once one exists it demands a signed-in admin, so that authorization is decided
@@ -81,6 +106,23 @@ export const protectAdminUnlessBootstrap = async (req, res, next) => {
   return protectAdmin(req, res, next);
 };
 
+// A parent token is good for seven days, and until tokenVersion existed that
+// was unconditional: resetting the password after a lost or stolen phone left
+// every session already issued working to the day it expired, and there was
+// nothing to revoke them with. Now the number the token was stamped with has to
+// still match the account, so moving it ends every older session at once.
+//
+// Both defaults are 0 — a token issued before the claim existed carries no v,
+// and an account predating the field has no tokenVersion — so they agree, and
+// introducing this signs nobody out. Only a reset moves them apart.
+const atTokenVersion = ({ id, v }) => {
+  const version = v ?? 0;
+
+  return version === 0
+    ? { _id: id, $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
+    : { _id: id, tokenVersion: version };
+};
+
 export const protectParent = async (req, res, next) => {
   if (authBypassEnabled) {
     const parent = await resolveBypassParent();
@@ -99,6 +141,17 @@ export const protectParent = async (req, res, next) => {
 
   const payload = verifyToken(token, 'parent');
   if (!payload) return denied(res, 'Not authorized');
+
+  try {
+    // Costs a query per request, which protectAdmin has always paid. It buys
+    // revocation, and it retires a deleted parent's token for the same reason
+    // the Admin lookup retires a deleted admin's.
+    if (!(await Parent.exists(atTokenVersion(payload)))) {
+      return denied(res, 'Not authorized');
+    }
+  } catch (error) {
+    return denied(res, 'Token failed, invalid authorization');
+  }
 
   req.parent = {
     id: payload.id,

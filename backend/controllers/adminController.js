@@ -1,6 +1,6 @@
-import Admin from '../models/Admin.js';
+import Admin, { FULL_ADMIN } from '../models/Admin.js';
 import bcrypt from 'bcryptjs';
-import { signAdminToken } from '../utils/tokens.js';
+import { signStaffToken } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
 
@@ -21,14 +21,31 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const adminCount = await Admin.countDocuments();
-    const limit = parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3;
+    const adminCount = await Admin.countDocuments(FULL_ADMIN);
 
     // Who may call this is settled by protectAdminUnlessBootstrap on the route:
-    // open while no admin exists, signed-in admins only thereafter.
-    if (adminCount >= limit) {
+    // open while no account exists, signed-in full admins only thereafter.
+    //
+    // The bootstrap call is the exception that has to be forced rather than
+    // trusted: it is the one unauthenticated path in here, and a cashier is not
+    // something a deployment can be founded on — there would be nobody left who
+    // could create the admin.
+    const wantsCashier = req.body?.role === 'cashier' && adminCount > 0;
+    const role = wantsCashier ? 'cashier' : 'admin';
+
+    // Counted separately, because they are limited for different reasons. Admin
+    // accounts are few by policy; tills are as many as the school has counters.
+    const limit = wantsCashier
+      ? parseInt(process.env.MAX_CASHIER_ACCOUNTS) || 10
+      : parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3;
+
+    const existing = wantsCashier
+      ? await Admin.countDocuments({ role: 'cashier' })
+      : adminCount;
+
+    if (existing >= limit) {
       return res.status(400).json({
-        message: `Registration limited. Max ${limit} admins allowed.`
+        message: `Registration limited. Max ${limit} ${role} accounts allowed.`
       });
     }
 
@@ -39,11 +56,14 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const admin = new Admin({ email, password });
+    const admin = new Admin({ email, password, role });
     await admin.save();
 
     return res.status(201).json({
-      message: "Admin registered successfully"
+      message: role === 'cashier'
+        ? "Cashier account created successfully"
+        : "Admin registered successfully",
+      role,
     });
 
   } catch (error) {
@@ -61,7 +81,13 @@ export const loginAdmin = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    res.json({ token: signAdminToken(admin._id), email: admin.email });
+    // Accounts created before cashiers existed have no role and are admins.
+    const role = admin.role || 'admin';
+
+    // The role is returned as well as signed in, so the back office can turn a
+    // cashier away at its own front door rather than signing them in to a
+    // console where every screen answers 403.
+    res.json({ token: signStaffToken(admin._id, role), email: admin.email, role });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

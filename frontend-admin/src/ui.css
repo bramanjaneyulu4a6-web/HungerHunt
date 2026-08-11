@@ -582,6 +582,27 @@
   color: var(--muted-soft);
 }
 
+/* Says what the choice above it actually costs the account. Sized to sit under
+   a field without competing with the label over it. */
+.auth-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--muted-soft);
+}
+
+/* Native selects ignore text-align on the closed control in several browsers,
+   so this one is centred by its padding instead and keeps room for the arrow. */
+select.auth-input {
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+  padding-right: 40px;
+  padding-left: 40px;
+}
+
 .auth-input:focus {
   background: var(--surface);
   border-color: var(--primary);

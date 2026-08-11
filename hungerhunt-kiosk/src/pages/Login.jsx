@@ -19,6 +19,11 @@ const Login = () => {
       setLoading(true);
       const res = await api.post("/admin/login", { email, password });
       localStorage.setItem("adminToken", res.data.token);
+
+      // Both roles work the till. Kept so the terminal can say who is on it —
+      // nothing is authorized from this, which is settled server-side.
+      localStorage.setItem("staffRole", res.data.role || "admin");
+
       navigate("/", { replace: true });
     } catch (err) {
       setError(

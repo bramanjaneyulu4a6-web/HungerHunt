@@ -7,6 +7,7 @@ import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
+import { flushQueuedPushes } from "../utils/sendNotification.js";
 import {
   passwordProblem,
   phoneProblem,
@@ -102,7 +103,7 @@ export const loginParent = async (req, res) => {
 
     if (!isMatch) return invalid();
 
-    const token = signParentToken(parent._id, parent.phone);
+    const token = signParentToken(parent._id, parent.phone, parent.tokenVersion ?? 0);
 
     res.json({
       token,
@@ -223,9 +224,21 @@ export const resetPassword = async (req, res) => {
     parent.resetPasswordToken = undefined;
     parent.resetPasswordExpire = undefined;
 
+    /* The reason somebody resets a password is usually that someone else has
+       it, or has the phone it is signed in on. Changing it did nothing to the
+       sessions already open on that phone: they are good for seven days from
+       when they were issued and were never asked about the password again.
+
+       Moving tokenVersion is what closes them. Every token carries the number
+       it was signed under, protectParent compares it to this one, and the
+       older ones stop verifying on their next request. */
+    parent.tokenVersion = (parent.tokenVersion ?? 0) + 1;
+
     await parent.save();
 
-    res.json({ message: "Password reset successful" });
+    res.json({
+      message: "Password reset successful. Any other devices signed in to this account have been signed out.",
+    });
 
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -518,6 +531,12 @@ export const savePushToken = async (req, res) => {
     );
 
     res.json({ message: "Device registered for notifications" });
+
+    // A new device is the moment to hand over anything still owed — this is
+    // what carries missed notifications across an uninstall or a fresh
+    // sign-in. After the response, and not awaited: registration is complete
+    // whether or not the backlog goes out now or on the next sweep.
+    flushQueuedPushes(req.parent.id);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

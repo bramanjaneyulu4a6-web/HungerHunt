@@ -4,6 +4,14 @@
 **Status:** Approved, ready for implementation planning
 **Branch:** Ashok-work
 
+> **Amended 2026-08-11, same day:** the role model changed after this spec was
+> approved. The cashier role is removed; the roles are **admin, student,
+> warehouse, parent** (warehouse is being built separately and is out of scope
+> here). Where this spec says "staff" or `protectStaff`, read "admin". Admin
+> billing also stops using the purchase code — see the companion spec,
+> `2026-08-11-admin-billing-parent-approval-design.md`, which takes precedence
+> where the two touch.
+
 ## Summary
 
 The kiosk stops being a cashier's terminal and becomes a self-serve one. A

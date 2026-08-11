@@ -1,24 +1,25 @@
-# Kiosk Student Self-Serve Implementation Plan
+# Kiosk Student Self-Serve + Admin Billing Rework Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The kiosk stops being a cashier's terminal: a student opens a session with their admission number, orders, pays with their existing 4-digit purchase code, and the session ends itself.
+**Goal:** The kiosk serves students directly — admission number to enter, 4-digit purchase code to pay, self-ending sessions — while the admin console stops asking for the code and instead routes every admin-billed order through parent approval. The cashier role is removed; roles become admin, student, warehouse, parent.
 
-**Architecture:** A third token identity (`student`, 450-second expiry) joins the existing staff/parent pattern in `backend/utils/tokens.js`. An open, rate-limited `POST /students/kiosk-session` route issues it from an admission number. The five till routes gain a dual guard that accepts staff *or* student tokens — the admin console's own till at `frontend-admin/src/pages/Billing.jsx` must keep working unchanged. For student callers, `studentId` comes from the token, never the body. The kiosk frontend replaces its staff login with an admission-number pad and gains two client-side timers whose ceiling is enforced by the token's own expiry.
+**Architecture:** A third token identity (`student`, 450-second expiry) joins the staff/parent pattern in `backend/utils/tokens.js`, issued by an open, rate-limited `POST /students/kiosk-session`. Till routes gain a guard accepting admin *or* student tokens; for student callers `studentId` comes from the token, never the body. `createPendingOrder` gains an admin branch: no purchase token, blocked when no parent is registered, always awaiting approval. The kiosk frontend swaps its staff login for an admission-number pad and gains two timers whose ceiling the token's own expiry enforces.
 
 **Tech Stack:** Express 4 + Mongoose 8, `node --test` with `mock.method` model stubs (no DB in tests), React 19 + Vite kiosk, vitest (new dev-dep, kiosk only) for timer-hook tests.
 
-**Spec:** `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md`
+**Specs:** `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md` and `docs/superpowers/specs/2026-08-11-admin-billing-parent-approval-design.md` (the latter wins where they touch).
 
 ## Global Constraints
 
+- **Warehouse work is live on this branch concurrently.** `STAFF_ROLES` already carries `'warehouse'`, `tests/warehouseRole.test.js` exists, and `models/Admin.js` / `middleware/authMiddleware.js` / `controllers/adminController.js` carry warehouse changes. **Do not revert, rename, or restructure anything warehouse.** Before editing any of those files, re-read them — they may have moved since this plan was written. The one sanctioned touch is Task 2's update to `warehouseRole.test.js`, which otherwise crashes.
 - Backend tests run with `npm test` (`node --test`) from `backend/`; they stub models and never touch a database.
-- The 4-digit rule, bcrypt compare, `purchaseCodeIsPin` bookkeeping and the single-use 2-minute cart-bound purchase token in `verify-payment` stay exactly as built.
-- `GET /students/search` stays `protectStaff`. The admin console's Billing.jsx flow (body-supplied `studentId`, ignored `phone`) must keep working.
+- The 4-digit rule, bcrypt compare, `purchaseCodeIsPin` bookkeeping and the single-use 2-minute cart-bound purchase token in `verify-payment` stay exactly as built — they now serve the kiosk path only.
+- `verify-payment` and `bill` remain admin-capable through the transition (a pre-deploy admin console still calls them); the new admin UI never does.
 - Session numbers, verbatim from the spec: token expiry **450 s**; warning banner at **7:00**; idle prompt after **30 s** of no pointer/key event, with a **10 s** countdown; result screen holds **5 s** (tap to skip); lockout after **5** consecutive wrong codes for **15 minutes**, counter reset on a correct code.
-- `admissionNumber` is school-issued: unique, sparse (existing rows lack it), trimmed. A student without one cannot log in — the import via existing bulk import is a launch prerequisite, not code.
-- User-facing copy says "purchase code", never "password". Numeric inputs use `inputMode="numeric"` and drop non-digits as typed (the pattern already in Billing.jsx / KioskBilling.jsx).
-- `authBypassEnabled` (kiosk `utils/authBypass.js`) stays in place — its removal is a separate release-checklist item, not part of this plan.
+- `admissionNumber` is school-issued: unique, sparse (existing rows lack it), trimmed. The bulk import of real numbers is a launch prerequisite, not code.
+- User-facing copy says "purchase code", never "password". Numeric inputs use `inputMode="numeric"`.
+- `authBypassEnabled` (kiosk `utils/authBypass.js`) stays — its removal is a separate release-checklist item.
 - Commit after every task; messages in the repo's style (imperative, saying why).
 
 ---
@@ -26,16 +27,16 @@
 ### Task 1: `admissionNumber` and lockout fields on the Student model
 
 **Files:**
-- Modify: `backend/models/Student.js` (schema fields)
-- Modify: `backend/controllers/studentController.js:15` (`WRITABLE_FIELDS`), `:126` (`SEARCH_FIELDS`)
-- Test: `backend/tests/kioskSession.test.js` (created here, grown in Task 4)
+- Modify: `backend/models/Student.js`
+- Modify: `backend/controllers/studentController.js` (`WRITABLE_FIELDS`, `SEARCH_FIELDS`)
+- Test: `backend/tests/kioskSession.test.js` (created here, grown in later tasks)
 
 **Interfaces:**
-- Produces: `Student.admissionNumber` (String, unique+sparse, trimmed), `Student.purchaseCodeAttempts` (Number, default 0), `Student.purchaseCodeLockedUntil` (Date, default null). Admin add/edit/bulk-import routes accept `admissionNumber` because `pickWritable` allows it.
+- Produces: `Student.admissionNumber` (String, unique+sparse, trimmed), `Student.purchaseCodeAttempts` (Number, default 0), `Student.purchaseCodeLockedUntil` (Date, default null). Admin add/edit/bulk-import accept `admissionNumber` via `pickWritable`. Search results carry `admissionNumber` and `isParentRegistered` (Task 12's Billing screen needs the latter to block unregistered-parent students).
 
 - [ ] **Step 1: Write the failing test**
 
-Create `backend/tests/kioskSession.test.js` with the suite scaffold used by every test in this repo (see `tests/purchaseAuthorization.test.js` for the idiom):
+Create `backend/tests/kioskSession.test.js` with the suite scaffold used across this repo (see `tests/purchaseAuthorization.test.js` for the idiom):
 
 ```js
 // The kiosk's open front door: a session from an admission number, and the
@@ -125,7 +126,7 @@ and after the `purchaseCodeIsPin` block:
   },
 ```
 
-- [ ] **Step 4: Let the admin routes write it**
+- [ ] **Step 4: Let the admin routes write and show it**
 
 In `backend/controllers/studentController.js`:
 
@@ -133,18 +134,18 @@ In `backend/controllers/studentController.js`:
 const WRITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber', 'admissionNumber'];
 ```
 
-and add `admissionNumber` to `SEARCH_FIELDS` so the admin till shows it:
+and extend `SEARCH_FIELDS` — `admissionNumber` for display, `isParentRegistered` because the admin billing screen (Task 12) refuses students whose parent has not registered:
 
 ```js
 const SEARCH_FIELDS =
-  "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber";
+  "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
 ```
 
-Nothing else: bulk import goes through `pickWritable`, so the sheet column starts working with this one change.
+Bulk import goes through `pickWritable`, so the sheet column starts working with the `WRITABLE_FIELDS` change alone.
 
 - [ ] **Step 5: Run the tests and make sure they pass**
 
-Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. Then the whole suite: `npm test` — everything green (the field is additive; nothing selects it away).
+Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. Then `npm test` — everything green (the fields are additive).
 
 - [ ] **Step 6: Commit**
 
@@ -155,19 +156,92 @@ git commit -m "Give the student roll an admission number and a checkout lock"
 
 ---
 
-### Task 2: A student token in `tokens.js`
+### Task 2: Retire the cashier role
 
 **Files:**
-- Modify: `backend/utils/tokens.js`
-- Test: `backend/tests/tokenRoles.test.js` (append a describe block)
+- Modify: `backend/utils/tokens.js`, `backend/models/Admin.js`, `backend/middleware/authMiddleware.js`, `backend/controllers/adminController.js`, `backend/.env.example`
+- Modify: `frontend-admin/src/pages/Login.jsx`, `frontend-admin/src/pages/Register.jsx`
+- Modify: `backend/tests/warehouseRole.test.js`, `backend/tests/tokenRoles.test.js`
+- Delete: `backend/tests/cashierRole.test.js`
 
 **Interfaces:**
-- Consumes: existing `verifyToken(token, role)`, `adminSecret`, legacy-grace machinery.
-- Produces: `signStudentToken(id, admissionNumber)` → JWT `{ id, admissionNumber, role: 'student' }`, `expiresIn: 450`, signed with `STUDENT_JWT_SECRET || JWT_SECRET`. `verifyToken(token, 'student')` accepts exactly these. `STUDENT_SESSION_SECONDS = 450` exported for reuse.
+- Produces: `STAFF_ROLES` without `'cashier'`; `signStaffToken(id, 'cashier')` throws; a token already claiming `role: 'cashier'` verifies against no accepted list and is refused. `protectStaff` (whatever its current role list) accepts admin only among till roles. Warehouse entries in every list are **untouched**.
+
+**⚠ Concurrency warning:** these exact files are being edited by the warehouse work in this same working tree. Re-read each file immediately before editing; make the smallest possible diff — remove `'cashier'` entries and cashier branches, change nothing else. If a file looks structurally different from what this task describes, adapt to what is there rather than restoring what was.
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `backend/tests/tokenRoles.test.js` (it already imports `jwt`, sets env secrets, and exercises `verifyToken` — follow its local idiom for building tokens):
+In `backend/tests/tokenRoles.test.js`, add:
+
+```js
+describe('cashier is no longer a role', () => {
+  test('a cashier token cannot be signed', () => {
+    assert.throws(() => signStaffToken('507f1f77bcf86cd799439012', 'cashier'), /Unknown staff role/);
+  });
+
+  test('a token already claiming cashier opens nothing', () => {
+    // Signed directly, standing in for a token minted before the removal.
+    const stale = jwt.sign(
+      { id: '507f1f77bcf86cd799439012', role: 'cashier' },
+      process.env.JWT_SECRET
+    );
+    assert.equal(verifyToken(stale, 'staff'), null);
+    assert.equal(verifyToken(stale, 'admin'), null);
+  });
+});
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+Run: `cd backend && node --test tests/tokenRoles.test.js`
+Expected: the new tests FAIL — cashier is currently a valid staff role.
+
+- [ ] **Step 3: Remove cashier from the backend**
+
+Each edit is a deletion of a `'cashier'` entry or branch — nothing more:
+
+- `backend/utils/tokens.js`: `STAFF_ROLES` loses `'cashier'` (keep `'warehouse'`). Update the comment above it — the till no longer has staff of any kind; the admin console's till is an admin. The legacy-tail comment about roleless tokens ("cashiers did not exist…") still reads correctly; leave it.
+- `backend/models/Admin.js`: the `role` enum loses `'cashier'`; trim its comment's cashier sentence. `FULL_ADMIN` stays exactly as is — it guards pre-role rows.
+- `backend/middleware/authMiddleware.js`: remove `'cashier'` from every role list handed to `staffGate` (currently `protectStaff` and one wider list that includes warehouse). Do not collapse `protectStaff` into `protectAdmin` even if their lists converge — routes and the warehouse work both reference the names.
+- `backend/controllers/adminController.js`: remove the `cashier:` entry from the account-limits object (`MAX_CASHIER_ACCOUNTS`), any cashier branch in register/login validation, and cashier mentions in comments. Warehouse entries stay.
+- `backend/.env.example`: remove `MAX_CASHIER_ACCOUNTS`.
+
+- [ ] **Step 4: Update the tests that reference cashier**
+
+- Delete `backend/tests/cashierRole.test.js` (`git rm`).
+- `backend/tests/warehouseRole.test.js` — **the sanctioned touch to the warehouse work:** it signs `signStaffToken(STAFF_ID, 'cashier')` at import time, which now throws. Delete the `cashierToken` line and the cashier-exclusion tests that use it (e.g. "a cashier cannot reach the storeroom-only surface either"). Change nothing else in the file.
+- Sweep the rest: `grep -rn "cashier" backend/tests/ backend/controllers backend/models backend/utils backend/middleware` — remaining hits should be comments only; judge each.
+
+- [ ] **Step 5: Remove cashier from the admin console UI**
+
+In `frontend-admin/src/pages/Login.jsx` and `Register.jsx` (both modified on this branch to add role handling): remove the cashier option from any role picker and any `staffRole === 'cashier'` branches. **Keep warehouse options untouched.** If `staffRole` storage exists only to distinguish cashier from admin, leave the storage mechanism alone — warehouse may use it.
+
+- [ ] **Step 6: Run to verify pass**
+
+Run: `cd backend && npm test` — full suite green with `cashierRole.test.js` gone. Then `cd ../frontend-admin && npm run build` — clean.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A backend frontend-admin/src/pages/Login.jsx frontend-admin/src/pages/Register.jsx
+git commit -m "Retire the cashier role: the till belongs to students and admins now"
+```
+
+---
+
+### Task 3: A student token in `tokens.js`
+
+**Files:**
+- Modify: `backend/utils/tokens.js`
+- Test: `backend/tests/tokenRoles.test.js` (append)
+
+**Interfaces:**
+- Consumes: existing `verifyToken(token, role)`, `adminSecret`, legacy-grace machinery.
+- Produces: `signStudentToken(id, admissionNumber)` → JWT `{ id, admissionNumber, role: 'student' }`, `expiresIn: 450`, signed with `STUDENT_JWT_SECRET || JWT_SECRET`. `verifyToken(token, 'student')` accepts exactly these. `STUDENT_SESSION_SECONDS = 450` exported.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `backend/tests/tokenRoles.test.js`:
 
 ```js
 describe('student tokens', () => {
@@ -193,10 +267,10 @@ describe('student tokens', () => {
     assert.equal(exp - iat, 450);
   });
 
-  // The legacy grace window exists to carry pre-role staff and parent tokens
-  // across a deploy. No student token predates the role, so a roleless token
-  // must never be read as a student — even while the grace window is open and
-  // the student secret still falls back to the admin one.
+  // The legacy grace window carries pre-role staff and parent tokens across a
+  // deploy. No student token predates the role claim, so a roleless token must
+  // never be read as a student — even while the window is open and the student
+  // secret still falls back to the admin one.
   test('a roleless legacy token is not a student', () => {
     const legacy = jwt.sign({ id: STUDENT_ID }, process.env.JWT_SECRET);
     assert.equal(verifyToken(legacy, 'student'), null);
@@ -204,7 +278,7 @@ describe('student tokens', () => {
 });
 ```
 
-Import `signStudentToken` alongside the existing imports at the top of the file.
+Import `signStudentToken` alongside the file's existing token imports.
 
 - [ ] **Step 2: Run to verify failure**
 
@@ -232,23 +306,18 @@ export const signStudentToken = (id, admissionNumber) =>
   });
 ```
 
-In `verifyToken`, replace the secret-selection line:
+In `verifyToken`, the secret pick becomes three-way (adapt to the file's current shape — the warehouse work may have touched it):
 
 ```js
-export const verifyToken = (token, role) => {
   const wantsStaff = role === 'staff' || isStaffRole(role);
   const secrets = [
     wantsStaff ? adminSecret() : role === 'student' ? studentSecret() : parentSecret(),
   ];
 ```
 
-and guard the legacy tail so a roleless token can never come back as a student (it currently returns the payload for *any* requested role during grace):
+and the legacy tail must never hand a roleless token to the student role:
 
 ```js
-    // A roleless staff token is a full admin's: cashiers did not exist when any
-    // of them was issued, so there is no reading of one that grants less. No
-    // student token predates the role claim, so for the student role a roleless
-    // token is never acceptable, grace or no grace.
     return payload.role === undefined && role !== 'student' && legacyAccepted()
       ? payload
       : null;
@@ -267,15 +336,15 @@ git commit -m "Mint a third token identity for the student at the kiosk"
 
 ---
 
-### Task 3: `protectStudent` and the dual guard
+### Task 4: `protectStudent` and the admin-or-student guard
 
 **Files:**
-- Modify: `backend/middleware/authMiddleware.js`
+- Modify: `backend/middleware/authMiddleware.js`, `backend/routes/inventoryRoutes.js`
 - Test: `backend/tests/kioskSession.test.js` (append)
 
 **Interfaces:**
-- Consumes: `verifyToken` from Task 2; `denied`, `readToken`, `authBypassEnabled` already in the file.
-- Produces: `protectStudent` — verifies a student token, confirms the row still exists, sets `req.student = { id, admissionNumber }`. `protectStaffOrStudent` — routes a student-signed token to `protectStudent`, anything else to `protectStaff`; bypass mode goes to the staff path (bypass impersonates an admin, and that behavior must not change here).
+- Consumes: `verifyToken` from Task 3; `denied`, `readToken`, `authBypassEnabled` already in the file.
+- Produces: `protectStudent` — verifies a student token, confirms the row still exists, sets `req.student = { id, admissionNumber }`. `protectAdminOrStudent` — routes a student-signed token to `protectStudent`, anything else to `protectStaff` (which, after Task 2, admits admins); bypass mode goes to the staff path. Downstream controllers distinguish callers by `req.student` vs `req.staff`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -286,6 +355,7 @@ const { signStudentToken, signAdminToken } = await import('../utils/tokens.js');
 const Admin = (await import('../models/Admin.js')).default;
 
 const STUDENT_ID = '507f191e810c19729de860ea';
+const ADMIN_ID = '507f1f77bcf86cd799439012';
 
 const asStudent = (path, options = {}) =>
   fetch(base + path, {
@@ -297,40 +367,48 @@ const asStudent = (path, options = {}) =>
     },
   });
 
+const asAdmin = (path, options = {}) =>
+  fetch(base + path, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${signAdminToken(ADMIN_ID)}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+// The inventory stub — read backend/controllers/inventoryController.js first
+// and stub exactly the calls getInventory makes.
+const stubInventory = async () => {
+  const Inventory = (await import('../models/Inventory.js')).default;
+  mock.method(Inventory, 'find', () => {
+    const query = Promise.resolve([]);
+    query.select = () => query;
+    query.populate = () => query;
+    return query;
+  });
+};
+
 describe('the dual guard on /inventory', () => {
   test('a live student token is let through', async () => {
     mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
-    const Inventory = (await import('../models/Inventory.js')).default;
-    mock.method(Inventory, 'find', () => {
-      const query = Promise.resolve([]);
-      query.select = () => query;
-      query.populate = () => query;
-      return query;
-    });
+    await stubInventory();
 
     const res = await asStudent('/api/inventory');
     assert.equal(res.status, 200);
   });
 
-  test('a deleted student\'s unexpired token is refused', async () => {
+  test("a deleted student's unexpired token is refused", async () => {
     mock.method(Student, 'exists', async () => null);
     const res = await asStudent('/api/inventory');
     assert.equal(res.status, 401);
   });
 
-  test('a staff token still works — the admin till must not break', async () => {
-    mock.method(Admin, 'exists', async () => ({ _id: '507f1f77bcf86cd799439012' }));
-    const Inventory = (await import('../models/Inventory.js')).default;
-    mock.method(Inventory, 'find', () => {
-      const query = Promise.resolve([]);
-      query.select = () => query;
-      query.populate = () => query;
-      return query;
-    });
+  test('an admin token still works — the admin console must not break', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    await stubInventory();
 
-    const res = await fetch(base + '/api/inventory', {
-      headers: { Authorization: `Bearer ${signAdminToken('507f1f77bcf86cd799439012')}` },
-    });
+    const res = await asAdmin('/api/inventory');
     assert.equal(res.status, 200);
   });
 
@@ -341,20 +419,16 @@ describe('the dual guard on /inventory', () => {
 });
 ```
 
-(Adjust the `Inventory.find` stub to whatever `getInventory` actually calls — read `backend/controllers/inventoryController.js` first and stub that shape.)
+(If the account check in the current `staffGate` uses something other than `Admin.exists`, mirror what `tests/warehouseRole.test.js` stubs.)
 
 - [ ] **Step 2: Run to verify failure**
 
 Run: `cd backend && node --test tests/kioskSession.test.js`
-Expected: the student-token tests FAIL with 401 (guard doesn't exist; route is staff-only). The staff test PASSES already — it must stay passing throughout.
+Expected: the student-token tests FAIL with 401. The admin test PASSES already — it must stay passing throughout.
 
-- [ ] **Step 3: Implement the middleware**
+- [ ] **Step 3: Implement**
 
-In `backend/middleware/authMiddleware.js`, import `Student` and add:
-
-```js
-import Student from '../models/Student.js';
-```
+In `backend/middleware/authMiddleware.js`, add `import Student from '../models/Student.js';` and:
 
 ```js
 // The kiosk's student session. The token settles who it is for; the lookup
@@ -380,11 +454,11 @@ export const protectStudent = async (req, res, next) => {
   next();
 };
 
-// The till routes serve two audiences now: the admin console's staff till and
-// the kiosk's student session. The token says which it is — a student-signed
-// token takes the student path, anything else falls through to the staff gate,
-// whose errors and bypass behavior stay exactly as they were.
-export const protectStaffOrStudent = (req, res, next) => {
+// The till routes serve two audiences: the admin console and the kiosk's
+// student session. The token says which — a student-signed token takes the
+// student path, anything else falls through to the staff gate, whose errors
+// and bypass behavior stay exactly as they were.
+export const protectAdminOrStudent = (req, res, next) => {
   if (authBypassEnabled) return protectStaff(req, res, next);
 
   const token = readToken(req);
@@ -396,20 +470,22 @@ export const protectStaffOrStudent = (req, res, next) => {
 };
 ```
 
-Then in `backend/routes/inventoryRoutes.js`, swap the guard:
+Then in `backend/routes/inventoryRoutes.js`:
 
 ```js
-import { protectStaffOrStudent } from "../middleware/authMiddleware.js";
+import { protectAdminOrStudent } from "../middleware/authMiddleware.js";
 
 // The menu the till draws its tiles from. Two kinds of till now: the admin
-// console's, holding a staff token, and the kiosk, holding a student session.
+// console's, holding an admin token, and the kiosk, holding a student session.
 // Reading stock is as far as either goes.
-router.get("/", protectStaffOrStudent, getInventory);
+router.get("/", protectAdminOrStudent, getInventory);
 ```
+
+(If the warehouse work has meanwhile changed this route's guard to admit warehouse accounts, compose rather than replace: the student check wraps whatever staff gate the route currently has.)
 
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. Then `npm test` — the full suite stays green (notably `cashierRole.test.js`, which asserts staff access to these routes).
+Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. Then `npm test` — full suite green.
 
 - [ ] **Step 5: Commit**
 
@@ -420,15 +496,15 @@ git commit -m "Let a student session through the till's read gate"
 
 ---
 
-### Task 4: `POST /students/kiosk-session`
+### Task 5: `POST /students/kiosk-session`
 
 **Files:**
 - Modify: `backend/controllers/studentController.js`, `backend/routes/studentRoutes.js`, `backend/middleware/rateLimit.js`
 - Test: `backend/tests/kioskSession.test.js` (append)
 
 **Interfaces:**
-- Consumes: `signStudentToken`, `STUDENT_SESSION_SECONDS` (Task 2); `Student.findOne`.
-- Produces: `POST /api/students/kiosk-session` — open, rate-limited. Body `{ admissionNumber }`. 200 → `{ token, expiresInSeconds: 450, student: { id, name, admissionNumber, pocketMoney, requiresParentApproval } }`. 400 missing number, 404 unknown, 403 no purchase code set. The kiosk Login screen (Task 7) consumes this exact shape.
+- Consumes: `signStudentToken`, `STUDENT_SESSION_SECONDS` (Task 3); `Student.findOne`.
+- Produces: `POST /api/students/kiosk-session` — open, rate-limited. Body `{ admissionNumber }`. 200 → `{ token, expiresInSeconds: 450, student: { id, name, admissionNumber, pocketMoney, requiresParentApproval } }`. 400 missing number, 404 unknown, 403 no purchase code set. The kiosk Login screen (Task 9) consumes this exact shape.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -479,8 +555,7 @@ describe('opening a kiosk session', () => {
       requiresParentApproval: false,
     });
     // The open route must not leak what it was not asked for.
-    assert.equal(body.student.parentPhoneNumber, undefined);
-    assert.equal(body.student.hostelNumber, undefined);
+    assert.equal(JSON.stringify(body).includes('9876543210'), false);
     assert.equal(JSON.stringify(body).includes('bcrypt'), false);
   });
 
@@ -581,7 +656,7 @@ export const createKioskSession = async (req, res) => {
 };
 ```
 
-In `backend/routes/studentRoutes.js`, import `createKioskSession` and `kioskSessionLimiter`, and add above the staff search route:
+In `backend/routes/studentRoutes.js`, import `createKioskSession` and `kioskSessionLimiter`, and add above the search route:
 
 ```js
 /* The kiosk's login: open on purpose — the decision and its cost are recorded
@@ -603,25 +678,25 @@ git commit -m "Open a kiosk session from an admission number"
 
 ---
 
-### Task 5: `verify-payment` — token-scoped student, no phone, lockout
+### Task 6: `verify-payment` — token-scoped student, no phone, lockout
 
 **Files:**
 - Modify: `backend/controllers/transactionController.js` (`verifyPayment`), `backend/routes/transactionRoutes.js`
 - Test: `backend/tests/kioskSession.test.js` (append) — existing suites `purchaseAuthorization.test.js` and `parentSurface.test.js` must stay green
 
 **Interfaces:**
-- Consumes: `req.student` from `protectStaffOrStudent` (Task 3); lockout fields (Task 1).
-- Produces: `verifyPayment` reads `studentId` from `req.student?.id ?? req.body.studentId`; ignores `phone` entirely; refuses a locked student with **423** `{ message, code: 'CODE_LOCKED' }`; increments `purchaseCodeAttempts` on a wrong code, locks at 5, resets on a correct one. Response shape unchanged: `{ success, purchaseToken, requiresApproval }`.
+- Consumes: `req.student` from `protectAdminOrStudent` (Task 4); lockout fields (Task 1).
+- Produces: `verifyPayment` reads `studentId` from `req.student?.id ?? req.body.studentId` (the body path serves pre-deploy admin consoles through the transition); ignores `phone` entirely; refuses a locked student with **423** `{ message, code: 'CODE_LOCKED' }`; increments `purchaseCodeAttempts` on a wrong code, locks at 5, resets on a correct one. Response shape unchanged: `{ success, purchaseToken, requiresApproval }`.
 
 - [ ] **Step 1: Check what the existing suites assert about the phone**
 
 Run: `cd backend && grep -n "phone" tests/purchaseAuthorization.test.js tests/parentSurface.test.js`
 
-They *send* a phone but — verify by reading the matches — the only behavior to preserve is that sending one is harmless. If any test asserts a wrong-phone 400 ("Wrong mobile number"), delete that test in this task and note it in the commit message: the check is gone by design, the server derives identity from the session.
+They *send* a phone — harmless once ignored. If any test asserts a wrong-phone 400 ("Wrong mobile number"), delete that test in this task and say so in the commit message: the check is gone by design; identity comes from the session.
 
 - [ ] **Step 2: Write the failing tests**
 
-Append to `backend/tests/kioskSession.test.js`. Reuse the `stubBillPath`-style stubs from `purchaseAuthorization.test.js` — copy the small helpers rather than importing across test files, matching repo convention:
+Append to `backend/tests/kioskSession.test.js` (copy the small stub helpers from `purchaseAuthorization.test.js` rather than importing across test files — repo convention):
 
 ```js
 const bcrypt = (await import('bcryptjs')).default;
@@ -757,30 +832,29 @@ describe('the checkout lock', () => {
 - [ ] **Step 3: Run to verify failure**
 
 Run: `cd backend && node --test tests/kioskSession.test.js`
-Expected: FAIL — the route refuses the student token (401) until the guard swaps, and the lock logic doesn't exist.
+Expected: FAIL — 401 for the student token until the guard swaps, and the lock logic doesn't exist.
 
 - [ ] **Step 4: Implement**
 
-`backend/routes/transactionRoutes.js` — swap the two till routes:
+`backend/routes/transactionRoutes.js` — swap the two till routes (`/history` stays `protectAdmin`):
 
 ```js
-import { protectAdmin, protectStaffOrStudent } from "../middleware/authMiddleware.js";
+import { protectAdmin, protectAdminOrStudent } from "../middleware/authMiddleware.js";
 
-router.post("/verify-payment", protectStaffOrStudent, verifyPayment);
-router.post("/bill", protectStaffOrStudent, generateBill);
+router.post("/verify-payment", protectAdminOrStudent, verifyPayment);
+router.post("/bill", protectAdminOrStudent, generateBill);
 ```
 
-(`/history` stays `protectAdmin`.)
-
-In `verifyPayment` (`backend/controllers/transactionController.js`), the top becomes:
+In `verifyPayment` (`backend/controllers/transactionController.js`):
 
 ```js
 export const verifyPayment = async (req, res) => {
   try {
     /* Who is paying is settled by whoever cleared the guard. A student session
        names its own student — the body's studentId is never read, which is what
-       stops a session for one student charging another. The staff till has no
-       student token, so it still says which student it is serving. */
+       stops a session for one student charging another. The admin path keeps
+       the body's studentId only for consoles cached from before the deploy;
+       the new admin UI does not call this route at all. */
     const studentId = req.student?.id ?? req.body.studentId;
     const { password, items } = req.body;
 
@@ -789,16 +863,16 @@ export const verifyPayment = async (req, res) => {
     }
 ```
 
-The 4-digit `purchaseCodeProblem` check stays exactly where it is. **Delete** the phone check:
+The 4-digit `purchaseCodeProblem` check stays where it is. **Delete** the phone check entirely:
 
 ```js
-    // DELETE these three lines:
+    // DELETE:
     if (student.parentPhoneNumber !== phone) {
       return res.status(400).json({ message: "Wrong mobile number" });
     }
 ```
 
-After `const student = await Student.findById(studentId).select('+purchasePassword');` and the not-found / no-code checks, add the lock gate:
+After the not-found / no-code checks, add the lock gate:
 
 ```js
     /* Five wrong codes lock this student's checkout for 15 minutes on every
@@ -812,7 +886,7 @@ After `const student = await Student.findById(studentId).select('+purchasePasswo
     }
 ```
 
-Replace the wrong-code branch (keep its existing message logic) so it counts:
+Replace the wrong-code branch so it counts (keeping its message logic):
 
 ```js
     if (!matched) {
@@ -860,19 +934,12 @@ Replace the wrong-code branch (keep its existing message logic) so it counts:
     }
 ```
 
-The `select` needs the lock fields — extend it:
-
-```js
-    const student = await Student.findById(studentId)
-      .select('+purchasePassword purchaseCodeAttempts purchaseCodeLockedUntil purchaseCodeIsPin requiresParentApproval parentPhoneNumber pocketMoney');
-```
-
-(Verify against the file: `.select('+field')` with a leading `+` *adds* to the default selection rather than replacing it, so `.select('+purchasePassword')` alone already returns the lock fields. If so, leave the select as it was — prefer the smaller diff.)
+On the `.select`: `.select('+purchasePassword')` with a leading `+` *adds* to the default selection, so the lock fields (not marked `select: false`) already come back. Verify with the failing test before widening the select — prefer the smaller diff.
 
 - [ ] **Step 5: Run to verify pass**
 
 Run: `cd backend && node --test tests/kioskSession.test.js` — PASS.
-Then: `npm test` — `purchaseAuthorization.test.js` and `parentSurface.test.js` must stay green. If a test asserted the wrong-phone 400, remove that test now (see Step 1).
+Then `npm test` — `purchaseAuthorization.test.js` and `parentSurface.test.js` stay green (any wrong-phone assertion was handled in Step 1).
 
 - [ ] **Step 6: Commit**
 
@@ -883,7 +950,7 @@ git commit -m "Scope verify-payment to the session's student and lock guessed co
 
 ---
 
-### Task 6: `bill` and `pending-orders` under a student session
+### Task 7: `bill` and `pending-orders` under a student session
 
 **Files:**
 - Modify: `backend/controllers/transactionController.js` (`generateBill`), `backend/controllers/pendingOrderController.js` (`createPendingOrder`), `backend/routes/pendingOrderRoutes.js`
@@ -891,7 +958,7 @@ git commit -m "Scope verify-payment to the session's student and lock guessed co
 
 **Interfaces:**
 - Consumes: purchase tokens from `verify-payment` (unchanged); `req.student` from the guard.
-- Produces: both `generateBill` and `createPendingOrder` resolve `const studentId = req.student?.id ?? req.body.studentId;`. `POST /pending-orders` and `GET /pending-orders/:id/status` take `protectStaffOrStudent`. Cross-student spending is impossible under a student token because `consumeAuthorization` matches the token-derived `studentId` against the authorization row.
+- Produces: both controllers resolve `const studentId = req.student?.id ?? req.body.studentId;`. `POST /pending-orders` and `GET /pending-orders/:id/status` take `protectAdminOrStudent`. Cross-student spending is impossible under a student token because `consumeAuthorization` matches the token-derived `studentId` against the authorization row. Task 8 builds its admin branch on top of this exact resolution.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -899,9 +966,7 @@ Append to `backend/tests/kioskSession.test.js`:
 
 ```js
 describe('a student session cannot spend for another student', () => {
-  test('a bill under student A\'s token with a body naming student B charges A or nothing', async () => {
-    // Full verify → bill round trip, with the authorization store live (the
-    // in-memory Map idiom from purchaseAuthorization.test.js).
+  test("a bill under student A's token naming student B charges A or nothing", async () => {
     const store = new Map();
     mock.method(PurchaseAuthorization, 'create', async (doc) => { store.set(doc.token, { ...doc }); return doc; });
     mock.method(PurchaseAuthorization, 'findOneAndDelete', async ({ token }) => {
@@ -917,18 +982,18 @@ describe('a student session cannot spend for another student', () => {
     });
     const { purchaseToken } = await verified.json();
 
-    // The charge path is stubbed to observe who gets debited.
     const debited = [];
     mock.method(Student, 'findOneAndUpdate', async (filter) => { debited.push(String(filter._id)); return { pocketMoney: 480 }; });
 
-    const billed = await asStudent('/api/transactions/bill', {
+    await asStudent('/api/transactions/bill', {
       method: 'POST',
       body: JSON.stringify({ studentId: OTHER_STUDENT, items: CART, totalAmount: 20, purchaseToken }),
     });
 
-    // Either the bill succeeds against A (token's student) or the authorization
-    // mismatch refuses it — both are safe. What must not happen is a debit to B.
-    assert.ok(!debited.includes(OTHER_STUDENT), 'student B must never be debited from A\'s session');
+    // Either the bill succeeds against A (the token's student) or the
+    // authorization mismatch refuses it — both are safe. What must never
+    // happen is a debit to B.
+    assert.ok(!debited.includes(OTHER_STUDENT), "student B must never be debited from A's session");
   });
 });
 
@@ -960,44 +1025,43 @@ describe('pending orders from a student session', () => {
 
     if (created.length) {
       assert.equal(String(created[0].studentId ?? created[0].student), STUDENT_ID,
-        'the pending order must belong to the token\'s student, not the body\'s');
+        "the pending order must belong to the token's student, not the body's");
     } else {
-      // The authorization mismatch refused it outright — also safe.
-      assert.ok(res.status >= 400);
+      assert.ok(res.status >= 400); // authorization mismatch refused it — also safe
     }
   });
 });
 ```
 
-Before writing the `PendingOrder.create` assertion, read `backend/controllers/pendingOrderController.js` to see the created document's field names and any other model calls (`sendToParent` etc.) that need stubbing — mirror what `tests/pendingOrders.test.js` already stubs.
+Before finalizing the `PendingOrder.create` assertion, read `backend/controllers/pendingOrderController.js` for the created document's field names and any calls (`sendToParent` etc.) that need stubbing — mirror what `tests/pendingOrders.test.js` stubs.
 
 - [ ] **Step 2: Run to verify failure**
 
 Run: `cd backend && node --test tests/kioskSession.test.js`
-Expected: FAIL — 401 on `/api/pending-orders` (still staff-only), and the bill path reads the body's `studentId`.
+Expected: FAIL — 401 on `/api/pending-orders` for the student token, and the bill path reads the body's `studentId`.
 
 - [ ] **Step 3: Implement**
 
 `backend/routes/pendingOrderRoutes.js`:
 
 ```js
-import { protectParent, protectStaff, protectStaffOrStudent } from "../middleware/authMiddleware.js";
+import { protectParent, protectAdminOrStudent } from "../middleware/authMiddleware.js";
 
-router.post("/", protectStaffOrStudent, createPendingOrder);
-router.get("/:id/status", protectStaffOrStudent, getPendingOrderStatus);
+router.post("/", protectAdminOrStudent, createPendingOrder);
+router.get("/:id/status", protectAdminOrStudent, getPendingOrderStatus);
 ```
 
-`generateBill` in `backend/controllers/transactionController.js` — first lines become:
+`generateBill` — first lines become:
 
 ```js
 export const generateBill = async (req, res) => {
-  // A student session names its own student; the staff till says which one it
-  // is serving. Same rule as verify-payment, for the same reason.
+  // A student session names its own student; an admin console says which one
+  // it is serving. Same rule as verify-payment, for the same reason.
   const studentId = req.student?.id ?? req.body.studentId;
   const { items, purchaseToken } = req.body;
 ```
 
-`createPendingOrder` in `backend/controllers/pendingOrderController.js` — same substitution:
+`createPendingOrder` — same substitution (remove `studentId` from the `req.body` destructuring):
 
 ```js
 export const createPendingOrder = async (req, res) => {
@@ -1006,11 +1070,9 @@ export const createPendingOrder = async (req, res) => {
     const { purchaseToken } = req.body;
 ```
 
-(and remove `studentId` from the destructuring of `req.body` below it; everything downstream already works from the local `studentId`.)
-
 - [ ] **Step 4: Run to verify pass**
 
-Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. `npm test` — full suite green, especially `pendingOrders.test.js` (staff path unchanged: `req.student` is undefined there, so the body still rules).
+Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. `npm test` — full suite green, especially `pendingOrders.test.js` (admin path unchanged: `req.student` is undefined there, so the body still rules).
 
 - [ ] **Step 5: Commit**
 
@@ -1021,15 +1083,166 @@ git commit -m "Bill and pending orders answer to the session's own student"
 
 ---
 
-### Task 7: Kiosk login becomes an admission-number pad
+### Task 8: Admin-billed orders always go to the parent
 
 **Files:**
-- Modify: `hungerhunt-kiosk/src/utils/api.js`, `hungerhunt-kiosk/src/pages/Login.jsx`, `hungerhunt-kiosk/src/components/ProtectedRoute.jsx`, `hungerhunt-kiosk/src/App.jsx`
-- Modify: `hungerhunt-kiosk/src/kiosk.css` (login-pad styles)
+- Modify: `backend/controllers/pendingOrderController.js` (`createPendingOrder`), `backend/models/PendingOrder.js`
+- Test: `backend/tests/kioskSession.test.js` (append)
 
 **Interfaces:**
-- Consumes: `POST /api/students/kiosk-session` (Task 4's exact response shape).
-- Produces: localStorage keys `kioskToken` (the JWT) and `kioskStudent` (JSON of the `student` object) — Task 8 reads both. `KioskScreen` passes `student` and `onLogout` props to `KioskBilling`. The old `adminToken`/`staffRole` keys are gone from the kiosk app.
+- Consumes: Task 7's `studentId` resolution; `req.staff` set by the staff gate; `Student.isParentRegistered` (existing field).
+- Produces: an admin caller (`req.staff` set, `req.student` not) raises a pending order with **no purchase token**, for **any** student regardless of `requiresParentApproval`, **unless** `isParentRegistered` is false → **409** `{ code: 'NO_PARENT', message }`. The order records `raisedBy: req.staff.id`. The student path is byte-for-byte the Task 7 behavior. Task 12's Billing screen consumes the 201 and the 409.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `backend/tests/kioskSession.test.js`. First read `tests/pendingOrders.test.js` and copy its stub set for the admin path (account stub, `sendToParent`-adjacent mocks); then:
+
+```js
+describe('an admin raises orders without a code', () => {
+  const adminStubs = async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    // plus whatever account-row stub the staff gate needs — mirror pendingOrders.test.js
+  };
+
+  test('no purchase token needed; the order records who rang it up', async () => {
+    await adminStubs();
+    mock.method(Student, 'findById', () =>
+      queryFor(studentRow({ isParentRegistered: true, requiresParentApproval: false })));
+
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    const created = [];
+    mock.method(PendingOrder, 'create', async (doc) => { created.push(doc); return { _id: '507f191e810c19729de860ed', ...doc }; });
+
+    const consumed = mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
+
+    const res = await asAdmin('/api/pending-orders', {
+      method: 'POST',
+      body: JSON.stringify({ studentId: STUDENT_ID, items: CART }),
+    });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.length, 1, 'requiresParentApproval:false must still become a pending order, never a charge');
+    assert.equal(String(created[0].raisedBy), ADMIN_ID);
+    assert.equal(consumed.mock.callCount(), 0, 'the admin path must not touch purchase tokens');
+  });
+
+  test('a student whose parent has not registered cannot be admin-billed', async () => {
+    await adminStubs();
+    mock.method(Student, 'findById', () =>
+      queryFor(studentRow({ isParentRegistered: false })));
+
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    const create = mock.method(PendingOrder, 'create', async (doc) => doc);
+
+    const res = await asAdmin('/api/pending-orders', {
+      method: 'POST',
+      body: JSON.stringify({ studentId: STUDENT_ID, items: CART }),
+    });
+
+    assert.equal(res.status, 409);
+    assert.equal((await res.json()).code, 'NO_PARENT');
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('the admin exemption does not leak to student sessions', async () => {
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(Student, 'findById', () => queryFor(studentRow()));
+    mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
+
+    const res = await asStudent('/api/pending-orders', {
+      method: 'POST',
+      body: JSON.stringify({ items: CART }),  // no purchaseToken
+    });
+    assert.ok(res.status >= 400, 'a student without a purchase token must still be refused');
+  });
+});
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+Run: `cd backend && node --test tests/kioskSession.test.js`
+Expected: FAIL — the admin call is refused for lacking a purchase token, and `raisedBy` doesn't exist.
+
+- [ ] **Step 3: Implement**
+
+`backend/models/PendingOrder.js` — add (read the file for style; it's a plain schema):
+
+```js
+  // Set when an admin rang the order up at the console. The parent's approval
+  // is what spends the money either way; this is who asked.
+  raisedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
+```
+
+`createPendingOrder` — after Task 7's `studentId` resolution and the items validation, branch on the caller:
+
+```js
+    const items = asItems(req.body.items);
+
+    if (req.staff && !req.student) {
+      /* The admin path. No purchase token: the admin's own signed-in identity
+         is what authorizes *raising* the order, and the parent approving it in
+         the app is what spends the money — always, regardless of the student's
+         requiresParentApproval setting. That is the deal that let the code
+         requirement go from the console.
+
+         Which is also why a student with no registered parent is refused: an
+         order nobody can approve is not an order, and finding that out here
+         beats a cart that sits pending forever. */
+      const student = await Student.findById(studentId).select('isParentRegistered');
+
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+
+      if (!student.isParentRegistered) {
+        return res.status(409).json({
+          code: 'NO_PARENT',
+          message:
+            "This student's parent has not registered in the app, so there is " +
+            'nobody to approve the order. Invite the parent to register — or ' +
+            'the student can buy at the kiosk with their purchase code.',
+        });
+      }
+    } else {
+      const authorization = await consumeAuthorization({
+        token: purchaseToken,
+        studentId,
+        items,
+      });
+
+      if (!authorization.ok) {
+        // ... existing refusal, unchanged ...
+      }
+    }
+```
+
+and where the order is created, add `raisedBy: req.staff?.id ?? null` to the document. (Import `Student` if the controller does not already.)
+
+- [ ] **Step 4: Run to verify pass**
+
+Run: `cd backend && node --test tests/kioskSession.test.js` — PASS. `npm test` — green; `pendingOrders.test.js` exercises the old staff path, which now takes the admin branch — if any of its tests assert a purchase-token refusal *for staff callers*, update them to the new contract (admin needs no token) and say so in the commit message.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/controllers/pendingOrderController.js backend/models/PendingOrder.js backend/tests/kioskSession.test.js
+git commit -m "Admin-billed orders always wait for the parent, code not asked"
+```
+
+---
+
+### Task 9: Kiosk login becomes an admission-number pad
+
+**Files:**
+- Modify: `hungerhunt-kiosk/src/utils/api.js`, `hungerhunt-kiosk/src/pages/Login.jsx`, `hungerhunt-kiosk/src/components/ProtectedRoute.jsx`, `hungerhunt-kiosk/src/App.jsx`, `hungerhunt-kiosk/src/kiosk.css`
+
+**Interfaces:**
+- Consumes: `POST /api/students/kiosk-session` (Task 5's exact response shape).
+- Produces: localStorage keys `kioskToken` (the JWT) and `kioskStudent` (JSON of the `student` object) — Task 10 reads both. `KioskScreen` passes `student` and `onLogout` props to `KioskBilling`. The `adminToken`/`staffRole` keys are gone from the kiosk app.
 
 - [ ] **Step 1: Rewire `api.js`**
 
@@ -1151,7 +1364,7 @@ const Login = () => {
 export default Login;
 ```
 
-Note: the admission number is not forced to digits — school IDs can carry letters (`ADM-1042`). `inputMode="numeric"` only suggests the pad.
+The admission number is deliberately not forced to digits — school IDs can carry letters (`ADM-1042`); `inputMode="numeric"` only suggests the pad.
 
 - [ ] **Step 3: Gate on the student session**
 
@@ -1177,7 +1390,7 @@ const ProtectedRoute = ({ children }) => {
 export default ProtectedRoute;
 ```
 
-`App.jsx` — `KioskScreen` becomes:
+`App.jsx` — `KioskScreen` becomes (add `Navigate` to the existing `react-router-dom` import if not present):
 
 ```jsx
 // The kiosk owns the session's ending: every way out — Done, the timers, the
@@ -1207,11 +1420,9 @@ function KioskScreen() {
 }
 ```
 
-(add `Navigate` to the existing `react-router-dom` import list — it is already there.)
-
 - [ ] **Step 4: Style the gate**
 
-In `hungerhunt-kiosk/src/kiosk.css`, next to the existing `.kiosk-welcome` block (which Task 8 deletes), add:
+In `hungerhunt-kiosk/src/kiosk.css`, next to the existing `.kiosk-welcome` block (which Task 10 deletes), add:
 
 ```css
 /* ---- the gate ----------------------------------------------------------- */
@@ -1269,9 +1480,9 @@ In `hungerhunt-kiosk/src/kiosk.css`, next to the existing `.kiosk-welcome` block
 }
 ```
 
-- [ ] **Step 5: Verify by running the app**
+- [ ] **Step 5: Verify**
 
-Run: `cd hungerhunt-kiosk && npm run dev` with the backend up (`cd backend && npm run dev`), or verify statically: `npm run build` compiles, and `npm run lint` passes. With a seeded student carrying an `admissionNumber` and a purchase code, the pad logs in and lands on the (still search-bar-bearing) till; an unknown number shows the 404 message.
+Run: `cd hungerhunt-kiosk && npm run lint && npm run build` — clean. Live with the backend up: a seeded student with an `admissionNumber` and a code logs in and lands on the (still search-bar-bearing) till; an unknown number shows the 404 message; a code-less student shows the 403 message.
 
 - [ ] **Step 6: Commit**
 
@@ -1282,16 +1493,16 @@ git commit -m "Open the kiosk with an admission number instead of a staff accoun
 
 ---
 
-### Task 8: The till serves the session's student
+### Task 10: The till serves the session's student
 
 **Files:**
 - Modify: `hungerhunt-kiosk/src/pages/KioskBilling.jsx`, `hungerhunt-kiosk/src/kiosk.css`
 
 **Interfaces:**
-- Consumes: `student` and `onLogout` props from Task 7. Backend routes from Tasks 4–6 (no `studentId`/`phone` in request bodies).
-- Produces: a till with no student search, no welcome splash; a session header; a result screen state `result: null | 'paid' | 'pending'` that Task 9's timers treat as session-over. Exposes `payingRef` semantics unchanged for Task 9's in-flight-bill exception.
+- Consumes: `student` and `onLogout` props from Task 9; backend routes from Tasks 5–7 (no `studentId`/`phone` in bodies).
+- Produces: a till with no student search and no welcome splash; a session header; a result-screen state `result: null | 'paid' | 'pending'` that Task 11's timers treat as session-over; `payingRef` semantics unchanged for Task 11's in-flight-bill exception.
 
-**Caution:** the admin console mounts its own *copy* of an older KioskBilling — this file is kiosk-only (see `scripts/check-shared-files.mjs`, where its entry is already red by design). Nothing here touches `frontend-admin`.
+**Caution:** the admin console mounts its own separate copy of an older KioskBilling — this file is kiosk-only (`scripts/check-shared-files.mjs` lists it as red by design). Nothing here touches `frontend-admin`.
 
 - [ ] **Step 1: Take the student from the session**
 
@@ -1302,8 +1513,8 @@ In `KioskBilling.jsx`:
 - Add state:
 
 ```jsx
-  // The session's student, seeded from login. Balance is re-read from the
-  // session payload only — the till never looks a student up.
+  // The session's student, seeded from login. Balance is the login snapshot —
+  // the till never looks a student up; the server re-checks at charge time.
   const [student] = useState(sessionStudent);
 
   // null | 'paid' | 'pending' — set when the sale ends, drives the result
@@ -1312,12 +1523,12 @@ In `KioskBilling.jsx`:
 ```
 
 - Delete functions: `selectStudent`, `handleStudentSearch`.
-- Replace every `selectedStudent` read with `student` (checkout guard, wallet math, verify modal, ticket header). `remaining`, `short`, `canPay` keep their logic with `student` in place of `selectedStudent`.
-- Delete the `showWelcome` early-return block (lines ~485–494) and the `.kiosk-welcome` / `.kiosk-start`-block CSS in `kiosk.css` **except** keep the `.kiosk-start` button class — the login gate reuses it.
+- Replace every `selectedStudent` read with `student` (checkout guard, wallet math, verify modal, ticket header). `remaining`, `short`, `canPay` keep their logic.
+- Delete the `showWelcome` early-return block and the `.kiosk-welcome`-specific CSS in `kiosk.css`, **keeping** the `.kiosk-start` button class — the gate and prompts reuse it.
 
 - [ ] **Step 2: Replace the lookup bar with the session header**
 
-In the `wall-top` JSX, delete the `selectedStudent ? … : <form className="wall-lookup …">` conditional and the `searchResults` block below it, and render unconditionally:
+In the `wall-top` JSX, delete the `selectedStudent ? … : <form className="wall-lookup …">` conditional and the `searchResults` block, and render unconditionally:
 
 ```jsx
           <div className="wall-top">
@@ -1342,22 +1553,15 @@ In the `wall-top` JSX, delete the `selectedStudent ? … : <form className="wall
           </div>
 ```
 
-The `onLogout &&`-guarded Sign out button and `inventoryError` banner stay as they are (drop only the lookup form and results list).
+The `inventoryError` banner stays. The separate Sign out button goes — **Done** is the session's exit.
 
 - [ ] **Step 3: Stop sending what the server now derives**
 
-- `handleVerifyAndPay`: body becomes `{ password: purchasePassword, items }` — no `studentId`, no `phone`.
-- `handleCheckout`: body becomes `{ items, totalAmount: invoiceTotal, purchaseToken }`. Remove the "Please search and select a student first" guard (a session always has its student); keep the balance guard.
-- `requestApproval`: body becomes `{ items, purchaseToken }`.
-- In the two success paths, **replace** `toast.success(...)` + `applyInventory(...)` + `resetTerminal()` with:
-
-```jsx
-      setResult("paid");        // in handleCheckout
-      setResult("pending");     // in requestApproval
-```
-
-- Delete `resetTerminal` entirely — the session ends instead of resetting.
-- Handle the lock: in `handleVerifyAndPay`'s catch, before the generic toast:
+- `handleVerifyAndPay`: body `{ password: purchasePassword, items }` — no `studentId`, no `phone`.
+- `handleCheckout`: body `{ items, totalAmount: invoiceTotal, purchaseToken }`; drop the "search and select a student" guard; keep the balance guard.
+- `requestApproval`: body `{ items, purchaseToken }`.
+- Success paths: replace `toast.success(...)` / `applyInventory(...)` / `resetTerminal()` with `setResult("paid")` (checkout) and `setResult("pending")` (approval). Delete `resetTerminal`.
+- Lock handling in `handleVerifyAndPay`'s catch, before the generic toast:
 
 ```jsx
       if (err.response?.status === 423) {
@@ -1369,11 +1573,11 @@ The `onLogout &&`-guarded Sign out button and `inventoryError` banner stay as th
 
 - [ ] **Step 4: The result screen**
 
-Above the main `return`, after the `showVerifyModal` state is settled:
+Above the main `return`:
 
 ```jsx
   // The sale has ended; hold the answer for 5 seconds, or a tap. The timers
-  // (Task 9) do not run here — the session is already over.
+  // (Task 11) do not run here — the session is already over.
   useEffect(() => {
     if (!result) return;
     const exit = setTimeout(onLogout, 5000);
@@ -1397,7 +1601,7 @@ Above the main `return`, after the `showVerifyModal` state is settled:
   }
 ```
 
-And in `kiosk.css`:
+`kiosk.css` (`rise-in` already exists in the file):
 
 ```css
 /* ---- the ending --------------------------------------------------------- */
@@ -1455,11 +1659,9 @@ And in `kiosk.css`:
 }
 ```
 
-(`rise-in` already exists in this file.)
-
 - [ ] **Step 5: Verify**
 
-Run: `cd hungerhunt-kiosk && npm run lint && npm run build` — both clean (lint will catch any orphaned reference to the deleted state). Then run the app against the backend: log in, order, pay with the right code → "Order confirmed" → back at the gate after 5 s; five wrong codes → lock toast → back at the gate.
+Run: `cd hungerhunt-kiosk && npm run lint && npm run build` — clean (lint catches orphaned references to the deleted state). Live: log in, order, pay with the right code → "Order confirmed" → gate after 5 s; five wrong codes → lock toast → gate.
 
 - [ ] **Step 6: Commit**
 
@@ -1470,16 +1672,15 @@ git commit -m "Serve the session's student and end the sale on a result screen"
 
 ---
 
-### Task 9: Session timers
+### Task 11: Session timers
 
 **Files:**
-- Create: `hungerhunt-kiosk/src/hooks/useSessionTimers.js`
-- Create: `hungerhunt-kiosk/src/hooks/useSessionTimers.test.js`
-- Modify: `hungerhunt-kiosk/src/pages/KioskBilling.jsx`, `hungerhunt-kiosk/src/kiosk.css`, `hungerhunt-kiosk/package.json` (vitest)
+- Create: `hungerhunt-kiosk/src/hooks/useSessionTimers.js`, `hungerhunt-kiosk/src/hooks/useSessionTimers.test.js`, `hungerhunt-kiosk/vitest.config.js`
+- Modify: `hungerhunt-kiosk/src/pages/KioskBilling.jsx`, `hungerhunt-kiosk/src/kiosk.css`, `hungerhunt-kiosk/package.json`
 
 **Interfaces:**
 - Consumes: `onLogout` and `payingRef` from KioskBilling; `result` state (timers stop when set).
-- Produces: `useSessionTimers({ active, onExpire, isBusy })` returning `{ capRemaining, capWarning, idlePrompt, idleRemaining, dismissIdle }`. All numbers in seconds. `capWarning` true in the final 30 s. `idlePrompt` true while "Still there?" shows.
+- Produces: `useSessionTimers({ active, onExpire, isBusy })` → `{ capRemaining, capWarning, idlePrompt, idleRemaining, dismissIdle }`. Seconds throughout. `capWarning` true in the final 30 s; `idlePrompt` true while "Still there?" shows.
 
 - [ ] **Step 1: Add vitest**
 
@@ -1487,7 +1688,7 @@ git commit -m "Serve the session's student and end the sale on a result screen"
 cd hungerhunt-kiosk && npm install -D vitest jsdom @testing-library/react
 ```
 
-In `hungerhunt-kiosk/package.json` scripts: `"test": "vitest run"`. Create `vitest.config.js`:
+Add `"test": "vitest run"` to scripts. Create `vitest.config.js`:
 
 ```js
 import { defineConfig } from 'vite';
@@ -1550,10 +1751,7 @@ describe('the hard cap', () => {
     const onExpire = vi.fn();
     renderHook(() => useSessionTimers({ active: true, onExpire, isBusy: () => false }));
 
-    for (let i = 0; i < 45; i++) {
-      tick(10);
-      act(() => { window.dispatchEvent(new Event('pointerdown')); });
-    }
+    tickTouching(450);
     expect(onExpire).toHaveBeenCalled();
   });
 
@@ -1582,7 +1780,7 @@ describe('the idle prompt', () => {
     tick(1);
     expect(result.current.idlePrompt).toBe(true);
 
-    act(() => { window.dispatchEvent(new Event('pointerdown')); });
+    touch();
     expect(result.current.idlePrompt).toBe(false);
     expect(onExpire).not.toHaveBeenCalled();
   });
@@ -1655,8 +1853,8 @@ export const useSessionTimers = ({ active, onExpire, isBusy }) => {
   const [idlePrompt, setIdlePrompt] = useState(false);
   const [idleRemaining, setIdleRemaining] = useState(PROMPT_SECONDS);
 
-  // The idle countdowns live in refs and surface through state once a second;
-  // the interval is the single writer, so the two cannot disagree.
+  // The countdowns live in refs and surface through state once a second; the
+  // interval is the single writer, so the two cannot disagree.
   const idleQuietRef = useRef(0);
   const promptLeftRef = useRef(PROMPT_SECONDS);
   const expiredRef = useRef(false);
@@ -1742,7 +1940,7 @@ export const useSessionTimers = ({ active, onExpire, isBusy }) => {
 };
 ```
 
-Note for the implementer: the `touched` handler closes over `showingPrompt`, which the interval also writes — both live inside the same effect, so this is one closure, not a stale-props hazard. If the tests disagree with the implementation, trust the tests' described behavior.
+`touched` and the interval share `showingPrompt` inside one effect closure — deliberate, not a stale-props hazard. If tests and implementation disagree, trust the tests' described behavior.
 
 - [ ] **Step 5: Run to verify pass**
 
@@ -1785,7 +1983,7 @@ In the JSX, alongside the verify modal:
       )}
 ```
 
-And the styles:
+Styles:
 
 ```css
 /* ---- session clocks ----------------------------------------------------- */
@@ -1840,11 +2038,11 @@ And the styles:
 }
 ```
 
-One subtlety: the veil's own backdrop click counts as a `pointerdown` on `window`, which resets the idle clock and dismisses the prompt — exactly the "any touch dismisses it" behavior the spec asks for. No extra handler needed.
+The veil's backdrop click is itself a window `pointerdown`, which resets the idle clock and dismisses the prompt — exactly "any touch dismisses it". No extra handler.
 
 - [ ] **Step 7: Verify in the app**
 
-`npm run lint && npm run build && npm test` — clean. Live check with the dev server: leave the till untouched 30 s → prompt with a visible countdown; touch → gone; ignore → gate. (For the 7:30 cap, temporarily set `HARD_CAP_SECONDS` low in the dev session if desired, but **commit it at 450**.)
+`npm run lint && npm run build && npm test` — clean. Live: untouched 30 s → prompt with countdown; touch → gone; ignored → gate. (For the cap, temporarily lower `HARD_CAP_SECONDS` in the dev session if desired, but **commit it at 450**.)
 
 - [ ] **Step 8: Commit**
 
@@ -1855,29 +2053,108 @@ git commit -m "Give the session two clocks and a way to say still-there"
 
 ---
 
-### Task 10: Admission number in the admin console
+### Task 12: Admin Billing — no code, always parent approval
+
+**Files:**
+- Modify: `frontend-admin/src/pages/Billing.jsx`
+
+**Interfaces:**
+- Consumes: Task 8's admin branch — `POST /pending-orders { studentId, items }` → 201, or 409 `{ code: 'NO_PARENT' }`; `isParentRegistered` in search results (Task 1).
+- Produces: a billing screen with no verify modal, no code entry, no `verify-payment`/`bill` calls.
+
+- [ ] **Step 1: Rework the checkout flow**
+
+Read `frontend-admin/src/pages/Billing.jsx` in full first — it is the admin console's own till and shares idioms, not code, with the kiosk. Then:
+
+- Delete the verify modal JSX, `purchasePassword` state, the `PURCHASE_CODE_LENGTH` gating, and the handlers calling `/transactions/verify-payment` and `/transactions/bill`.
+- The pay button becomes **"Send for approval"** and posts directly:
+
+```jsx
+  const sendForApproval = async () => {
+    if (payingRef.current) return;
+    payingRef.current = true;
+    setPaying(true);
+
+    try {
+      await api.post("/pending-orders", {
+        studentId: selectedStudent._id,
+        items: billedItems(),
+      });
+
+      toast.success(
+        `Order sent to ${selectedStudent.name}'s parent for approval — nothing has been charged yet.`,
+        { duration: 8000 }
+      );
+
+      resetTerminal();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Could not send the order for approval",
+        { duration: 8000 }
+      );
+    } finally {
+      payingRef.current = false;
+      setPaying(false);
+    }
+  };
+```
+
+(Keep the existing `payingRef` double-tap guard and `resetTerminal` if the file has them; adapt names to the file's own.)
+
+- [ ] **Step 2: Refuse unregistered-parent students visibly**
+
+Where the pay button renders:
+
+```jsx
+  const parentMissing = selectedStudent && !selectedStudent.isParentRegistered;
+```
+
+- Disable the button when `parentMissing`.
+- Beside it, when `parentMissing`, show the reason (use the file's existing banner/hint idiom):
+  "This student's parent hasn't registered in the app, so there's nobody to approve an order. The student can buy at the kiosk with their purchase code."
+
+The server refuses anyway (409 `NO_PARENT`); the UI check just says it before the round trip.
+
+- [ ] **Step 3: Sweep the copy**
+
+Any remaining "verify", "purchase code", or phone-related copy on this screen goes. The screen's promise is now: *build the cart, send it, the parent decides.*
+
+- [ ] **Step 4: Verify**
+
+Run: `cd frontend-admin && npm run build` — clean. Live: bill a registered-parent student → pending order appears in the parent app, nothing charged; an unregistered-parent student → button disabled with the reason; approve in the parent app → charge lands (existing flow).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend-admin/src/pages/Billing.jsx
+git commit -m "The admin till raises orders for parents to approve, code not asked"
+```
+
+---
+
+### Task 13: Admission number in the admin console roster
 
 **Files:**
 - Modify: `frontend-admin/src/pages/Students.jsx`
 
 **Interfaces:**
-- Consumes: Task 1's `WRITABLE_FIELDS` (the backend already accepts the field on add/edit/bulk).
-- Produces: the field on the add/edit form, the roster table, and available to bulk import sheets by column name `admissionNumber`.
+- Consumes: Task 1's `WRITABLE_FIELDS` (backend already accepts the field on add/edit/bulk).
+- Produces: the field on the add/edit form, the roster table, and available to bulk-import sheets by column name `admissionNumber`.
 
-- [ ] **Step 1: Add the field to the form and table**
+- [ ] **Step 1: Add the field everywhere `hostelNumber` appears as the pattern**
 
-In `frontend-admin/src/pages/Students.jsx` (read the file first; these are the four places the existing `hostelNumber` handling shows the pattern):
+In `frontend-admin/src/pages/Students.jsx` (read first; approximate anchors):
 
-- `emptyForm` (~line 18): add `admissionNumber: '',`
-- The columns list (~line 26): add `{ key: 'admissionNumber', label: 'Admission No.' },`
-- The edit-seeding object (~line 231): add `admissionNumber: st.admissionNumber,`
-- The form-fields list (~line 240): add `{ key: 'admissionNumber', label: 'Admission Number', type: 'text' },`
+- `emptyForm` (~line 18): `admissionNumber: '',`
+- Columns list (~line 26): `{ key: 'admissionNumber', label: 'Admission No.' },`
+- Edit-seeding object (~line 231): `admissionNumber: st.admissionNumber,`
+- Form-fields list (~line 240): `{ key: 'admissionNumber', label: 'Admission Number', type: 'text' },`
 
-Search the file for any explicit payload construction on submit — if the form posts the whole form object, nothing more is needed; if it picks fields, add `admissionNumber` there too.
+If the submit handler picks fields explicitly rather than posting the whole form object, add `admissionNumber` there too.
 
 - [ ] **Step 2: Verify**
 
-Run: `cd frontend-admin && npm run build` (and `npm run lint` if the script exists) — clean. Live: add a student with an admission number, edit it, see it in the roster. A duplicate number surfaces the driver's E11000 message from the existing error path — acceptable; the number is school-issued and duplicates are data errors.
+Run: `cd frontend-admin && npm run build` — clean. Live: add a student with an admission number, edit it, see it in the roster. A duplicate surfaces the driver's E11000 through the existing error path — acceptable; the number is school-issued and a duplicate is a data error.
 
 - [ ] **Step 3: Commit**
 
@@ -1888,7 +2165,7 @@ git commit -m "Let the back office see and set admission numbers"
 
 ---
 
-### Task 11: Full-suite sweep and release notes
+### Task 14: Full-suite sweep and release notes
 
 **Files:**
 - Modify: `backend/.env.example`, `RELEASE-CHECKLIST.md`
@@ -1901,31 +2178,35 @@ cd ../hungerhunt-kiosk && npm run lint && npm run build && npm test
 cd ../frontend-admin && npm run build
 ```
 
-All green before proceeding. Fix anything that isn't — the likeliest strays are tests still posting `phone`/`studentId` shapes (harmless, but tidy them to the new shape while there) and lint catching dead imports in KioskBilling.
+All green before proceeding. Likeliest strays: tests still posting `phone`/`studentId` shapes (harmless — tidy to the new shape while there), lint catching dead imports in KioskBilling or Billing, and any cashier reference the Task 2 grep missed.
 
 - [ ] **Step 2: Record the deploy surface**
 
-- `backend/.env.example`: add `STUDENT_JWT_SECRET=` beside `PARENT_JWT_SECRET=` with a one-line comment: `# Signs kiosk student sessions. Falls back to JWT_SECRET when unset.`
-- `RELEASE-CHECKLIST.md`: add three items under the existing structure:
+- `backend/.env.example`: add `STUDENT_JWT_SECRET=` beside `PARENT_JWT_SECRET=` with: `# Signs kiosk student sessions. Falls back to JWT_SECRET when unset.`
+- `RELEASE-CHECKLIST.md`, under the existing structure:
   - Set `STUDENT_JWT_SECRET` in production.
   - Import admission numbers via bulk import before enabling the kiosk — a student without one cannot log in.
   - The kiosk session route is open by design; the accepted risk and its upgrade path (device enrollment) are in `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md`.
+  - Cashier accounts no longer sign in; any `role: 'cashier'` row should be deleted or re-created as admin/warehouse.
+  - Admin-billed orders now always await parent approval; students without a registered parent can buy only at the kiosk.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add backend/.env.example RELEASE-CHECKLIST.md
-git commit -m "Write down what the kiosk deploy needs"
+git commit -m "Write down what the kiosk and billing deploys need"
 ```
 
 ---
 
 ## Self-Review (performed while writing)
 
-**Spec coverage.** Screens 1–4 → Tasks 7, 8; timers incl. the in-flight-bill exception → Task 9; data model → Task 1; token/middleware/session route → Tasks 2–4; verify-payment reshape + lockout → Task 5; bill/pending-orders scoping → Task 6; admin form + bulk import → Tasks 1, 10; accepted-risk mitigations (limiter, minimal fields) → Task 4; welcome-splash removal → Task 8; `/students/search` untouched → no task touches it; deploy notes → Task 11. Frontend timer coverage → Task 9's vitest suite. Existing-test updates → Tasks 5–6 run the affected suites and Task 5 Step 1 handles any wrong-phone assertion.
+**Spec coverage — kiosk spec:** screens → Tasks 9, 10; timers incl. in-flight exception → Task 11; data model → Task 1; token/middleware/session route → Tasks 3–5; verify-payment reshape + lockout → Task 6; bill/pending scoping → Task 7; admin form + bulk import → Tasks 1, 13; accepted-risk mitigations → Task 5; welcome-splash removal → Task 10; deploy notes → Task 14. **Admin-billing spec:** cashier removal → Task 2 (incl. the `warehouseRole.test.js` collision); admin branch + `NO_PARENT` + `raisedBy` → Task 8; Billing UI → Task 12; transition tolerance on `verify-payment`/`bill` → Tasks 6–7 keep the body-`studentId` path.
 
 **Known judgment calls, made deliberately:**
-- The lockout counts wrong codes from staff tills too, not just kiosk sessions — one rule, one counter, and a guesser gains nothing by walking to the admin counter.
-- `pocketMoney` in the session payload is a snapshot at login; the server re-checks balance at charge time, so a stale display can at worst show a number that then fails the charge with a clear message.
-- Kiosk keeps `authBypassEnabled` plumbing; its removal is an existing release-checklist item, out of scope here (memory: parent-app release plan).
-- `GET /pending-orders/:id/status` is re-scoped for completeness per the spec even though the current kiosk build does not poll it.
+- `protectAdminOrStudent` (not `protectStaffOrStudent`) — named for the post-cashier world; Task 2 lands before Task 4 so the name is honest when written.
+- The lockout counts wrong codes wherever `verify-payment` is called — including a stale pre-deploy admin console. One rule, one counter.
+- `pocketMoney` on the kiosk is a login snapshot; the server re-checks at charge time, so staleness at worst yields a clearly-messaged failed charge.
+- Kiosk keeps `authBypassEnabled` plumbing; removal is an existing release-checklist item.
+- `GET /pending-orders/:id/status` re-scoped for completeness per spec though the current kiosk build does not poll it.
+- Task ordering puts all backend work (1–8) before any frontend task, so the UI is only ever written against routes that exist.

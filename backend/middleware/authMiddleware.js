@@ -1,5 +1,6 @@
 import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
+import Student from '../models/Student.js';
 import { verifyToken } from '../utils/tokens.js';
 import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './devBypass.js';
 
@@ -84,6 +85,55 @@ export const protectAnyStaff = staffGate(
   ['admin', 'cashier', 'warehouse'],
   'This action needs a staff account.'
 );
+
+/* The kiosk's student session.
+ *
+ * The token settles who it is for. The lookup settles that the row is still
+ * there, which is the only thing that retires an unexpired token inside its
+ * 450 seconds — the same price protectParent pays, for the same reason.
+ *
+ * Note what this gate does *not* prove: the student typed no secret to get
+ * here. It says which student the session belongs to, not that they are who
+ * they say. What guards the money is the purchase code at checkout. */
+export const protectStudent = async (req, res, next) => {
+  const token = readToken(req);
+  if (!token) return denied(res, 'Not authorized, no token');
+
+  const payload = verifyToken(token, 'student');
+  if (!payload) return denied(res, 'Not authorized');
+
+  try {
+    if (!(await Student.exists({ _id: payload.id }))) {
+      return denied(res, 'Not authorized');
+    }
+  } catch (error) {
+    return denied(res, 'Token failed, invalid authorization');
+  }
+
+  req.student = { id: payload.id, admissionNumber: payload.admissionNumber };
+  next();
+};
+
+/* The till's routes now serve two audiences: the admin console, holding a
+ * staff token, and the kiosk, holding a student session. This wraps whichever
+ * staff gate a route already has rather than replacing it, so a route keeps
+ * its own answer for staff — protectStaff and protectAnyStaff say different
+ * things to a warehouse account, and that distinction survives.
+ *
+ * A student-signed token takes the student path; everything else, including a
+ * missing or unreadable one, falls through to the staff gate so its errors and
+ * its bypass behaviour are unchanged. */
+export const orStudent = (staffGate) => (req, res, next) => {
+  if (authBypassEnabled) return staffGate(req, res, next);
+
+  const token = readToken(req);
+
+  if (token && verifyToken(token, 'student')) {
+    return protectStudent(req, res, next);
+  }
+
+  return staffGate(req, res, next);
+};
 
 // Admin registration is open only long enough to create the very first account.
 // Once one exists it demands a signed-in admin, so that authorization is decided

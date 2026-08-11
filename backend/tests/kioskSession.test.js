@@ -46,3 +46,73 @@ describe('the Student schema carries the kiosk fields', () => {
     assert.equal(doc.purchaseCodeLockedUntil, null);
   });
 });
+
+const { signStudentToken, signAdminToken } = await import('../utils/tokens.js');
+const Admin = (await import('../models/Admin.js')).default;
+const Inventory = (await import('../models/Inventory.js')).default;
+
+const STUDENT_ID = '507f191e810c19729de860ea';
+const ADMIN_ID = '507f1f77bcf86cd799439012';
+
+// Mongoose queries are thenable and chainable; the controllers await some
+// directly and call .select()/.populate() on others.
+const queryFor = (value) => {
+  const query = Promise.resolve(value);
+  query.select = () => query;
+  query.populate = () => query;
+  return query;
+};
+
+const asStudent = (path, options = {}) =>
+  fetch(base + path, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${signStudentToken(STUDENT_ID, 'ADM-1042')}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+const asAdmin = (path, options = {}) =>
+  fetch(base + path, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${signAdminToken(ADMIN_ID)}`,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+const stubInventory = () => mock.method(Inventory, 'find', () => queryFor([]));
+
+describe('the till read gate takes a student session or staff', () => {
+  test('a live student token is let through', async () => {
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    stubInventory();
+
+    const res = await asStudent('/api/inventory');
+    assert.equal(res.status, 200);
+  });
+
+  // The only thing that retires an unexpired token before its 450 seconds are
+  // up, and the reason the gate pays for a lookup per request.
+  test("a deleted student's unexpired token is refused", async () => {
+    mock.method(Student, 'exists', async () => null);
+
+    const res = await asStudent('/api/inventory');
+    assert.equal(res.status, 401);
+  });
+
+  test('staff still read it — the console and the storeroom must not break', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubInventory();
+
+    const res = await asAdmin('/api/inventory');
+    assert.equal(res.status, 200);
+  });
+
+  test('no token is still no entry', async () => {
+    const res = await fetch(base + '/api/inventory');
+    assert.equal(res.status, 401);
+  });
+});

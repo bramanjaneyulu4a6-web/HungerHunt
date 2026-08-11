@@ -8,9 +8,10 @@ import jwt from 'jsonwebtoken';
 
 process.env.JWT_SECRET = 'admin-test-secret';
 process.env.PARENT_JWT_SECRET = 'parent-test-secret';
+process.env.STUDENT_JWT_SECRET = 'student-test-secret';
 
 const {
-  signAdminToken, signParentToken, verifyToken, parentSecretChangeover,
+  signAdminToken, signParentToken, signStudentToken, verifyToken, parentSecretChangeover,
 } = await import('../utils/tokens.js');
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';
@@ -147,5 +148,51 @@ describe('when PARENT_JWT_SECRET is not set', () => {
   test('reports nothing outstanding once the key is set', () => {
     setGrace(FUTURE);
     assert.equal(parentSecretChangeover().pending, false);
+  });
+});
+
+// The kiosk's student session — the third identity, and the first one whose
+// token is short-lived by design rather than by policy.
+describe('student tokens', () => {
+  const STUDENT_ID = '507f191e810c19729de860ff';
+
+  test('a student token opens the student role and nothing else', () => {
+    const token = signStudentToken(STUDENT_ID, 'ADM-1042');
+    const payload = verifyToken(token, 'student');
+
+    assert.equal(payload?.id, STUDENT_ID);
+    assert.equal(payload?.admissionNumber, 'ADM-1042');
+    assert.equal(verifyToken(token, 'staff'), null);
+    assert.equal(verifyToken(token, 'parent'), null);
+  });
+
+  test('staff and parent tokens do not open the student role', () => {
+    assert.equal(verifyToken(signAdminToken(ADMIN_ID), 'student'), null);
+    assert.equal(verifyToken(signParentToken(PARENT_ID, '9876543210'), 'student'), null);
+  });
+
+  test('expires in 450 seconds — the session cap, enforced here', () => {
+    const { exp, iat } = jwt.decode(signStudentToken(STUDENT_ID, 'ADM-1042'));
+    assert.equal(exp - iat, 450);
+  });
+
+  /* The legacy grace window carries pre-role staff and parent tokens across a
+     deploy. No student token predates the role claim, so a roleless token must
+     never be read as a student.
+
+     The secret is what makes this worth a test: STUDENT_JWT_SECRET is optional
+     and falls back to JWT_SECRET, which is the key those legacy tokens were
+     signed with. Unset here on purpose — with the key set, jwt.verify would
+     reject them and the guard would never be reached. */
+  test('a roleless legacy token is not a student, even sharing the admin key', () => {
+    const studentKey = process.env.STUDENT_JWT_SECRET;
+    delete process.env.STUDENT_JWT_SECRET;
+
+    try {
+      setGrace(FUTURE);
+      assert.equal(verifyToken(legacyToken({ id: STUDENT_ID }), 'student'), null);
+    } finally {
+      process.env.STUDENT_JWT_SECRET = studentKey;
+    }
   });
 });

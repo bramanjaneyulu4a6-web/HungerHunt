@@ -16,6 +16,17 @@ const parentSecret = () => process.env.PARENT_JWT_SECRET || adminSecret();
 
 export const parentSecretIsShared = () => !process.env.PARENT_JWT_SECRET;
 
+// The kiosk's student session. Third instance of the same pattern, with the
+// same fallback and for the same reason: a deploy that has not set the key
+// should keep working rather than turn every kiosk away, and the role claim
+// still holds while it is shared.
+const studentSecret = () => process.env.STUDENT_JWT_SECRET || adminSecret();
+
+// 7 minutes 30 seconds — the kiosk session's hard cap. The terminal counts it
+// down on screen, but this is what enforces it: the session cannot be extended
+// by reloading the page, because a reload does not mint a new token.
+export const STUDENT_SESSION_SECONDS = 450;
+
 // Staff sign in on two terminals with very different reach. The back office
 // edits the catalogue, tops up wallets and creates accounts; the till only
 // needs to find a student and take their money. Both are staff and both are
@@ -39,6 +50,14 @@ export const signStaffToken = (id, role = 'admin') => {
 };
 
 export const signAdminToken = (id) => signStaffToken(id, 'admin');
+
+// The student standing at the kiosk. admissionNumber rides along so the
+// terminal can name whose session it is without a second lookup; it is the
+// id that authorizes anything.
+export const signStudentToken = (id, admissionNumber) =>
+  jwt.sign({ id, admissionNumber, role: 'student' }, studentSecret(), {
+    expiresIn: STUDENT_SESSION_SECONDS,
+  });
 
 // v carries the account's tokenVersion, which is what makes a parent session
 // revocable before its seven days are up. See atTokenVersion in the auth
@@ -98,7 +117,13 @@ export const parentSecretChangeover = () => ({
 // the token is not a parent's.
 export const verifyToken = (token, role) => {
   const wantsStaff = role === 'staff' || isStaffRole(role);
-  const secrets = [wantsStaff ? adminSecret() : parentSecret()];
+  const secrets = [
+    wantsStaff
+      ? adminSecret()
+      : role === 'student'
+        ? studentSecret()
+        : parentSecret(),
+  ];
 
   // A legacy parent token was signed with JWT_SECRET, which is a different key
   // from the parent one once PARENT_JWT_SECRET is set. Nothing equivalent is
@@ -126,7 +151,16 @@ export const verifyToken = (token, role) => {
     //
     // A roleless staff token is a full admin's: cashiers did not exist when any
     // of them was issued, so there is no reading of one that grants less.
-    return payload.role === undefined && legacyAccepted() ? payload : null;
+    //
+    // The student role is excluded outright rather than left to the date. No
+    // student token predates the claim, so a roleless one is never a student's
+    // — and while STUDENT_JWT_SECRET is unset the student key *is* the admin
+    // key, which is what those legacy tokens were signed with. Without this,
+    // every legacy admin token would open a kiosk session as whatever student
+    // its id happened to name.
+    return payload.role === undefined && role !== 'student' && legacyAccepted()
+      ? payload
+      : null;
   }
 
   return null;

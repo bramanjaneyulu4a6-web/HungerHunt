@@ -52,6 +52,36 @@ These are open items, not formalities. Each one is a real gap today.
       trading: students who always used four digits record themselves on their
       next purchase, and the remainder is the real number to chase.
 
+- [ ] **Import the admission numbers before turning on the kiosk.** The
+      self-serve terminal identifies a student by the school's own admission
+      number, and a student whose record has none cannot open a session at
+      all — they are refused at the gate. The field is `admissionNumber`; it
+      goes through the existing bulk import as a sheet column, and the roster
+      shows "Not set" for anyone still missing one. This is data, not code: no
+      deploy fixes it, and nobody can use the kiosk until it is done.
+
+- [ ] **Set `STUDENT_JWT_SECRET`.** It signs the kiosk's student sessions. It
+      is optional and falls back to `JWT_SECRET`, so an unset key does not turn
+      terminals away — which is exactly why it is easy to forget. While it is
+      unset, a kiosk session is signed with the same key as a staff token.
+
+- [ ] **Know what the open kiosk route exposes, and decide it is still what you
+      want.** `POST /students/kiosk-session` takes an admission number and no
+      secret, by decision. Anyone who can reach the API can walk the number
+      space and read back names and wallet balances, and open a session as any
+      student. They cannot spend: the four-digit code still gates checkout, and
+      five wrong ones lock it for fifteen minutes. The rate limiter is the only
+      other thing in front of it. The upgrade path, if the logs ever show
+      enumeration, is one-time device enrollment — written up in
+      `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md`.
+
+- [ ] **Tell the counter staff that admin billing no longer charges.** An order
+      raised from the admin console now always goes to the parent to approve —
+      the student's four-digit code is not asked for there any more, and
+      nothing moves until a parent answers. A student who wants food now buys
+      it at the kiosk with their own code. Students whose parents have never
+      registered cannot be billed from the console at all.
+
 - [ ] **Decide what the store listings say.** Screenshots, description, privacy
       policy URL, and a support contact. An app that reads a child's spending
       will be asked what it collects and who sees it.

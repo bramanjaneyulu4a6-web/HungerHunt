@@ -20,6 +20,13 @@ const Inventory = () => {
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editReorderLevel, setEditReorderLevel] = useState("");
+  const [adjusting, setAdjusting] = useState(null); // inventory row being adjusted
+  const [adjustDelta, setAdjustDelta] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [savingAdjust, setSavingAdjust] = useState(false);
+  const [historyFor, setHistoryFor] = useState(null); // product whose ledger is open
+  const [history, setHistory] = useState(null); // null = loading
 
   useEffect(() => {
     fetchInventory();
@@ -51,6 +58,7 @@ const Inventory = () => {
     setEditingProduct(product._id);
     setEditName(product.name || "");
     setEditPrice(product?.price ?? 0);
+    setEditReorderLevel(product?.reorderLevel ?? 5);
   };
 
   const saveEdit = async (e) => {
@@ -65,9 +73,11 @@ const Inventory = () => {
 
     try {
       const updatedPrice = parseFloat(editPrice);
+      const level = parseInt(editReorderLevel, 10);
       await api.put(`/products/${editingProduct}`, {
         name: editName.trim(),
         price: isNaN(updatedPrice) ? 0 : updatedPrice,
+        ...(isNaN(level) || level < 0 ? {} : { reorderLevel: level }),
       });
 
       await fetchInventory();
@@ -81,17 +91,69 @@ const Inventory = () => {
     }
   };
 
-  const deleteProduct = async (id) => {
-    if (!id) return;
-    if (!window.confirm("Permanently delete this product?")) return;
+  const setArchived = async (product, archived) => {
+    if (!product?._id) return;
+    if (
+      archived &&
+      !window.confirm(
+        `Archive ${product.name}? It disappears from sale everywhere; its stock and history stay, and you can restore it from here or the Products page.`
+      )
+    )
+      return;
 
     try {
-      await api.delete(`/products/${id}`);
+      await api.put(`/products/${product._id}`, { active: !archived });
       await fetchInventory();
-      toast.success("Product deleted");
+      toast.success(archived ? "Product archived" : "Product restored");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to delete product");
+      toast.error(err.response?.data?.message || "Failed to update product");
+    }
+  };
+
+  const submitAdjustment = async (e) => {
+    e.preventDefault();
+
+    const delta = parseInt(adjustDelta, 10);
+    if (isNaN(delta) || delta === 0) {
+      toast.error("Enter a whole number of units, positive or negative.");
+      return;
+    }
+    if (!adjustReason.trim()) {
+      toast.error("A reason is required.");
+      return;
+    }
+
+    setSavingAdjust(true);
+
+    try {
+      await api.post(`/inventory/${adjusting.productId._id}/adjust`, {
+        delta,
+        reason: adjustReason.trim(),
+      });
+      await fetchInventory();
+      setAdjusting(null);
+      toast.success("Stock adjusted");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to adjust stock");
+    } finally {
+      setSavingAdjust(false);
+    }
+  };
+
+  const openHistory = async (product) => {
+    if (!product?._id) return;
+    setHistoryFor(product);
+    setHistory(null);
+
+    try {
+      const res = await api.get(`/inventory/${product._id}/adjustments`);
+      setHistory(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      setHistory([]);
+      toast.error("Failed to load the adjustment history");
     }
   };
 
@@ -148,6 +210,19 @@ const Inventory = () => {
               onChange={(e) => setEditPrice(e.target.value)}
             />
 
+            <label className="field-label" htmlFor="edit-reorder">
+              Reorder level (flag when stock falls below this; 0 never flags)
+            </label>
+            <input
+              id="edit-reorder"
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={editReorderLevel}
+              onChange={(e) => setEditReorderLevel(e.target.value)}
+            />
+
             <div className="modal-actions">
               <Button type="submit" variant="success" disabled={saving}>
                 {saving ? "Saving…" : "Save Changes"}
@@ -161,6 +236,110 @@ const Inventory = () => {
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {adjusting && (
+        <div className="modal-backdrop" onClick={() => !savingAdjust && setAdjusting(null)}>
+          <form
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submitAdjustment}
+          >
+            <h3 className="modal-title">Adjust Stock — {adjusting.productId?.name}</h3>
+            <p style={{ marginBottom: 14, color: "var(--muted-soft)" }}>
+              Currently {adjusting.stock || 0} in stock. Positive adds units,
+              negative removes them; every adjustment is recorded with your
+              account and the reason.
+            </p>
+
+            <label className="field-label" htmlFor="adjust-delta">
+              Adjustment (whole units, e.g. -3 or 12)
+            </label>
+            <input
+              id="adjust-delta"
+              type="number"
+              step="1"
+              className="input"
+              style={{ marginBottom: 14 }}
+              required
+              value={adjustDelta}
+              onChange={(e) => setAdjustDelta(e.target.value)}
+            />
+
+            <label className="field-label" htmlFor="adjust-reason">
+              Reason
+            </label>
+            <input
+              id="adjust-reason"
+              type="text"
+              className="input"
+              maxLength={200}
+              required
+              placeholder="e.g. stocktake correction, spoiled in storage"
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+            />
+
+            <div className="modal-actions">
+              <Button type="submit" variant="success" disabled={savingAdjust}>
+                {savingAdjust ? "Saving…" : "Apply Adjustment"}
+              </Button>
+              <Button variant="ghost" onClick={() => setAdjusting(null)} disabled={savingAdjust}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {historyFor && (
+        <div className="modal-backdrop" onClick={() => setHistoryFor(null)}>
+          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Adjustments — {historyFor.name}</h3>
+
+            {history === null ? (
+              <Skeleton height={16} style={{ marginTop: 10 }} />
+            ) : history.length === 0 ? (
+              <p style={{ color: "var(--muted-soft)" }}>
+                No manual adjustments recorded. Receipts and sales move stock
+                without appearing here.
+              </p>
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>When</th>
+                      <th>Change</th>
+                      <th>Reason</th>
+                      <th>By</th>
+                      <th>Stock after</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((row) => (
+                      <tr key={row._id}>
+                        <td>{new Date(row.createdAt).toLocaleString()}</td>
+                        <td style={{ fontWeight: 600, color: row.delta < 0 ? "var(--danger)" : "var(--success)" }}>
+                          {row.delta > 0 ? `+${row.delta}` : row.delta}
+                        </td>
+                        <td>{row.reason}</td>
+                        <td>{row.adjustedBy?.email || "—"}</td>
+                        <td>{row.stockAfter}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <Button variant="ghost" onClick={() => setHistoryFor(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -202,7 +381,9 @@ const Inventory = () => {
             </thead>
             <tbody>
               {filteredInventory.map((item, index) => {
-                const isLowStock = (item.stock || 0) < 5;
+                const reorderLevel = item.productId?.reorderLevel ?? 5;
+                const isLowStock = (item.stock || 0) < reorderLevel;
+                const archived = item.productId?.active === false;
 
                 return (
                   <tr key={item._id}>
@@ -212,6 +393,11 @@ const Inventory = () => {
                       style={{ fontWeight: 700, color: "var(--ink)" }}
                     >
                       {item.productId?.name || "Unlinked product"}
+                      {archived && (
+                        <Badge variant="neutral" style={{ marginLeft: 8 }}>
+                          Archived
+                        </Badge>
+                      )}
                     </td>
                     <td
                       data-label="Price"
@@ -235,12 +421,31 @@ const Inventory = () => {
                           Edit
                         </Button>
                         <Button
-                          variant="danger"
                           className="btn--sm"
-                          onClick={() => deleteProduct(item.productId?._id)}
+                          onClick={() => {
+                            setAdjusting(item);
+                            setAdjustDelta("");
+                            setAdjustReason("");
+                          }}
+                          disabled={!item.productId}
+                        >
+                          Adjust
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="btn--sm"
+                          onClick={() => openHistory(item.productId)}
+                          disabled={!item.productId}
+                        >
+                          History
+                        </Button>
+                        <Button
+                          variant={archived ? "success" : "danger"}
+                          className="btn--sm"
+                          onClick={() => setArchived(item.productId, !archived)}
                           disabled={!item.productId?._id}
                         >
-                          Delete
+                          {archived ? "Restore" : "Archive"}
                         </Button>
                       </div>
                     </td>

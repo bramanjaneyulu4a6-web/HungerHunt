@@ -10,9 +10,17 @@ const Purchase = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierId, setSupplierId] = useState("");
 
   useEffect(() => {
     fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    api.get("/suppliers")
+      .then((res) => setSuppliers(res.data))
+      .catch((err) => console.error(err));
   }, []);
 
   const fetchProducts = async () => {
@@ -51,7 +59,10 @@ const Purchase = () => {
     setSubmitting(true);
 
     try {
-      await api.post("/purchases", { items: selectedItems });
+      await api.post("/purchases", {
+        items: selectedItems,
+        ...(supplierId ? { supplierId } : {}),
+      });
       toast.success("Purchase request created");
       setProducts((prev) => prev.map((p) => ({ ...p, quantity: 0 })));
     } catch (err) {
@@ -81,6 +92,23 @@ const Purchase = () => {
           </Button>
         }
       />
+
+      <div style={{ maxWidth: 420, marginBottom: 20 }}>
+        <label className="auth-label" htmlFor="po-supplier" style={{ display: "block", marginBottom: 6 }}>
+          Supplier
+        </label>
+        <select
+          id="po-supplier"
+          className="auth-input"
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+        >
+          <option value="">— no supplier —</option>
+          {suppliers.map((s) => (
+            <option key={s._id} value={s._id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ marginBottom: 20 }}>
         <input

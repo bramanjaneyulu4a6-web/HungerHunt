@@ -75,6 +75,7 @@ export const getNewPurchases = async (req, res) => {
       status: "NEW"
     })
       .populate("items.productId")
+      .populate("supplierId")
       .sort({ createdAt: -1 });
 
     res.json(purchases);
@@ -91,7 +92,9 @@ export const getCompletedPurchases = async (req, res) => {
 
     const purchases = await Purchase.find({
       status: "COMPLETED"
-    }).populate("items.productId");
+    })
+      .populate("items.productId")
+      .populate("supplierId");
 
     res.json(purchases);
 

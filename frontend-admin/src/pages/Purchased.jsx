@@ -80,6 +80,14 @@ const Purchased = () => {
     );
   };
 
+  // ordered - received across the whole order; > 0 means the supplier
+  // short-shipped and the gap is now permanent record, not edited history.
+  const shortfall = (purchase) =>
+    purchase.items.reduce(
+      (sum, item) => sum + Math.max(0, item.quantity - (item.received ?? item.quantity)),
+      0
+    );
+
   const completePurchase = async (purchase) => {
     setCompletingId(purchase._id);
 
@@ -327,11 +335,17 @@ const Purchased = () => {
                   </h3>
                   <p className="card-meta">
                     Closed on {new Date(purchase.completedAt).toLocaleString()}
+                    {purchase.supplierId?.name ? ` · ${purchase.supplierId.name}` : ""}
                   </p>
                 </div>
-                <Badge variant="success">
-                  Total spent: {formatINR(completedGrandTotal)}
-                </Badge>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  {shortfall(purchase) > 0 && (
+                    <Badge variant="alert">{shortfall(purchase)} short</Badge>
+                  )}
+                  <Badge variant="success">
+                    Total spent: {formatINR(completedGrandTotal)}
+                  </Badge>
+                </div>
               </div>
 
               <div className="table-wrap">

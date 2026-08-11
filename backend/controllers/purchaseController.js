@@ -44,12 +44,18 @@ export const createPurchase = async (req, res) => {
       return res.status(400).json({ message: ITEMS_REJECTED });
     }
 
-    const purchase = new Purchase({
-      status: "NEW",
-      items
-    });
+    const supplierId = req.body.supplierId;
+    if (supplierId !== undefined && supplierId !== null && supplierId !== "" &&
+        !mongoose.Types.ObjectId.isValid(supplierId)) {
+      return res.status(400).json({ message: "Unknown supplier" });
+    }
 
-    await purchase.save();
+    const purchase = await Purchase.create({
+      status: "NEW",
+      items,
+      ...(supplierId ? { supplierId } : {}),
+      raisedBy: req.adminId,
+    });
 
     res.status(201).json(purchase);
 
@@ -177,5 +183,38 @@ export const completePurchase = async (req, res) => {
     res.status(500).json({
       message: err.message
     });
+  }
+};
+
+// NEW and PARTIAL together are "the storeroom's inbox": everything a delivery
+// could still arrive against. Remaining per line is derivable client-side as
+// quantity - received.
+export const getOpenPurchases = async (req, res) => {
+  try {
+    const purchases = await Purchase.find({ status: { $in: ["NEW", "PARTIAL"] } })
+      .populate("items.productId")
+      .populate("supplierId")
+      .sort({ createdAt: -1 });
+
+    res.json(purchases);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const getPurchase = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: "Purchase not found" });
+    }
+
+    const purchase = await Purchase.findById(req.params.id)
+      .populate("items.productId")
+      .populate("supplierId");
+
+    if (!purchase) return res.status(404).json({ message: "Purchase not found" });
+    res.json(purchase);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };

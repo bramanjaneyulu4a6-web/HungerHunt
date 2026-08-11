@@ -118,7 +118,6 @@ const BACK_OFFICE_ROUTES = [
   ['GET', '/api/students/count'],
   ['GET', '/api/transactions/history'],
   ['GET', '/api/products'],
-  ['POST', '/api/purchases', {}],
   ['GET', '/api/purchases/new'],
   ['GET', '/api/stock-groups'],
   ['GET', '/api/units'],
@@ -168,6 +167,13 @@ describe('and nothing else', () => {
       );
     });
   }
+
+  test('POST /api/purchases is closed to a cashier — storeroom work', async () => {
+    accountIs('cashier');
+    const res = await send('POST', '/api/purchases', cashierToken, {});
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).message, 'This action needs a warehouse account.');
+  });
 });
 
 describe('the refusal is a permission, not an expiry', () => {

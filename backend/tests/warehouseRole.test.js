@@ -16,6 +16,7 @@ const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Supplier = (await import('../models/Supplier.js')).default;
+const Purchase = (await import('../models/Purchase.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -47,6 +48,20 @@ beforeEach(() => {
   accountIs('warehouse');
   mock.method(Inventory, 'find', () => ({ populate: async () => [] }));
   mock.method(Supplier, 'find', () => ({ sort: async () => [] }));
+  mock.method(Purchase, 'find', () => {
+    const chain = { populate: () => chain, sort: async () => [] };
+    return chain;
+  });
+  mock.method(Purchase, 'create', async (doc) => ({ _id: 'x', ...doc }));
+  // findById's chain is awaited directly (no terminal .sort()/.exec()), unlike
+  // find's above, so this is a separate stub rather than a shared one.
+  mock.method(Purchase, 'findById', () => {
+    const chain = {
+      populate: () => chain,
+      then: (resolve) => resolve({ _id: 'x', items: [] }),
+    };
+    return chain;
+  });
 });
 
 const send = (method, path, token, body) =>
@@ -63,6 +78,9 @@ const send = (method, path, token, body) =>
 const WAREHOUSE_ROUTES = [
   ['GET', '/api/inventory'],
   ['GET', '/api/suppliers'],
+  ['GET', '/api/purchases/open'],
+  ['POST', '/api/purchases', { items: [{ productId: '507f191e810c19729de860ec', quantity: 1 }] }],
+  ['GET', '/api/purchases/507f191e810c19729de860ed'],
 ];
 
 // A sample of everything else, which no storeroom has ever needed.
@@ -73,19 +91,22 @@ const CLOSED_ROUTES = [
   ['GET', '/api/students/search?q=as', 'This action needs a till account.'],
   ['POST', '/api/admin/register', 'This action needs a full admin account.'],
   ['POST', '/api/suppliers', 'This action needs a full admin account.'],
+  ['GET', '/api/purchases/completed', 'This action needs a full admin account.'],
 ];
 
 describe('a warehouse account works the storeroom', () => {
-  for (const [method, path] of WAREHOUSE_ROUTES) {
+  for (const route of WAREHOUSE_ROUTES) {
+    const [method, path] = route;
+
     test(`${method} ${path} is open to a warehouse account`, async () => {
-      const res = await send(method, path, warehouseToken);
+      const res = await send(method, path, warehouseToken, route[2]);
       assert.ok(res.status !== 401 && res.status !== 403,
         `${method} ${path} refused the warehouse token with ${res.status}`);
     });
 
     test(`${method} ${path} is open to an admin`, async () => {
       accountIs('admin');
-      const res = await send(method, path, adminToken);
+      const res = await send(method, path, adminToken, route[2]);
       assert.ok(res.status !== 401 && res.status !== 403);
     });
   }

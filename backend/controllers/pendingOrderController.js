@@ -102,7 +102,10 @@ const priceCart = async (items) => {
 ========================================================= */
 export const createPendingOrder = async (req, res) => {
   try {
-    const { studentId, purchaseToken } = req.body;
+    // A student session names its own student; the admin console says which
+    // one it is serving. Same rule as the two transaction routes.
+    const studentId = req.student?.id ?? req.body.studentId;
+    const { purchaseToken } = req.body;
 
     if (!studentId || !validItems(req.body.items)) {
       return res.status(400).json({

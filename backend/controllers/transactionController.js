@@ -14,7 +14,10 @@ import {
 } from "../utils/purchaseAuthorization.js";
 
 export const generateBill = async (req, res) => {
-  const { studentId, items, purchaseToken } = req.body;
+  // As in verifyPayment: a student session names its own student, and the
+  // admin console says which one it is serving.
+  const studentId = req.student?.id ?? req.body.studentId;
+  const { items, purchaseToken } = req.body;
 
   if (!studentId || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'A student and at least one item are required.' });

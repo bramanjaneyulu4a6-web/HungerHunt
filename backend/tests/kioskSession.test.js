@@ -50,6 +50,9 @@ describe('the Student schema carries the kiosk fields', () => {
 const { signStudentToken, signAdminToken, verifyToken } = await import('../utils/tokens.js');
 const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
+const Parent = (await import('../models/Parent.js')).default;
+const Transaction = (await import('../models/Transaction.js')).default;
+const PendingOrder = (await import('../models/PendingOrder.js')).default;
 
 const STUDENT_ID = '507f191e810c19729de860ea';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
@@ -335,5 +338,96 @@ describe('the checkout lock', () => {
     const res = await verifyAsStudent({ password: CODE, items: CART });
     assert.equal(res.status, 200);
     assert.ok(writes.some((w) => w.$set?.purchaseCodeAttempts === 0));
+  });
+});
+
+// A live authorization store, standing in for the collection. findOneAndDelete
+// takes the row out as it reads it, which is what makes a token single-use.
+const stubAuthorizationStore = () => {
+  const store = new Map();
+
+  mock.method(PurchaseAuthorization, 'create', async (doc) => {
+    store.set(doc.token, { ...doc });
+    return doc;
+  });
+
+  mock.method(PurchaseAuthorization, 'findOneAndDelete', async ({ token }) => {
+    const found = store.get(token);
+    if (!found) return null;
+    store.delete(token);
+    return found;
+  });
+
+  return store;
+};
+
+const tokenForCart = async (row = studentRow()) => {
+  mock.method(Student, 'findById', () => queryFor(row));
+  mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+  mock.method(Student, 'updateOne', async () => ({}));
+
+  const res = await verifyAsStudent({ password: CODE, items: CART });
+  return (await res.json()).purchaseToken;
+};
+
+describe('a student session cannot spend for another student', () => {
+  /* consumeAuthorization compares the token's student against the one the
+     charge names. If the body were still naming them, this bill would be
+     refused as "a different student" — that it is not is the proof the id came
+     from the session. And whichever way it goes, B is never debited. */
+  test("a bill under A's session naming B charges A or nothing", async () => {
+    stubAuthorizationStore();
+    const purchaseToken = await tokenForCart();
+
+    const debited = [];
+    mock.method(Student, 'findOneAndUpdate', async (filter) => {
+      debited.push(String(filter._id));
+      return { pocketMoney: 480 };
+    });
+    mock.method(Inventory, 'findOne', () =>
+      queryFor({ stock: 50, productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 } }));
+    mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: 48 }));
+    mock.method(Transaction, 'create', async () => ({ _id: '507f191e810c19729de860ee' }));
+    mock.method(Parent, 'findOne', async () => null);
+
+    const res = await asStudent('/api/transactions/bill', {
+      method: 'POST',
+      body: JSON.stringify({
+        studentId: OTHER_STUDENT,
+        items: CART,
+        totalAmount: 20,
+        purchaseToken,
+      }),
+    });
+
+    assert.notEqual(res.status, 403, 'the authorization must match the token\'s student');
+    assert.ok(!debited.includes(OTHER_STUDENT), 'student B must never be debited from A\'s session');
+  });
+});
+
+describe('pending orders from a student session', () => {
+  test('the order is raised for the token\'s student, not the body\'s', async () => {
+    stubAuthorizationStore();
+    const purchaseToken = await tokenForCart(studentRow({ requiresParentApproval: true, name: 'Asha' }));
+
+    mock.method(Parent, 'findOne', async () => ({ _id: '507f1f77bcf86cd799439013' }));
+    mock.method(PendingOrder, 'findOne', async () => null);
+    mock.method(Inventory, 'findOne', () =>
+      queryFor({ stock: 50, productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 } }));
+
+    const created = [];
+    mock.method(PendingOrder, 'create', async (doc) => {
+      created.push(doc);
+      return { _id: '507f191e810c19729de860ed', ...doc };
+    });
+
+    const res = await asStudent('/api/pending-orders', {
+      method: 'POST',
+      body: JSON.stringify({ studentId: OTHER_STUDENT, items: CART, purchaseToken }),
+    });
+
+    assert.notEqual(res.status, 403, 'the authorization must match the token\'s student');
+    assert.equal(created.length, 1);
+    assert.equal(String(created[0].studentId), STUDENT_ID);
   });
 });

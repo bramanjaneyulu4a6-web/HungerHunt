@@ -1557,6 +1557,66 @@
   transform: none;
 }
 
+/* ---- the ending --------------------------------------------------------- */
+
+/* Two endings, and the difference between them is the whole message: one means
+   the food is paid for, the other means nothing has been charged and a parent
+   is being asked. A student who misreads this walks off without their lunch,
+   or walks off thinking they have one. Hence the colour and the mark, not just
+   the words.
+
+   On the till's white rather than the gate's brand ground: this is the end of
+   the order, still part of the till, not a return to the front door. */
+
+.kiosk-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 100svh;
+  padding: 32px;
+  text-align: center;
+  background: #ffffff;
+  color: #17110a;
+  cursor: pointer;
+}
+
+.kiosk-result h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.kiosk-result p {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 17px;
+  line-height: 1.5;
+  color: #6d6152;
+}
+
+.kiosk-result-mark {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  font-size: 46px;
+  animation: rise-in 420ms cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+
+.kiosk-result-mark--paid {
+  background: #e8f6ec;
+  color: #1d7a3e;
+}
+
+.kiosk-result-mark--pending {
+  background: #fff3e2;
+  color: #b06a10;
+}
+
 /* ---- scrollbars ---------------------------------------------------------- */
 
 /* Scoped to the till's own scroll areas. This used to be an injected global
@@ -1647,7 +1707,8 @@
   .ticket-grand b,
   .tile,
   .tile-step,
-  .nutrition-bar i {
+  .nutrition-bar i,
+  .kiosk-result-mark {
     animation: none;
   }
 

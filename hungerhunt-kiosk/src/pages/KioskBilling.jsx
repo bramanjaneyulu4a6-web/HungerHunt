@@ -64,19 +64,21 @@ const toProduct = (item) => ({
   nutrition: readNutrition(item.productId),
 });
 
-const KioskBilling = ({ onLogout }) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const KioskBilling = ({ student, onLogout }) => {
   const [productSearchQuery, setProductSearchQuery] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [searchResults, setSearchResults] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [cart, setCart] = useState([]);
 
+  /* How the sale ended: null while it is still going, then 'paid' or
+     'pending'. Once set the session is over — the wall is gone, the timers
+     stop, and the only thing left running is the few seconds this screen is
+     held for. */
+  const [result, setResult] = useState(null);
+
   // Starts true: the catalogue is fetched on mount, and seeding the flag here
   // keeps that effect free of a synchronous setState.
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [showWelcome, setShowWelcome] = useState(true);
   const [inventoryError, setInventoryError] = useState("");
 
   const [ticketFolded, setTicketFolded] = useState(false);
@@ -152,19 +154,21 @@ const KioskBilling = ({ onLogout }) => {
 
   const refreshPage = async () => {
     setLoadingProducts(true);
-    const result = await loadInventory();
-    applyInventory(result);
+    // Named for what it is rather than `result`, which now means how the sale
+    // ended and is in scope here.
+    const refreshed = await loadInventory();
+    applyInventory(refreshed);
 
     // A failed refresh must leave the ticket alone. Reconciling against the
     // empty list an error returns would silently clear every line the moment
     // the network hiccuped, mid-sale.
-    if (result.error) return;
+    if (refreshed.error) return;
 
     // Reconcile the ticket against fresh stock rather than dropping it.
     setCart((prevCart) =>
       prevCart
         .map((cartItem) => {
-          const latest = result.products.find((p) => p._id === cartItem._id);
+          const latest = refreshed.products.find((p) => p._id === cartItem._id);
           if (!latest) return null;
 
           return {
@@ -179,60 +183,6 @@ const KioskBilling = ({ onLogout }) => {
         })
         .filter((item) => item && item.stock > 0)
     );
-
-    // Drop the selected student so their balance is re-read on the next lookup.
-    setSelectedStudent(null);
-    setSearchResults([]);
-    setSearchQuery("");
-  };
-
-  // The ticket belongs to whoever is selected. Switching to a different student
-  // must not carry the previous one's goods onto their bill; re-selecting the
-  // same student leaves the ticket alone.
-  const selectStudent = (student) => {
-    if (selectedStudent && selectedStudent._id !== student._id) setCart([]);
-    setSelectedStudent(student);
-    setSearchResults([]);
-    setSearchQuery("");
-  };
-
-  const handleStudentSearch = async (e) => {
-    e?.preventDefault();
-
-    if (!searchQuery.trim()) {
-      toast.error("Please enter student name or hostel number");
-      return;
-    }
-
-    if (searchQuery.trim().length < 2) {
-      toast.error("Please enter at least 2 characters to search");
-      return;
-    }
-
-    try {
-      const res = await api.get(
-        `/students/search?q=${encodeURIComponent(searchQuery)}`
-      );
-
-      // A search that finds nothing, or that needs the cashier to pick from a
-      // list, has not changed who is being served — so it leaves both the
-      // selected student and the ticket alone.
-      if (res.data.length === 0) {
-        setSearchResults([]);
-        toast.error("No student found matching that name or hostel number");
-        return;
-      }
-
-      if (res.data.length === 1) {
-        selectStudent(res.data[0]);
-        return;
-      }
-
-      setSearchResults(res.data);
-    } catch (error) {
-      console.error(error);
-      toast.error("Student search failed");
-    }
   };
 
   const addToCart = (product) => {
@@ -303,11 +253,10 @@ const KioskBilling = ({ onLogout }) => {
   const removeFromCart = (productId) =>
     setCart((prev) => prev.filter((item) => item._id !== productId));
 
+  // Empties the ticket without ending the session. Starting the basket again
+  // is not the same as being finished — that is what Done is for.
   const voidTicket = () => {
     setCart([]);
-    setSelectedStudent(null);
-    setSearchResults([]);
-    setSearchQuery("");
     setProductSearchQuery("");
     setConfirmVoid(false);
   };
@@ -325,29 +274,23 @@ const KioskBilling = ({ onLogout }) => {
   // off the cart again — anything re-derived in between would not match, and
   // the server would refuse the charge.
   const handleCheckout = async (items, purchaseToken) => {
-    if (!selectedStudent) {
-      toast.error("Please search and select a student first.");
-      return;
-    }
-
-    if (invoiceTotal > selectedStudent.pocketMoney) {
-      toast.error("Insufficient wallet balance!");
+    // The balance is the one the session was opened with. The server re-reads
+    // it before charging, so this only saves a round trip to be told no.
+    if (invoiceTotal > student.pocketMoney) {
+      toast.error("Not enough in your wallet for this.");
       return;
     }
 
     try {
+      // No studentId: the session's token says whose wallet this is, and the
+      // server reads it from there rather than from anything sent here.
       await api.post("/transactions/bill", {
-        studentId: selectedStudent._id,
         items,
         totalAmount: invoiceTotal,
         purchaseToken,
       });
 
-      toast.success("Payment successful!");
-
-      applyInventory(await loadInventory());
-
-      resetTerminal();
+      setResult("paid");
     } catch (err) {
       console.error("Checkout Error:", err);
       toast.error(
@@ -358,36 +301,15 @@ const KioskBilling = ({ onLogout }) => {
     }
   };
 
-  // Clears the counter for the next customer. Both endings need it; only one of
-  // them has changed any stock.
-  const resetTerminal = () => {
-    setCart([]);
-    setSelectedStudent(null);
-    setSearchQuery("");
-    setProductSearchQuery("");
-    setTicketFolded(false);
-    setShowWelcome(true);
-  };
-
   /* The other ending. When a parent has asked to approve their child's
-     purchases, the same password buys a request rather than the food: nothing
-     is charged and no stock moves until they say yes in the app. The counter
-     does not wait for that — it prints this and serves the next person — so the
-     message has to be unambiguous that nothing has been paid for yet. */
+     purchases, the same code buys a request rather than the food: nothing is
+     charged and no stock moves until they say yes in the app. So the screen
+     that follows has to be unambiguous that nothing has been paid for yet. */
   const requestApproval = async (items, purchaseToken) => {
     try {
-      await api.post("/pending-orders", {
-        studentId: selectedStudent._id,
-        items,
-        purchaseToken,
-      });
+      await api.post("/pending-orders", { items, purchaseToken });
 
-      toast.success(
-        `Order placed for ${selectedStudent.name}. Awaiting parent approval — nothing has been charged yet.`,
-        { duration: 8000 }
-      );
-
-      resetTerminal();
+      setResult("pending");
     } catch (err) {
       console.error("Approval request error:", err);
       toast.error(
@@ -407,9 +329,10 @@ const KioskBilling = ({ onLogout }) => {
     try {
       const items = billedItems();
 
+      // Only the code and the lines. Who is paying comes from the session's
+      // token, and the parent's mobile number is no longer a second factor —
+      // there is nobody at the counter to ask for it.
       const { data } = await api.post("/transactions/verify-payment", {
-        studentId: selectedStudent._id,
-        phone: selectedStudent.parentPhoneNumber,
         password: purchasePassword,
         items,
       });
@@ -417,15 +340,28 @@ const KioskBilling = ({ onLogout }) => {
       setShowVerifyModal(false);
       setPurchasePassword("");
 
-      // The password was right either way. Which of the two endings follows is
-      // the parent's standing choice, reported by verify-payment so the till
-      // does not have to look the student up a second time to find out.
+      // The code was right either way. Which of the two endings follows is the
+      // parent's standing choice, reported by verify-payment so the till does
+      // not have to look the student up a second time to find out.
       if (data?.requiresApproval) {
         await requestApproval(items, data?.purchaseToken);
       } else {
         await handleCheckout(items, data?.purchaseToken);
       }
     } catch (err) {
+      /* Locked out. Five wrong codes closes checkout for fifteen minutes, and
+         there is nothing to be done at this terminal in the meantime — so the
+         session ends rather than leaving a child tapping at a cart they cannot
+         pay for, with a queue behind them. */
+      if (err.response?.status === 423) {
+        toast.error(
+          err.response.data?.message || "Too many wrong codes.",
+          { duration: 7000 }
+        );
+        onLogout();
+        return;
+      }
+
       toast.error(err.response?.data?.message || "Verification Failed");
     } finally {
       payingRef.current = false;
@@ -475,20 +411,35 @@ const KioskBilling = ({ onLogout }) => {
     return () => window.removeEventListener("resize", seat);
   }, [selectedCategory, categoryKey]);
 
+  // A session always has its student, so none of this is conditional any more.
   const itemCount = cart.length;
-  const remaining = selectedStudent
-    ? selectedStudent.pocketMoney - invoiceTotal
-    : 0;
-  const short = Boolean(selectedStudent) && remaining < 0;
-  const canPay = Boolean(selectedStudent) && cart.length > 0 && !short;
+  const remaining = student.pocketMoney - invoiceTotal;
+  const short = remaining < 0;
+  const canPay = cart.length > 0 && !short;
 
-  if (showWelcome) {
+  /* How the session ends. Held long enough to be read over a shoulder in a
+     queue, and skippable by touching it — the next student should not have to
+     wait out somebody else's receipt. The timers do not run here; the session
+     is already over, and this is only the telling. */
+  if (result) {
     return (
-      <div className="kiosk-welcome">
-        <img className="kiosk-welcome-logo" src={hungerLogo} alt="Hunger Hunt" />
-        <button className="kiosk-start" onClick={() => setShowWelcome(false)}>
-          START ORDER
-        </button>
+      <div className="kiosk-result" onClick={onLogout} role="status">
+        <div
+          className={`kiosk-result-mark kiosk-result-mark--${result}`}
+          aria-hidden="true"
+        >
+          {result === "paid" ? "✓" : "⏳"}
+        </div>
+
+        <h1>
+          {result === "paid" ? "Order confirmed" : "Sent to your parent"}
+        </h1>
+
+        <p>
+          {result === "paid"
+            ? "Collect your items at the counter. Enjoy!"
+            : "Nothing has been charged yet — your parent has been asked to approve it."}
+        </p>
       </div>
     );
   }
@@ -518,34 +469,23 @@ const KioskBilling = ({ onLogout }) => {
                 </p>
               </div>
 
+              {/* The hostel and the father's name were here for a cashier
+                  making sure they had the right child. The child is holding
+                  the terminal now, so what is left is what they came to check:
+                  that this is them, and what they have to spend. */}
               <div className="ticket-who">
-                {selectedStudent ? (
-                  <>
-                    <div className="ticket-who-row">
-                      <span>Student</span>
-                      <b>{selectedStudent.name}</b>
-                    </div>
-                    <div className="ticket-who-row">
-                      <span>Hostel</span>
-                      <b>{selectedStudent.hostelNumber}</b>
-                    </div>
-                    <div className="ticket-who-row">
-                      <span>Father</span>
-                      <b>{selectedStudent.fatherName}</b>
-                    </div>
-                    <div className="ticket-wallet">
-                      <span>Wallet</span>
-                      <b className="money">
-                        {formatINR(selectedStudent.pocketMoney)}
-                      </b>
-                    </div>
-                  </>
-                ) : (
-                  <div className="ticket-who-row">
-                    <span>Student</span>
-                    <b>Not selected yet</b>
-                  </div>
-                )}
+                <div className="ticket-who-row">
+                  <span>Student</span>
+                  <b>{student.name}</b>
+                </div>
+                <div className="ticket-who-row">
+                  <span>Admission</span>
+                  <b>{student.admissionNumber}</b>
+                </div>
+                <div className="ticket-wallet">
+                  <span>Wallet</span>
+                  <b className="money">{formatINR(student.pocketMoney)}</b>
+                </div>
               </div>
 
               <div className="ticket-lines">
@@ -592,16 +532,14 @@ const KioskBilling = ({ onLogout }) => {
                   <b className="money">{itemCount}</b>
                 </div>
 
-                {selectedStudent && (
-                  <div
-                    className={`ticket-tot-row${
-                      short ? " ticket-tot-row--short" : ""
-                    }`}
-                  >
-                    <span>{short ? "Short by" : "Balance after"}</span>
-                    <b className="money">{formatINR(Math.abs(remaining))}</b>
-                  </div>
-                )}
+                <div
+                  className={`ticket-tot-row${
+                    short ? " ticket-tot-row--short" : ""
+                  }`}
+                >
+                  <span>{short ? "Short by" : "Balance after"}</span>
+                  <b className="money">{formatINR(Math.abs(remaining))}</b>
+                </div>
 
                 <div className="ticket-grand">
                   <span>Total</span>
@@ -675,78 +613,31 @@ const KioskBilling = ({ onLogout }) => {
               <img className="wall-logo" src={hungerLogo} alt="Hunger Hunt" />
             )}
 
-            {selectedStudent ? (
-              <div className="serving glass">
-                <span className="serving-avatar" aria-hidden="true">
-                  {selectedStudent.name?.charAt(0).toUpperCase()}
-                </span>
+            {/* Where the student search used to be. Nobody is looked up here
+                any more — the session already knows who this is, so the bar
+                reports it instead of asking. */}
+            <div className="serving glass">
+              <span className="serving-avatar" aria-hidden="true">
+                {student.name?.charAt(0).toUpperCase()}
+              </span>
 
-                <div className="serving-who">
-                  <div className="serving-name">{selectedStudent.name}</div>
-                  <div className="serving-meta">
-                    Hostel {selectedStudent.hostelNumber}
-                  </div>
-                </div>
-
-                <span className="serving-wallet money">
-                  {formatINR(selectedStudent.pocketMoney)}
-                </span>
-
-                <Button
-                  className="btn--switch"
-                  onClick={() => {
-                    setSelectedStudent(null);
-                    setSearchResults([]);
-                  }}
-                >
-                  Change
-                </Button>
+              <div className="serving-who">
+                <div className="serving-name">{student.name}</div>
+                <div className="serving-meta">№ {student.admissionNumber}</div>
               </div>
-            ) : (
-              <form className="wall-lookup glass" onSubmit={handleStudentSearch}>
-                <span aria-hidden="true">⌕</span>
-                <input
-                  className="wall-lookup-input"
-                  placeholder="Search students by name or hostel number…"
-                  aria-label="Search students by name or hostel number"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <Button type="submit" className="btn--lookup">
-                  Search
-                </Button>
-              </form>
-            )}
 
-            {onLogout && (
-              <Button className="btn--signout glass" onClick={onLogout}>
-                Sign out
+              <span className="serving-wallet money">
+                {formatINR(student.pocketMoney)}
+              </span>
+
+              {/* The way out that is not a timer. A student who has finished,
+                  or who changed their mind, should not have to wait to be
+                  thrown out before the next one can start. */}
+              <Button className="btn--switch" onClick={onLogout}>
+                Done
               </Button>
-            )}
-          </div>
-
-          {searchResults.length > 0 && (
-            <div className="lookup-results">
-              {searchResults.map((student) => (
-                <button
-                  type="button"
-                  key={student._id}
-                  className="btn lookup-result"
-                  onClick={() => selectStudent(student)}
-                >
-                  <span className="lookup-result-name">
-                    {student.name}
-                    <em>
-                      Hostel {student.hostelNumber} · {student.fatherName}
-                    </em>
-                  </span>
-                  <span className="lookup-result-wallet money">
-                    {formatINR(student.pocketMoney)}
-                  </span>
-                </button>
-              ))}
             </div>
-          )}
+          </div>
 
           {inventoryError && (
             <div className="banner banner--alert" role="status">
@@ -1036,7 +927,7 @@ const KioskBilling = ({ onLogout }) => {
         </div>
       )}
 
-      {showVerifyModal && selectedStudent && (
+      {showVerifyModal && (
         <div
           className="modal-backdrop till-modal-backdrop"
           onClick={closeVerify}
@@ -1049,14 +940,16 @@ const KioskBilling = ({ onLogout }) => {
             aria-busy={paying}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* It was "Parent verification" when a cashier read a phone
+                number off the screen and rang the parent. The student is
+                standing here now, and what they are being asked for is their
+                own code. */}
             <h2 className="modal-title" id="verify-title">
-              Parent verification
+              Enter your purchase code
             </h2>
 
             <p className="verify-line">
-              Confirm with <b>{selectedStudent.fatherName}</b> on{" "}
-              <b>{selectedStudent.parentPhoneNumber}</b> before charging{" "}
-              <b>{selectedStudent.name}</b>&rsquo;s wallet.
+              Your 4-digit code confirms this order and pays from your wallet.
             </p>
 
             <div className="verify-amount">

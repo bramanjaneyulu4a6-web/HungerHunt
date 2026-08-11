@@ -195,3 +195,145 @@ describe('opening a kiosk session', () => {
     assert.equal(findOne.mock.callCount(), 0);
   });
 });
+
+const bcrypt = (await import('bcryptjs')).default;
+const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
+
+const OTHER_STUDENT = '507f191e810c19729de860eb';
+const PRODUCT_ID = '507f191e810c19729de860ec';
+const CART = [{ productId: PRODUCT_ID, quantity: 2 }];
+const CODE = '4321';
+
+let codeHash;
+
+before(async () => {
+  codeHash = await bcrypt.hash(CODE, 4);
+});
+
+const studentRow = (overrides = {}) => ({
+  _id: STUDENT_ID,
+  purchasePassword: codeHash,
+  purchaseCodeIsPin: true,
+  purchaseCodeAttempts: 0,
+  purchaseCodeLockedUntil: null,
+  requiresParentApproval: false,
+  ...overrides,
+});
+
+const verifyAsStudent = (body) =>
+  asStudent('/api/transactions/verify-payment', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+describe('verify-payment under a student session', () => {
+  /* The whole point of the token carrying the id. A crafted request naming
+     somebody else must not be able to reach their wallet. */
+  test('the token names the student; a body studentId for another is ignored', async () => {
+    const findById = mock.method(Student, 'findById', () => queryFor(studentRow()));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(Student, 'updateOne', async () => ({}));
+    mock.method(PurchaseAuthorization, 'create', async (doc) => doc);
+
+    const res = await verifyAsStudent({
+      studentId: OTHER_STUDENT,
+      password: CODE,
+      items: CART,
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(String(findById.mock.calls[0].arguments[0]), STUDENT_ID);
+  });
+
+  // The cashier used to supply it. There is no cashier, and a child should not
+  // be typing their parent's mobile number into a counter terminal.
+  test('no phone is required and none is checked', async () => {
+    mock.method(Student, 'findById', () => queryFor(studentRow()));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(Student, 'updateOne', async () => ({}));
+    mock.method(PurchaseAuthorization, 'create', async (doc) => doc);
+
+    const res = await verifyAsStudent({ password: CODE, items: CART });
+    assert.equal(res.status, 200);
+  });
+});
+
+describe('the checkout lock', () => {
+  /* Checked before bcrypt on purpose: a locked student's *correct* code is
+     refused too. Answering it differently would tell a guesser they had just
+     found the right one. */
+  test('a locked student is refused, correct code or not', async () => {
+    mock.method(Student, 'findById', () =>
+      queryFor(studentRow({ purchaseCodeLockedUntil: new Date(Date.now() + 10 * 60 * 1000) })));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+
+    const res = await verifyAsStudent({ password: CODE, items: CART });
+    assert.equal(res.status, 423);
+    assert.equal((await res.json()).code, 'CODE_LOCKED');
+  });
+
+  test('a lock that has run out no longer locks', async () => {
+    mock.method(Student, 'findById', () =>
+      queryFor(studentRow({ purchaseCodeLockedUntil: new Date(Date.now() - 1000) })));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(Student, 'updateOne', async () => ({}));
+    mock.method(PurchaseAuthorization, 'create', async (doc) => doc);
+
+    const res = await verifyAsStudent({ password: CODE, items: CART });
+    assert.equal(res.status, 200);
+  });
+
+  test('the fifth consecutive wrong code sets the lock', async () => {
+    mock.method(Student, 'findById', () => queryFor(studentRow({ purchaseCodeAttempts: 4 })));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+
+    const writes = [];
+    mock.method(Student, 'updateOne', async (filter, update) => {
+      writes.push(update);
+      return {};
+    });
+
+    const res = await verifyAsStudent({ password: '0000', items: CART });
+    assert.equal(res.status, 423);
+
+    const lockWrite = writes.find((w) => w.$set?.purchaseCodeLockedUntil);
+    assert.ok(lockWrite, 'the fifth miss must write a lock');
+
+    const minutes = (lockWrite.$set.purchaseCodeLockedUntil - Date.now()) / 60000;
+    assert.ok(minutes > 14 && minutes <= 15, `lock should be ~15 minutes, was ${minutes}`);
+  });
+
+  test('a wrong code below the limit counts but does not lock', async () => {
+    mock.method(Student, 'findById', () => queryFor(studentRow({ purchaseCodeAttempts: 1 })));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+
+    const writes = [];
+    mock.method(Student, 'updateOne', async (filter, update) => {
+      writes.push(update);
+      return {};
+    });
+
+    const res = await verifyAsStudent({ password: '0000', items: CART });
+    assert.equal(res.status, 400);
+    assert.ok(writes.some((w) => w.$inc?.purchaseCodeAttempts === 1));
+    assert.ok(!writes.some((w) => w.$set?.purchaseCodeLockedUntil));
+  });
+
+  // Consecutive, not cumulative — four misses across a term should not leave a
+  // student one typo from being locked out at lunch.
+  test('a correct code resets the count', async () => {
+    mock.method(Student, 'findById', () => queryFor(studentRow({ purchaseCodeAttempts: 3 })));
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(PurchaseAuthorization, 'create', async (doc) => doc);
+
+    const writes = [];
+    mock.method(Student, 'updateOne', async (filter, update) => {
+      writes.push(update);
+      return {};
+    });
+
+    const res = await verifyAsStudent({ password: CODE, items: CART });
+    assert.equal(res.status, 200);
+    assert.ok(writes.some((w) => w.$set?.purchaseCodeAttempts === 0));
+  });
+});

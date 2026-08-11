@@ -114,9 +114,45 @@ export const getAllTransactions = async (req, res) => {
   }
 };
 
+// Five misses and the checkout closes for a quarter of an hour. Four digits is
+// ten thousand codes, which a patient person gets through in an afternoon if
+// nothing stops them; this is what stops them. Short enough that a child who
+// simply forgot can eat at the next break.
+const MAX_CODE_ATTEMPTS = 5;
+const CODE_LOCK_MINUTES = 15;
+
+const CODE_LOCKED = {
+  code: 'CODE_LOCKED',
+  message:
+    'Too many wrong codes. Checkout is locked for a few minutes — or a parent' +
+    ' can set a new code in the app.',
+};
+
+/* Counting a miss must not decide whether the miss can be reported. Awaited so
+   the count is reliable while the database is, but its failure is logged and
+   swallowed: the answer to a wrong code is "wrong code", never a 500 because
+   the tally could not be written. */
+const recordCodeMiss = async (studentId, update) => {
+  try {
+    await Student.updateOne({ _id: studentId }, update);
+  } catch (err) {
+    console.error('Could not record a purchase code miss:', err);
+  }
+};
+
 export const verifyPayment = async (req, res) => {
   try {
-    const { studentId, phone, password, items } = req.body;
+    /* Who is paying is settled by whoever cleared the gate, not by the body. A
+       student session names its own student, so a request naming someone else
+       cannot reach their wallet. The admin console still says which student it
+       is serving — it holds no student token, and consoles cached from before
+       this deploy still call this route. */
+    const studentId = req.student?.id ?? req.body.studentId;
+    const { password, items } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ message: "A student is required." });
+    }
 
     /* A student has one secret and it is four digits. Anything else is not a
        code anyone could have been given, so it is turned away before the
@@ -135,31 +171,60 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    if (student.parentPhoneNumber !== phone) {
-      return res.status(400).json({ message: "Wrong mobile number" });
-    }
-
     if (!student.purchasePassword) {
       return res.status(400).json({
         message: "No purchase code has been set for this student yet."
       });
     }
 
+    /* Before bcrypt, and deliberately blind to whether the code is right. A
+       locked student who types the correct one is refused exactly as they are
+       for a wrong one — answering the two differently would tell a guesser
+       they had just found it. */
+    if (student.purchaseCodeLockedUntil && student.purchaseCodeLockedUntil > new Date()) {
+      return res.status(423).json(CODE_LOCKED);
+    }
+
     const matched = await bcrypt.compare(password, student.purchasePassword);
 
     if (!matched) {
+      // Consecutive, not cumulative: four misses spread across a term should
+      // not leave a student one typo away from missing lunch.
+      if ((student.purchaseCodeAttempts ?? 0) + 1 >= MAX_CODE_ATTEMPTS) {
+        await recordCodeMiss(student._id, {
+          $set: {
+            purchaseCodeAttempts: 0,
+            purchaseCodeLockedUntil: new Date(Date.now() + CODE_LOCK_MINUTES * 60 * 1000),
+          },
+        });
+
+        return res.status(423).json(CODE_LOCKED);
+      }
+
+      await recordCodeMiss(student._id, { $inc: { purchaseCodeAttempts: 1 } });
+
       /* A student never confirmed to have a four-digit code may not be typing
          the wrong one — they may be on a code from before the rule, which
          nothing here can accept and no query can identify, since all that is
-         stored is a hash. Same refusal either way, but the cashier is told
-         what else it might be so the family is sent somewhere useful instead
-         of trying again. */
+         stored is a hash. Same refusal either way, but they are told what else
+         it might be so the family is sent somewhere useful instead of trying
+         again. */
       return res.status(400).json({
         message: student.purchaseCodeIsPin
           ? "Wrong purchase code"
           : "Wrong purchase code. If this student's code was set before codes" +
             " became 4 digits, their parent needs to set a new one in the app.",
       });
+    }
+
+    // The code was right, so the run of misses ends here. Not awaited, and not
+    // written when there is nothing to clear: this is bookkeeping, and the
+    // person at the counter should not wait on it.
+    if (student.purchaseCodeAttempts > 0 || student.purchaseCodeLockedUntil) {
+      Student.updateOne(
+        { _id: student._id },
+        { $set: { purchaseCodeAttempts: 0, purchaseCodeLockedUntil: null } }
+      ).catch((err) => console.error('Could not reset the code attempt count:', err));
     }
 
     /* The one moment the stored code is in plain sight, and the only way to

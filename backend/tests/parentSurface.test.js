@@ -402,6 +402,11 @@ describe('a code is recorded as four digits so the counter can tell', () => {
     const bcrypt = (await import('bcryptjs')).default;
     const hash = await bcrypt.hash('9999', 4);
 
+    // A miss is counted towards the checkout lock now. The controller does not
+    // depend on the write landing — it answers "wrong code" either way — but an
+    // unstubbed one costs this test a buffering timeout.
+    mock.method(Student, 'updateOne', async () => ({}));
+
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
     mock.method(Student, 'findById', () => ({
       select: async () => ({

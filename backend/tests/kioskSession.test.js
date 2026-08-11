@@ -431,3 +431,79 @@ describe('pending orders from a student session', () => {
     assert.equal(String(created[0].studentId), STUDENT_ID);
   });
 });
+
+describe('an admin raises orders without a code', () => {
+  const adminSignedIn = () => mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+
+  const orderableStudent = (overrides = {}) =>
+    mock.method(Student, 'findById', () =>
+      queryFor({ _id: STUDENT_ID, name: 'Asha', requiresParentApproval: false, ...overrides }));
+
+  const priceable = () => {
+    mock.method(PendingOrder, 'findOne', async () => null);
+    mock.method(Inventory, 'findOne', () =>
+      queryFor({ stock: 50, productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 } }));
+  };
+
+  const raise = (body) =>
+    asAdmin('/api/pending-orders', { method: 'POST', body: JSON.stringify(body) });
+
+  /* The trade that let the purchase code go from the console: the admin's own
+     sign-in authorizes raising the order, and the parent approving it is what
+     spends the money. So a student who needs no approval still gets one — the
+     setting binds the kiosk, not the console. */
+  test('no purchase token needed, and approval applies even when not required', async () => {
+    adminSignedIn();
+    orderableStudent({ requiresParentApproval: false });
+    priceable();
+    mock.method(Parent, 'findOne', async () => ({ _id: '507f1f77bcf86cd799439013' }));
+
+    const consumed = mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
+    const created = [];
+    mock.method(PendingOrder, 'create', async (doc) => {
+      created.push(doc);
+      return { _id: '507f191e810c19729de860ed', ...doc };
+    });
+
+    const res = await raise({ studentId: STUDENT_ID, items: CART });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.length, 1, 'a no-approval student must still become a pending order');
+    assert.equal(String(created[0].raisedBy), ADMIN_ID, 'the order records who rang it up');
+    assert.equal(consumed.mock.callCount(), 0, 'the admin path must not touch purchase tokens');
+  });
+
+  // An order nobody can approve is not an order. Better said here than left
+  // sitting pending until it expires three days later.
+  test('a student whose parent has not registered cannot be billed', async () => {
+    adminSignedIn();
+    orderableStudent({ requiresParentApproval: true });
+    priceable();
+    mock.method(Parent, 'findOne', async () => null);
+
+    const create = mock.method(PendingOrder, 'create', async (doc) => doc);
+
+    const res = await raise({ studentId: STUDENT_ID, items: CART });
+
+    assert.equal((await res.json()).code, 'NO_PARENT');
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  // The exemption is the admin's sign-in. A student has no such thing, so the
+  // purchase token stays the only way they can raise one.
+  test('the exemption does not leak to student sessions', async () => {
+    mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+    mock.method(Student, 'findById', () => queryFor(studentRow({ requiresParentApproval: true })));
+    mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
+
+    const create = mock.method(PendingOrder, 'create', async (doc) => doc);
+
+    const res = await asStudent('/api/pending-orders', {
+      method: 'POST',
+      body: JSON.stringify({ items: CART }),
+    });
+
+    assert.equal(res.status, 403, 'a student with no purchase token must still be refused');
+    assert.equal(create.mock.callCount(), 0);
+  });
+});

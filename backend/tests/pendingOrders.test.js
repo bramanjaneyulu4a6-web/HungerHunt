@@ -24,7 +24,7 @@ const Inventory = (await import('../models/Inventory.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
 const { hashCart } = await import('../utils/purchaseAuthorization.js');
-const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
+const { signAdminToken, signParentToken, signStudentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
 mongoose.set('bufferTimeoutMS', 1000);
@@ -120,6 +120,23 @@ const createRequest = (body) =>
     ...body,
   });
 
+// The kiosk's caller. A student holds a session of their own, and the purchase
+// token — bought with their four-digit code a moment earlier — is what
+// authorises the order. The admin console authorises with its own sign-in
+// instead, so the token rules below are tested from this side.
+const studentToken = signStudentToken(STUDENT_ID, 'ADM-1042');
+
+const studentSession = () => {
+  mock.method(Student, 'exists', async () => ({ _id: STUDENT_ID }));
+};
+
+const createRequestAsStudent = (body) =>
+  send('POST', '/api/pending-orders', studentToken, {
+    items: ITEMS,
+    purchaseToken: 'good-token',
+    ...body,
+  });
+
 describe('each side of the counter gets its own routes', () => {
   test('a parent token cannot raise a request', async () => {
     const res = await send('POST', '/api/pending-orders', parentToken, {
@@ -148,20 +165,30 @@ describe('each side of the counter gets its own routes', () => {
   });
 });
 
-describe('raising a request still costs a verified password', () => {
+/* Who pays for the order with what.
+ *
+ * At the kiosk it is the student's four-digit code, spent for a purchase token
+ * bound to that student and that exact cart. That is the only thing between an
+ * unattended terminal and somebody else's wallet, so these rules are pinned
+ * from the student's side.
+ *
+ * At the console the code is no longer asked for at all. What authorises an
+ * admin is their own sign-in, and what protects the student is that every
+ * admin-raised order goes to the parent to answer. */
+describe('a student raising a request still costs a verified code', () => {
   test('a request with no purchase token is refused', async () => {
-    signedIn();
+    studentSession();
     mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
 
-    const res = await createRequest({ purchaseToken: undefined });
+    const res = await createRequestAsStudent({ purchaseToken: undefined });
 
-    // 403 rather than 401: the till is signed in, it is the charge that is not
-    // authorised. A 401 would sign the kiosk out.
+    // 403 rather than 401: the session is fine, it is the charge that is not
+    // authorised. A 401 would sign the kiosk out mid-order.
     assert.equal(res.status, 403);
   });
 
   test('a token issued for a different cart is refused', async () => {
-    signedIn();
+    studentSession();
     mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => ({
       token: 'good-token',
       studentId: STUDENT_ID,
@@ -169,9 +196,26 @@ describe('raising a request still costs a verified password', () => {
       expiresAt: new Date(Date.now() + 60_000),
     }));
 
-    const res = await createRequest();
+    const res = await createRequestAsStudent();
 
     assert.equal(res.status, 403);
+  });
+
+  // The other half of the same rule, and the reason the two are tested apart.
+  test('an admin needs no token — their sign-in is the authorisation', async () => {
+    signedIn();
+    studentNeedingApproval();
+    parentIsLinked();
+    noOpenOrder();
+    stockedAt(20, 10);
+
+    const consumed = mock.method(PurchaseAuthorization, 'findOneAndDelete', async () => null);
+    mock.method(PendingOrder, 'create', async (doc) => ({ ...doc, _id: ORDER_ID }));
+
+    const res = await createRequest({ purchaseToken: undefined });
+
+    assert.equal(res.status, 201);
+    assert.equal(consumed.mock.callCount(), 0);
   });
 
   test('a verified cart is accepted and the parent is asked', async () => {
@@ -198,12 +242,16 @@ describe('raising a request still costs a verified password', () => {
 });
 
 describe('the approval route is only for students set up for it', () => {
-  test('a student who needs no approval is charged at the counter instead', async () => {
-    signedIn();
+  /* The setting binds the kiosk. A student who needs no approval is charged at
+     the kiosk against their own wallet, so reaching this route from a session
+     is a mistake worth naming. An admin-raised order waits for the parent
+     whatever the setting says — covered in kioskSession.test.js. */
+  test('a student who needs no approval is charged at the kiosk instead', async () => {
+    studentSession();
     passwordWasVerified();
     studentNeedingApproval({ requiresParentApproval: false });
 
-    const res = await createRequest();
+    const res = await createRequestAsStudent();
     const body = await res.json();
 
     assert.equal(res.status, 400);
@@ -219,6 +267,8 @@ describe('the approval route is only for students set up for it', () => {
     const res = await createRequest();
 
     assert.equal(res.status, 404);
+    // The console keys its disabled pay button on this rather than on prose.
+    assert.equal((await res.json()).code, 'NO_PARENT');
   });
 });
 

@@ -115,19 +115,34 @@ export const createPendingOrder = async (req, res) => {
 
     const items = asItems(req.body.items);
 
-    const authorization = await consumeAuthorization({
-      token: purchaseToken,
-      studentId,
-      items,
-    });
+    /* Two callers, and what authorizes them differs.
 
-    if (!authorization.ok) {
-      // Not 401: the till is properly signed in, it is this request that is
-      // unauthorised. No grace window — nothing older than this endpoint exists
-      // to be kind to.
-      return res
-        .status(403)
-        .json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
+       A student at the kiosk presents a purchase token, which is what their
+       four-digit code bought a moment ago. That is the only thing standing
+       between an unattended terminal and somebody else's wallet, so it stays.
+
+       An admin at the console presents nothing but their own sign-in, and that
+       is deliberate: the console stopped asking children for their code, and
+       what replaced it is stronger — every order an admin raises goes to the
+       parent, who sees the exact items and answers. Nothing is charged here
+       either way. */
+    const raisedByAdmin = Boolean(req.staff) && !req.student;
+
+    if (!raisedByAdmin) {
+      const authorization = await consumeAuthorization({
+        token: purchaseToken,
+        studentId,
+        items,
+      });
+
+      if (!authorization.ok) {
+        // Not 401: the till is properly signed in, it is this request that is
+        // unauthorised. No grace window — nothing older than this endpoint
+        // exists to be kind to.
+        return res
+          .status(403)
+          .json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
+      }
     }
 
     const student = await Student.findById(studentId);
@@ -136,7 +151,12 @@ export const createPendingOrder = async (req, res) => {
       return res.status(404).json({ message: "Student record not found." });
     }
 
-    if (!student.requiresParentApproval) {
+    /* The setting binds the kiosk, not the console. A student who needs no
+       approval pays at the kiosk with their code and is charged there, so
+       reaching this route is a mistake worth naming. An admin-raised order
+       waits for the parent regardless — that is the whole of what replaced the
+       code at the console. */
+    if (!raisedByAdmin && !student.requiresParentApproval) {
       return res.status(400).json({
         message:
           "This student does not need parent approval. Charge the sale at the counter instead.",
@@ -146,9 +166,13 @@ export const createPendingOrder = async (req, res) => {
     const parent = await Parent.findOne({ studentIds: student._id });
 
     if (!parent) {
+      // Named with a code as well as a message: the console disables its own
+      // pay button on this, and matching on prose is not a contract.
       return res.status(404).json({
+        code: "NO_PARENT",
         message:
-          "No parent account is linked to this student, so there is nobody to approve the order.",
+          "No parent account is linked to this student, so there is nobody to approve the order." +
+          " The student can still buy at the kiosk with their purchase code.",
       });
     }
 
@@ -175,6 +199,7 @@ export const createPendingOrder = async (req, res) => {
       items: priced.orderItems,
       totalAmount: priced.totalAmount,
       expiresAt: pendingOrderExpiry(),
+      raisedBy: req.staff?.id ?? null,
     });
 
     // Not awaited: the counter gets its answer now. sendToParent never rejects.

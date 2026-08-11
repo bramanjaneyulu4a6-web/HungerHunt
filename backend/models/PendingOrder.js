@@ -85,6 +85,15 @@ const pendingOrderSchema = new mongoose.Schema(
       default: pendingOrderExpiry,
     },
 
+    // Set when an admin rang the order up at the console, null when the student
+    // raised it themselves at the kiosk. The parent's approval is what spends
+    // the money either way; this records who asked.
+    raisedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+
     approvedAt: Date,
 
     rejectedAt: Date,

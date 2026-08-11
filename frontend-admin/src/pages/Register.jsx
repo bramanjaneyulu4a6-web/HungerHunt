@@ -115,11 +115,14 @@ const Register = () => {
             >
               <option value="admin">Admin — full back office</option>
               <option value="cashier">Cashier — till only</option>
+              <option value="warehouse">Warehouse — goods in only</option>
             </select>
 
             <p className="auth-hint">
               {formData.role === 'cashier'
                 ? 'Can look up students and take payments on the kiosk. Cannot change prices, stock, student records or wallets.'
+                : formData.role === 'warehouse'
+                ? 'Can raise purchase orders and receive deliveries in the warehouse app. Cannot touch students, wallets, prices or the till.'
                 : 'Full access, including student records, wallet top-ups and creating other accounts.'}
             </p>
           </div>

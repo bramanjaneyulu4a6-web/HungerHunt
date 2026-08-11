@@ -1,4 +1,4 @@
-import Admin, { FULL_ADMIN } from '../models/Admin.js';
+import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import { verifyToken } from '../utils/tokens.js';
 import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './devBypass.js';
@@ -19,21 +19,15 @@ const denied = (res, message) =>
 // wrong. 403 says the token is fine and the account simply does not reach here.
 const forbidden = (res, message) => res.status(403).json({ message });
 
-// Two independent checks stand between a token and staff access, and a third
-// between a token and the admin-only half of it.
-//
-// verifyToken settles what the token is: signed with the admin key, and
-// claiming a staff role. Tokens predating the role claim have none, and are
-// accepted as full admins until the grace date in utils/tokens.js.
-//
-// The lookup below settles who it is for, and what that account is *now*. It is
-// what makes a parent's token useless here during that grace period, when the
-// claim cannot distinguish them; it is the only thing that revokes a deleted
-// admin's unexpired token at any time; and by asking whether the row is still a
-// full admin rather than merely present, it is what makes demoting someone in
-// the back office take effect on their next request instead of whenever their
-// token happens to expire.
-const staffGate = (required) => async (req, res, next) => {
+// One row filter per gate: the account's stored role must be in the gate's
+// allow-list. A row with no role at all predates roles entirely and is a full
+// admin, which outranks every gate — so the missing field is accepted
+// everywhere, spelled out because Mongo will not infer it.
+const roleFilter = (allowed) => ({
+  $or: [{ role: { $in: allowed } }, { role: { $exists: false } }],
+});
+
+const staffGate = (allowed, needsMessage) => async (req, res, next) => {
   if (authBypassEnabled) {
     const adminId = await resolveBypassAdmin();
     if (!adminId) {
@@ -56,15 +50,13 @@ const staffGate = (required) => async (req, res, next) => {
 
     const role = payload.role || 'admin';
 
-    if (required === 'admin' && role !== 'admin') {
-      return forbidden(res, 'This action needs a full admin account.');
+    if (!allowed.includes(role)) {
+      return forbidden(res, needsMessage);
     }
 
-    const filter = required === 'admin'
-      ? { _id: payload.id, ...FULL_ADMIN }
-      : { _id: payload.id };
-
-    if (!(await Admin.exists(filter))) return denied(res, 'Not authorized');
+    if (!(await Admin.exists({ _id: payload.id, ...roleFilter(allowed) }))) {
+      return denied(res, 'Not authorized');
+    }
 
     req.adminId = payload.id;
     req.staff = { id: payload.id, role };
@@ -75,13 +67,23 @@ const staffGate = (required) => async (req, res, next) => {
 };
 
 // The back office: everything that changes the shop, the money supply, or who
-// may sign in. This is the strict one on purpose — a route that nobody thought
-// about keeps the narrower audience rather than quietly gaining a wider one.
-export const protectAdmin = staffGate('admin');
+// may sign in. Strict on purpose — a route nobody thought about keeps the
+// narrower audience rather than quietly gaining a wider one.
+export const protectAdmin = staffGate(['admin'], 'This action needs a full admin account.');
 
-// The till's routes, open to both kinds of staff. Deliberately few: look a
-// student up, verify their code, take the payment, raise an approval request.
-export const protectStaff = staffGate('staff');
+// The till's routes: look a student up, verify their code, take the payment,
+// raise an approval request.
+export const protectStaff = staffGate(['admin', 'cashier'], 'This action needs a till account.');
+
+// The storeroom's routes: see and raise purchase orders, receive deliveries,
+// read stock and suppliers.
+export const protectWarehouse = staffGate(['admin', 'warehouse'], 'This action needs a warehouse account.');
+
+// Read-only surfaces every kind of staff needs (live stock).
+export const protectAnyStaff = staffGate(
+  ['admin', 'cashier', 'warehouse'],
+  'This action needs a staff account.'
+);
 
 // Admin registration is open only long enough to create the very first account.
 // Once one exists it demands a signed-in admin, so that authorization is decided

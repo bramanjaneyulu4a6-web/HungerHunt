@@ -6,12 +6,14 @@ const adminSchema = new mongoose.Schema({
   password: { type: String, required: true },
 
   // What this account may reach. 'cashier' is the till: find a student, take a
-  // payment, raise an approval request, and nothing else. Everything that
-  // changes the shop or the money supply — the catalogue, top-ups, student
-  // records, other accounts — stays with 'admin'.
+  // payment, raise an approval request, and nothing else. 'warehouse' receives
+  // deliveries and raises purchase orders — no students, no wallets, no
+  // prices, no till. Everything that changes the shop or the money supply —
+  // the catalogue, top-ups, student records, other accounts — stays with
+  // 'admin'.
   role: {
     type: String,
-    enum: ['admin', 'cashier'],
+    enum: ['admin', 'cashier', 'warehouse'],
     default: 'admin',
   },
 

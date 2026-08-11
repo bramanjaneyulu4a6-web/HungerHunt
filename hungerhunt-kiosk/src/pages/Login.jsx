@@ -18,6 +18,14 @@ const Login = () => {
     try {
       setLoading(true);
       const res = await api.post("/admin/login", { email, password });
+
+      // A warehouse account's credentials are good — for the other app.
+      if (res.data.role === "warehouse") {
+        setError("This is a warehouse account. Sign in on the warehouse app instead.");
+        setLoading(false);
+        return;
+      }
+
       localStorage.setItem("adminToken", res.data.token);
 
       // Both roles work the till. Kept so the terminal can say who is on it —

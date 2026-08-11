@@ -26,7 +26,7 @@ export const parentSecretIsShared = () => !process.env.PARENT_JWT_SECRET;
 // The till is the most physically exposed device in the system: it sits on a
 // counter, unattended between customers, with a token in its browser storage.
 // A cashier account is what that token is worth.
-export const STAFF_ROLES = ['admin', 'cashier'];
+export const STAFF_ROLES = ['admin', 'cashier', 'warehouse'];
 
 const isStaffRole = (role) => STAFF_ROLES.includes(role);
 

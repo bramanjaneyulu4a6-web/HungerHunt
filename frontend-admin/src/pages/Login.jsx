@@ -18,13 +18,11 @@ const Login = () => {
     try {
       const response = await api.post('/admin/login', { email, password });
 
-      /* A cashier's credentials are good — they are just good for the till.
-         Signing them in here would work, in the sense that they would reach a
-         dashboard where every panel came back empty and every action was
-         refused. Saying so at the door is the only version of this that
-         explains itself. */
-      if (response.data.role === 'cashier') {
-        setError('This is a till account. Sign in on the kiosk instead.');
+      /* A non-admin's credentials are good — just good for a different
+         terminal. Saying so at the door beats a dashboard of empty panels. */
+      if (response.data.role && response.data.role !== 'admin') {
+        const home = response.data.role === 'cashier' ? 'the kiosk' : 'the warehouse app';
+        setError(`This is a ${response.data.role} account. Sign in on ${home} instead.`);
         setSubmitting(false);
         return;
       }

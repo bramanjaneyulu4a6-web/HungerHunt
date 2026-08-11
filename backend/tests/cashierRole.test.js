@@ -34,6 +34,7 @@ const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
+const { accountMatcher } = await import('./helpers/accountIs.js');
 
 // Routes with no stub fall through to a query that cannot run. They still prove
 // what they are asked to prove — a gate that opened is not a 401 — so let them
@@ -62,21 +63,9 @@ before(async () => {
 
 afterEach(() => mock.restoreAll());
 
-// Models the one account row the gate looks up. protectAdmin asks whether the
-// id is a *full admin* — the filter carries the $or that also matches rows
-// predating the field — while protectStaff only asks whether it is there.
-const accountIs = (role) => {
-  mock.method(Admin, 'exists', async (filter) => {
-    if (String(filter._id) !== STAFF_ID) return null;
-
-    const mustBeFullAdmin = Boolean(filter.$or);
-    if (mustBeFullAdmin && role !== 'admin') return null;
-
-    return { _id: STAFF_ID };
-  });
-
-  mock.method(Admin, 'countDocuments', async () => 1);
-};
+// Models the one account row the gate looks up. Shared with warehouseRole.test.js
+// so the two stay in lockstep if a gate's filter shape ever changes.
+const accountIs = accountMatcher(Admin, STAFF_ID);
 
 // Enough for the till's routes to answer from memory instead of a database, so
 // the same request twice gives the same reply both times.
@@ -223,13 +212,7 @@ describe('accounts that predate cashiers', () => {
   // admin. Reading the missing field as anything narrower would lock the back
   // office out of itself the moment this deploys.
   test('a row with no role at all is a full admin', async () => {
-    mock.method(Admin, 'exists', async (filter) => {
-      // What Mongo does with { $or: [{role:'admin'}, {role:{$exists:false}}] }
-      // against a document that has no role: it matches the second branch.
-      if (String(filter._id) !== STAFF_ID) return null;
-      return { _id: STAFF_ID };
-    });
-    mock.method(Admin, 'countDocuments', async () => 1);
+    accountIs(undefined);
 
     const res = await send('GET', '/api/transactions/history', adminToken);
     assert.notEqual(res.status, 403);

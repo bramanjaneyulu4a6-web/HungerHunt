@@ -27,25 +27,25 @@ export const registerAdmin = async (req, res) => {
     // open while no account exists, signed-in full admins only thereafter.
     //
     // The bootstrap call is the exception that has to be forced rather than
-    // trusted: it is the one unauthenticated path in here, and a cashier is not
-    // something a deployment can be founded on — there would be nobody left who
-    // could create the admin.
-    const wantsCashier = req.body?.role === 'cashier' && adminCount > 0;
-    const role = wantsCashier ? 'cashier' : 'admin';
+    // trusted: it is the one unauthenticated path in here, and a deployment
+    // cannot be founded on a cashier or a storekeeper — there would be nobody
+    // left who could create the admin.
+    const LIMITS = {
+      admin: parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3,
+      cashier: parseInt(process.env.MAX_CASHIER_ACCOUNTS) || 10,
+      warehouse: parseInt(process.env.MAX_WAREHOUSE_ACCOUNTS) || 5,
+    };
 
-    // Counted separately, because they are limited for different reasons. Admin
-    // accounts are few by policy; tills are as many as the school has counters.
-    const limit = wantsCashier
-      ? parseInt(process.env.MAX_CASHIER_ACCOUNTS) || 10
-      : parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3;
+    const requested = req.body?.role;
+    const role = adminCount > 0 && LIMITS[requested] ? requested : 'admin';
 
-    const existing = wantsCashier
-      ? await Admin.countDocuments({ role: 'cashier' })
-      : adminCount;
+    const existing = role === 'admin'
+      ? adminCount
+      : await Admin.countDocuments({ role });
 
-    if (existing >= limit) {
+    if (existing >= LIMITS[role]) {
       return res.status(400).json({
-        message: `Registration limited. Max ${limit} ${role} accounts allowed.`
+        message: `Registration limited. Max ${LIMITS[role]} ${role} accounts allowed.`
       });
     }
 
@@ -60,9 +60,9 @@ export const registerAdmin = async (req, res) => {
     await admin.save();
 
     return res.status(201).json({
-      message: role === 'cashier'
-        ? "Cashier account created successfully"
-        : "Admin registered successfully",
+      message: role === 'admin'
+        ? "Admin registered successfully"
+        : `${role[0].toUpperCase()}${role.slice(1)} account created successfully`,
       role,
     });
 

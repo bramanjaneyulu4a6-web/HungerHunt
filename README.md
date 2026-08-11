@@ -2,9 +2,9 @@
 
 A school meal and pocket-money system. Students carry a wallet balance; staff bill purchases at a kiosk; parents watch spending and set limits from their phone.
 
-The whole stack is JavaScript — Node/Express on the server, React + Vite in the three clients.
+The whole stack is JavaScript — Node/Express on the server, React + Vite in the four clients.
 
-## The four apps
+## The five apps
 
 | Directory | What it is | Dev port |
 |---|---|---|
@@ -12,8 +12,11 @@ The whole stack is JavaScript — Node/Express on the server, React + Vite in th
 | `frontend-admin/` | School office dashboard: students, products, inventory, purchases, billing, recharges | 5174 |
 | `frontend-parent/` | Parent app (also packaged as iOS/Android via Capacitor): balances, history, wallet limits, purchase password | 5173 |
 | `hungerhunt-kiosk/` | Counter terminal for staff to ring up purchases | 5175 |
+| `hungerhunt-warehouse/` | Storeroom app: suppliers, purchase orders, receiving deliveries, stock | 5176 |
 
 The parent app is a web app wrapped in Capacitor, so `frontend-parent/ios/` and `frontend-parent/android/` are native shells around the same React code — there is no separate mobile codebase.
+
+`hungerhunt-warehouse`'s dev port is pinned with `strictPort` rather than left to float — the backend's CORS allowlist is a hardcoded array of origins, so a dev server that drifted onto a different port would be silently rejected by every request.
 
 ## Setup
 
@@ -26,15 +29,18 @@ cp frontend-parent/.env.example   frontend-parent/.env
 cp hungerhunt-kiosk/.env.example  hungerhunt-kiosk/.env
 ```
 
+`hungerhunt-warehouse/` has no `.env.example` yet — copy `hungerhunt-kiosk/.env.example` as a starting point and point `VITE_API_BASE_URL` at the backend.
+
 `.env` files are gitignored. Never commit real credentials — see Security below.
 
 Then install and run each app in its own terminal:
 
 ```bash
-npm install --prefix backend           && npm run dev --prefix backend
-npm install --prefix frontend-admin    && npm run dev --prefix frontend-admin
-npm install --prefix frontend-parent   && npm run dev --prefix frontend-parent
-npm install --prefix hungerhunt-kiosk  && npm run dev --prefix hungerhunt-kiosk
+npm install --prefix backend              && npm run dev --prefix backend
+npm install --prefix frontend-admin       && npm run dev --prefix frontend-admin
+npm install --prefix frontend-parent      && npm run dev --prefix frontend-parent
+npm install --prefix hungerhunt-kiosk     && npm run dev --prefix hungerhunt-kiosk
+npm install --prefix hungerhunt-warehouse && npm run dev --prefix hungerhunt-warehouse
 ```
 
 `GET /health` on the backend reports server and database status.
@@ -82,7 +88,7 @@ Each frontend follows the standard Vite layout: `src/pages`, `src/components`, `
 
 ## Checks and releases
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, `eslint` for `frontend-parent` and `hungerhunt-kiosk`, a build of all three frontends, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps. `frontend-admin` is built but not yet linted — it has 10 outstanding eslint errors.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, `eslint` for `frontend-parent`, `hungerhunt-kiosk` and `hungerhunt-warehouse`, a build of all four frontends, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps. `frontend-admin` is built but not yet linted — it has 10 outstanding eslint errors.
 
 Shipping the parent app to the App Store or Play has its own list, including the credential rotation and push setup still outstanding: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 

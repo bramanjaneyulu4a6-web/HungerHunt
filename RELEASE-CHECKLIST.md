@@ -75,6 +75,17 @@ These are open items, not formalities. Each one is a real gap today.
       enumeration, is one-time device enrollment — written up in
       `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md`.
 
+- [ ] **Create warehouse account(s) in the admin console (Account type →
+      Warehouse).** A warehouse account can see and raise purchase orders,
+      receive deliveries, and read stock and suppliers — no students, no
+      wallets, no prices, no till. Nobody can sign into
+      `hungerhunt-warehouse` until at least one exists.
+
+- [ ] **Sign the storeroom device into `hungerhunt-warehouse`.** Its dev port
+      (5176) is pinned with `strictPort` because the backend's CORS allowlist
+      is a hardcoded array of origins; a deployed instance needs its own
+      origin added the same way.
+
 - [ ] **Tell the counter staff that admin billing no longer charges.** An order
       raised from the admin console now always goes to the parent to approve —
       the student's four-digit code is not asked for there any more, and

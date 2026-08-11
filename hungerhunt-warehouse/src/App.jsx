@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
+import Home from "./pages/Home";
+import Receive from "./pages/Receive";
 
 // Replaced by real pages in the next two tasks.
 const Placeholder = ({ name }) => <div className="wh-page"><h1 className="wh-title">{name}</h1></div>;
@@ -41,8 +43,8 @@ const App = () => (
     <Toaster position="top-center" />
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<ProtectedRoute><Shell><Placeholder name="Open orders" /></Shell></ProtectedRoute>} />
-      <Route path="/receive/:id" element={<ProtectedRoute><Shell><Placeholder name="Receive" /></Shell></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><Shell><Home /></Shell></ProtectedRoute>} />
+      <Route path="/receive/:id" element={<ProtectedRoute><Shell><Receive /></Shell></ProtectedRoute>} />
       <Route path="/new-order" element={<ProtectedRoute><Shell><Placeholder name="New order" /></Shell></ProtectedRoute>} />
       <Route path="/stock" element={<ProtectedRoute><Shell><Placeholder name="Stock" /></Shell></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><Shell><Placeholder name="History" /></Shell></ProtectedRoute>} />

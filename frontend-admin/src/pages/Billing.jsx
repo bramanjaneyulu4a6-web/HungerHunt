@@ -4,10 +4,6 @@ import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import { Banner, Button, Card, PageHeader } from "../components/ui";
 
-// Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
-// actually enforces it. Here it only shapes the field.
-const PURCHASE_CODE_LENGTH = 4;
-
 const Billing = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [productSearchQuery, setProductSearchQuery] = useState("");
@@ -19,14 +15,12 @@ const Billing = () => {
   const [cart, setCart] = useState([]);
   const [invoiceTotal, setInvoiceTotal] = useState(0);
   const [isSearched, setIsSearched] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [purchasePassword, setPurchasePassword] = useState("");
   const [paying, setPaying] = useState(false);
 
   // `paying` drives the disabled state and the label, but it cannot be the
   // lock: setPaying does not apply until the next render, so submits landing in
-  // the same tick all read false and every one of them charges the wallet. A
-  // ref flips synchronously, so the second one bails however fast it arrives.
+  // the same tick all read false and every one of them raises an order. A ref
+  // flips synchronously, so the second one bails however fast it arrives.
   const payingRef = useRef(false);
 
   // Staged quantities before appending to cart: { [productId]: quantity }
@@ -264,68 +258,44 @@ const Billing = () => {
       quantity: parseInt(item.quantity, 10) || 1,
     }));
 
-  // The token comes from verify-payment and is bound to exactly the lines that
-  // were sent with it, so those same lines are passed in here rather than read
-  // off the cart again — anything re-derived in between would not match, and
-  // the server would refuse the charge.
-  const handleCheckout = async (items, purchaseToken) => {
-    if (!selectedStudent) return;
-
-    if (invoiceTotal > selectedStudent.pocketMoney) {
-      toast.error("Insufficient wallet balance");
-      return;
-    }
-
-    await api.post("/transactions/bill", {
-      studentId: selectedStudent._id,
-      items,
-      totalAmount: invoiceTotal,
-      purchaseToken,
-    });
-
-    toast.success("Payment successful");
-    setCart([]);
-    setSelectedStudent(null);
-    setSearchQuery("");
-    setProductSearchQuery("");
-    setIsSearched(false);
-  };
-
-  const handleVerifyAndPay = async (e) => {
-    e.preventDefault();
-
+  /* This screen no longer charges anything.
+   *
+   * It used to ask the child for their four-digit code and take the money on
+   * the spot. That code was standing in for consent, which is not what it was
+   * ever able to prove — only that whoever was at the counter knew four
+   * digits. So the console stopped asking, and every order raised here goes to
+   * the parent, who sees the exact items and answers. Nothing moves until they
+   * do, whatever the student's approval setting says.
+   *
+   * A student can still buy on the spot: at the kiosk, with their own code,
+   * against their own wallet. */
+  const sendForApproval = async () => {
     if (payingRef.current) return;
     payingRef.current = true;
     setPaying(true);
 
-    const items = billedItems();
-    let purchaseToken;
-
     try {
-      const { data } = await api.post("/transactions/verify-payment", {
+      await api.post("/pending-orders", {
         studentId: selectedStudent._id,
-        phone: selectedStudent.parentPhoneNumber,
-        password: purchasePassword,
-        items,
+        items: billedItems(),
       });
 
-      purchaseToken = data?.purchaseToken;
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Verification failed");
-      payingRef.current = false;
-      setPaying(false);
-      return;
-    }
+      toast.success(
+        `Sent to ${selectedStudent.name}'s parent to approve — nothing has been charged yet.`,
+        { duration: 8000 }
+      );
 
-    try {
-      setShowVerifyModal(false);
-      setPurchasePassword("");
-      await handleCheckout(items, purchaseToken);
+      setCart([]);
+      setSelectedStudent(null);
+      setSearchQuery("");
+      setProductSearchQuery("");
+      setIsSearched(false);
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
           err.response?.data?.error ||
-          "Checkout failed"
+          "Could not send the order for approval",
+        { duration: 8000 }
       );
     } finally {
       payingRef.current = false;
@@ -340,6 +310,9 @@ const Billing = () => {
   const remaining = selectedStudent
     ? selectedStudent.pocketMoney - invoiceTotal
     : 0;
+
+  // Nothing raised here can be approved without a parent on the other end.
+  const parentMissing = Boolean(selectedStudent) && !selectedStudent.isParentRegistered;
 
   return (
     <div className="page">
@@ -858,6 +831,28 @@ const Billing = () => {
                     : `Remaining Balance: ${formatINR(remaining)}`}
                 </div>
 
+                {/* Said before the button rather than after the request comes
+                    back refused. The server checks it too — this only saves
+                    the round trip and explains what to do instead. */}
+                {parentMissing && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      color: "var(--danger)",
+                      background: "var(--danger-soft, rgba(200,60,60,0.08))",
+                    }}
+                    role="status"
+                  >
+                    {selectedStudent?.name}&rsquo;s parent has not registered in
+                    the app, so there is nobody to approve an order. They can
+                    still buy at the kiosk with their purchase code.
+                  </div>
+                )}
+
                 <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                   <Button variant="danger" onClick={handleCancelPayment}>
                     Cancel Payment
@@ -865,10 +860,12 @@ const Billing = () => {
                   <Button
                     variant="success"
                     style={{ flex: 1 }}
-                    disabled={cart.length === 0 || remaining < 0 || paying}
-                    onClick={() => setShowVerifyModal(true)}
+                    disabled={
+                      cart.length === 0 || remaining < 0 || paying || parentMissing
+                    }
+                    onClick={sendForApproval}
                   >
-                    Complete Payment
+                    {paying ? "Sending…" : "Send for approval"}
                   </Button>
                 </div>
               </div>
@@ -877,79 +874,6 @@ const Billing = () => {
         </div>
       )}
 
-      {showVerifyModal && (
-        <div
-          className="modal-backdrop"
-          onClick={() => {
-            if (payingRef.current) return;
-            setShowVerifyModal(false);
-            setPurchasePassword("");
-          }}
-        >
-          <form
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={handleVerifyAndPay}
-          >
-            <h2 className="modal-title">Parent Verification</h2>
-
-            <label className="field-label" htmlFor="verify-phone">
-              Father's Mobile Number
-            </label>
-            <input
-              id="verify-phone"
-              className="input"
-              style={{ marginBottom: 14 }}
-              readOnly
-              value={selectedStudent?.parentPhoneNumber || ""}
-            />
-
-            <label className="field-label" htmlFor="verify-password">
-              Purchase Code
-            </label>
-            {/* Four digits and nothing else — a student has one secret and this
-                is it. A code predating the rule cannot be typed here; the
-                parent replaces it in the app with their account password. */}
-            <input
-              id="verify-password"
-              type="password"
-              inputMode="numeric"
-              className="input"
-              placeholder="4-digit code"
-              autoComplete="off"
-              maxLength={PURCHASE_CODE_LENGTH}
-              value={purchasePassword}
-              onChange={(e) =>
-                setPurchasePassword(
-                  e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
-                )
-              }
-            />
-
-            <div className="modal-actions">
-              <Button
-                variant="ghost"
-                style={{ flex: 1 }}
-                disabled={paying}
-                onClick={() => {
-                  setShowVerifyModal(false);
-                  setPurchasePassword("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="success"
-                style={{ flex: 1 }}
-                disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
-              >
-                {paying ? "Processing…" : "Verify & Pay"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 };

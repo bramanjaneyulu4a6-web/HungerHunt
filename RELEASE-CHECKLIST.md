@@ -78,8 +78,15 @@ These are open items, not formalities. Each one is a real gap today.
 - [ ] **Create warehouse account(s) in the admin console (Account type →
       Warehouse).** A warehouse account can see and raise purchase orders,
       receive deliveries, and read stock and suppliers — no students, no
-      wallets, no prices, no till. Nobody can sign into
-      `hungerhunt-warehouse` until at least one exists.
+      wallets, no prices. Nobody can sign into `hungerhunt-warehouse` until at
+      least one exists.
+
+- [ ] **Clear out any `role: 'cashier'` accounts.** The role is gone with the
+      counter it belonged to. Nobody is signed out by this — every cashier
+      token was issued on an unreleased branch — but a row still carrying the
+      role can no longer sign in anywhere, and login tells it so rather than
+      failing obscurely. Delete those accounts or re-create them as admin:
+      `db.admins.find({ role: 'cashier' })`.
 
 - [ ] **Sign the storeroom device into `hungerhunt-warehouse`.** Its dev port
       (5176) is pinned with `strictPort` because the backend's CORS allowlist

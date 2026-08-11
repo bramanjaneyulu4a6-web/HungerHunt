@@ -14,6 +14,7 @@ import {
 
 const EMPTY_FORM = {
   name: '',
+  admissionNumber: '',
   fatherName: '',
   hostelNumber: '',
   grade: '',
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
 
 const SORTABLE_COLUMNS = [
   { key: 'name', label: 'Name' },
+  { key: 'admissionNumber', label: 'Admission No.' },
   { key: 'fatherName', label: "Father's Name" },
   { key: 'hostelNumber', label: 'Hostel No.' },
   { key: 'grade', label: 'Grade' },
@@ -193,7 +195,10 @@ const Students = () => {
     if (!query) return true;
     return (
       st.name?.toLowerCase().includes(query) ||
-      st.hostelNumber?.toString().toLowerCase().includes(query)
+      st.hostelNumber?.toString().toLowerCase().includes(query) ||
+      // Searchable too: it is the number a student would quote when something
+      // is wrong at the kiosk, and often the only one they know.
+      st.admissionNumber?.toString().toLowerCase().includes(query)
     );
   });
 
@@ -227,6 +232,7 @@ const Students = () => {
     setEditingId(st._id);
     setFormData({
       name: st.name,
+      admissionNumber: st.admissionNumber,
       fatherName: st.fatherName,
       hostelNumber: st.hostelNumber,
       grade: st.grade,
@@ -236,6 +242,11 @@ const Students = () => {
 
   const formFields = [
     { key: 'name', label: 'Student Name', type: 'text' },
+    // The school's own number, and what a student types at the kiosk — without
+    // one they cannot use it. Left optional on this form rather than required:
+    // the roll arrives by import, and a record missing its number should still
+    // be editable in every other respect.
+    { key: 'admissionNumber', label: 'Admission Number', type: 'text' },
     { key: 'fatherName', label: "Father's Name", type: 'text' },
     { key: 'hostelNumber', label: 'Hostel Room No.', type: 'text' },
     { key: 'grade', label: 'Grade / Class', type: 'text' },
@@ -474,6 +485,14 @@ const Students = () => {
                     <tr key={st._id}>
                       <td data-label="Name">
                         <strong>{st.name}</strong>
+                      </td>
+                      {/* A student without one cannot open a kiosk session, so
+                          the gap is worth seeing at a glance while the roll is
+                          being imported. */}
+                      <td data-label="Admission No.">
+                        {st.admissionNumber || (
+                          <span style={{ color: 'var(--muted)' }}>Not set</span>
+                        )}
                       </td>
                       <td data-label="Father's Name">{st.fatherName}</td>
                       <td data-label="Hostel No.">

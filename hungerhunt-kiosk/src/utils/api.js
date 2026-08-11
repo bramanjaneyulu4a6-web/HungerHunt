@@ -7,7 +7,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("adminToken");
+  const token = localStorage.getItem("kioskToken");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -19,17 +19,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // A 401 out here is the session's own token reaching its 450 seconds, or a
+    // student removed from the roll mid-order. Either way the session is over
+    // and the screen belongs to the next person.
+    //
     // With the bypass on there is no token to clear and no login to return to,
     // so a stray 401 must not eject the kiosk.
-    // A 403 is a cashier reaching past the till, not a dead session, so it must
-    // not eject anyone — the till's own routes never answer with one.
     if (error.response?.status === 401 && !authBypassEnabled) {
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("staffRole");
+      localStorage.removeItem("kioskToken");
+      localStorage.removeItem("kioskStudent");
+
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
+
     return Promise.reject(error);
   }
 );

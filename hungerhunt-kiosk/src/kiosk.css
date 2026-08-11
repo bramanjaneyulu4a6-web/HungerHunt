@@ -1478,6 +1478,85 @@
   height: auto;
 }
 
+/* ---- the gate ----------------------------------------------------------- */
+
+/* The welcome screen with a field in it. It used to be a splash with START
+   ORDER on it and nothing to say; now the same tap opens a session, so the
+   two are one screen and the queue is a screen shorter.
+
+   Everything here sits on the brand gradient .kiosk-welcome brings, which is
+   why the field is light-on-dark rather than the till's warm paper. */
+
+.kiosk-gate {
+  padding: 32px;
+}
+
+/* Smaller than on the splash it grew from. The artwork carries a good deal of
+   transparent margin, so at its full 420px the group sits low on the screen
+   and the field — the only thing anyone is here to use — lands near the
+   bottom edge. */
+.kiosk-gate .kiosk-welcome-logo {
+  width: 300px;
+  margin-bottom: -18px;
+}
+
+.kiosk-gate-prompt {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--on-dark);
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.kiosk-gate-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: min(420px, 100%);
+}
+
+/* Big enough to read across a counter and to hit without aiming, and centred
+   because what goes in it is short. */
+.kiosk-gate-input {
+  width: 100%;
+  min-height: 76px;
+  padding: 0 24px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.12em;
+  color: var(--brand-deep);
+  outline: none;
+}
+
+.kiosk-gate-input::placeholder {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #a1937f;
+}
+
+.kiosk-gate-input:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.22);
+}
+
+/* A disabled START ORDER has to read as "not yet", not as broken — it is the
+   resting state of this screen, before anything has been typed. */
+.kiosk-gate .kiosk-start:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.kiosk-gate .kiosk-start:disabled:active {
+  transform: none;
+}
+
 /* ---- scrollbars ---------------------------------------------------------- */
 
 /* Scoped to the till's own scroll areas. This used to be an injected global

@@ -5,7 +5,7 @@ import { authBypassEnabled } from "../utils/authBypass";
 const ProtectedRoute = ({ children }) => {
   if (authBypassEnabled) return children;
 
-  const token = localStorage.getItem("adminToken");
+  const token = localStorage.getItem("kioskToken");
 
   if (!token) {
     return <Navigate to="/login" replace />;

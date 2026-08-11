@@ -1,7 +1,9 @@
+import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import Inventory from '../models/Inventory.js';
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { isNonNegativeNumber, isWholeNonNegative } from '../utils/quantities.js';
 
 
 const uploadImage = (file) => {
@@ -74,93 +76,77 @@ export const addProduct = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
+    // Active-only by default: both ordering screens build their lists here
+    // and must not offer what is off sale. The admin catalogue asks for
+    // everything so archived rows stay visible and restorable.
+    const filter = req.query.all ? {} : { active: { $ne: false } };
 
-    const products = await Product.find()
+    const products = await Product.find(filter)
+      .collation({ locale: "en", strength: 2 })
+      .sort({ name: 1 })
       .populate("stockGroup")
       .populate("unit");
 
     res.json(products);
-
   } catch (error) {
-
     res.status(500).json({
       error: error.message
     });
-
   }
 };
 
 export const updateProduct = async (req, res) => {
-
-  try {
-
-    const updateData = {
-
-      name: req.body.name,
-
-      stockGroup: req.body.stockGroup,
-
-      unit: req.body.unit,
-
-      price: Number(req.body.price)
-
-    };
-
-    if (req.file) {
-
-      updateData.image = await uploadImage(req.file);
-
-    }
-
-    const product = await Product.findByIdAndUpdate(
-
-      req.params.id,
-
-      updateData,
-
-      {
-
-        new: true,
-
-        runValidators: true
-
-      }
-
-    );
-
-    res.json(product);
-
-  } catch (error) {
-
-    res.status(500).json({
-
-      error: error.message
-
-    });
-
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(404).json({ message: "Product not found" });
   }
 
-};
-
-export const deleteProduct = async (req, res) => {
   try {
+    // Only fields the body actually carries are written — an archive toggle
+    // arrives alone, and must not drag undefined over the rest of the row.
+    const updateData = {};
 
-    await Inventory.findOneAndDelete({
-      productId: req.params.id
+    if (req.body.name !== undefined) updateData.name = req.body.name;
+    if (req.body.stockGroup !== undefined) updateData.stockGroup = req.body.stockGroup;
+    if (req.body.unit !== undefined) updateData.unit = req.body.unit;
+
+    if (req.body.price !== undefined) {
+      if (!isNonNegativeNumber(req.body.price)) {
+        return res.status(400).json({ message: "Price must be a non-negative number." });
+      }
+      updateData.price = Number(req.body.price);
+    }
+
+    if (req.body.reorderLevel !== undefined) {
+      if (!isWholeNonNegative(req.body.reorderLevel)) {
+        return res.status(400).json({ message: "Reorder level must be a whole number of zero or more." });
+      }
+      updateData.reorderLevel = Number(req.body.reorderLevel);
+    }
+
+    // Forms send strings; both spellings of true mean true.
+    if (req.body.active !== undefined) {
+      updateData.active = req.body.active === true || req.body.active === "true";
+    }
+
+    if (req.file) {
+      updateData.image = await uploadImage(req.file);
+    }
+
+    const product = await Product.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true
     });
 
-    await Product.findByIdAndDelete(
-      req.params.id
-    );
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
 
-    res.json({
-      message: "Product removed"
-    });
-
+    res.json(product);
   } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
+    // A refusal the caller can fix is 400; only genuine failure is 500.
+    const status =
+      error.name === "ValidationError" || error.name === "CastError" ? 400 : 500;
+    res.status(status).json({ error: error.message });
   }
 };
 

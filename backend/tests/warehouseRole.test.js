@@ -84,10 +84,16 @@ beforeEach(() => {
     };
     return chain;
   });
-  // getProducts awaits Product.find().populate("stockGroup").populate("unit"),
+  // getProducts awaits
+  // Product.find().collation().sort().populate("stockGroup").populate("unit"),
   // so the chain has to be thenable at every link.
   mock.method(Product, 'find', () => {
-    const chain = { populate: () => chain, then: (resolve) => resolve([]) };
+    const chain = {
+      collation: () => chain,
+      sort: () => chain,
+      populate: () => chain,
+      then: (resolve) => resolve([]),
+    };
     return chain;
   });
 });

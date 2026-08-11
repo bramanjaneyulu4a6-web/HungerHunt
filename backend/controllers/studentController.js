@@ -12,7 +12,7 @@ import {
 // pocketMoney to topUpWallet, which records the movement in rechargeHistory;
 // purchasePassword and walletControl to the parent. Handing a request body
 // straight to the driver let these routes quietly set any of them.
-const WRITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber'];
+const WRITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber', 'admissionNumber'];
 
 const pickWritable = (body) => {
   const source = body ?? {};
@@ -123,8 +123,11 @@ export const bulkImportStudents = async (req, res) => {
 // purchaseCodeIsPin rides along so the till can shape the code field before
 // asking for it — a number pad for a student known to have a four-digit code,
 // and something that will accept an older one for a student who may not.
+// isParentRegistered rides along too: the admin till cannot bill a student
+// whose parent has never registered, because nobody would be there to approve
+// the order, and the screen says so rather than letting the request fail.
 const SEARCH_FIELDS =
-  "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin";
+  "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

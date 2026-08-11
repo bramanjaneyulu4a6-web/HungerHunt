@@ -6,6 +6,19 @@ const studentSchema = new mongoose.Schema({
   hostelNumber: { type: String, required: true },
   grade: { type: String, required: true },
   parentPhoneNumber: { type: String, required: true },
+
+  // The school's own ID for the student, imported from its roll. It is what a
+  // student types to open a kiosk session, so it is unique — and sparse,
+  // because every row from before the field exists has none, and two nulls
+  // must not collide. A student without one cannot use the kiosk.
+  admissionNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    default: undefined
+  },
+
   pocketMoney: { type: Number, default: 0 },
   rechargeHistory: [
   {
@@ -41,6 +54,20 @@ const studentSchema = new mongoose.Schema({
 purchaseCodeIsPin: {
   type: Boolean,
   default: false
+},
+
+/* Five consecutive wrong codes at checkout lock this student's checkout for
+ * 15 minutes on every kiosk at once. The count and the deadline live on the
+ * row rather than in memory so the lock holds across terminals and restarts.
+ * A correct code resets the count. */
+purchaseCodeAttempts: {
+  type: Number,
+  default: 0
+},
+
+purchaseCodeLockedUntil: {
+  type: Date,
+  default: null
 },
 
 // When on, the till cannot charge this student at the counter. The purchase

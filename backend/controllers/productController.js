@@ -47,6 +47,19 @@ export const addProduct = async (req, res) => {
 
     });
 
+    // A product without a shelf is invisible to every sale screen and the
+    // Inventory page alike, with nothing anywhere able to create the row
+    // later except a goods receipt. So the catalogue row and its shelf are
+    // created together or refused together.
+    try {
+      await Inventory.create({ productId: product._id, stock: 0 });
+    } catch (err) {
+      await Product.findByIdAndDelete(product._id).catch((rollbackErr) =>
+        console.error("Product rollback failed", product._id, rollbackErr)
+      );
+      throw err;
+    }
+
     res.status(201).json(product);
 
   } catch (error) {

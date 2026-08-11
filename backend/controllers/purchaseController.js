@@ -117,6 +117,19 @@ export const getNewPurchases = async (req, res) => {
     });
   }
 };
+/* Lean on purpose, and the console's money depends on it. Hydration applies
+   the schema default, so a row closed before receipts existed — which has no
+   `received` field in the database at all — would arrive at the browser
+   carrying `received: 0`. The console reads `item.received ?? item.quantity`,
+   meaning "an order closed before receipts existed was fully received", and a
+   zero that Mongoose invented satisfies `??` perfectly well: every legacy
+   order would report nothing arrived and ₹0.00 spent, against rows somebody
+   reconciles the school's money with. Lean hands back what the document
+   actually holds, so absent stays absent and the fallback fires.
+
+   The pending list above is deliberately not lean. There the same absent field
+   means the opposite — nothing has arrived on an order nobody has closed — and
+   0 is the honest reading of it. */
 export const getCompletedPurchases = async (req, res) => {
   try {
 
@@ -124,7 +137,8 @@ export const getCompletedPurchases = async (req, res) => {
       status: "COMPLETED"
     })
       .populate("items.productId")
-      .populate("supplierId");
+      .populate("supplierId")
+      .lean();
 
     res.json(purchases);
 
@@ -286,11 +300,18 @@ export const completePurchase = async (req, res) => {
 
       appliedStock.push({ productId: item.productId, quantity: item.quantity });
 
+      /* Same rule as the receive path: a price is only written when one was
+         actually given. normalizeItems defaults an absent price to 0, so
+         setting it unconditionally means an admin who clears the box wipes the
+         figure the storeroom copied off the supplier's invoice — and nothing
+         anywhere can put it back. */
       await Purchase.updateOne(
         { _id: id, "items.productId": item.productId },
         {
           $inc: { "items.$.received": item.quantity },
-          $set: { "items.$.purchasePrice": item.purchasePrice }
+          ...(item.purchasePrice > 0
+            ? { $set: { "items.$.purchasePrice": item.purchasePrice } }
+            : {})
         }
       );
 

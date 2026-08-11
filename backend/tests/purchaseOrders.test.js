@@ -199,6 +199,72 @@ describe('the back office pending list', () => {
   });
 });
 
+/* The completed ledger is the only screen anyone reconciles the school's money
+   against, and the whole of it rests on being able to tell two rows apart:
+   one closed before receipts existed, which has no `received` field at all and
+   whose ordered quantity *is* what arrived because the old close overwrote it;
+   and one closed since, whose genuine `received: 0` means nothing came.
+
+   Hydration erases that distinction. Mongoose applies the schema default, so
+   the legacy row arrives carrying `received: 0` and the console's
+   `item.received ?? item.quantity` never fires — every legacy order reports
+   nothing arrived and ₹0.00 spent. Lean is what keeps absent absent. */
+describe('the completed ledger', () => {
+  // The console's rule, verbatim, so this test fails if the wire shape stops
+  // being one the console can read.
+  const receivedOf = (item) => item.received ?? item.quantity;
+
+  const LEGACY = { productId: PRODUCT_ID, quantity: 10, purchasePrice: 5 };
+  const SHORT_SHIPPED = { productId: PRODUCT_ID, quantity: 10, purchasePrice: 5, received: 0 };
+
+  test('hands the rows back as they are stored, absent field and all', async () => {
+    accountIs('admin');
+    let leaned = false;
+
+    const rows = [
+      { _id: PURCHASE_ID, status: 'COMPLETED', items: [{ ...LEGACY }] },
+      { _id: PURCHASE_ID, status: 'COMPLETED', items: [{ ...SHORT_SHIPPED }] },
+    ];
+
+    mock.method(Purchase, 'find', () => {
+      const chain = {
+        populate: () => chain,
+        lean: async () => { leaned = true; return rows; },
+        // Awaiting the chain without .lean() is what Mongoose does when it
+        // hydrates, and hydration is what fills the schema default in.
+        then: (resolve) => resolve(rows.map((row) => ({
+          ...row,
+          items: row.items.map((i) => ({ received: 0, ...i })),
+        }))),
+      };
+      return chain;
+    });
+
+    const res = await fetch(base + '/api/purchases/completed', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+
+    assert.equal(res.status, 200);
+
+    const [legacy, shortShipped] = await res.json();
+
+    // The consequences first, because those are what somebody notices: the
+    // ledger reporting nothing arrived and nothing spent on an order that was
+    // delivered in full and paid for.
+    assert.equal('received' in legacy.items[0], false,
+      'a row that predates receipts must not gain a count it never had');
+    assert.equal(receivedOf(legacy.items[0]), 10,
+      'a legacy order reads as fully received — its quantity is what arrived');
+    assert.equal(receivedOf(legacy.items[0]) * legacy.items[0].purchasePrice, 50,
+      'and the money is priced off that, not off zero');
+
+    assert.equal(receivedOf(shortShipped.items[0]), 0,
+      'while a genuine received of 0 reads as fully short');
+
+    assert.ok(leaned, 'and lean is the only thing keeping the two rows apart');
+  });
+});
+
 describe('reading one order', () => {
   test('a valid id that exists returns the populated document', async () => {
     accountIs('warehouse');

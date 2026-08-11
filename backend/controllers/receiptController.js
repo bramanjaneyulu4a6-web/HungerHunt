@@ -182,6 +182,9 @@ export const receiveDelivery = async (req, res) => {
         }
 
         const coverage = line.received + line.damaged;
+        const item = purchase.items.find(
+          (i) => String(i.productId) === String(line.productId)
+        );
 
         /* The unit cost rides along on the same positional write when, and
            only when, the storeroom typed one. Nothing else in the system ever
@@ -201,7 +204,15 @@ export const receiveDelivery = async (req, res) => {
               : {}),
           }
         );
-        appliedOrder.push({ productId: line.productId, coverage });
+        /* The price the line held before this write, remembered only when this
+           write is about to replace it. The compensation below is exact about
+           every other field it touches; a price left standing on a delivery
+           that was rolled back is a figure the ledger has no receipt for. */
+        appliedOrder.push({
+          productId: line.productId,
+          coverage,
+          priorPrice: line.purchasePrice > 0 ? Number(item?.purchasePrice || 0) : undefined,
+        });
       }
 
       const fresh = await Purchase.findById(purchase._id);
@@ -226,11 +237,16 @@ export const receiveDelivery = async (req, res) => {
         }
       }
 
-      for (const { productId, coverage } of appliedOrder) {
+      for (const { productId, coverage, priorPrice } of appliedOrder) {
         try {
           await Purchase.updateOne(
             { _id: purchase._id, "items.productId": productId },
-            { $inc: { "items.$.received": -coverage } }
+            {
+              $inc: { "items.$.received": -coverage },
+              ...(priorPrice === undefined
+                ? {}
+                : { $set: { "items.$.purchasePrice": priorPrice } }),
+            }
           );
         } catch (rollbackErr) {
           console.error("Order rollback failed for product", productId, rollbackErr);

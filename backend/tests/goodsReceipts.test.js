@@ -379,6 +379,40 @@ describe('the price off the invoice', () => {
     assert.equal(seen.receipt.lines[0].purchasePrice, 0);
   });
 
+  test('and comes back off the order when the delivery that carried it is rolled back', async () => {
+    accountIs('warehouse');
+    mock.method(console, 'error', () => {});
+    orderWith(); // A already carries a purchasePrice of 5, B of 9
+
+    mock.method(GoodsReceipt, 'create', async (doc) => ({ _id: 'r1', ...doc }));
+    mock.method(GoodsReceipt, 'deleteOne', async () => ({}));
+    mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+    const writes = [];
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      writes.push([String(filter['items.productId']), update]);
+      // B's write is what fails; A's is already on the order by then.
+      if (String(filter['items.productId']) === PRODUCT_B && update.$inc['items.$.received'] > 0) {
+        throw new Error('mongo hiccup');
+      }
+      return { modifiedCount: 1 };
+    });
+
+    const res = await receive({
+      lines: [
+        { productId: PRODUCT_A, received: 6, purchasePrice: 40 },
+        { productId: PRODUCT_B, received: 2, purchasePrice: 70 },
+      ],
+    });
+
+    assert.equal(res.status, 500);
+
+    const rollback = writes.find(([id, u]) => id === PRODUCT_A && u.$inc['items.$.received'] < 0);
+    assert.ok(rollback, 'the received count must come back');
+    assert.equal(rollback[1].$set['items.$.purchasePrice'], 5,
+      'and so must the price, or the order keeps a figure no receipt stands behind');
+  });
+
   test('and something that is not an amount is refused rather than booked as one', async () => {
     accountIs('warehouse');
     const created = mock.method(GoodsReceipt, 'create', async (doc) => ({ _id: 'r1', ...doc }));
@@ -642,6 +676,44 @@ describe('the legacy one-step close', () => {
 
     assert.equal(res.status, 500);
     assert.deepEqual(reopened, ['PARTIAL']);
+  });
+
+  // Purchased.jsx prefills the price it already has, so this only bites when
+  // somebody clears the box — and then it destroys the one figure in the
+  // system that no screen can put back.
+  test('an admin who clears the price box does not wipe what the storeroom captured', async () => {
+    accountIs('admin');
+    closeReaches();
+
+    mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    const writes = [];
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      writes.push(update);
+      return { modifiedCount: 1 };
+    });
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 4, purchasePrice: 0 }]);
+
+    assert.equal(res.status, 200);
+    assert.equal(writes[0].$set, undefined, 'a blank box is not a price of zero');
+    assert.equal(writes[0].$inc['items.$.received'], 4, 'the delivery itself still books');
+  });
+
+  test('but a price the admin did type still lands on the order', async () => {
+    accountIs('admin');
+    closeReaches();
+
+    mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    const writes = [];
+    mock.method(Purchase, 'updateOne', async (filter, update) => {
+      writes.push(update);
+      return { modifiedCount: 1 };
+    });
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 4, purchasePrice: 12.5 }]);
+
+    assert.equal(res.status, 200);
+    assert.equal(writes[0].$set['items.$.purchasePrice'], 12.5);
   });
 
   test('an order already closed is a 409, not a second application of stock', async () => {

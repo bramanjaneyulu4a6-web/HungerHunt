@@ -8,13 +8,21 @@ import {
   searchStudents,
   getStudentCount,
   getActiveStudentCount,
-  topUpWallet
+  topUpWallet,
+  createKioskSession
 } from "../controllers/studentController.js";
 
 import { protectAdmin, protectStaff } from '../middleware/authMiddleware.js';
-import { searchLimiter } from '../middleware/rateLimit.js';
+import { kioskSessionLimiter, searchLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
+
+/* The kiosk's login, and the only open route on this router. A student types
+   their admission number and gets a session; no token is presented because
+   there is nothing yet to present one with. The limiter is the whole of what
+   stands in front of it, which is why it is tight — see the accepted risk in
+   docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md. */
+router.post('/kiosk-session', kioskSessionLimiter, createKioskSession);
 
 /* Search is the till's route: it returns the few fields needed to ring a
    student up, and the counter cannot work without it. Every other route here

@@ -1,6 +1,7 @@
 import Student from '../models/Student.js';
 import Parent from "../models/Parent.js";
 import { sendToParent } from "../utils/sendNotification.js";
+import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
 import {
   linkQuietly,
   findStudentsByIdentity,
@@ -159,6 +160,55 @@ export const searchStudents = async (req, res) => {
 };
 
 
+
+/* The kiosk's login, and the one route here that asks for nothing.
+
+   The admission number identifies; the four-digit code, asked for at checkout
+   rather than here, authenticates. That split is deliberate and its cost is
+   recorded in the spec: anyone who can reach this route can walk the roll and
+   read back a name and a balance. So this returns the smallest set the
+   ordering screen can work from — nothing that is not already printed on the
+   student's own ID card — and the limiter in front of it is doing real work.
+
+   A student whose parent has never set a code is refused here rather than
+   after they have filled a basket they cannot pay for. */
+export const createKioskSession = async (req, res) => {
+  const admissionNumber = String(req.body?.admissionNumber ?? '').trim();
+
+  if (!admissionNumber) {
+    return res.status(400).json({ message: 'An admission number is required.' });
+  }
+
+  try {
+    const student = await Student.findOne({ admissionNumber })
+      .select('name admissionNumber pocketMoney requiresParentApproval +purchasePassword');
+
+    if (!student) {
+      return res.status(404).json({ message: 'No student found with that admission number.' });
+    }
+
+    if (!student.purchasePassword) {
+      return res.status(403).json({
+        message:
+          'No purchase code has been set for this student yet. A parent can set one in the app.',
+      });
+    }
+
+    res.json({
+      token: signStudentToken(student._id.toString(), student.admissionNumber),
+      expiresInSeconds: STUDENT_SESSION_SECONDS,
+      student: {
+        id: student._id.toString(),
+        name: student.name,
+        admissionNumber: student.admissionNumber,
+        pocketMoney: student.pocketMoney,
+        requiresParentApproval: Boolean(student.requiresParentApproval),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 export const getStudentCount = async (req, res) => {
   try {

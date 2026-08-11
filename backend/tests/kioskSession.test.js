@@ -47,7 +47,7 @@ describe('the Student schema carries the kiosk fields', () => {
   });
 });
 
-const { signStudentToken, signAdminToken } = await import('../utils/tokens.js');
+const { signStudentToken, signAdminToken, verifyToken } = await import('../utils/tokens.js');
 const Admin = (await import('../models/Admin.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 
@@ -114,5 +114,84 @@ describe('the till read gate takes a student session or staff', () => {
   test('no token is still no entry', async () => {
     const res = await fetch(base + '/api/inventory');
     assert.equal(res.status, 401);
+  });
+});
+
+const postSession = (body) =>
+  fetch(base + '/api/students/kiosk-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+describe('opening a kiosk session', () => {
+  const onRoll = {
+    _id: STUDENT_ID,
+    name: 'Asha Rao',
+    admissionNumber: 'ADM-1042',
+    pocketMoney: 350,
+    requiresParentApproval: false,
+    purchasePassword: 'some-bcrypt-hash',
+    parentPhoneNumber: '9876543210',
+    hostelNumber: 'H-4',
+  };
+
+  test('a known admission number gets a token and only what the screen needs', async () => {
+    mock.method(Student, 'findOne', () => queryFor(onRoll));
+
+    const res = await postSession({ admissionNumber: ' ADM-1042 ' });
+    assert.equal(res.status, 200);
+
+    const body = await res.json();
+    assert.ok(body.token);
+    assert.equal(body.expiresInSeconds, 450);
+    assert.deepEqual(body.student, {
+      id: STUDENT_ID,
+      name: 'Asha Rao',
+      admissionNumber: 'ADM-1042',
+      pocketMoney: 350,
+      requiresParentApproval: false,
+    });
+
+    // The route is open, so what it returns is what anyone holding an
+    // admission number can read. Nothing beyond the student's own ID card.
+    const raw = JSON.stringify(body.student);
+    assert.equal(raw.includes('9876543210'), false, 'the parent phone must not ride along');
+    assert.equal(raw.includes('H-4'), false, 'nor the hostel');
+    assert.equal(raw.includes('bcrypt'), false, 'nor anything of the code');
+  });
+
+  test('the token it hands back is a session for that student', async () => {
+    mock.method(Student, 'findOne', () => queryFor(onRoll));
+
+    const { token } = await (await postSession({ admissionNumber: 'ADM-1042' })).json();
+    const payload = verifyToken(token, 'student');
+
+    assert.equal(payload?.id, STUDENT_ID);
+    assert.equal(payload?.admissionNumber, 'ADM-1042');
+  });
+
+  test('an unknown admission number is refused', async () => {
+    mock.method(Student, 'findOne', () => queryFor(null));
+
+    const res = await postSession({ admissionNumber: 'ADM-9999' });
+    assert.equal(res.status, 404);
+  });
+
+  // Turned away at the door rather than after a cart they cannot pay for.
+  test('a student with no purchase code cannot open a session', async () => {
+    mock.method(Student, 'findOne', () => queryFor({ ...onRoll, purchasePassword: null }));
+
+    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    assert.equal(res.status, 403);
+    assert.match((await res.json()).message, /purchase code/i);
+  });
+
+  test('a missing admission number is answered without a query', async () => {
+    const findOne = mock.method(Student, 'findOne', () => queryFor(null));
+
+    const res = await postSession({});
+    assert.equal(res.status, 400);
+    assert.equal(findOne.mock.callCount(), 0);
   });
 });

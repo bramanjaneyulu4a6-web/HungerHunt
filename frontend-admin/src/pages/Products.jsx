@@ -2,18 +2,21 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import {
+  Badge,
   Banner,
   Button,
   EmptyState,
   PageHeader,
   Skeleton,
 } from '../components/ui';
+import { formatINR } from '../utils/format';
 
 const EMPTY_FORM = {
   name: '',
   stockGroup: '',
   unit: '',
   price: '',
+  reorderLevel: '5',
   image: null,
 };
 
@@ -47,7 +50,7 @@ const Products = () => {
     setLoadError(false);
 
     try {
-      const res = await api.get('/products');
+      const res = await api.get('/products?all=1');
       setProducts(res.data);
     } catch (error) {
       console.error(error);
@@ -94,6 +97,7 @@ const Products = () => {
       data.append('stockGroup', form.stockGroup);
       data.append('unit', form.unit);
       data.append('price', form.price);
+      data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
       if (form.image) {
         data.append('image', form.image);
       }
@@ -123,6 +127,7 @@ const Products = () => {
       stockGroup: product.stockGroup?._id || '',
       unit: product.unit?._id || '',
       price: product.price ?? '',
+      reorderLevel: String(product.reorderLevel ?? 5),
       image: null,
     });
     setIsProductOpen(true);
@@ -133,17 +138,23 @@ const Products = () => {
     setEditingId(null);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this product permanently?')) return;
+  const setArchived = async (product, archived) => {
+    if (
+      archived &&
+      !window.confirm(
+        `Archive ${product.name}? It disappears from sale everywhere; its stock and history stay, and you can restore it any time.`
+      )
+    )
+      return;
 
     try {
-      await api.delete(`/products/${id}`);
-      if (editingId === id) clearForm();
-      toast.success('Product deleted');
+      await api.put(`/products/${product._id}`, { active: !archived });
+      if (editingId === product._id) clearForm();
+      toast.success(archived ? 'Product archived' : 'Product restored');
       fetchProducts();
     } catch (error) {
       console.error(error);
-      toast.error('Failed to delete product');
+      toast.error(error.response?.data?.message || 'Failed to update product');
     }
   };
 
@@ -283,6 +294,8 @@ const Products = () => {
                 <th>Product Name</th>
                 <th>Stock Group</th>
                 <th>Unit</th>
+                <th style={{ width: 120 }}>Price</th>
+                <th style={{ width: 130 }}>Reorder level</th>
                 <th style={{ width: 180 }}>Actions</th>
               </tr>
             </thead>
@@ -307,9 +320,18 @@ const Products = () => {
                   </td>
                   <td data-label="Product">
                     <strong>{p.name}</strong>
+                    {p.active === false && (
+                      <Badge variant="neutral" style={{ marginLeft: 8 }}>
+                        Archived
+                      </Badge>
+                    )}
                   </td>
                   <td data-label="Stock Group">{p.stockGroup?.name}</td>
                   <td data-label="Unit">{p.unit?.symbol}</td>
+                  <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                    {formatINR(p.price || 0)}
+                  </td>
+                  <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
                   <td data-label="Actions">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button
@@ -319,11 +341,11 @@ const Products = () => {
                         Edit
                       </Button>
                       <Button
-                        variant="danger"
+                        variant={p.active === false ? 'success' : 'danger'}
                         className="btn--sm"
-                        onClick={() => handleDelete(p._id)}
+                        onClick={() => setArchived(p, p.active !== false)}
                       >
-                        Delete
+                        {p.active === false ? 'Restore' : 'Archive'}
                       </Button>
                     </div>
                   </td>
@@ -513,6 +535,22 @@ const Products = () => {
                   required
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-reorder">
+                  Reorder Level (flag when stock falls below this; 0 never flags)
+                </label>
+                <input
+                  id="product-reorder"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input"
+                  required
+                  value={form.reorderLevel}
+                  onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
                 />
               </div>
 

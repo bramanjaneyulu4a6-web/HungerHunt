@@ -89,7 +89,11 @@ const Suppliers = () => {
       fetchSuppliers();
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.message || "Failed to save supplier");
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to save supplier"
+      );
     } finally {
       setSaving(false);
     }
@@ -102,7 +106,11 @@ const Suppliers = () => {
       toast.success(active ? "Supplier reactivated" : "Supplier deactivated");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update supplier");
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update supplier"
+      );
     }
   };
 

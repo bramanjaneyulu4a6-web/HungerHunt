@@ -116,7 +116,13 @@ const KioskBilling = ({ student, onLogout }) => {
 
       return {
         products: res.data
-          .filter((item) => item.stock > 0 && item.productId)
+          .filter(
+            (item) =>
+              item.stock > 0 &&
+              item.productId &&
+              // Archived is off sale; absent means the row predates the flag.
+              item.productId.active !== false
+          )
           .map(toProduct)
           .filter((item) => item._id),
         error: "",

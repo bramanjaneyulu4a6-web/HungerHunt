@@ -12,8 +12,9 @@ import {
   Skeleton,
 } from '../components/ui';
 import Icon from '../components/Icon';
+import PendingApprovalCard from '../components/PendingApprovalCard';
 
-const TABS = [
+const BASE_TABS = [
   { id: 'purchases', icon: '🛒', label: 'Purchases' },
   { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
@@ -169,6 +170,8 @@ export default function ChildDetails() {
   const [loadError, setLoadError] = useState('');
 
   const [activeTab, setActiveTab] = useState('purchases');
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingNotice, setPendingNotice] = useState('');
 
   const [walletEnabled, setWalletEnabled] = useState(false);
   const [walletLimit, setWalletLimit] = useState(500);
@@ -210,6 +213,24 @@ export default function ChildDetails() {
         }
 
         setData(res.data);
+
+        // Approval availability enhances this screen but must not make the
+        // child's balance and history unavailable if that secondary request
+        // fails. It can catch up on focus or the next push.
+        try {
+          const pending = await API.get('/pending-orders/parent');
+          if (!ignore) {
+            const childOrders = (pending.data.orders || []).filter(
+              (order) => String(order.studentId?._id) === id
+            );
+            setPendingOrders(childOrders);
+            if (childOrders.length === 0) {
+              setActiveTab((tab) => (tab === 'pending' ? 'purchases' : tab));
+            }
+          }
+        } catch {
+          // Keep the last known pending list.
+        }
       } catch (err) {
         if (ignore) return;
 
@@ -315,7 +336,7 @@ export default function ChildDetails() {
   };
 
   const backLink = (
-    <Link to="/" className="page-back">
+    <Link to="/accounts" className="page-back">
       <Icon name="arrowLeft" size={17} /> Back to accounts
     </Link>
   );
@@ -356,6 +377,27 @@ export default function ChildDetails() {
   }
 
   const student = data.student;
+  const tabs = pendingOrders.length
+    ? [
+        { id: 'pending', icon: '⏳', label: `Pending (${pendingOrders.length})` },
+        ...BASE_TABS,
+      ]
+    : BASE_TABS;
+
+  const refreshPending = async (message) => {
+    setPendingNotice(message || 'Approval updated.');
+    try {
+      const response = await API.get('/pending-orders/parent');
+      const childOrders = (response.data.orders || []).filter(
+        (order) => String(order.studentId?._id) === id
+      );
+      setPendingOrders(childOrders);
+      if (childOrders.length === 0) setActiveTab('purchases');
+    } catch {
+      // The action succeeded. A foreground refresh or push will reconcile the
+      // list if this follow-up read happens to fail.
+    }
+  };
 
   /* Shared by both history tabs: the first load shows skeletons, a failure
      offers to retry, and a full page offers the next one. */
@@ -418,7 +460,7 @@ export default function ChildDetails() {
       </Card>
 
       <div className="tabs child-tabs" role="tablist" aria-label={`${student.name}'s account sections`}>
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             id={`tab-${tab.id}`}
@@ -433,6 +475,31 @@ export default function ChildDetails() {
           </button>
         ))}
       </div>
+
+      {activeTab === 'pending' && pendingOrders.length > 0 && (
+        <div role="tabpanel" id="panel-pending" aria-labelledby="tab-pending" tabIndex={0}>
+          <div className="section-heading-row">
+            <div>
+              <h2 className="section-title">Pending approval</h2>
+              <p className="section-copy">Review this kiosk order before it expires.</p>
+            </div>
+          </div>
+
+          {pendingNotice && (
+            <Banner variant="success" icon="✅" style={{ marginBottom: 18 }}>
+              {pendingNotice}
+            </Banner>
+          )}
+
+          {pendingOrders.map((order) => (
+            <PendingApprovalCard
+              key={order._id}
+              order={order}
+              onResolved={refreshPending}
+            />
+          ))}
+        </div>
+      )}
 
       {activeTab === 'purchases' && (
         <div role="tabpanel" id="panel-purchases" aria-labelledby="tab-purchases" tabIndex={0}>

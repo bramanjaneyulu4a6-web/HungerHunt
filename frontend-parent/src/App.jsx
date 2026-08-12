@@ -13,6 +13,7 @@ import { useAuth } from "./context/auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import Accounts from "./pages/Accounts";
 import ChildDetails from "./pages/ChildDetails";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -36,12 +37,13 @@ const PublicOnlyRoute = ({ children }) => {
 const pageTitle = (pathname) => {
   if (pathname.startsWith('/child/')) return 'Child account';
   if (pathname === '/pending-orders') return 'Approval requests';
+  if (pathname === '/accounts') return 'Student accounts';
   if (pathname.startsWith('/purchase-password/')) return 'Purchase code';
   if (pathname === '/login') return 'Sign in';
   if (pathname === '/register') return 'Create account';
   if (pathname === '/forgot-password') return 'Forgot password';
   if (pathname.startsWith('/reset-password/')) return 'Reset password';
-  return 'Your children';
+  return 'Pending approvals';
 };
 
 function RouteEffects() {
@@ -105,6 +107,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/accounts"
+          element={
+            <ProtectedRoute>
+              <Accounts />
             </ProtectedRoute>
           }
         />

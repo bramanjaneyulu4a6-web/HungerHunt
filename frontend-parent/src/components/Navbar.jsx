@@ -37,6 +37,9 @@ export default function Navbar() {
           <NavLink to="/" end className={navClass}>
             <Icon name="home" size={18} /> Dashboard
           </NavLink>
+          <NavLink to="/accounts" className={navClass}>
+            <Icon name="user" size={18} /> Accounts
+          </NavLink>
         </nav>
 
         <div className="parent-account">
@@ -58,6 +61,9 @@ export default function Navbar() {
       <nav className="parent-bottom-nav" aria-label="Primary navigation">
         <NavLink to="/" end className={navClass}>
           <Icon name="home" size={21} /> <span>Dashboard</span>
+        </NavLink>
+        <NavLink to="/accounts" className={navClass}>
+          <Icon name="user" size={21} /> <span>Accounts</span>
         </NavLink>
         <button type="button" className="parent-nav-link" onClick={() => setConfirmingLogout(true)}>
           <Icon name="logout" size={21} /> <span>Sign out</span>

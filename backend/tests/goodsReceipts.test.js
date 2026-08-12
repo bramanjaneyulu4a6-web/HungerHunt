@@ -157,6 +157,25 @@ describe('booking a delivery', () => {
     assert.equal(res.status, 409);
   });
 
+  /* The office can cancel an order the storeroom is mid-delivery on; the
+     storeroom's screen may be minutes stale. Booking anyway would apply stock
+     against an order the ledger says is void, and flip the status straight
+     back to PARTIAL or COMPLETED — silently un-cancelling it. */
+  test('a cancelled order takes no deliveries, and nothing moves', async () => {
+    accountIs('warehouse');
+    orderWith(0, 0, 'CANCELLED');
+
+    const stock = mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
+    const created = mock.method(GoodsReceipt, 'create', async (doc) => ({ _id: 'r1', ...doc }));
+
+    const res = await receive({ lines: [{ productId: PRODUCT_A, received: 1 }] });
+
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).message, /cancelled/i);
+    assert.equal(created.mock.callCount(), 0, 'no receipt row for a delivery against a void order');
+    assert.equal(stock.mock.callCount(), 0, 'and no stock may move');
+  });
+
   test('the same tap twice books one delivery', async () => {
     accountIs('warehouse');
     orderWith();
@@ -725,5 +744,28 @@ describe('the legacy one-step close', () => {
 
     assert.equal(res.status, 409);
     assert.equal(stock.mock.callCount(), 0);
+  });
+
+  /* The order read at the top of the function is not the order the claim
+     just lost to — a cancel and a completion are two different doors out of
+     NEW/PARTIAL, and either could go through in the gap between that read
+     and this write. Telling someone who cancelled it themselves that it was
+     "already completed" is the wrong answer. */
+  test('a claim that loses a race to a cancel says cancelled, not completed', async () => {
+    accountIs('admin');
+    const order = orderWith(0, 0, 'NEW');
+
+    mock.method(Purchase, 'findOneAndUpdate', async () => {
+      // The gap this closes: another request cancelled the order between
+      // this function's own read and its claim.
+      order.status = 'CANCELLED';
+      return null;
+    });
+
+    const res = await close([{ productId: PRODUCT_A, quantity: 6, purchasePrice: 5 }]);
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.match(body.message, /cancelled/i);
   });
 });

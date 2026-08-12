@@ -128,6 +128,18 @@ export const receiveDelivery = async (req, res) => {
       return res.status(409).json({ message: "This order is already fully received." });
     }
 
+    /* A cancel is a statement about the order's future, and this delivery
+       showing up does not retract it. Booking anyway would apply stock
+       against an order the ledger says is void, and the unconditional status
+       write further down would flip it straight back to PARTIAL or COMPLETED
+       — undoing the cancel by accident, with cancelledAt/cancelledBy left on
+       the document as evidence of a decision nothing downstream still shows. */
+    if (purchase.status === "CANCELLED") {
+      return res.status(409).json({
+        message: "This order was cancelled. If something did arrive, raise a new order for it.",
+      });
+    }
+
     // Every line must be on the order, and fit inside what remains.
     for (const line of lines) {
       const item = purchase.items.find(

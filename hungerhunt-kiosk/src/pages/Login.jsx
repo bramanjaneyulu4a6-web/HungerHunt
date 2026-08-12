@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import hungerLogo from "../assets/Logo.png";
@@ -16,6 +16,17 @@ const Login = () => {
   const [admissionNumber, setAdmissionNumber] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    if (!sessionReady) return undefined;
+
+    const enter = window.setTimeout(
+      () => navigate("/", { replace: true }),
+      650
+    );
+    return () => window.clearTimeout(enter);
+  }, [navigate, sessionReady]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
@@ -33,8 +44,7 @@ const Login = () => {
 
       localStorage.setItem("kioskToken", data.token);
       localStorage.setItem("kioskStudent", JSON.stringify(data.student));
-
-      navigate("/", { replace: true });
+      setSessionReady(true);
     } catch (err) {
       // The server's own words. An unknown number and a student whose parent
       // never set a code are different problems with different answers, and
@@ -52,41 +62,59 @@ const Login = () => {
        the login are now the same screen — one tap fewer, and the brand ground
        it already had is kept, so restyling it onto the till's white remains
        the open decision it was. */
-    <div className="kiosk-welcome kiosk-gate">
-      <img className="kiosk-welcome-logo" src={hungerLogo} alt="Hunger Hunt" />
+    <div
+      className={`kiosk-welcome kiosk-gate${
+        sessionReady ? " kiosk-gate--ready" : ""
+      }`}
+      aria-busy={loading}
+    >
+      <div className="kiosk-gate-orb kiosk-gate-orb--one" aria-hidden="true" />
+      <div className="kiosk-gate-orb kiosk-gate-orb--two" aria-hidden="true" />
 
-      <h1 className="kiosk-gate-prompt">Enter your admission number</h1>
+      <div className="kiosk-gate-content">
+        <img className="kiosk-welcome-logo" src={hungerLogo} alt="Hunger Hunt" />
 
-      {error && (
-        <Banner variant="alert" icon="⚠️" style={{ marginBottom: 20 }}>
-          {error}
-        </Banner>
-      )}
+        <p className="kiosk-gate-kicker">Ready when you are</p>
+        <h1 className="kiosk-gate-prompt">Enter your admission number</h1>
 
-      <form onSubmit={handleSubmit} className="kiosk-gate-form">
+        {error && (
+          <Banner variant="alert" icon="⚠️" style={{ marginBottom: 20 }}>
+            {error}
+          </Banner>
+        )}
+
+        <form onSubmit={handleSubmit} className="kiosk-gate-form">
         {/* Not restricted to digits: a school's admission numbers may carry a
             letter or a dash, and a field that refuses them locks the student
             out of the only screen they can start from. inputMode brings up the
             number pad for the common case without ruling the rest out. */}
-        <input
-          className="kiosk-gate-input"
-          inputMode="numeric"
-          autoComplete="off"
-          autoFocus
-          aria-label="Admission number"
-          placeholder="Admission number"
-          value={admissionNumber}
-          onChange={(e) => setAdmissionNumber(e.target.value.trim())}
-        />
+          <input
+            className="kiosk-gate-input"
+            inputMode="numeric"
+            autoComplete="off"
+            autoFocus
+            aria-label="Admission number"
+            placeholder="Admission number"
+            value={admissionNumber}
+            onChange={(e) => setAdmissionNumber(e.target.value.trim())}
+            disabled={sessionReady}
+          />
 
-        <button
-          type="submit"
-          className="kiosk-start"
-          disabled={loading || !admissionNumber.trim()}
-        >
-          {loading ? "Starting…" : "START ORDER"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="kiosk-start"
+            disabled={loading || !admissionNumber.trim()}
+          >
+            {sessionReady ? (
+              <><span className="kiosk-ready-check">✓</span> Welcome!</>
+            ) : loading ? (
+              <><span className="kiosk-button-spinner" /> Finding you…</>
+            ) : (
+              "START ORDER"
+            )}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

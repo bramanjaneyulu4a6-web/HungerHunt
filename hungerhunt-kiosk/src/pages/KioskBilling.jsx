@@ -75,6 +75,10 @@ const KioskBilling = ({ student, onLogout }) => {
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [cart, setCart] = useState([]);
+  const [recentlyAdded, setRecentlyAdded] = useState(null);
+  const [removingIds, setRemovingIds] = useState([]);
+  const feedbackTimerRef = useRef(null);
+  const removeTimersRef = useRef(new Map());
 
   /* How the sale ended: null while it is still going, then 'paid' or
      'pending'. Once set the session is over — the wall is gone, the timers
@@ -90,6 +94,7 @@ const KioskBilling = ({ student, onLogout }) => {
   const [ticketFolded, setTicketFolded] = useState(false);
   const [nutritionFor, setNutritionFor] = useState(null);
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
 
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [purchasePassword, setPurchasePassword] = useState("");
@@ -157,6 +162,15 @@ const KioskBilling = ({ student, onLogout }) => {
     };
   }, [applyInventory]);
 
+  useEffect(
+    () => () => {
+      window.clearTimeout(feedbackTimerRef.current);
+      removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      removeTimersRef.current.clear();
+    },
+    []
+  );
+
   // A cleared quantity box prices as 1, which is what checkout posts and what
   // the steppers clamp to. Treating it as 0 here understated the bill.
   const invoiceTotal = cart.reduce(
@@ -205,9 +219,28 @@ const KioskBilling = ({ student, onLogout }) => {
         ? prev
         : [...prev, { ...product, quantity: 1 }]
     );
+
+    // Adding is feedback about the receipt, so reveal it if the student had
+    // folded it away. The new line's paint burst then lands where the change
+    // actually happened rather than travelling across the product wall.
+    setTicketFolded(false);
+    setRecentlyAdded(product._id);
+    window.clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = window.setTimeout(
+      () => setRecentlyAdded(null),
+      1050
+    );
   };
 
   const stepQuantity = (productId, amount) => {
+    const currentLine = cart.find((item) => item._id === productId);
+    const currentQuantity = parseInt(currentLine?.quantity, 10) || 1;
+
+    if (amount < 0 && currentLine && currentQuantity <= 1) {
+      removeFromCart(productId);
+      return;
+    }
+
     setCart((prevCart) =>
       prevCart
         .map((item) => {
@@ -222,12 +255,8 @@ const KioskBilling = ({ student, onLogout }) => {
             return item;
           }
 
-          // Stepping below one takes the line off the ticket.
-          if (next < 1) return null;
-
           return { ...item, quantity: next };
         })
-        .filter(Boolean)
     );
   };
 
@@ -262,12 +291,33 @@ const KioskBilling = ({ student, onLogout }) => {
     );
   };
 
-  const removeFromCart = (productId) =>
-    setCart((prev) => prev.filter((item) => item._id !== productId));
+  const removeFromCart = (productId) => {
+    // The map is the synchronous lock. State does not update until the next
+    // render, so relying on removingIds alone would let rapid taps schedule
+    // several removals for the same receipt line.
+    if (removeTimersRef.current.has(productId)) return;
+
+    setRemovingIds((prev) => [...prev, productId]);
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const timer = window.setTimeout(
+      () => {
+        setCart((prev) => prev.filter((item) => item._id !== productId));
+        setRemovingIds((prev) => prev.filter((id) => id !== productId));
+        removeTimersRef.current.delete(productId);
+      },
+      reducedMotion ? 0 : 640
+    );
+    removeTimersRef.current.set(productId, timer);
+  };
 
   // Empties the ticket without ending the session. Starting the basket again
   // is not the same as being finished — that is what Done is for.
   const voidTicket = () => {
+    removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    removeTimersRef.current.clear();
+    setRemovingIds([]);
     setCart([]);
     setProductSearchQuery("");
     setConfirmVoid(false);
@@ -459,23 +509,39 @@ const KioskBilling = ({ student, onLogout }) => {
      is already over, and this is only the telling. */
   if (result) {
     return (
-      <div className="kiosk-result" onClick={onLogout} role="status">
-        <div
-          className={`kiosk-result-mark kiosk-result-mark--${result}`}
-          aria-hidden="true"
-        >
-          {result === "paid" ? "✓" : "⏳"}
+      <div
+        className={`kiosk-result kiosk-result--${result}`}
+        onClick={onLogout}
+        role="status"
+      >
+        <div className="kiosk-result-burst" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => (
+            <i key={i} style={{ "--particle": i }} />
+          ))}
         </div>
+        <div className="kiosk-result-card">
+          <div
+            className={`kiosk-result-mark kiosk-result-mark--${result}`}
+            aria-hidden="true"
+          >
+            {result === "paid" ? "✓" : "⏳"}
+          </div>
 
-        <h1>
-          {result === "paid" ? "Order confirmed" : "Sent to your parent"}
-        </h1>
+          <p className="kiosk-result-kicker">
+            {result === "paid" ? "All done" : "Request sent"}
+          </p>
+          <h1>
+            {result === "paid" ? "Order confirmed" : "Sent to your parent"}
+          </h1>
 
-        <p>
-          {result === "paid"
-            ? "Collect your items at the counter. Enjoy!"
-            : "Nothing has been charged yet — your parent has been asked to approve it."}
-        </p>
+          <p>
+            {result === "paid"
+              ? "Collect your items at the counter. Enjoy!"
+              : "Nothing has been charged yet — your parent has been asked to approve it."}
+          </p>
+          <span className="kiosk-result-skip">Tap anywhere for next order</span>
+        </div>
+        <div className="kiosk-result-timer" aria-hidden="true" />
       </div>
     );
   }
@@ -534,7 +600,31 @@ const KioskBilling = ({ student, onLogout }) => {
                 </div>
 
                 {cart.map((item) => (
-                  <div className="ticket-line" key={item._id}>
+                  <div
+                    className={`ticket-line${
+                      recentlyAdded === item._id
+                        ? " ticket-line--paint-born"
+                        : ""
+                    }${
+                      removingIds.includes(item._id)
+                        ? " ticket-line--paint-delete"
+                        : ""
+                    }`}
+                    key={item._id}
+                  >
+                    {(recentlyAdded === item._id ||
+                      removingIds.includes(item._id)) && (
+                      <span
+                        className={`ticket-paint${
+                          removingIds.includes(item._id)
+                            ? " ticket-paint--erase"
+                            : ""
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <i /><i /><i /><i /><i /><i /><i /><i />
+                      </span>
+                    )}
                     <img src={item.image || PLACEHOLDER} alt="" />
 
                     <div className="ticket-line-name">
@@ -554,6 +644,7 @@ const KioskBilling = ({ student, onLogout }) => {
                       type="button"
                       className="ticket-line-drop"
                       onClick={() => removeFromCart(item._id)}
+                      disabled={removingIds.includes(item._id)}
                       aria-label={`Remove ${item.name} from the ticket`}
                     >
                       ×
@@ -662,17 +753,16 @@ const KioskBilling = ({ student, onLogout }) => {
                 <div className="serving-meta">№ {student.admissionNumber}</div>
               </div>
 
-              <span className="serving-wallet money">
-                {formatINR(student.pocketMoney)}
-              </span>
-
-              {/* The way out that is not a timer. A student who has finished,
-                  or who changed their mind, should not have to wait to be
-                  thrown out before the next one can start. */}
-              <Button className="btn--switch" onClick={onLogout}>
-                Done
-              </Button>
             </div>
+
+            <button
+              type="button"
+              className="kiosk-exit"
+              onClick={() => setConfirmExit(true)}
+              aria-label="Void order and end session"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
           </div>
 
           {inventoryError && (
@@ -735,7 +825,13 @@ const KioskBilling = ({ student, onLogout }) => {
                     (parseInt(line?.quantity, 10) || 0) >= p.stock;
 
                   return (
-                    <article className="tile" key={p._id} style={{ "--i": i }}>
+                    <article
+                      className={`tile${
+                        recentlyAdded === p._id ? " tile--just-added" : ""
+                      }`}
+                      key={p._id}
+                      style={{ "--i": i }}
+                    >
                       <figure>
                         <img src={p.image || PLACEHOLDER} alt="" />
                       </figure>
@@ -757,12 +853,11 @@ const KioskBilling = ({ student, onLogout }) => {
                       <div className="tile-body">
                         <h3 className="tile-name">{p.name}</h3>
 
-                        <p className="tile-meta">
-                          {p.stockGroup?.name
-                            ? `${titleCase(p.stockGroup.name)} · `
-                            : ""}
-                          {p.stock} left
-                        </p>
+                        {p.stockGroup?.name && (
+                          <p className="tile-meta">
+                            {titleCase(p.stockGroup.name)}
+                          </p>
+                        )}
 
                         {p.nutrition && (
                           <div className="tile-macros">
@@ -830,6 +925,12 @@ const KioskBilling = ({ student, onLogout }) => {
             )}
           </div>
         </section>
+      </div>
+
+      <div className="kiosk-cart-announcer" aria-live="polite">
+        {recentlyAdded
+          ? `${products.find((p) => p._id === recentlyAdded)?.name || "Item"} added to order`
+          : ""}
       </div>
 
       {nutritionFor && (
@@ -957,6 +1058,50 @@ const KioskBilling = ({ student, onLogout }) => {
               </Button>
               <Button className="btn--confirm btn--destroy" onClick={voidTicket}>
                 Void ticket
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmExit && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setConfirmExit(false)}
+        >
+          <div
+            className="modal till-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="exit-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="exit-warning-mark" aria-hidden="true">×</div>
+
+            <h2 className="modal-title" id="exit-title">
+              Void this order?
+            </h2>
+
+            <p className="verify-line">
+              {itemCount > 0
+                ? `The ${itemCount} ${
+                    itemCount === 1 ? "item" : "items"
+                  } in your cart will be removed and your session will end. Nothing will be charged.`
+                : "Your ordering session will end and return to the admission screen. Nothing will be charged."}
+            </p>
+
+            <div className="modal-actions">
+              <Button
+                className="btn--quiet"
+                onClick={() => setConfirmExit(false)}
+              >
+                Keep ordering
+              </Button>
+              <Button
+                className="btn--confirm btn--destroy"
+                onClick={onLogout}
+              >
+                Void &amp; exit
               </Button>
             </div>
           </div>

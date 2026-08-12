@@ -129,4 +129,6 @@ Optionally scrub history afterwards with BFG or `git filter-repo`, but rotation 
 
 ## Not done — deferred features
 
-Receipt/bill printing · parent top-up and payment gateway · native push via `@capacitor/push-notifications` (plus a production `capacitor.config.json`; it currently points native builds at `localhost:5173`) · refunds and voids · manual inventory adjustments and low-stock alerts · cost/margin reporting from `Purchase.purchasePrice` · server-side Excel import · websocket live updates · consolidating the two near-identical admin billing screens · automated tests and CI
+Receipt/bill printing · parent top-up and payment gateway · native push via `@capacitor/push-notifications` (plus a production `capacitor.config.json`; it currently points native builds at `localhost:5173`) · refunds and voids · cost/margin reporting from `Purchase.purchasePrice` · server-side Excel import · websocket live updates · consolidating the two near-identical admin billing screens · automated tests and CI
+
+Manual inventory adjustments and low-stock alerts shipped with the admin-inventory-ordering-repair plan, along with product archiving (in place of hard delete) and purchase-order cancellation.

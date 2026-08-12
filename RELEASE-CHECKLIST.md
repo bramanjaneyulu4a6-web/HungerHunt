@@ -93,6 +93,10 @@ These are open items, not formalities. Each one is a real gap today.
       is a hardcoded array of origins; a deployed instance needs its own
       origin added the same way.
 
+- [ ] **Run `node scripts/backfill-inventory-rows.mjs` from `backend/` once
+      after deploy** — shelves every product that predates inventory-at-creation
+      (idempotent).
+
 - [ ] **Tell the counter staff that admin billing no longer charges.** An order
       raised from the admin console now always goes to the parent to approve —
       the student's four-digit code is not asked for there any more, and

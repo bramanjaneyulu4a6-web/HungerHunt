@@ -94,8 +94,8 @@ These are open items, not formalities. Each one is a real gap today.
       origin added the same way.
 
 - [ ] **Run `node scripts/backfill-inventory-rows.mjs` from `backend/` once
-      after deploy** — shelves every product that predates inventory-at-creation
-      (idempotent).
+      after deploy.** It shelves every product that predates inventory-at-creation
+      (idempotent — running it again touches nothing that already has a row).
 
 - [ ] **Tell the counter staff that admin billing no longer charges.** An order
       raised from the admin console now always goes to the parent to approve —

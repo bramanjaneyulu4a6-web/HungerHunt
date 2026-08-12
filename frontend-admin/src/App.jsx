@@ -18,6 +18,7 @@ import { authBypassEnabled } from './utils/authBypass';
 import RechargeHistory from './pages/RechargeHistory';
 import Purchase from "./pages/Purchase";
 import Purchased from "./pages/Purchased";
+import Suppliers from './pages/Suppliers';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
   <Route path="/billing" element={<Billing />} />
   <Route path="/purchase" element={<Purchase />} />
   <Route path="/purchased" element={<Purchased />} />
+  <Route path="/suppliers" element={<Suppliers />} />
   <Route path="/recharge-history" element={<RechargeHistory />} />
 </Route>
       </Routes>

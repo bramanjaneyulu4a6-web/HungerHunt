@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { path: "/products", label: "Add Product", icon: "📦" },
   { path: "/purchase", label: "Purchase", icon: "🧾" },
   { path: "/purchased", label: "Purchased", icon: "✅" },
+  { path: "/suppliers", label: "Suppliers", icon: "🚚" },
   { path: "/inventory", label: "Inventory", icon: "📈" },
   { path: "/recharge-history", label: "Recharge History", icon: "💰" },
 ];

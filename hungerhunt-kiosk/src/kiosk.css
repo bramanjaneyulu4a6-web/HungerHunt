@@ -74,6 +74,13 @@
   animation: ticket-column-open 460ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
 }
 
+/* Only becomes the dismiss surface for the bottom-sheet ticket on compact
+   screens. Keeping it in the DOM lets the receipt retain one accessible close
+   action across layouts without measuring the viewport in React. */
+.mobile-ticket-backdrop {
+  display: none;
+}
+
 @keyframes ticket-column-open {
   from {
     opacity: 0;
@@ -2365,60 +2372,506 @@
   background: #c9bda9;
 }
 
-/* ---- narrow screens ------------------------------------------------------ */
+/* ---- responsive layouts ------------------------------------------------- */
 
-/* Below a wide counter display the ticket stops being a column and docks to
-   the bottom, which is where a hand rests on a smaller screen anyway. */
+/* Landscape tablets keep the two-panel till, but spend less space on the
+   receipt and allow smaller product tiles. */
+@media (min-width: 901px) and (max-width: 1180px) {
+  .till {
+    grid-template-columns: 330px minmax(0, 1fr);
+  }
+
+  .till--folded {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .ticket-col {
+    padding-inline: 16px;
+  }
+
+  .wall {
+    padding: 18px 18px 22px 40px;
+  }
+
+  .till--bare .wall {
+    padding: 18px;
+  }
+
+  .wall-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  }
+
+  .filterbar {
+    align-items: stretch;
+  }
+
+  .seg {
+    flex: 1 1 auto;
+  }
+
+  .wall-filter {
+    width: 210px;
+  }
+}
+
+/* Portrait tablets and phones use a catalogue with a persistent cart summary.
+   The full receipt is an animated bottom sheet, so reviewing an order never
+   sends the student to the bottom of a long product page. */
 @media (max-width: 900px) {
   .till,
   .till--folded,
   .till--bare {
+    position: relative;
+    height: 100svh;
+    height: 100dvh;
+    min-height: 0;
     grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .wall,
   .till--bare .wall {
-    padding: 16px 16px 24px;
+    height: 100%;
+    padding: max(14px, env(safe-area-inset-top)) 18px 0;
   }
 
   .ticket-col {
-    order: 2;
-    padding: 0 16px 20px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 52;
+    width: 100%;
+    height: min(82dvh, 760px);
+    min-height: 420px;
+    padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+    border-radius: 26px 26px 0 0;
+    background: #fff;
+    box-shadow: 0 -20px 60px -24px rgba(39, 26, 12, 0.48);
+    animation: mobile-ticket-open 420ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
   }
 
   .ticket {
+    padding: 18px 18px 20px;
+    border-radius: 12px;
     animation: none;
   }
 
-  .ticket-handle,
+  .ticket-brand {
+    height: 36px;
+    margin: 0 56px 10px 4px;
+  }
+
+  .ticket-brand img {
+    height: 34px;
+  }
+
+  .ticket-col > .ticket-handle {
+    top: 15px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    transform: none;
+    border-radius: 999px;
+    font-size: 0;
+    box-shadow: none;
+  }
+
+  .ticket-col > .ticket-handle::before {
+    content: '\00d7';
+    font-size: 27px;
+    font-weight: 500;
+  }
+
+  .ticket-col > .ticket-handle:active {
+    transform: scale(0.92);
+  }
+
+  .mobile-ticket-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 51;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(35, 24, 12, 0.34);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    animation: kiosk-backdrop-in 220ms ease-out both;
+  }
+
   .ticket-stub {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 40;
+    display: block;
+    padding: 0;
+    animation: mobile-cart-bar-in 420ms cubic-bezier(0.22, 0.9, 0.25, 1.15) both;
+  }
+
+  .ticket-stub--just-added .ticket-stub-paper {
+    animation: mobile-cart-added 620ms cubic-bezier(0.2, 1.15, 0.3, 1) both;
+  }
+
+  .ticket-stub--just-added::before,
+  .ticket-stub--just-added::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    top: -8px;
+    right: 56px;
+    width: 13px;
+    height: 9px;
+    border-radius: 52% 48% 60% 40%;
+    background: var(--brand);
+    pointer-events: none;
+    animation: mobile-cart-paint 650ms ease-out both;
+  }
+
+  .ticket-stub--just-added::after {
+    right: 34px;
+    width: 8px;
+    height: 8px;
+    background: var(--brand-amber);
+    animation-delay: 45ms;
+  }
+
+  .ticket-stub-paper {
+    width: 100%;
+    min-height: 66px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid rgba(23, 17, 10, 0.86);
+    border-radius: 18px;
+    background: #17110a;
+    color: #fff;
+    box-shadow: 0 16px 34px -16px rgba(23, 17, 10, 0.72);
+  }
+
+  .ticket-stub-n {
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .ticket-stub-rot {
+    writing-mode: horizontal-tb;
+    transform: none;
+    color: #fff5ec;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+  }
+
+  .ticket-stub-rot::after {
+    content: '  ·  Tap to review';
+    color: #bfb5a8;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .ticket-stub-tot {
+    align-items: flex-end;
+  }
+
+  .ticket-stub-tot span {
+    color: #bfb5a8;
+  }
+
+  .ticket-stub-tot b {
+    color: #fff;
+    font-size: 20px;
+  }
+
+  .ticket-stub > .ticket-handle {
     display: none;
   }
 
-  /* The page scrolls here, so the ledger must not become its own scroll box —
-     it was growing a scrollbar of its own across the bottom of the lines. */
   .ticket-lines {
-    overflow: visible;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  /* The tall gutter exists to clear the floating refresh control on a counter
-     display; stacked, it just leaves a hole above the ticket. */
   .wall-grid {
-    padding-bottom: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+    padding-bottom: 30px;
+  }
+
+  .till--folded .wall-grid {
+    padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+
+  .wall-scroll {
+    overscroll-behavior: contain;
   }
 
   .filterbar {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 34%);
+    padding: 5px 0 10px;
+    background: rgba(255, 255, 255, 0.94);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
   }
 
   .wall-filter {
     width: 100%;
   }
+
+  .seg {
+    min-width: 0;
+  }
+
+  .till .seg-item {
+    min-height: 46px;
+  }
+
+  .kiosk-cap-banner {
+    top: max(8px, env(safe-area-inset-top));
+    width: min(calc(100% - 28px), 520px);
+    padding-inline: 16px;
+    text-align: center;
+  }
+
+  .till-modal-backdrop.modal-backdrop {
+    align-items: flex-end;
+    padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .till-modal.modal,
+  .nutrition.modal {
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top));
+    overflow-y: auto;
+    border-radius: 22px;
+    animation-name: mobile-ticket-open;
+  }
+
+  .refresh-fab {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  @keyframes mobile-ticket-open {
+    from { opacity: 0; transform: translateY(100%); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes mobile-cart-bar-in {
+    from { opacity: 0; transform: translateY(28px) scale(0.94); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes mobile-cart-added {
+    0% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }
+    45% { transform: scale(1.015); box-shadow: 0 0 0 6px rgba(255, 107, 53, 0.18); }
+    100% { transform: none; box-shadow: 0 16px 34px -16px rgba(23, 17, 10, 0.72); }
+  }
+
+  @keyframes mobile-cart-paint {
+    0% { opacity: 0; transform: translate(0, 20px) scale(0); }
+    35% { opacity: 1; }
+    100% { opacity: 0; transform: translate(12px, -24px) rotate(28deg) scale(1.15); }
+  }
 }
 
 @media (max-width: 600px) {
+  .wall,
+  .till--bare .wall {
+    padding-inline: 12px;
+  }
+
+  .wall-top {
+    min-height: 48px;
+    margin-bottom: 10px;
+  }
+
   .wall-logo {
     display: none;
+  }
+
+  .serving {
+    max-width: calc(100% - 58px);
+    height: 48px;
+  }
+
+  .serving-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+
+  .serving-name {
+    font-size: 14px;
+  }
+
+  .kiosk-exit {
+    width: 44px;
+    height: 44px;
+  }
+
+  .filterbar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .seg {
+    width: 100%;
+  }
+
+  .wall-filter {
+    height: 48px;
+  }
+
+  .wall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .tile figure {
+    height: clamp(104px, 31vw, 138px);
+  }
+
+  .tile-body {
+    padding: 9px;
+  }
+
+  .tile-name {
+    min-height: 2.5em;
+    font-size: 13.5px;
+    line-height: 1.25;
+  }
+
+  .tile-meta {
+    font-size: 9px;
+  }
+
+  .tile-macros {
+    display: none;
+  }
+
+  .till .btn--add,
+  .tile-step {
+    height: 46px;
+    min-height: 46px;
+    margin-top: 9px;
+  }
+
+  .tile-step {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .till .tile-step-btn {
+    min-height: 44px;
+  }
+
+  .tile-price {
+    min-width: 48px;
+    font-size: 14px;
+  }
+
+  .ticket-col {
+    height: min(88dvh, 720px);
+    padding-inline: 10px;
+  }
+
+  .ticket-who {
+    padding-block: 8px;
+  }
+
+  .ticket-line {
+    font-size: 12.5px;
+  }
+
+  .ticket-lhead,
+  .ticket-line {
+    grid-template-columns: 30px minmax(0, 1fr) 22px 52px 32px;
+    gap: 5px;
+  }
+
+  .ticket-grand b {
+    font-size: 30px;
+  }
+
+  .till .btn--place {
+    height: 54px;
+  }
+
+  .ticket-stub {
+    left: 10px;
+    right: 10px;
+  }
+
+  .ticket-stub-rot::after {
+    content: '  ·  Review';
+  }
+
+  .kiosk-gate {
+    min-height: 100svh;
+    min-height: 100dvh;
+    padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+  }
+
+  .kiosk-gate-content {
+    gap: 15px;
+  }
+
+  .kiosk-gate .kiosk-welcome-logo {
+    width: min(250px, 72vw);
+    margin-bottom: -14px;
+  }
+
+  .kiosk-gate-prompt {
+    font-size: clamp(23px, 7vw, 28px);
+    text-align: center;
+  }
+
+  .kiosk-gate-input {
+    min-height: 64px;
+    padding-inline: 16px;
+    border-radius: 15px;
+    font-size: 24px;
+  }
+
+  .kiosk-gate .kiosk-start {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .kiosk-idle-veil,
+  .kiosk-result {
+    padding: 20px;
+  }
+
+  .kiosk-idle-card {
+    width: 100%;
+    padding: 30px 22px;
+  }
+
+  .kiosk-idle-card h2,
+  .kiosk-result h1 {
+    font-size: 27px;
+  }
+
+  .kiosk-idle-card .kiosk-start {
+    width: 100%;
+    padding-inline: 20px;
+  }
+
+  .kiosk-result-mark {
+    width: 88px;
+    height: 88px;
+    font-size: 40px;
+  }
+
+  .modal-actions {
+    gap: 8px;
   }
 }
 
@@ -2432,6 +2885,9 @@
   .kiosk-result-mark,
   .ticket-col,
   .ticket-stub,
+  .ticket-stub--just-added .ticket-stub-paper,
+  .ticket-stub--just-added::before,
+  .ticket-stub--just-added::after,
   .till-modal-backdrop,
   .till-modal,
   .kiosk-gate-content,

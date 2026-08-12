@@ -220,10 +220,13 @@ const KioskBilling = ({ student, onLogout }) => {
         : [...prev, { ...product, quantity: 1 }]
     );
 
-    // Adding is feedback about the receipt, so reveal it if the student had
-    // folded it away. The new line's paint burst then lands where the change
-    // actually happened rather than travelling across the product wall.
-    setTicketFolded(false);
+    // A counter display has room to reveal the receipt immediately. On a
+    // phone/tablet it would cover the catalogue after every tap, so the new
+    // item lands in the animated bottom cart bar instead and the student opens
+    // the sheet when they are ready to review it.
+    setTicketFolded(
+      window.matchMedia?.("(max-width: 900px)").matches ?? false
+    );
     setRecentlyAdded(product._id);
     window.clearTimeout(feedbackTimerRef.current);
     feedbackTimerRef.current = window.setTimeout(
@@ -554,8 +557,17 @@ const KioskBilling = ({ student, onLogout }) => {
       <div
         className={`till${cart.length === 0 ? " till--bare" : ""}${
           stubVisible ? " till--folded" : ""
-        }`}
+        }${ticketVisible ? " till--cart-open" : ""}`}
       >
+        {ticketVisible && (
+          <button
+            type="button"
+            className="mobile-ticket-backdrop"
+            onClick={() => setTicketFolded(true)}
+            aria-label="Close order ticket"
+          />
+        )}
+
         {ticketVisible && (
           <aside className="ticket-col">
             <div className="ticket-brand">
@@ -704,7 +716,9 @@ const KioskBilling = ({ student, onLogout }) => {
         )}
 
         {stubVisible && (
-          <aside className="ticket-stub">
+          <aside
+            className={`ticket-stub${recentlyAdded ? " ticket-stub--just-added" : ""}`}
+          >
             <div
               className="ticket-stub-paper"
               role="button"

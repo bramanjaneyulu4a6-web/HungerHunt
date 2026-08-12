@@ -85,7 +85,7 @@ const Inventory = () => {
       toast.success("Product updated");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update product");
+      toast.error(err.response?.data?.message || "Failed to update product");
     } finally {
       setSaving(false);
     }
@@ -382,8 +382,12 @@ const Inventory = () => {
             <tbody>
               {filteredInventory.map((item, index) => {
                 const reorderLevel = item.productId?.reorderLevel ?? 5;
-                const isLowStock = (item.stock || 0) < reorderLevel;
                 const archived = item.productId?.active === false;
+                // An archived product does not appear on either ordering
+                // screen, so a reorder badge on one is a reorder nobody can
+                // act on — it just tells the office to chase stock for
+                // something no longer sold.
+                const isLowStock = !archived && (item.stock || 0) < reorderLevel;
 
                 return (
                   <tr key={item._id}>

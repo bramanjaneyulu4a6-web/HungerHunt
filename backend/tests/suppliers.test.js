@@ -104,6 +104,40 @@ describe('writing suppliers', () => {
     assert.equal(res.status, 400);
   });
 
+  // Mongo's unique index trips before Mongoose validation ever runs, so its
+  // message is collection internals — E11000, index name, dup key — not
+  // something to put in front of whoever typed the name.
+  test('a duplicate name is 409 with a message meant for a person', async () => {
+    accountIs('admin');
+    mock.method(Supplier, 'create', async () => {
+      const err = new Error('E11000 duplicate key error collection: hungerhunt.suppliers index: name_1 dup key: { name: "Fresh Farm Co" }');
+      err.code = 11000;
+      throw err;
+    });
+
+    const res = await send('POST', '/api/suppliers', adminToken, { name: 'Fresh Farm Co' });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.message, 'A supplier with that name already exists.');
+    assert.equal(body.error, undefined, 'the raw Mongo text must not reach the response');
+  });
+
+  test('renaming into a collision is 409 the same way', async () => {
+    accountIs('admin');
+    mock.method(Supplier, 'findByIdAndUpdate', async () => {
+      const err = new Error('E11000 duplicate key error collection: hungerhunt.suppliers index: name_1 dup key: { name: "Fresh Farm Co" }');
+      err.code = 11000;
+      throw err;
+    });
+
+    const res = await send('PUT', `/api/suppliers/${SUPPLIER_ID}`, adminToken, { name: 'Fresh Farm Co' });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.message, 'A supplier with that name already exists.');
+  });
+
   test('deactivating is the delete', async () => {
     accountIs('admin');
     mock.method(Supplier, 'findByIdAndUpdate', async (id, update) => ({

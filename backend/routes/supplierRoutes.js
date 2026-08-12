@@ -32,6 +32,13 @@ router.post("/", protectAdmin, async (req, res) => {
 
     res.status(201).json(supplier);
   } catch (error) {
+    // A duplicate name trips Mongo's unique index before it ever reaches
+    // Mongoose validation, so the message on it is collection internals —
+    // "E11000 duplicate key error collection: ... index: name_1 dup key:
+    // {...}" — not something to put in front of whoever typed the name.
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "A supplier with that name already exists." });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -47,6 +54,9 @@ router.put("/:id", protectAdmin, async (req, res) => {
     if (!supplier) return res.status(404).json({ message: "Supplier not found" });
     res.json(supplier);
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "A supplier with that name already exists." });
+    }
     res.status(400).json({ error: error.message });
   }
 });

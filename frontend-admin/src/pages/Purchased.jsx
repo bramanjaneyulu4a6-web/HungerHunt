@@ -518,7 +518,13 @@ const Purchased = () => {
                   </thead>
                   <tbody>
                     {purchase.items.map((item, index) => {
-                      const received = receivedOf(item);
+                      /* receivedOf's ?? fallback reads a missing `received` as
+                         fully delivered — right for a COMPLETED legacy row,
+                         since only a delivery could have closed it. A
+                         cancelled order carries no such guarantee: a row that
+                         predates receipts and was left NEW, then cancelled,
+                         has no `received` key and nothing ever arrived. */
+                      const received = cancelled ? item.received || 0 : receivedOf(item);
                       const historicalProductTotal =
                         received * (item.purchasePrice || 0);
                       const short = Math.max(0, item.quantity - received);

@@ -268,13 +268,23 @@ export const completePurchase = async (req, res) => {
     );
 
     if (!claimed) {
-      const exists = await Purchase.exists({ _id: id });
+      /* The order read at the top of this function is not the order this
+         claim just lost to — cancelling and completing are two different
+         doors out of NEW/PARTIAL, and either one could have gone through in
+         the gap between that read and this write. Read again rather than
+         assume: whoever is looking at this screen closed the tab a moment
+         after somebody else opened a different one, and "already completed"
+         is the wrong answer to give someone who cancelled it themselves. */
+      const current = await Purchase.findById(id);
 
-      return exists
-        ? res.status(409).json({
-            message: "This purchase order has already been completed."
-          })
-        : res.status(404).json({ message: "Purchase not found" });
+      if (!current) return res.status(404).json({ message: "Purchase not found" });
+
+      return res.status(409).json({
+        message:
+          current.status === "CANCELLED"
+            ? "This purchase order was cancelled. Raise a new order for anything that did arrive."
+            : "This purchase order has already been completed.",
+      });
     }
 
     /* The audit row is a precondition of the close, not a footnote to it: an

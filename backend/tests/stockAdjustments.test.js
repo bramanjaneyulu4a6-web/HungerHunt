@@ -95,6 +95,56 @@ describe('adjusting stock', () => {
     assert.deepEqual(compensated, { $inc: { stock: -5 } });
   });
 
+  test('a rollback guards its decrement the same way a real write-down does', async () => {
+    accountIs('admin');
+    mock.method(Inventory, 'findOne', async () => ({ productId: PRODUCT_ID, stock: 10 }));
+    mock.method(Inventory, 'findOneAndUpdate', async () => ({ productId: PRODUCT_ID, stock: 15 }));
+    mock.method(StockAdjustment, 'create', async () => { throw new Error('db down'); });
+    let filter;
+    mock.method(Inventory, 'updateOne', async (f) => { filter = f; return { matchedCount: 1 }; });
+
+    const res = await adjust({ delta: 5, reason: 'opening stock' });
+
+    assert.equal(res.status, 500);
+    assert.deepEqual(filter, { productId: PRODUCT_ID, stock: { $gte: 5 } });
+  });
+
+  // Concurrent sales can drain the shelf in the window between a write-up
+  // landing and its ledger row failing to write. Letting the compensation
+  // through anyway would push stock negative — this is what stops it, and
+  // it must not do so silently.
+  test('a rollback the guard refuses is logged, not swallowed', async () => {
+    accountIs('admin');
+    mock.method(Inventory, 'findOne', async () => ({ productId: PRODUCT_ID, stock: 10 }));
+    mock.method(Inventory, 'findOneAndUpdate', async () => ({ productId: PRODUCT_ID, stock: 15 }));
+    mock.method(StockAdjustment, 'create', async () => { throw new Error('db down'); });
+    mock.method(Inventory, 'updateOne', async () => ({ matchedCount: 0 }));
+
+    let logged = false;
+    mock.method(console, 'error', (...args) => {
+      if (String(args[0]).includes('Adjustment rollback refused')) logged = true;
+    });
+
+    const res = await adjust({ delta: 5, reason: 'opening stock' });
+
+    assert.equal(res.status, 500);
+    assert.ok(logged, 'a rollback the guard blocked must still be on record');
+  });
+
+  test('a write-down\'s rollback compensation is an increment and carries no guard', async () => {
+    accountIs('admin');
+    mock.method(Inventory, 'findOne', async () => ({ productId: PRODUCT_ID, stock: 10 }));
+    mock.method(Inventory, 'findOneAndUpdate', async () => ({ productId: PRODUCT_ID, stock: 5 }));
+    mock.method(StockAdjustment, 'create', async () => { throw new Error('db down'); });
+    let filter;
+    mock.method(Inventory, 'updateOne', async (f) => { filter = f; return { matchedCount: 1 }; });
+
+    const res = await adjust({ delta: -5, reason: 'stocktake' });
+
+    assert.equal(res.status, 500);
+    assert.deepEqual(filter, { productId: PRODUCT_ID });
+  });
+
   test('zero, fractions, garbage, and empty reasons are refused', async () => {
     accountIs('admin');
     mock.method(Inventory, 'findOne', async () => ({ productId: PRODUCT_ID, stock: 10 }));

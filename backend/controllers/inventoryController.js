@@ -97,10 +97,30 @@ export const adjustStock = async (req, res) => {
 
       return res.status(201).json({ adjustment, stock: updated.stock });
     } catch (err) {
-      await Inventory.updateOne({ productId }, { $inc: { stock: -d } }).catch(
-        (rollbackErr) =>
-          console.error("Adjustment rollback failed for product", productId, rollbackErr)
-      );
+      // The compensation for a write-up is a decrement, so it is guarded the
+      // same way every other decrement in this file is: concurrent sales
+      // could have drained the shelf in the window since the write-up
+      // landed, and an unguarded rollback would push stock negative — the
+      // one invariant every other path here goes out of its way to protect.
+      // A write-down's compensation is an increment and needs no guard.
+      const rollback = await Inventory.updateOne(
+        d > 0 ? { productId, stock: { $gte: d } } : { productId },
+        { $inc: { stock: -d } }
+      ).catch((rollbackErr) => {
+        console.error("Adjustment rollback failed for product", productId, rollbackErr);
+        return null;
+      });
+
+      if (d > 0 && rollback && rollback.matchedCount === 0) {
+        // Silently leaving it would be worse than the stock this write-up
+        // added standing uncompensated: at least this is on record.
+        console.error(
+          "Adjustment rollback refused for product",
+          productId,
+          "— stock has too little left to take the write-up back without going negative"
+        );
+      }
+
       throw err;
     }
   } catch (err) {

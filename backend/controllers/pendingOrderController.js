@@ -76,6 +76,19 @@ const priceCart = async (items) => {
       return { ok: false, status: 404, message: "Inventory record not found." };
     }
 
+    // Archived is off sale everywhere, including a console screen that loaded
+    // its menu this morning and still shows the product. Caught here, the
+    // refusal lands at the counter while the student is still standing
+    // there — approvePendingOrder re-checks against live stock, but by then
+    // the wrong person (the parent, days later) is the one being told.
+    if (inventory.productId.active === false) {
+      return {
+        ok: false,
+        status: 400,
+        message: `${inventory.productId.name} is no longer sold.`,
+      };
+    }
+
     if (inventory.stock < item.quantity) {
       return {
         ok: false,

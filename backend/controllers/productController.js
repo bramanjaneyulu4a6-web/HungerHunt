@@ -35,6 +35,14 @@ export const addProduct = async (req, res) => {
       image = await uploadImage(req.file);
     }
 
+    // Validated exactly as updateProduct validates it, and left out entirely
+    // when absent so the schema default still applies — a caller that never
+    // mentions reorder level should get the default, not a rejection for not
+    // supplying one.
+    if (req.body.reorderLevel !== undefined && !isWholeNonNegative(req.body.reorderLevel)) {
+      return res.status(400).json({ message: "Reorder level must be a whole number of zero or more." });
+    }
+
     const product = await Product.create({
 
       name: req.body.name,
@@ -45,7 +53,11 @@ export const addProduct = async (req, res) => {
 
       price: req.body.price || 0,
 
-      image
+      image,
+
+      ...(req.body.reorderLevel !== undefined
+        ? { reorderLevel: Number(req.body.reorderLevel) }
+        : {}),
 
     });
 

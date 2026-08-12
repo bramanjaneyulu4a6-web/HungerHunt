@@ -83,6 +83,31 @@ describe('creating a product', () => {
     assert.equal(res.status, 400);
     assert.equal(String(deleted), PRODUCT_ID);
   });
+
+  // The admin screen makes reorder level required and sends it on every
+  // create. Silently discarding it and falling back to the schema default
+  // means the number on the table never matches what was typed.
+  test('a supplied reorder level is stored, not discarded for the default', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, reorderLevel: 40 });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.reorderLevel, 40);
+  });
+
+  test('a fractional reorder level is refused, and nothing is created', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, reorderLevel: 2.5 });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
 });
 
 const put = (path, body) =>

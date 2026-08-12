@@ -112,6 +112,15 @@ const stockedAt = (price, stock) => {
   }));
 };
 
+const archivedAt = (price, stock) => {
+  mock.method(Inventory, 'findOne', () => ({
+    populate: async () => ({
+      stock,
+      productId: { _id: PRODUCT_ID, name: 'Samosa', price, active: false },
+    }),
+  }));
+};
+
 const createRequest = (body) =>
   send('POST', '/api/pending-orders', adminToken, {
     studentId: STUDENT_ID,
@@ -238,6 +247,55 @@ describe('a student raising a request still costs a verified code', () => {
 
     // Priced from inventory, never from what the till said it cost.
     assert.equal(created.mock.calls[0].arguments[0].totalAmount, 40);
+  });
+});
+
+/* The console no longer charges directly — it raises a request through this
+   same route, and approval can be days off. Without this check an archived
+   product sails past the counter and the refusal lands on the parent's phone
+   instead, holding the student's one open-request slot the whole time. */
+describe('the console cannot raise a request for an archived product', () => {
+  test('is refused at the counter, not on the parent\'s phone days later', async () => {
+    signedIn();
+    studentNeedingApproval();
+    parentIsLinked();
+    noOpenOrder();
+    archivedAt(20, 10);
+
+    const created = mock.method(PendingOrder, 'create', async (doc) => ({ ...doc, _id: ORDER_ID }));
+
+    const res = await createRequest({ purchaseToken: undefined });
+    const body = await res.json();
+
+    assert.equal(res.status, 400);
+    assert.match(body.message, /Samosa is no longer sold/);
+    assert.equal(created.mock.callCount(), 0);
+  });
+
+  // A parent trimming the archived line out must still be able to — the
+  // check only sees the lines actually being priced, and by then that one
+  // is gone.
+  test('but a parent can still remove the offending line from an existing order', async () => {
+    mock.method(PendingOrder, 'findOne', async () => ({
+      _id: ORDER_ID,
+      parentId: PARENT_ID,
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + 60_000),
+      items: [
+        { productId: PRODUCT_ID, name: 'Samosa', quantity: 2, price: 20 },
+        { productId: '507f191e810c19729de860ff', name: 'Chips', quantity: 1, price: 15 },
+      ],
+      save: async function () { return this; },
+    }));
+    stockedAt(20, 10);
+
+    const res = await send('PUT', `/api/pending-orders/${ORDER_ID}`, parentToken, {
+      // Drops the second (archived) line entirely; the remaining line is a
+      // live one, so priceCart never has to look at the archived product.
+      items: [{ productId: PRODUCT_ID, quantity: 2 }],
+    });
+
+    assert.equal(res.status, 200);
   });
 });
 

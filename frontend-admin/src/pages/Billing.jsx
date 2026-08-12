@@ -43,7 +43,10 @@ const Billing = () => {
       const res = await api.get("/inventory");
 
       const inventoryProducts = (Array.isArray(res.data) ? res.data : [])
-        .filter((item) => item.productId && item.stock > 0)
+        .filter(
+          (item) =>
+            item.productId && item.stock > 0 && item.productId.active !== false
+        )
         .map((item) => ({
           _id: item.productId._id,
           name: item.productId.name,

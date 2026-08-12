@@ -23,6 +23,7 @@ export default function Navbar() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="parent-appbar">
         <NavLink to="/" className="parent-brand" aria-label="Hunger Hunt home">
           <img src="/Logo.jpeg" alt="" />
@@ -34,10 +35,7 @@ export default function Navbar() {
 
         <nav className="parent-desktop-nav" aria-label="Primary navigation">
           <NavLink to="/" end className={navClass}>
-            <Icon name="home" size={18} /> Accounts
-          </NavLink>
-          <NavLink to="/pending-orders" className={navClass}>
-            <Icon name="cart" size={18} /> Approvals
+            <Icon name="home" size={18} /> Dashboard
           </NavLink>
         </nav>
 
@@ -59,10 +57,7 @@ export default function Navbar() {
 
       <nav className="parent-bottom-nav" aria-label="Primary navigation">
         <NavLink to="/" end className={navClass}>
-          <Icon name="home" size={21} /> <span>Accounts</span>
-        </NavLink>
-        <NavLink to="/pending-orders" className={navClass}>
-          <Icon name="cart" size={21} /> <span>Approvals</span>
+          <Icon name="home" size={21} /> <span>Dashboard</span>
         </NavLink>
         <button type="button" className="parent-nav-link" onClick={() => setConfirmingLogout(true)}>
           <Icon name="logout" size={21} /> <span>Sign out</span>

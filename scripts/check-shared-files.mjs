@@ -42,6 +42,13 @@ const SHARED = [
     file: 'src/components/ui/index.jsx',
     apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
+  // Joined the shared set when the parent app's redesign began importing it
+  // from ui/index.jsx. A shared component that reaches for a file only one app
+  // has is a build break in the other three, so the file travels with it.
+  {
+    file: 'src/components/Icon.jsx',
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
+  },
   {
     file: 'src/utils/format.js',
     apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],

@@ -35,8 +35,11 @@ if (config.apiKey && config.messagingSenderId) {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
+  const type = event.notification.data?.type;
   const studentId = event.notification.data?.studentId;
-  const path = studentId ? `/child/${studentId}` : '/';
+  // Approval notifications belong to the unified dashboard, where the parent
+  // can answer them. Other account updates still open the child they concern.
+  const path = type === 'PENDING_ORDER' ? '/' : studentId ? `/child/${studentId}` : '/';
   const target = new URL(path, self.location.origin).href;
 
   event.waitUntil(

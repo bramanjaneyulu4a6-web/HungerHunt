@@ -66,6 +66,8 @@ export default function Register() {
 
   return (
     <AuthLayout
+      logo="/Logo.jpeg"
+      eyebrow="Hunger Hunt Parent"
       title="Create Account"
       subtitle="Use the father's name and phone number registered with the school office"
       footer={

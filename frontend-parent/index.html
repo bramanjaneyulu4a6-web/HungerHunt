@@ -6,6 +6,8 @@
          of Logo.jpeg, which the tab was loading in full to draw it 16px wide.
          The JPEG stays for the notification icon, which wants the full square. -->
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/Logo.jpeg" />
     <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to the
          real notch and home-indicator sizes inside the Capacitor shell. -->
     <meta
@@ -13,6 +15,10 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Hunger Hunt" />
     <meta
       name="description"
       content="Manage your child's Hunger Hunt wallet, purchase approvals, spending limits and account activity."

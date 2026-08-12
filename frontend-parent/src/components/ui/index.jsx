@@ -80,17 +80,22 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
 }
 
 /* Shell shared by login, register, forgot-password and reset-password.
-   `logo` is optional — only the kiosk brands its sign-in, since that screen
-   faces a counter rather than a browser tab the staff member already trusts. */
-export function AuthLayout({ title, subtitle, children, footer, eyebrow = 'Hunger Hunt Parent' }) {
+
+   `logo` and `eyebrow` are both optional, and stay that way deliberately. The
+   parent app brands this screen because it faces a customer opening an app
+   they chose to install; the back office and the storeroom do not, because
+   their staff are already looking at a tab they trust. Hardcoding either one
+   here puts the parent app's branding on both of the others — and a logo they
+   do not ship the file for. */
+export function AuthLayout({ logo, eyebrow, title, subtitle, children, footer }) {
   return (
     <div className="auth-page">
       <div className="auth-ambient auth-ambient--one" aria-hidden="true" />
       <div className="auth-ambient auth-ambient--two" aria-hidden="true" />
       <div className="auth-card">
         <header className="auth-header">
-          <img className="auth-logo" src="/Logo.jpeg" alt="Hunger Hunt" />
-          <p className="auth-eyebrow">{eyebrow}</p>
+          {logo && <img className="auth-logo" src={logo} alt="" />}
+          {eyebrow && <p className="auth-eyebrow">{eyebrow}</p>}
           <h1 className="auth-title">{title}</h1>
           {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         </header>

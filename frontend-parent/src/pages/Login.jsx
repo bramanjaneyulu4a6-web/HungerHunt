@@ -46,6 +46,8 @@ export default function Login() {
 
   return (
     <AuthLayout
+      logo="/Logo.jpeg"
+      eyebrow="Hunger Hunt Parent"
       title="Parent Login"
       subtitle="Enter your phone number and password to access your account"
       footer={

@@ -5,6 +5,7 @@ import {
   Route,
   Navigate,
   useNavigate,
+  useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/auth";
@@ -16,7 +17,6 @@ import ChildDetails from "./pages/ChildDetails";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetPurchasePassword from "./pages/SetPurchasePassword";
-import PendingOrders from "./pages/PendingOrders";
 
 import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -32,6 +32,28 @@ const PublicOnlyRoute = ({ children }) => {
   const { parent } = useAuth();
   return parent ? <Navigate to="/" replace /> : children;
 };
+
+const pageTitle = (pathname) => {
+  if (pathname.startsWith('/child/')) return 'Child account';
+  if (pathname === '/pending-orders') return 'Approval requests';
+  if (pathname.startsWith('/purchase-password/')) return 'Purchase code';
+  if (pathname === '/login') return 'Sign in';
+  if (pathname === '/register') return 'Create account';
+  if (pathname === '/forgot-password') return 'Forgot password';
+  if (pathname.startsWith('/reset-password/')) return 'Reset password';
+  return 'Your children';
+};
+
+function RouteEffects() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.title = `${pageTitle(pathname)} — Hunger Hunt Parent`;
+  }, [pathname]);
+
+  return null;
+}
 
 function AppContent() {
   const { parent } = useAuth();
@@ -55,7 +77,7 @@ function AppContent() {
       if (!tapped) return;
 
       if (data.type === "PENDING_ORDER") {
-        navigate("/pending-orders");
+        navigate("/");
       } else if (data.studentId) {
         navigate(`/child/${data.studentId}`);
       }
@@ -64,9 +86,11 @@ function AppContent() {
 
   return (
     <>
+      <RouteEffects />
       {parent && <Navbar />}
 
-      <Routes>
+      <main id="main-content" className="parent-main">
+        <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
@@ -96,11 +120,7 @@ function AppContent() {
 
         <Route
           path="/pending-orders"
-          element={
-            <ProtectedRoute>
-              <PendingOrders />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/" replace />}
         />
 
         <Route
@@ -114,7 +134,8 @@ function AppContent() {
 
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        </Routes>
+      </main>
     </>
   );
 }

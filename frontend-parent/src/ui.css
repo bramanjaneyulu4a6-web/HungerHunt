@@ -19,6 +19,17 @@
   margin-bottom: 32px;
 }
 
+/* The page header's top row. Was a block of inline styles on the component
+   until the parent app needed to restyle it; it lives here so every app keeps
+   the same layout and any one of them can override it in its own layer. */
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .page-title {
   font-size: 32px;
   font-weight: 800;

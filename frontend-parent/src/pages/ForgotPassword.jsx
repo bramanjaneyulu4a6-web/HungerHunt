@@ -32,6 +32,8 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout
+      logo="/Logo.jpeg"
+      eyebrow="Hunger Hunt Parent"
       title="Forgot Password"
       subtitle="Enter your email address to receive a secure password reset link"
       footer={

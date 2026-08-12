@@ -45,6 +45,8 @@ export default function ResetPassword() {
 
   return (
     <AuthLayout
+      logo="/Logo.jpeg"
+      eyebrow="Hunger Hunt Parent"
       title="Reset Password"
       subtitle="Choose a secure, strong password to regain access to your account"
       footer={

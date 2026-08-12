@@ -31,6 +31,12 @@ export default function SetPurchasePassword() {
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
 
+  useEffect(() => {
+    if (!success) return undefined;
+    const timer = window.setTimeout(() => navigate(`/child/${id}`), 1200);
+    return () => window.clearTimeout(timer);
+  }, [id, navigate, success]);
+
   // "Try again" bumps this to run the effect below again, so the request has a
   // single home and is abandoned with the screen that asked for it.
   const [attempt, setAttempt] = useState(0);
@@ -88,7 +94,6 @@ export default function SetPurchasePassword() {
     try {
       await API.post(endpoint, { studentId: id, ...body });
       setSuccess('Purchase code updated successfully.');
-      setTimeout(() => navigate(`/child/${id}`), 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save the code.');
       setSaving(false);
@@ -175,6 +180,26 @@ export default function SetPurchasePassword() {
       onChange: (e) => onChange(e.target.value),
     });
 
+  // Existing accounts may still have a legacy code containing more than four
+  // digits or letters. The backend deliberately accepts that old value while
+  // requiring the replacement to be a four-digit PIN, so the UI must not
+  // prevent the parent from typing the current code here.
+  const currentCodeField = (label, value, onChange) =>
+    field(label, {
+      type: 'password',
+      inputMode: student?.purchaseCodeIsPin ? 'numeric' : 'text',
+      autoComplete: 'current-password',
+      maxLength: student?.purchaseCodeIsPin ? PURCHASE_CODE_LENGTH : undefined,
+      placeholder: student?.purchaseCodeIsPin ? '••••' : 'Current code',
+      value,
+      onChange: (e) =>
+        onChange(
+          student?.purchaseCodeIsPin
+            ? e.target.value.replace(/\D/g, '').slice(0, PURCHASE_CODE_LENGTH)
+            : e.target.value
+        ),
+    });
+
   if (loading) {
     return (
       <div className="page">
@@ -219,20 +244,17 @@ export default function SetPurchasePassword() {
   return (
     <div className="page">
       <div style={{ maxWidth: 500, margin: '0 auto' }}>
-        <Button
-          variant="ghost"
-          onClick={() => navigate(`/child/${id}`)}
-          style={{ marginBottom: 20 }}
-        >
-          <span aria-hidden="true">←</span> Back
+        <Button variant="ghost" onClick={() => navigate(`/child/${id}`)} style={{ marginBottom: 20 }}>
+          ← Back to {student.name}
         </Button>
 
         <Card>
           <h1 className="page-title" style={{ fontSize: 24 }}>
-            Purchase Code
+            Purchase code
           </h1>
           <p className="card-meta" style={{ fontSize: 14 }}>
-            {student.name} · Grade {student.grade} · Room {student.hostelNumber}
+            {student.name} · Grade {student.grade || '—'} · Room{' '}
+            {student.hostelNumber || '—'}
           </p>
 
           <p
@@ -259,7 +281,7 @@ export default function SetPurchasePassword() {
               counter takes nothing else. If {student.name} already uses a{' '}
               {PURCHASE_CODE_LENGTH}-digit code there is nothing to do. If
               theirs is longer or has letters in it, use{' '}
-              <strong>Forgot Purchase Code</strong> below — it asks for your own
+              <strong>Forgot purchase code</strong> below — it asks for your own
               account password, so you do not need the old one.
             </Banner>
           )}
@@ -296,7 +318,7 @@ export default function SetPurchasePassword() {
                 aria-expanded={openForm === 'change'}
                 onClick={() => toggle('change')}
               >
-                Change Code
+                Change code
               </Button>
 
               {openForm === 'change' && (
@@ -304,7 +326,7 @@ export default function SetPurchasePassword() {
                   onSubmit={changePassword}
                   style={{ display: 'grid', gap: 16, marginBottom: 4 }}
                 >
-                  {codeField('Current Code', currentPassword, setCurrentPassword)}
+                  {currentCodeField('Current Code', currentPassword, setCurrentPassword)}
                   {codeField('New Code', newPassword, setNewPassword)}
                   {codeField(
                     'Confirm New Code',
@@ -324,7 +346,7 @@ export default function SetPurchasePassword() {
                 aria-expanded={openForm === 'reset'}
                 onClick={() => toggle('reset')}
               >
-                Forgot Purchase Code?
+                Forgot purchase code?
               </Button>
 
               {openForm === 'reset' && (

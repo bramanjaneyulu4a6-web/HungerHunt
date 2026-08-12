@@ -28,6 +28,11 @@ const ProtectedRoute = ({ children }) => {
   return parent ? children : <Navigate to="/login" replace />;
 };
 
+const PublicOnlyRoute = ({ children }) => {
+  const { parent } = useAuth();
+  return parent ? <Navigate to="/" replace /> : children;
+};
+
 function AppContent() {
   const { parent } = useAuth();
   const navigate = useNavigate();
@@ -63,9 +68,11 @@ function AppContent() {
 
       <Routes>
         {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+        <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+        <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+        {/* A reset link may be opened while another session is still present;
+            it must remain usable so the token can close those old sessions. */}
         <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* Protected Routes */}

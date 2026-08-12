@@ -3,22 +3,16 @@
    change to a button or card lands everywhere at once. Each accepts className
    and passes the rest through, so a one-off tweak stays possible. */
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Icon from '../Icon';
 
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
     <header className="page-header">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
+      <div className="page-header-row">
         <div>
           <h1 className="page-title">{title}</h1>
           {subtitle && <p className="page-subtitle">{subtitle}</p>}
@@ -76,7 +70,7 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
   return (
     <div
       className={cx('banner', `banner--${variant}`, className)}
-      role="status"
+      role={variant === 'alert' ? 'alert' : 'status'}
       {...rest}
     >
       {icon && <span aria-hidden="true">{icon}</span>}
@@ -88,12 +82,15 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
 /* Shell shared by login, register, forgot-password and reset-password.
    `logo` is optional — only the kiosk brands its sign-in, since that screen
    faces a counter rather than a browser tab the staff member already trusts. */
-export function AuthLayout({ logo, title, subtitle, children, footer }) {
+export function AuthLayout({ title, subtitle, children, footer, eyebrow = 'Hunger Hunt Parent' }) {
   return (
     <div className="auth-page">
+      <div className="auth-ambient auth-ambient--one" aria-hidden="true" />
+      <div className="auth-ambient auth-ambient--two" aria-hidden="true" />
       <div className="auth-card">
         <header className="auth-header">
-          {logo && <img className="auth-logo" src={logo} alt="" />}
+          <img className="auth-logo" src="/Logo.jpeg" alt="Hunger Hunt" />
+          <p className="auth-eyebrow">{eyebrow}</p>
           <h1 className="auth-title">{title}</h1>
           {subtitle && <p className="auth-subtitle">{subtitle}</p>}
         </header>
@@ -127,6 +124,36 @@ export function AuthField({ id, label, aside, ...inputProps }) {
       )}
 
       <input id={id} className="auth-input" {...inputProps} />
+    </div>
+  );
+}
+
+export function PasswordField({ id, label, aside, ...inputProps }) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="auth-field">
+      <div className="auth-label-row">
+        <label className="auth-label" htmlFor={id}>{label}</label>
+        {aside}
+      </div>
+      <div className="password-input-wrap">
+        <input
+          id={id}
+          className="auth-input"
+          type={visible ? 'text' : 'password'}
+          {...inputProps}
+        />
+        <button
+          type="button"
+          className="password-reveal"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={visible ? 'Hide password' : 'Show password'}
+          aria-pressed={visible}
+        >
+          <Icon name={visible ? 'eyeOff' : 'eye'} size={19} />
+        </button>
+      </div>
     </div>
   );
 }

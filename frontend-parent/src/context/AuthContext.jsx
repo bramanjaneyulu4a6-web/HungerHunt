@@ -15,10 +15,15 @@ const restoreSession = () => {
 
   try {
     const saved = localStorage.getItem('parentData');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) {
+      localStorage.removeItem('parentToken');
+      return null;
+    }
+    return JSON.parse(saved);
   } catch {
     // Corrupt entry: drop it rather than leaving it to fail again next start.
     localStorage.removeItem('parentData');
+    localStorage.removeItem('parentToken');
     return null;
   }
 };

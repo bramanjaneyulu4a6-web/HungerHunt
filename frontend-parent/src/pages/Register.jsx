@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import API from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
-import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../components/ui';
 import {
   PASSWORD_MIN_LENGTH,
   emailProblem,
@@ -20,6 +20,12 @@ export default function Register() {
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!success) return undefined;
+    const timer = window.setTimeout(() => navigate('/login'), 1800);
+    return () => window.clearTimeout(timer);
+  }, [navigate, success]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,8 +47,7 @@ export default function Register() {
 
     try {
       await API.post('/parent/register', formData);
-      setSuccess('Account created successfully! Redirecting to login...');
-      setTimeout(() => navigate('/login'), 2500);
+      setSuccess('Account created. Taking you to sign in…');
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -52,8 +57,12 @@ export default function Register() {
     }
   };
 
-  const update = (field) => (e) =>
-    setFormData({ ...formData, [field]: e.target.value });
+  const update = (field) => (e) => {
+    const value = field === 'parentPhoneNumber'
+      ? e.target.value.replace(/\D/g, '').slice(0, 10)
+      : e.target.value;
+    setFormData({ ...formData, [field]: value });
+  };
 
   return (
     <AuthLayout
@@ -78,7 +87,7 @@ export default function Register() {
       )}
 
       <form onSubmit={handleSubmit} className="auth-form">
-        <AuthField
+        <PasswordField
           id="father-name"
           label="Father's Name"
           type="text"
@@ -116,7 +125,6 @@ export default function Register() {
         <AuthField
           id="password"
           label={`Set App Password (at least ${PASSWORD_MIN_LENGTH} characters)`}
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
@@ -132,7 +140,7 @@ export default function Register() {
           className="auth-submit"
           disabled={submitting || Boolean(success)}
         >
-          {submitting ? 'Verifying…' : 'Verify & Register'}
+          {submitting ? 'Verifying details…' : 'Create parent account'}
         </Button>
       </form>
     </AuthLayout>

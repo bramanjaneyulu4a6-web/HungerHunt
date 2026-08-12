@@ -12,6 +12,7 @@ import {
   PageHeader,
   Skeleton,
 } from '../components/ui';
+import Icon from '../components/Icon';
 
 const LOW_BALANCE = 500;
 
@@ -51,7 +52,10 @@ const Dashboard = () => {
   // the effect that owns it rather than beside it, so there is one copy of the
   // fetch and it is always torn down with the screen that started it.
   const [attempt, setAttempt] = useState(0);
-  const retry = () => setAttempt((n) => n + 1);
+  const retry = () => {
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     // A reply that arrives after this effect is cleaned up belongs to a screen
@@ -71,7 +75,10 @@ const Dashboard = () => {
         // Previously this only reached the console, so a failed load was
         // indistinguishable from a parent with no children linked.
         console.error('Error loading linked students:', err);
-        setError("Couldn't load your children's accounts. Check your connection.");
+        setError(
+          err.response?.data?.message ||
+            "Couldn't load your children's accounts. Check your connection."
+        );
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -93,8 +100,8 @@ const Dashboard = () => {
   return (
     <div className="page">
       <PageHeader
-        title="Linked Children Accounts"
-        subtitle="Check the balance, purchases and recharges on each account"
+        title="Your children"
+        subtitle="Balances, purchase history and spending controls—all in one place."
       />
 
       {loading && <DashboardSkeleton />}
@@ -123,54 +130,46 @@ const Dashboard = () => {
             return (
               <AnimateIn key={child._id} index={i}>
                 <Card
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    height: '100%',
-                  }}
+                  className="student-card"
+                  style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        gap: 12,
-                      }}
-                    >
+                  <div className="student-card-head">
+                    <div className="student-identity">
+                      <span className="student-avatar" aria-hidden="true">
+                        {child.name?.charAt(0).toUpperCase() || 'S'}
+                      </span>
                       <div>
                         <h2 className="card-title">{child.name}</h2>
-                        <p className="card-meta">
-                          Grade: {child.grade || 'N/A'} | Room:{' '}
-                          {child.hostelNumber || 'N/A'}
+                        <p className="student-meta">
+                          Grade {child.grade || '—'} · Room {child.hostelNumber || '—'}
                         </p>
                       </div>
-
-                      {/* The glyph repeats what the colour says, so a low
-                          balance still reads without green-vs-red vision. */}
-                      <Badge variant={balance > LOW_BALANCE ? 'success' : 'alert'}>
-                        <span aria-hidden="true">
-                          {balance > LOW_BALANCE ? '✓' : '!'}
-                        </span>
-                        {formatINR(balance)}
-                      </Badge>
                     </div>
 
-                    {balance <= 0 && (
-                      <Banner variant="alert" icon="⚠️" style={{ marginTop: 12 }}>
-                        Balance exhausted. Please top up at the school accounts
-                        counter.
-                      </Banner>
-                    )}
+                    <Badge variant={balance > LOW_BALANCE ? 'success' : 'alert'}>
+                      {balance > LOW_BALANCE ? 'Available' : 'Low balance'}
+                    </Badge>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                  <div className="student-balance-row">
+                    <span className="student-balance-label">Wallet balance</span>
+                    <strong className={`student-balance${balance <= LOW_BALANCE ? ' student-balance--low' : ''}`}>
+                      {formatINR(balance)}
+                    </strong>
+                  </div>
+
+                  {balance <= 0 && (
+                    <Banner variant="alert" icon="⚠️" style={{ marginTop: 14 }}>
+                      This wallet is empty. Top up at the school accounts counter.
+                    </Banner>
+                  )}
+
+                  <div className="student-card-actions">
                     <Button to={`/child/${child._id}`} variant="dark" block>
-                      View Details
+                      View account <Icon name="chevronRight" size={17} />
                     </Button>
-                    <Button to={`/purchase-password/${child._id}`} block>
-                      Set Code
+                    <Button to={`/purchase-password/${child._id}`} variant="ghost" block>
+                      <Icon name="shield" size={17} /> Purchase code
                     </Button>
                   </div>
                 </Card>

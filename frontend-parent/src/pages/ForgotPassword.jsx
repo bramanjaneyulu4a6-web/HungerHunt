@@ -2,6 +2,7 @@ import { useState } from 'react';
 import API from '../services/api';
 import { Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { emailProblem } from '../utils/validation';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -13,6 +14,10 @@ export default function ForgotPassword() {
     e.preventDefault();
     setMsg('');
     setError('');
+
+    const problem = emailProblem(email);
+    if (problem) return setError(problem);
+
     setSubmitting(true);
 
     try {
@@ -66,7 +71,7 @@ export default function ForgotPassword() {
           className="auth-submit"
           disabled={submitting}
         >
-          {submitting ? 'Sending…' : 'Send Reset Link'}
+          {submitting ? 'Sending…' : 'Email reset link'}
         </Button>
       </form>
     </AuthLayout>

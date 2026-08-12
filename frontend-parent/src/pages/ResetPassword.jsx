@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../services/api';
-import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { AuthLayout, Banner, Button, PasswordField } from '../components/ui';
 import { PASSWORD_MIN_LENGTH, passwordProblem } from '../utils/validation';
 
 export default function ResetPassword() {
@@ -9,9 +9,16 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!msg) return undefined;
+    const timer = window.setTimeout(() => navigate('/login'), 1800);
+    return () => window.clearTimeout(timer);
+  }, [msg, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,6 +27,7 @@ export default function ResetPassword() {
 
     const problem = passwordProblem(password);
     if (problem) return setError(problem);
+    if (password !== confirmPassword) return setError('The two passwords do not match.');
 
     setSubmitting(true);
 
@@ -29,7 +37,6 @@ export default function ResetPassword() {
       });
 
       setMsg(res.data.message || 'Password reset successfully!');
-      setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset failed');
       setSubmitting(false);
@@ -59,16 +66,26 @@ export default function ResetPassword() {
       )}
 
       <form onSubmit={handleSubmit} className="auth-form">
-        <AuthField
+        <PasswordField
           id="new-password"
           label={`New Password (at least ${PASSWORD_MIN_LENGTH} characters)`}
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <PasswordField
+          id="confirm-password"
+          label="Confirm new password"
+          autoComplete="new-password"
+          required
+          minLength={PASSWORD_MIN_LENGTH}
+          placeholder="••••••••"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
         />
 
         <Button

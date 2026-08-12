@@ -11,12 +11,20 @@ import {
   EmptyState,
   Skeleton,
 } from '../components/ui';
+import Icon from '../components/Icon';
 
 const TABS = [
   { id: 'purchases', icon: '🛒', label: 'Purchases' },
   { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
 ];
+
+const formatDate = (value) =>
+  new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
 
 const DetailsSkeleton = () => (
   <>
@@ -175,7 +183,10 @@ export default function ChildDetails() {
   // "Try again" bumps this to run the effect below again, which keeps the one
   // copy of the request inside the effect that owns and cancels it.
   const [attempt, setAttempt] = useState(0);
-  const retry = () => setAttempt((n) => n + 1);
+  const retry = () => {
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     // A reply for a child this screen has already left must not land on it.
@@ -273,6 +284,15 @@ export default function ChildDetails() {
 
   const saveWalletControl = async () => {
     setWalletBanner({ type: '', message: '' });
+
+    if (walletEnabled && (!Number.isFinite(walletLimit) || walletLimit <= 0)) {
+      setWalletBanner({
+        type: 'error',
+        message: 'Enter a spending limit greater than ₹0.',
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -295,20 +315,8 @@ export default function ChildDetails() {
   };
 
   const backLink = (
-    <Link
-      to="/"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 24,
-        fontSize: 14,
-        fontWeight: 600,
-        color: 'var(--primary)',
-        textDecoration: 'none',
-      }}
-    >
-      <span aria-hidden="true">←</span> Back to Accounts
+    <Link to="/" className="page-back">
+      <Icon name="arrowLeft" size={17} /> Back to accounts
     </Link>
   );
 
@@ -390,42 +398,34 @@ export default function ChildDetails() {
     <div className="page">
       {backLink}
 
-      <Card
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)' }}>
-            {student.name}
-          </h1>
-          <p className="card-meta" style={{ fontSize: 14 }}>
-            Grade: {student.grade || 'N/A'} | Room:{' '}
-            {student.hostelNumber || 'N/A'}
-          </p>
+      <Card className="child-hero">
+        <div className="student-identity">
+          <span className="student-avatar" aria-hidden="true">
+            {student.name?.charAt(0).toUpperCase() || 'S'}
+          </span>
+          <div>
+            <h1 style={{ fontSize: 25, fontWeight: 850 }}>{student.name}</h1>
+            <p className="student-meta">
+              Grade {student.grade || '—'} · Room {student.hostelNumber || '—'}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <p className="stat-label">Wallet Balance</p>
+        <div className="child-balance">
+          <p className="stat-label">Available balance</p>
           <p className="stat-value">{formatINR(student.pocketMoney)}</p>
         </div>
       </Card>
 
-      <div
-        className="tabs"
-        role="tablist"
-        style={{ maxWidth: 460, marginBottom: 32 }}
-      >
+      <div className="tabs child-tabs" role="tablist" aria-label={`${student.name}'s account sections`}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
+            id={`tab-${tab.id}`}
             role="tab"
             aria-selected={activeTab === tab.id}
+            aria-controls={`panel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             className={`tab${activeTab === tab.id ? ' tab--active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
@@ -435,7 +435,7 @@ export default function ChildDetails() {
       </div>
 
       {activeTab === 'purchases' && (
-        <div role="tabpanel">
+        <div role="tabpanel" id="panel-purchases" aria-labelledby="tab-purchases" tabIndex={0}>
           <h2 className="section-title">Purchase History</h2>
 
           {renderList(bills, {
@@ -454,7 +454,7 @@ export default function ChildDetails() {
                         #{bill._id.slice(-6).toUpperCase()}
                       </span>
                     </span>
-                    <span>{new Date(bill.createdAt).toLocaleDateString()}</span>
+                    <span>{formatDate(bill.createdAt)}</span>
                   </div>
 
                   <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
@@ -494,7 +494,7 @@ export default function ChildDetails() {
       )}
 
       {activeTab === 'recharges' && (
-        <div role="tabpanel">
+        <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
           <h2 className="section-title">Recharge History</h2>
 
           {renderList(recharges, {
@@ -510,7 +510,7 @@ export default function ChildDetails() {
                 <Card className="card--tight" style={{ marginBottom: 16 }}>
                   <div className="ledger-head">
                     <span>Wallet Recharge</span>
-                    <span>{new Date(r.date).toLocaleDateString()}</span>
+                    <span>{formatDate(r.date)}</span>
                   </div>
 
                   <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
@@ -535,8 +535,8 @@ export default function ChildDetails() {
       )}
 
       {activeTab === 'wallet' && (
-        <div role="tabpanel">
-          <Card style={{ maxWidth: 460, marginBottom: 24 }}>
+        <div role="tabpanel" id="panel-wallet" aria-labelledby="tab-wallet" tabIndex={0} className="settings-grid">
+          <Card className="settings-card">
             <h2 className="section-title" style={{ fontSize: 20 }}>
               Purchase Approval
             </h2>
@@ -575,7 +575,7 @@ export default function ChildDetails() {
             </p>
           </Card>
 
-          <Card style={{ maxWidth: 460 }}>
+          <Card className="settings-card">
             <h2 className="section-title" style={{ fontSize: 20 }}>
               Wallet Control
             </h2>
@@ -594,6 +594,7 @@ export default function ChildDetails() {
               <input
                 type="checkbox"
                 checked={walletEnabled}
+                disabled={saving}
                 onChange={(e) => setWalletEnabled(e.target.checked)}
               />
               Enable Spending Limit
@@ -610,7 +611,7 @@ export default function ChildDetails() {
                   type="number"
                   min="0"
                   value={walletLimit}
-                  disabled={!walletEnabled}
+                  disabled={!walletEnabled || saving}
                   onChange={(e) => setWalletLimit(Number(e.target.value))}
                   placeholder="Enter amount"
                 />
@@ -624,7 +625,7 @@ export default function ChildDetails() {
                   id="wallet-frequency"
                   className="select"
                   value={walletType}
-                  disabled={!walletEnabled}
+                  disabled={!walletEnabled || saving}
                   onChange={(e) => setWalletType(e.target.value)}
                 >
                   <option value="DAILY">Daily</option>

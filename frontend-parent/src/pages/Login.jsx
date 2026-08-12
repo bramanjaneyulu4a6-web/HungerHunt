@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useAuth } from '../context/auth';
 import API from '../services/api';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../components/ui';
+import { phoneProblem } from '../utils/validation';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -22,6 +23,10 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const problem = phoneProblem(formData.parentPhoneNumber);
+    if (problem) return setError(problem);
+
     setSubmitting(true);
 
     try {
@@ -71,15 +76,18 @@ export default function Login() {
           required
           placeholder="e.g. 9876543210"
           value={formData.parentPhoneNumber}
+          maxLength={10}
           onChange={(e) =>
-            setFormData({ ...formData, parentPhoneNumber: e.target.value })
+            setFormData({
+              ...formData,
+              parentPhoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10),
+            })
           }
         />
 
-        <AuthField
+        <PasswordField
           id="password"
           label="Password"
-          type="password"
           autoComplete="current-password"
           required
           placeholder="••••••••"
@@ -89,7 +97,7 @@ export default function Login() {
           }
           aside={
             <Link to="/forgot-password" className="auth-link">
-              Forgot Password?
+              Forgot password?
             </Link>
           }
         />
@@ -101,7 +109,7 @@ export default function Login() {
           className="auth-submit"
           disabled={submitting}
         >
-          {submitting ? 'Signing in…' : 'Sign In'}
+          {submitting ? 'Signing in…' : 'Sign in securely'}
         </Button>
       </form>
     </AuthLayout>

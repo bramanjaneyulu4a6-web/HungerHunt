@@ -11,6 +11,7 @@ import {
   PageHeader,
   Skeleton,
 } from '../components/ui';
+import Icon from '../components/Icon';
 
 const ListSkeleton = () => (
   <>
@@ -45,6 +46,13 @@ const draftTotal = (drafts, order) => {
   );
 };
 
+const formatExpiry = (value) =>
+  new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+
 export default function PendingOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +67,10 @@ export default function PendingOrders() {
   const [notice, setNotice] = useState('');
 
   const [attempt, setAttempt] = useState(0);
-  const reload = () => setAttempt((n) => n + 1);
+  const reload = () => {
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -70,6 +81,13 @@ export default function PendingOrders() {
         if (ignore) return;
 
         setOrders(res.data.orders || []);
+        setDrafts((current) =>
+          Object.fromEntries(
+            Object.entries(current).filter(([orderId]) =>
+              (res.data.orders || []).some((order) => order._id === orderId)
+            )
+          )
+        );
         setError('');
       } catch (err) {
         if (ignore) return;
@@ -159,7 +177,7 @@ export default function PendingOrders() {
     <div className="page">
       <PageHeader
         title="Approval Requests"
-        subtitle="Purchases waiting for your yes before the wallet is charged"
+        subtitle="Review, adjust and approve kiosk orders before any money leaves the wallet."
       />
 
       {notice && (
@@ -194,23 +212,19 @@ export default function PendingOrders() {
           const edited = isEdited(drafts, order);
           const busy = busyId === order._id;
           const empty = total === 0;
+          const insufficient = total > Number(student.pocketMoney || 0);
 
           return (
             <AnimateIn key={order._id} index={i}>
-              <Card style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                  }}
-                >
+              <Card className={`pending-card${busy ? ' pending-card--busy' : ''}`} aria-busy={busy}>
+                <div className="pending-head">
                   <div>
                     <h2 className="card-title">{student.name || 'Your child'}</h2>
                     <p className="card-meta">
-                      Grade: {student.grade || 'N/A'} | Room:{' '}
-                      {student.hostelNumber || 'N/A'}
+                      Grade {student.grade || '—'} · Room {student.hostelNumber || '—'}
+                    </p>
+                    <p className="pending-expiry">
+                      <Icon name="clock" size={14} /> Expires {formatExpiry(order.expiresAt)}
                     </p>
                   </div>
 
@@ -242,19 +256,19 @@ export default function PendingOrders() {
                           </span>
                         </span>
 
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="quantity-control">
                           <Button
                             variant="ghost"
                             aria-label={`One fewer ${item.name}`}
                             disabled={busy || quantity === 0}
                             onClick={() => setQuantity(order, item.productId, quantity - 1)}
                           >
-                            −
+                            <Icon name="minus" size={16} />
                           </Button>
 
-                          <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 600 }}>
+                          <output aria-label={`${item.name} quantity`}>
                             {quantity}
-                          </span>
+                          </output>
 
                           <Button
                             variant="ghost"
@@ -262,7 +276,7 @@ export default function PendingOrders() {
                             disabled={busy || quantity >= item.quantity}
                             onClick={() => setQuantity(order, item.productId, quantity + 1)}
                           >
-                            +
+                            <Icon name="plus" size={16} />
                           </Button>
                         </span>
                       </li>
@@ -276,8 +290,7 @@ export default function PendingOrders() {
                 </div>
 
                 <p className="card-meta" style={{ marginTop: 12 }}>
-                  Expires {new Date(order.expiresAt).toLocaleDateString()}. Until
-                  then {student.name || 'your child'} cannot place another order.
+                  Until this is answered or expires, {student.name || 'your child'} cannot place another kiosk order.
                 </p>
 
                 {empty && (
@@ -287,8 +300,14 @@ export default function PendingOrders() {
                   </Banner>
                 )}
 
+                {insufficient && !empty && (
+                  <Banner variant="alert" icon="⚠️" className="insufficient-note">
+                    This order is {formatINR(total - Number(student.pocketMoney || 0))} over the available balance. Reduce it before approving.
+                  </Banner>
+                )}
+
                 {edited && !empty && (
-                  <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <div className="pending-actions">
                     <Button block disabled={busy} onClick={() => saveEdits(order)}>
                       {busy ? 'Saving…' : 'Save changes'}
                     </Button>
@@ -304,14 +323,14 @@ export default function PendingOrders() {
                 )}
 
                 {confirming?.id === order._id ? (
-                  <div style={{ marginTop: 16 }}>
+                  <div className="pending-confirm" style={{ display: 'block' }}>
                     <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
                       {confirming.action === 'approve'
                         ? `This takes ${formatINR(total)} from ${student.name || 'your child'}'s wallet now.`
                         : 'The counter will not be paid and the order is cancelled.'}
                     </p>
 
-                    <div style={{ display: 'flex', gap: 10 }}>
+                    <div className="pending-actions" style={{ marginTop: 0 }}>
                       <Button
                         variant={confirming.action === 'approve' ? 'dark' : 'alert'}
                         block
@@ -333,11 +352,11 @@ export default function PendingOrders() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <div className="pending-actions">
                     <Button
                       variant="dark"
                       block
-                      disabled={busy || edited || empty}
+                      disabled={busy || edited || empty || insufficient}
                       onClick={() => setConfirming({ id: order._id, action: 'approve' })}
                     >
                       {busy ? 'Working…' : `Approve ${formatINR(total)}`}

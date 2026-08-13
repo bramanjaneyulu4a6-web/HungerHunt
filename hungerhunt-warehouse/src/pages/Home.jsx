@@ -5,7 +5,11 @@ import RefreshButton from "../components/RefreshButton";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 
 const remainingUnits = (po) =>
-  po.items.reduce((sum, item) => sum + Math.max(0, item.quantity - (item.received || 0)), 0);
+  po.items.reduce(
+    (sum, item) =>
+      sum + Math.max(0, item.quantity - (item.receivedQuantity || 0)),
+    0
+  );
 
 const Home = () => {
   const navigate = useNavigate();
@@ -17,8 +21,12 @@ const Home = () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await api.get("/purchases/open");
-      setOrders(res.data);
+      const res = await api.get("/v1/purchase-orders");
+      setOrders(
+        res.data.data.filter((order) =>
+          ["PENDING_REVIEW", "APPROVED", "PARTIALLY_RECEIVED"].includes(order.status)
+        )
+      );
     } catch (err) {
       console.error(err);
       setLoadError(true);
@@ -53,30 +61,37 @@ const Home = () => {
           Every order has been fully received. Raise a new one from the New order tab.
         </EmptyState>
       ) : (
-        orders.map((po) => (
+        orders.map((po) => {
+          const receivable = ["APPROVED", "PARTIALLY_RECEIVED"].includes(po.status);
+          return (
           <div
-            key={po._id}
-            className="wh-card wh-card--tappable"
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(`/receive/${po._id}`)}
-            onKeyDown={(e) => e.key === "Enter" && navigate(`/receive/${po._id}`)}
+            key={po.id}
+            className={`wh-card${receivable ? " wh-card--tappable" : ""}`}
+            role={receivable ? "button" : undefined}
+            tabIndex={receivable ? 0 : undefined}
+            onClick={() => receivable && navigate(`/receive/${po.id}`)}
+            onKeyDown={(e) =>
+              receivable && e.key === "Enter" && navigate(`/receive/${po.id}`)
+            }
           >
             <div className="wh-row">
               <span className="wh-product">
-                {po.supplierId?.name || "No supplier recorded"}
+                {po.supplierName || "No supplier recorded"}
               </span>
-              <span className={`wh-badge wh-badge--${po.status === "PARTIAL" ? "partial" : "new"}`}>
-                {po.status === "PARTIAL" ? "PARTLY RECEIVED" : "NEW"}
+              <span className={`wh-badge wh-badge--${po.status === "PARTIALLY_RECEIVED" ? "partial" : "new"}`}>
+                {po.status === "PENDING_REVIEW"
+                  ? "AWAITING ACCOUNTS"
+                  : po.status.replaceAll("_", " ")}
               </span>
             </div>
             <p className="wh-remaining" style={{ margin: "6px 0 0" }}>
               {po.items.length} line{po.items.length === 1 ? "" : "s"} ·{" "}
               <span className="wh-num">{remainingUnits(po)}</span> units still to come ·
-              raised {new Date(po.createdAt).toLocaleDateString()}
+              raised {new Date(po.submittedAt).toLocaleDateString()}
             </p>
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );

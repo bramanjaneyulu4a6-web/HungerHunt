@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { Banner, Skeleton } from "../components/ui";
+import { formatINR } from "../utils/format";
 
 /* Raising an order from the storeroom: the person staring at the empty shelf
    acts on it. Stock is shown per product so "running low" is visible at the
    moment of ordering; the back office still pays the invoice. */
 const NewOrder = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const draft = location.state?.replenishmentDraft;
   const [products, setProducts] = useState([]);
   const [stockByProduct, setStockByProduct] = useState({});
   const [suppliers, setSuppliers] = useState([]);
   const [supplierId, setSupplierId] = useState("");
-  const [quantities, setQuantities] = useState({});
+  const [quantities, setQuantities] = useState(() => Object.fromEntries(
+    (draft?.items || []).map((item) => [item.productId, item.suggestedQuantity])
+  ));
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -50,6 +55,10 @@ const NewOrder = () => {
   }, [products, search]);
 
   const lineCount = Object.values(quantities).filter((q) => Number(q) > 0).length;
+  const estimatedDraftTotal = (draft?.items || []).reduce(
+    (sum, item) => sum + Number(quantities[item.productId] || 0) * Number(item.estimatedUnitCost || 0),
+    0
+  );
 
   const submit = async () => {
     const items = products
@@ -63,8 +72,19 @@ const NewOrder = () => {
 
     setSubmitting(true);
     try {
-      await api.post("/purchases", { items, ...(supplierId ? { supplierId } : {}) });
-      toast.success("Order raised — the office will see it too");
+      if (draft) {
+        await api.post(`/v1/replenishment-drafts/${draft.id}/submit`, {
+          items,
+          ...(supplierId ? { supplierId } : {}),
+        });
+      } else {
+        await api.post("/v1/purchase-orders", {
+          items,
+          ...(supplierId ? { supplierId } : {}),
+          reason: "Warehouse replenishment request",
+        });
+      }
+      toast.success("Request sent to Accounts for review");
       navigate("/", { replace: true });
     } catch (err) {
       console.error(err);
@@ -84,7 +104,18 @@ const NewOrder = () => {
   return (
     <div className="wh-page">
       <h1 className="wh-title">New order</h1>
-      <p className="wh-subtitle">Current shelf count shown per product</p>
+      <p className="wh-subtitle">
+        {draft ? "Review analytics suggestions before sending to Accounts" : "Current shelf count shown per product"}
+      </p>
+
+      {draft && (
+        <Banner variant="warn" icon="✎">
+          Editable draft from {new Date(draft.analyticsAsOf).toLocaleString()}. Open orders have already been subtracted.
+          {draft.items.some((item) => Number.isFinite(item.estimatedUnitCost)) && (
+            <> Estimated value: <strong>{formatINR(estimatedDraftTotal)}</strong>.</>
+          )}
+        </Banner>
+      )}
 
       <label className="wh-field-label" htmlFor="supplier">Supplier</label>
       <select

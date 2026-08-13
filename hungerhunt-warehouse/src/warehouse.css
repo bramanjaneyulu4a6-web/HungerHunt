@@ -132,6 +132,20 @@
 }
 .wh-cta:disabled { opacity: 0.45; cursor: default; }
 
+.wh-cancel {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  margin-top: 8px;
+  color: var(--wh-red);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--wh-red) 55%, transparent);
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wh-cancel:disabled { opacity: 0.45; cursor: default; }
+
 .wh-summary {
   background: var(--wh-panel-raised);
   border: 1px solid var(--wh-line);
@@ -142,6 +156,47 @@
   color: var(--wh-muted);
 }
 .wh-summary strong { color: var(--wh-ink); }
+
+.wh-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 5px;
+  margin-bottom: 14px;
+  background: var(--wh-panel);
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+}
+.wh-view-tabs button {
+  padding: 10px 4px;
+  color: var(--wh-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wh-view-tabs button.active {
+  color: var(--wh-amber-ink);
+  background: var(--wh-amber);
+}
+
+.wh-date-range {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.wh-date-range label {
+  color: var(--wh-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.wh-date-range .wh-input {
+  margin-top: 5px;
+  padding: 10px;
+  color-scheme: dark;
+}
 
 .wh-tabbar {
   position: fixed;
@@ -161,3 +216,12 @@
 }
 .wh-tab.active { color: var(--wh-amber); }
 .wh-tab .wh-tab-icon { font-size: 20px; line-height: 1; }
+
+.wh-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.wh-metric-grid div { display: flex; flex-direction: column; }
+.wh-metric-grid strong { font-size: 26px; color: var(--wh-amber); }
+.wh-metric-grid span { color: var(--wh-muted); font-size: 12px; }

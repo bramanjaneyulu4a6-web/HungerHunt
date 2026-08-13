@@ -7,12 +7,16 @@ import Receive from "./pages/Receive";
 import NewOrder from "./pages/NewOrder";
 import Stock from "./pages/Stock";
 import History from "./pages/History";
+import Insights from "./pages/Insights";
+import Packages from "./pages/Packages";
 
 const TABS = [
   { to: "/", icon: "📥", label: "Orders" },
+  { to: "/packages", icon: "🛏️", label: "Packages" },
   { to: "/new-order", icon: "➕", label: "New order" },
   { to: "/stock", icon: "📦", label: "Stock" },
   { to: "/history", icon: "🧾", label: "History" },
+  { to: "/insights", icon: "📊", label: "Insights" },
 ];
 
 const TabBar = () => (
@@ -45,9 +49,11 @@ const App = () => (
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Shell><Home /></Shell></ProtectedRoute>} />
       <Route path="/receive/:id" element={<ProtectedRoute><Shell><Receive /></Shell></ProtectedRoute>} />
+      <Route path="/packages" element={<ProtectedRoute><Shell><Packages /></Shell></ProtectedRoute>} />
       <Route path="/new-order" element={<ProtectedRoute><Shell><NewOrder /></Shell></ProtectedRoute>} />
       <Route path="/stock" element={<ProtectedRoute><Shell><Stock /></Shell></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><Shell><History /></Shell></ProtectedRoute>} />
+      <Route path="/insights" element={<ProtectedRoute><Shell><Insights /></Shell></ProtectedRoute>} />
     </Routes>
   </BrowserRouter>
 );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import API from '../services/api';
 import { formatINR } from '../utils/format';
 import { Banner, Button, Card } from './ui';
@@ -17,6 +17,7 @@ const initialQuantities = (order) =>
   );
 
 export default function PendingApprovalCard({ order, onResolved, onStudentClick }) {
+  const approvalKey = useRef(null);
   const [quantities, setQuantities] = useState(() => initialQuantities(order));
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(null);
@@ -73,11 +74,23 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick 
       'Order updated.'
     );
 
-  const approve = () =>
-    run(
-      () => API.post(`/pending-orders/${order._id}/approve`),
+  const approve = () => {
+    if (!approvalKey.current) {
+      approvalKey.current =
+        globalThis.crypto?.randomUUID?.() ||
+        `${order._id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    return run(
+      () =>
+        API.post(
+          `/pending-orders/${order._id}/approve`,
+          {},
+          { headers: { 'Idempotency-Key': approvalKey.current } }
+        ),
       'Approved. The wallet has been charged.'
     );
+  };
 
   const decline = () =>
     run(

@@ -15,6 +15,7 @@ import Icon from '../components/Icon';
 import PendingApprovalCard from '../components/PendingApprovalCard';
 
 const BASE_TABS = [
+  { id: 'packages', icon: '📦', label: 'Packages' },
   { id: 'purchases', icon: '🛒', label: 'Purchases' },
   { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
@@ -26,6 +27,23 @@ const formatDate = (value) =>
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
+
+const formatDateTime = (value) =>
+  new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+
+const PACKAGE_LABELS = {
+  PENDING: 'Order received',
+  PACKED: 'Packed',
+  OUT_FOR_DELIVERY: 'On the way to the dorm',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled and refunded',
+};
 
 const DetailsSkeleton = () => (
   <>
@@ -272,6 +290,12 @@ export default function ChildDetails() {
     `/parent/child/${id}/recharges`,
     'recharges',
     activeTab === 'recharges'
+  );
+
+  const packages = usePagedList(
+    `/parent/child/${id}/packages`,
+    'packages',
+    activeTab === 'packages'
   );
 
   /* Saved on the switch rather than behind a button. There is one thing to
@@ -560,6 +584,67 @@ export default function ChildDetails() {
         </div>
       )}
 
+      {activeTab === 'packages' && (
+        <div role="tabpanel" id="panel-packages" aria-labelledby="tab-packages" tabIndex={0}>
+          <div className="section-heading-row">
+            <div>
+              <h2 className="section-title">Dorm Packages</h2>
+              <p className="section-copy">
+                Paid orders are delivered to the student&apos;s dorm within 48 hours.
+              </p>
+            </div>
+          </div>
+
+          {renderList(packages, {
+            empty: (
+              <EmptyState icon="📦" title="No packages yet">
+                A package will appear here after an order is paid.
+              </EmptyState>
+            ),
+            children: packages.items.map((item, i) => (
+              <AnimateIn key={item.id} index={i}>
+                <Card className="card--tight" style={{ marginBottom: 16 }}>
+                  <div className="ledger-head">
+                    <strong style={{ color: 'var(--ink)' }}>
+                      {PACKAGE_LABELS[item.status] || item.status}
+                    </strong>
+                    <span>{formatDate(item.orderedAt)}</span>
+                  </div>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
+                    {(item.items || []).map((product, idx) => (
+                      <li key={`${product.name}-${idx}`} className="ledger-row">
+                        <span>{product.name} × {product.quantity}</span>
+                        <span>{formatINR(product.price * product.quantity)}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="ledger-row">
+                    <span>{item.deliveredAt ? 'Delivered' : item.overdue ? 'Delivery overdue since' : 'Deliver by'}</span>
+                    <strong style={{ color: item.overdue ? 'var(--danger)' : 'var(--ink)' }}>
+                      {formatDateTime(item.deliveredAt || item.deliverBy)}
+                    </strong>
+                  </div>
+
+                  <div className="ledger-row">
+                    <span>Dorm room</span>
+                    <span>{item.hostelNumber || '—'}</span>
+                  </div>
+
+                  {item.receivedBy && (
+                    <div className="ledger-row">
+                      <span>Received by</span>
+                      <span>{item.receivedBy}</span>
+                    </div>
+                  )}
+                </Card>
+              </AnimateIn>
+            )),
+          })}
+        </div>
+      )}
+
       {activeTab === 'recharges' && (
         <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
           <h2 className="section-title">Recharge History</h2>
@@ -576,12 +661,18 @@ export default function ChildDetails() {
               <AnimateIn key={`${r.date}-${i}`} index={i}>
                 <Card className="card--tight" style={{ marginBottom: 16 }}>
                   <div className="ledger-head">
-                    <span>Wallet Recharge</span>
+                    <span>
+                      {r.kind === 'ORDER_CANCELLATION_REFUND'
+                        ? 'Cancelled Order Refund'
+                        : 'Wallet Recharge'}
+                    </span>
                     <span>{formatDate(r.date)}</span>
                   </div>
 
                   <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
-                    <span>Recharge Amount</span>
+                    <span>
+                      {r.kind === 'ORDER_CANCELLATION_REFUND' ? 'Refund Amount' : 'Recharge Amount'}
+                    </span>
                     <span className="amount-in">+{formatINR(r.amount)}</span>
                   </div>
 
@@ -589,6 +680,13 @@ export default function ChildDetails() {
                     <span>Previous Balance</span>
                     <span>{formatINR(r.previousBalance)}</span>
                   </div>
+
+                  {r.kind === 'ORDER_CANCELLATION_REFUND' && r.reason && (
+                    <div className="ledger-row">
+                      <span>Reason</span>
+                      <span>{r.reason}</span>
+                    </div>
+                  )}
 
                   <div className="ledger-row">
                     <span>New Balance</span>

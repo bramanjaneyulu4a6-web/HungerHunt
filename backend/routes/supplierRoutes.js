@@ -23,11 +23,17 @@ router.post("/", protectAdmin, async (req, res) => {
     const name = String(req.body.name ?? "").trim();
     if (!name) return res.status(400).json({ message: "Supplier name is required" });
 
+    const leadTimeDays = Number(req.body.leadTimeDays ?? 7);
+    if (!Number.isFinite(leadTimeDays) || leadTimeDays < 0) {
+      return res.status(400).json({ message: 'Lead time must be zero days or more.' });
+    }
+
     const supplier = await Supplier.create({
       name,
       phone: req.body.phone,
       contactPerson: req.body.contactPerson,
       notes: req.body.notes,
+      leadTimeDays,
     });
 
     res.status(201).json(supplier);
@@ -45,10 +51,20 @@ router.post("/", protectAdmin, async (req, res) => {
 
 router.put("/:id", protectAdmin, async (req, res) => {
   try {
-    const { name, phone, contactPerson, notes, active } = req.body;
+    const writable = ['name', 'phone', 'contactPerson', 'notes', 'active'];
+    const update = Object.fromEntries(
+      writable.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]])
+    );
+    if (req.body.leadTimeDays !== undefined) {
+      const leadTimeDays = Number(req.body.leadTimeDays);
+      if (!Number.isFinite(leadTimeDays) || leadTimeDays < 0) {
+        return res.status(400).json({ message: 'Lead time must be zero days or more.' });
+      }
+      update.leadTimeDays = leadTimeDays;
+    }
     const supplier = await Supplier.findByIdAndUpdate(
       req.params.id,
-      { name, phone, contactPerson, notes, active },
+      update,
       { new: true, runValidators: true }
     );
     if (!supplier) return res.status(404).json({ message: "Supplier not found" });

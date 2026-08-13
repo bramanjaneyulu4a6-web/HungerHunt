@@ -52,5 +52,6 @@ const goodsReceiptSchema = new mongoose.Schema(
 );
 
 goodsReceiptSchema.index({ purchaseId: 1, clientToken: 1 }, { unique: true });
+goodsReceiptSchema.index({ createdAt: -1 });
 
 export default mongoose.model('GoodsReceipt', goodsReceiptSchema);

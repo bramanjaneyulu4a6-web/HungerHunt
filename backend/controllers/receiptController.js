@@ -124,8 +124,20 @@ export const receiveDelivery = async (req, res) => {
 
     if (alreadyBooked) return res.json({ receipt: alreadyBooked, purchase });
 
-    if (purchase.status === "COMPLETED") {
+    if (["COMPLETED", "RECEIVED"].includes(purchase.status)) {
       return res.status(409).json({ message: "This order is already fully received." });
+    }
+
+    if (purchase.status === "PENDING_REVIEW") {
+      return res.status(409).json({
+        message: "This order must be approved by Accounts before a delivery can be received.",
+      });
+    }
+
+    if (purchase.status === "REJECTED") {
+      return res.status(409).json({
+        message: "This order was rejected. Raise a new request if inventory is still required.",
+      });
     }
 
     /* A cancel is a statement about the order's future, and this delivery
@@ -230,8 +242,14 @@ export const receiveDelivery = async (req, res) => {
       const fresh = await Purchase.findById(purchase._id);
       const done = fresh.items.every((i) => (i.received || 0) >= i.quantity);
 
-      fresh.status = done ? "COMPLETED" : "PARTIAL";
-      if (done) fresh.completedAt = new Date();
+      const versionedWorkflow = ["APPROVED", "PARTIALLY_RECEIVED"].includes(purchase.status);
+      fresh.status = versionedWorkflow
+        ? (done ? "RECEIVED" : "PARTIALLY_RECEIVED")
+        : (done ? "COMPLETED" : "PARTIAL");
+      if (done) {
+        fresh.completedAt = new Date();
+        if (versionedWorkflow) fresh.receivedAt = fresh.completedAt;
+      }
       await fresh.save();
 
       return res.status(201).json({ receipt, purchase: fresh });
@@ -285,10 +303,13 @@ export const getReceiptsForPurchase = async (req, res) => {
       return res.status(404).json({ message: "Purchase not found" });
     }
 
-    const receipts = await GoodsReceipt.find({ purchaseId: req.params.id })
+    let query = GoodsReceipt.find({ purchaseId: req.params.id })
       .populate("lines.productId")
       .populate("receivedBy", "email role")
       .sort({ createdAt: -1 });
+
+    if (typeof query.limit === 'function') query = query.limit(500);
+    const receipts = await query;
 
     res.json(receipts);
   } catch (err) {

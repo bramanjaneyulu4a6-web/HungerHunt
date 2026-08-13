@@ -10,8 +10,13 @@ const supplierSchema = new mongoose.Schema(
     contactPerson: { type: String, trim: true },
     notes: { type: String },
     active: { type: Boolean, default: true },
+    // Used by deterministic reorder calculations. Historical rows without a
+    // value use the analytics service's documented seven-day fallback.
+    leadTimeDays: { type: Number, min: 0, default: 7 },
   },
   { timestamps: true }
 );
+
+supplierSchema.index({ active: 1, name: 1 });
 
 export default mongoose.model('Supplier', supplierSchema);

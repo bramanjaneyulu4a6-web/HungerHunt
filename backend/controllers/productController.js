@@ -42,6 +42,9 @@ export const addProduct = async (req, res) => {
     if (req.body.reorderLevel !== undefined && !isWholeNonNegative(req.body.reorderLevel)) {
       return res.status(400).json({ message: "Reorder level must be a whole number of zero or more." });
     }
+    if (req.body.safetyStock !== undefined && !isWholeNonNegative(req.body.safetyStock)) {
+      return res.status(400).json({ message: "Safety stock must be a whole number of zero or more." });
+    }
 
     const product = await Product.create({
 
@@ -57,6 +60,9 @@ export const addProduct = async (req, res) => {
 
       ...(req.body.reorderLevel !== undefined
         ? { reorderLevel: Number(req.body.reorderLevel) }
+        : {}),
+      ...(req.body.safetyStock !== undefined
+        ? { safetyStock: Number(req.body.safetyStock) }
         : {}),
 
     });
@@ -135,6 +141,13 @@ export const updateProduct = async (req, res) => {
       updateData.reorderLevel = Number(req.body.reorderLevel);
     }
 
+    if (req.body.safetyStock !== undefined) {
+      if (!isWholeNonNegative(req.body.safetyStock)) {
+        return res.status(400).json({ message: "Safety stock must be a whole number of zero or more." });
+      }
+      updateData.safetyStock = Number(req.body.safetyStock);
+    }
+
     // Forms send strings; both spellings of true mean true.
     if (req.body.active !== undefined) {
       updateData.active = req.body.active === true || req.body.active === "true";
@@ -161,7 +174,6 @@ export const updateProduct = async (req, res) => {
     res.status(status).json({ error: error.message });
   }
 };
-
 
 
 

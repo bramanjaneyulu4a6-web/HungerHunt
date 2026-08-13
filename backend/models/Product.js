@@ -48,9 +48,19 @@ const productSchema = new mongoose.Schema(
   reorderLevel: {
     type: Number,
     default: 5
+  },
+
+  // Analytics suggests adjustments to this buffer but never writes it
+  // without an explicit administrative command.
+  safetyStock: {
+    type: Number,
+    min: 0,
+    default: 0
   }
 },
 { timestamps: true }
 );
+
+productSchema.index({ active: 1, name: 1 });
 
 export default mongoose.model("Product", productSchema);

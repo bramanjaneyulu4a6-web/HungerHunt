@@ -116,7 +116,7 @@ export const protectStudent = async (req, res, next) => {
   if (!payload) return denied(res, 'Not authorized');
 
   try {
-    if (!(await Student.exists({ _id: payload.id }))) {
+    if (!(await Student.exists({ _id: payload.id, active: { $ne: false } }))) {
       return denied(res, 'Not authorized');
     }
   } catch (error) {

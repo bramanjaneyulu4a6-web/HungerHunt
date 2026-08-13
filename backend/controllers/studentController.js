@@ -1,7 +1,11 @@
 import Student from '../models/Student.js';
 import Parent from "../models/Parent.js";
+import WalletAdjustment from "../models/WalletAdjustment.js";
+import PendingOrder from "../models/PendingOrder.js";
+import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
+import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
   linkQuietly,
   findStudentsByIdentity,
@@ -41,20 +45,22 @@ export const addStudent = async (req, res) => {
 
 export const getStudents = async (req, res) => {
   try {
+    const filter = req.query.all === '1' ? {} : { active: { $ne: false } };
     const page = Math.max(parseInt(req.query.page) || 0, 0);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
 
     // Paginated only when asked for, so existing callers keep the full list.
     if (page > 0 && limit > 0) {
       const [students, total] = await Promise.all([
-        Student.find().sort({ name: 1 }).skip((page - 1) * limit).limit(limit),
-        Student.countDocuments(),
+        Student.find(filter).sort({ name: 1 }).skip((page - 1) * limit).limit(limit),
+        Student.countDocuments(filter),
       ]);
 
       return res.json({ students, total, page, pages: Math.ceil(total / limit) });
     }
 
-    res.json(await Student.find());
+    const query = Student.find(filter);
+    res.json(await (typeof query.limit === 'function' ? query.limit(500) : query));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -62,7 +68,13 @@ export const getStudents = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, pickWritable(req.body), { new: true });
+    const student = await Student.findOneAndUpdate(
+      { _id: req.params.id, active: { $ne: false } },
+      pickWritable(req.body),
+      { new: true, runValidators: true }
+    );
+
+    if (!student) return res.status(404).json({ message: 'Active student not found' });
 
     // Correcting a phone number or surname can move a child to a different
     // parent — or to none.
@@ -76,12 +88,83 @@ export const updateStudent = async (req, res) => {
 
 export const deleteStudent = async (req, res) => {
   try {
-    await Student.findByIdAndDelete(req.params.id);
+    const student = await Student.findById(req.params.id).select('pocketMoney active');
+
+    if (!student || student.active === false) {
+      return res.status(404).json({ message: 'Active student not found' });
+    }
+
+    if (student.pocketMoney > 0) {
+      return res.status(409).json({
+        message: 'The wallet balance must be zero before this student can be archived.',
+      });
+    }
+
+    if (
+      await PendingOrder.exists({
+        studentId: student._id,
+        status: { $in: ['PENDING', 'PROCESSING'] },
+      })
+    ) {
+      return res.status(409).json({
+        message: 'Resolve the student’s pending approval request before archiving.',
+      });
+    }
+
+    if (await FulfillmentOrder.exists({
+      studentId: student._id,
+      status: { $in: ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY'] },
+    })) {
+      return res.status(409).json({
+        message: 'Deliver or cancel the student’s active dorm package before archiving.',
+      });
+    }
+
+    const archived = await Student.findOneAndUpdate(
+      { _id: student._id, active: { $ne: false }, pocketMoney: { $lte: 0 } },
+      {
+        $set: {
+          active: false,
+          archivedAt: new Date(),
+          archivedBy: req.staff.id,
+          isParentRegistered: false,
+        },
+      },
+      { new: true }
+    );
+
+    if (!archived) {
+      return res.status(409).json({
+        message: 'The student changed while being archived. Refresh and try again.',
+      });
+    }
+
     await unlinkStudent(req.params.id);
 
-    res.json({ message: 'Student removed successfully' });
+    res.json({ message: 'Student archived successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+export const restoreStudent = async (req, res) => {
+  try {
+    const student = await Student.findOneAndUpdate(
+      { _id: req.params.id, active: false },
+      {
+        $set: { active: true, archivedAt: null, archivedBy: null },
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: 'Archived student not found' });
+    }
+
+    await linkQuietly([student]);
+    res.json({ message: 'Student restored successfully', student });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -144,6 +227,7 @@ export const searchStudents = async (req, res) => {
     const pattern = new RegExp(escapeRegex(q), "i");
 
     const students = await Student.find({
+      active: { $ne: false },
       $or: [
         { name: pattern },
         { hostelNumber: pattern },
@@ -180,7 +264,10 @@ export const createKioskSession = async (req, res) => {
   }
 
   try {
-    const student = await Student.findOne({ admissionNumber })
+    const student = await Student.findOne({
+      admissionNumber,
+      active: { $ne: false },
+    })
       .select('name admissionNumber pocketMoney requiresParentApproval +purchasePassword');
 
     if (!student) {
@@ -212,7 +299,7 @@ export const createKioskSession = async (req, res) => {
 
 export const getStudentCount = async (req, res) => {
   try {
-    const count = await Student.countDocuments();
+    const count = await Student.countDocuments({ active: { $ne: false } });
     res.json({ totalStudents: count });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -223,7 +310,10 @@ export const getStudentCount = async (req, res) => {
 
 export const getActiveStudentCount = async (req, res) => {
   try {
-    const count = await Student.countDocuments({ pocketMoney: { $gt: 0 } });
+    const count = await Student.countDocuments({
+      active: { $ne: false },
+      pocketMoney: { $gt: 0 },
+    });
     res.json({ activeStudents: count });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -232,36 +322,109 @@ export const getActiveStudentCount = async (req, res) => {
 
 export const topUpWallet = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const amount = Number(req.body.amount);
     const studentId = req.params.id;
+    const performedBy = req.staff.id;
+    const idempotencyKey = String(
+      req.get('Idempotency-Key') || req.body.idempotencyKey || ''
+    ).trim();
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 1_000_000 ||
+      Math.round(amount * 100) / 100 !== amount
+    ) {
+      return res.status(400).json({
+        message: "Amount must be positive, at most ₹10,00,000, and have no more than two decimals.",
+      });
     }
 
-    const student = await Student.findById(studentId);
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!idempotencyKey || idempotencyKey.length > 100) {
+      return res.status(400).json({
+        message: 'A valid Idempotency-Key is required for a wallet top-up.',
+      });
     }
 
-    const previousBalance = student.pocketMoney || 0;
-    const newBalance = previousBalance + Number(amount);
+    const prior = await WalletAdjustment.findOne({ performedBy, idempotencyKey });
 
-    student.pocketMoney = newBalance;
+    if (prior) {
+      if (String(prior.studentId) !== String(studentId) || prior.amount !== amount) {
+        return res.status(409).json({
+          message: 'This Idempotency-Key was already used for a different top-up.',
+        });
+      }
 
-    if (!student.rechargeHistory) {
-      student.rechargeHistory = [];
+      return res.json({
+        message: 'Wallet top-up already applied.',
+        newBalance: prior.newBalance,
+        adjustment: prior,
+        replayed: true,
+      });
     }
 
-    student.rechargeHistory.push({
-      amount: Number(amount),
-      previousBalance,
-      newBalance,
-      date: new Date(),
+    const result = await withMongoTransaction(async (session) => {
+      const [adjustment] = session
+        ? await WalletAdjustment.create(
+            [{
+              studentId,
+              performedBy,
+              amount,
+              previousBalance: 0,
+              newBalance: 0,
+              idempotencyKey,
+            }],
+            { session }
+          )
+        : [await WalletAdjustment.create({
+            studentId,
+            performedBy,
+            amount,
+            previousBalance: 0,
+            newBalance: 0,
+            idempotencyKey,
+          })];
+
+      const student = await Student.findOneAndUpdate(
+        { _id: studentId, active: { $ne: false } },
+        { $inc: { pocketMoney: amount } },
+        { new: true, ...sessionOptions(session) }
+      );
+
+      if (!student) {
+        const notFound = new Error('Student not found');
+        notFound.status = 404;
+        throw notFound;
+      }
+
+      const newBalance = student.pocketMoney;
+      const previousBalance = newBalance - amount;
+      const historyEntry = { amount, previousBalance, newBalance, date: new Date() };
+
+      // The MongoDB driver does not support parallel operations inside one
+      // transaction, so these intentionally remain sequential.
+      await WalletAdjustment.updateOne(
+        { _id: adjustment._id },
+        { $set: { previousBalance, newBalance } },
+        sessionOptions(session)
+      );
+      await Student.updateOne(
+        { _id: studentId },
+        {
+          $push: {
+            rechargeHistory: { $each: [historyEntry], $slice: -500 },
+          },
+        },
+        sessionOptions(session)
+      );
+
+      adjustment.previousBalance = previousBalance;
+      adjustment.newBalance = newBalance;
+
+      return { student, adjustment, newBalance };
     });
 
-    await student.save();
+    const { student, adjustment, newBalance } = result;
 
     const parent = await Parent.findOne({
       studentIds: studentId,
@@ -282,10 +445,37 @@ export const topUpWallet = async (req, res) => {
     return res.json({
       message: "Wallet recharged successfully",
       newBalance,
-      rechargeHistory: student.rechargeHistory,
+      adjustment,
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      const prior = await WalletAdjustment.findOne({
+        performedBy: req.staff.id,
+        idempotencyKey: String(
+          req.get('Idempotency-Key') || req.body.idempotencyKey || ''
+        ).trim(),
+      });
+
+      if (prior) {
+        if (
+          String(prior.studentId) !== String(req.params.id) ||
+          prior.amount !== Number(req.body.amount)
+        ) {
+          return res.status(409).json({
+            message: 'This Idempotency-Key was already used for a different top-up.',
+          });
+        }
+
+        return res.json({
+          message: 'Wallet top-up already applied.',
+          newBalance: prior.newBalance,
+          adjustment: prior,
+          replayed: true,
+        });
+      }
+    }
+
     console.error("❌ topUpWallet Error:", error);
-    return res.status(500).json({ error: error.message });
+    return res.status(error.status || 500).json({ message: error.message });
   }
 };

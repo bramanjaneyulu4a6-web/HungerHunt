@@ -1,6 +1,9 @@
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import Inventory from '../models/Inventory.js';
+import { businessPeriodStart } from './businessTime.js';
+import { createFulfillmentOrder, findWeeklyFulfillment } from './fulfillment.js';
+import WalletReversal from '../models/WalletReversal.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -14,28 +17,15 @@ import Inventory from '../models/Inventory.js';
  * was fixed for, so the fix lives somewhere both callers reach instead.
  */
 
-const periodStart = (limitType) => {
-  const now = new Date();
-
-  if (limitType === "DAILY") {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  }
-
-  if (limitType === "WEEKLY") {
-    const start = new Date(now);
-    start.setDate(now.getDate() - now.getDay());
-    start.setHours(0, 0, 0, 0);
-    return start;
-  }
-
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-};
-
 // Puts stock back after a partially-applied checkout.
-const restoreStock = async (applied) => {
+const restoreStock = async (applied, session = null) => {
   for (const { productId, quantity } of applied) {
     try {
-      await Inventory.updateOne({ productId }, { $inc: { stock: quantity } });
+      await Inventory.updateOne(
+        { productId },
+        { $inc: { stock: quantity } },
+        session ? { session } : undefined
+      );
     } catch (err) {
       console.error("Stock rollback failed for product", productId, err);
     }
@@ -49,20 +39,44 @@ const restoreStock = async (applied) => {
  * HTTP response looks like. Amounts are always recomputed here from Inventory
  * rather than trusted from the caller — a request that names its own prices is
  * a request that can name its own total. */
-export const chargeCart = async ({ studentId, items }) => {
-  const student = await Student.findById(studentId);
+export const chargeCart = async ({
+  studentId,
+  items,
+  session = null,
+  sourceType = 'DIRECT_CHECKOUT',
+  sourceId,
+  idempotencyKey,
+}) => {
+  const studentQuery = Student.findById(studentId);
+  const student = session ? await studentQuery.session(session) : await studentQuery;
 
-  if (!student) {
+  if (!student || student.active === false) {
     return { ok: false, status: 404, message: 'Student record not found.' };
+  }
+
+  // Running traffic always supplies a Mongo session through
+  // withMongoTransaction. The sessionless path exists only for model-stubbed
+  // unit tests, where there is no database in which a package could live.
+  if (session) {
+    const existingWeeklyOrder = await findWeeklyFulfillment({ studentId, session });
+    if (existingWeeklyOrder) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'WEEKLY_ORDER_LIMIT',
+        message: 'This student has already placed an order this business week.',
+      };
+    }
   }
 
   let totalAmount = 0;
   const transactionItems = [];
 
   for (const orderItem of items) {
-    const inventory = await Inventory.findOne({
+    const inventoryQuery = Inventory.findOne({
       productId: orderItem.productId
     }).populate("productId");
+    const inventory = session ? await inventoryQuery.session(session) : await inventoryQuery;
 
     if (!inventory || !inventory.productId) {
       return { ok: false, status: 404, message: "Inventory record not found." };
@@ -87,28 +101,44 @@ export const chargeCart = async ({ studentId, items }) => {
       };
     }
 
-    totalAmount += inventory.productId.price * orderItem.quantity;
+    // Parent approvals carry the snapshotted price displayed in the confirm
+    // dialog. Direct checkout has no snapshot and uses the live catalogue.
+    const unitPrice = orderItem.price ?? inventory.productId.price;
+
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return { ok: false, status: 409, message: 'The approved order has an invalid price.' };
+    }
+
+    totalAmount += unitPrice * orderItem.quantity;
 
     transactionItems.push({
       productId: inventory.productId._id,
       name: inventory.productId.name,
       quantity: orderItem.quantity,
-      price: inventory.productId.price
+      price: unitPrice
     });
   }
 
   if (student.walletControl?.enabled) {
-    const spent = await Transaction.aggregate([
+    const spendingQuery = Transaction.aggregate([
       {
         $match: {
           studentId: student._id,
-          createdAt: { $gte: periodStart(student.walletControl.limitType) }
+          createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) }
         }
       },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } }
     ]);
+    const spent = session ? await spendingQuery.session(session) : await spendingQuery;
+    const reversalQuery = WalletReversal.aggregate([
+      { $match: { studentId: student._id, createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const reversals = session ? await reversalQuery.session(session) : await reversalQuery;
 
-    const alreadySpent = spent.length > 0 ? spent[0].total : 0;
+    const grossSpent = spent.length > 0 ? spent[0].total : 0;
+    const reversed = reversals.length > 0 ? reversals[0].total : 0;
+    const alreadySpent = Math.max(0, grossSpent - reversed);
     const remainingLimit = Math.max(0, student.walletControl.limitAmount - alreadySpent);
 
     if (totalAmount > remainingLimit) {
@@ -128,11 +158,11 @@ export const chargeCart = async ({ studentId, items }) => {
     const updated = await Inventory.findOneAndUpdate(
       { productId: orderItem.productId, stock: { $gte: orderItem.quantity } },
       { $inc: { stock: -orderItem.quantity } },
-      { new: true }
+      { new: true, ...(session ? { session } : {}) }
     );
 
     if (!updated) {
-      await restoreStock(applied);
+      await restoreStock(applied, session);
       return {
         ok: false,
         status: 409,
@@ -147,29 +177,47 @@ export const chargeCart = async ({ studentId, items }) => {
   const debited = await Student.findOneAndUpdate(
     { _id: studentId, pocketMoney: { $gte: totalAmount } },
     { $inc: { pocketMoney: -totalAmount } },
-    { new: true }
+    { new: true, ...(session ? { session } : {}) }
   );
 
   if (!debited) {
-    await restoreStock(applied);
+    await restoreStock(applied, session);
     return { ok: false, status: 400, message: 'Insufficient pocket money balance!' };
   }
 
   let transaction;
+  let fulfillmentOrder;
 
   try {
-    transaction = await Transaction.create({
+    const transactionDocument = {
       studentId,
       items: transactionItems,
       totalAmount,
       previousBalance: debited.pocketMoney + totalAmount,
-      remainingBalance: debited.pocketMoney
-    });
+      remainingBalance: debited.pocketMoney,
+      sourceType,
+      ...(sourceId ? { sourceId } : {}),
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    };
+
+    if (session) {
+      [transaction] = await Transaction.create([transactionDocument], { session });
+    } else {
+      transaction = await Transaction.create(transactionDocument);
+    }
+
+    if (session) {
+      fulfillmentOrder = await createFulfillmentOrder({ transaction, student, session });
+    }
   } catch (err) {
-    await restoreStock(applied);
-    await Student.updateOne({ _id: studentId }, { $inc: { pocketMoney: totalAmount } });
+    await restoreStock(applied, session);
+    await Student.updateOne(
+      { _id: studentId },
+      { $inc: { pocketMoney: totalAmount } },
+      session ? { session } : undefined
+    );
     throw err;
   }
 
-  return { ok: true, transaction, student: debited };
+  return { ok: true, transaction, fulfillmentOrder, student: debited };
 };

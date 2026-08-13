@@ -5,6 +5,7 @@ import {
   getParentDashboardDetails,
   getChildDetails,
   getChildBills,
+  getChildPackages,
   getChildRecharges,
   setPurchasePassword,
   changePurchasePassword,
@@ -31,6 +32,7 @@ router.get('/dashboard', protectParent, getParentDashboardDetails);
 router.get('/child/:id', protectParent, getChildDetails);
 router.get('/child/:id/bills', protectParent, getChildBills);
 router.get('/child/:id/recharges', protectParent, getChildRecharges);
+router.get('/child/:id/packages', protectParent, getChildPackages);
 
 router.post('/save-fcm-token', protectParent, savePushToken);
 router.post('/remove-fcm-token', protectParent, removePushToken);

@@ -69,4 +69,6 @@ const parentSchema = new mongoose.Schema(
 { timestamps: true }
 );
 
+parentSchema.index({ studentIds: 1 });
+
 export default mongoose.model("Parent", parentSchema);

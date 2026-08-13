@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
 import { purchaseCodeProblem } from "../utils/validation.js";
+import { withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -37,38 +38,47 @@ export const generateBill = async (req, res) => {
     // cannot leave a live token behind. That does cost the student a second
     // code entry when a sale loses a stock race — but that path already sends
     // them back to the cart, and a different cart needs its own token.
-    const authorization = await consumeAuthorization({
-      token: purchaseToken,
-      studentId,
-      items,
-    });
+    const outcome = await withMongoTransaction(async (session) => {
+      const authorization = await consumeAuthorization({
+        token: purchaseToken,
+        studentId,
+        items,
+        session,
+      });
 
-    if (!authorization.ok) {
-      const grace = authorization.reason === 'missing' && unverifiedBillsAccepted();
+      if (!authorization.ok) {
+        const grace = authorization.reason === 'missing' && unverifiedBillsAccepted();
 
-      if (!grace) {
-        // Not 401: the kiosk signs itself out on one, and this session is
-        // perfectly good — it is this charge that is unauthorised.
-        return res.status(403).json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
+        if (!grace) return { authorization };
+
+        console.warn(
+          `Charged student ${studentId} on a bill carrying no purchase authorization.` +
+          ` Accepted until ${graceUntil().toISOString()} — this client is running a build` +
+          ` from before verify-payment issued a token.`
+        );
       }
 
-      console.warn(
-        `Charged student ${studentId} on a bill carrying no purchase authorization.` +
-        ` Accepted until ${graceUntil().toISOString()} — this client is running a build` +
-        ` from before verify-payment issued a token.`
-      );
+      // Authorization claim, inventory, wallet and ledger commit together.
+      return {
+        charge: await chargeCart({ studentId, items, session }),
+      };
+    });
+
+    if (outcome.authorization) {
+      // Not 401: the kiosk signs itself out on one, and this session is
+      // perfectly good — it is this charge that is unauthorised.
+      return res.status(403).json({
+        message: AUTHORIZATION_MESSAGES[outcome.authorization.reason],
+      });
     }
 
-    // Pricing, the limit check, the conditional stock and wallet writes and
-    // their rollbacks all live in chargeCart, which the approval flow charges
-    // through as well. Both routes end at the same money.
-    const charge = await chargeCart({ studentId, items });
+    const { charge } = outcome;
 
     if (!charge.ok) {
       return res.status(charge.status).json({ message: charge.message });
     }
 
-    const { transaction, student } = charge;
+    const { transaction, fulfillmentOrder, student } = charge;
 
     const parent = await Parent.findOne({ studentIds: studentId });
 
@@ -86,9 +96,9 @@ export const generateBill = async (req, res) => {
       );
     }
 
-    res.status(201).json({ message: 'Checkout successful!', transaction });
+    res.status(201).json({ message: 'Checkout successful!', transaction, fulfillmentOrder });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ message: error.message });
   }
 };
 
@@ -111,7 +121,7 @@ export const getAllTransactions = async (req, res) => {
       return res.json({ transactions, total, page, pages: Math.ceil(total / limit) });
     }
 
-    res.json(await query);
+    res.json(await query.limit(500));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -170,7 +180,7 @@ export const verifyPayment = async (req, res) => {
 
     const student = await Student.findById(studentId).select('+purchasePassword');
 
-    if (!student) {
+    if (!student || student.active === false) {
       return res.status(404).json({ message: "Student not found" });
     }
 

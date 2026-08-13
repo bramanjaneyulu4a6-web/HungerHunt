@@ -1,8 +1,11 @@
+import FulfillmentOrder from "../models/FulfillmentOrder.js";
 import Student from "../models/Student.js";
 import Transaction from "../models/Transaction.js";
+import WalletReversal from '../models/WalletReversal.js';
 import Parent from "../models/Parent.js";
 
 import bcrypt from "bcryptjs";
+import { isOverdue } from "../src/domain/fulfillment/overdue.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
@@ -41,6 +44,7 @@ export const registerParent = async (req, res) => {
     const kids = await Student.find({
       fatherName,
       parentPhoneNumber: phone,
+      active: { $ne: false },
     });
 
     if (kids.length === 0) {
@@ -68,7 +72,7 @@ export const registerParent = async (req, res) => {
     });
 
     await Student.updateMany(
-      { fatherName, parentPhoneNumber: phone },
+      { fatherName, parentPhoneNumber: phone, active: { $ne: false } },
       { isParentRegistered: true }
     );
 
@@ -333,16 +337,80 @@ export const getChildRecharges = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    /* Recharges are embedded in the student document rather than a collection
-       of their own, so the page is cut here rather than by the database. They
-       are counted in top-ups per term, not purchases per day, so the array is
-       small — and this is still the difference between sending twenty entries
-       and sending all of them. */
-    const all = (student.rechargeHistory || []).slice().reverse();
+    const refunds = await WalletReversal.find({ studentId: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+    const all = [
+      ...(student.rechargeHistory || []).slice().reverse().map((entry) => ({
+        ...(entry.toObject?.() || entry),
+        kind: 'TOP_UP',
+      })),
+      ...refunds.map((entry) => ({
+        _id: entry._id,
+        kind: 'ORDER_CANCELLATION_REFUND',
+        amount: entry.amount,
+        previousBalance: entry.previousBalance,
+        newBalance: entry.newBalance,
+        date: entry.createdAt,
+        reason: entry.reason,
+      })),
+    ].sort((left, right) => new Date(right.date) - new Date(left.date));
 
     res.json({
       recharges: all.slice(skip, skip + limit),
       ...paged(all.length, page, limit)
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* What the parent is shown about a package, and no more.
+ *
+ * The order snapshot also carries the packing staff, the dispatching staff,
+ * the transition trail and the internal operational notes. None of that is a
+ * parent's business — the question this screen answers is "where is my child's
+ * package and when is it due", so it is answered with states, times and the
+ * short receiver note, and the staff accounts stay inside the storeroom.
+ *
+ * deliverBy is read from the order rather than recalculated here: it was
+ * stored at payment for exactly this reason, so the deadline the parent reads
+ * is the deadline the storeroom is working to, and no client has to know the
+ * 48-hour rule or the business timezone to display it. */
+const parentPackageView = (order, now) => ({
+  id: String(order._id),
+  status: order.status,
+  items: (order.items || []).map(({ name, quantity, price }) => ({ name, quantity, price })),
+  totalAmount: order.totalAmount,
+  hostelNumber: order.studentSnapshot?.hostelNumber || "",
+  orderedAt: order.orderedAt,
+  deliverBy: order.deliverBy,
+  packedAt: order.packedAt || null,
+  dispatchedAt: order.dispatchedAt || null,
+  deliveredAt: order.deliveredAt || null,
+  receivedBy: order.proofOfDelivery?.receivedBy || "",
+  overdue: isOverdue(order, now),
+});
+
+export const getChildPackages = async (req, res) => {
+  try {
+    if (!(await assertOwnsStudent(req, res, req.params.id))) return;
+
+    const { page, limit, skip } = readPaging(req);
+    const filter = { studentId: req.params.id };
+
+    const [orders, total] = await Promise.all([
+      FulfillmentOrder.find(filter).sort({ orderedAt: -1 }).skip(skip).limit(limit).lean(),
+      FulfillmentOrder.countDocuments(filter)
+    ]);
+
+    const now = new Date();
+
+    res.json({
+      packages: orders.map((order) => parentPackageView(order, now)),
+      ...paged(total, page, limit)
     });
 
   } catch (error) {

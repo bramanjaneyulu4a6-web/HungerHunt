@@ -122,9 +122,9 @@ describe('only the five identity fields are writable', () => {
     stubLinking();
 
     let written;
-    mock.method(Student, 'findByIdAndUpdate', async (id, update) => {
+    mock.method(Student, 'findOneAndUpdate', async (filter, update) => {
       written = update;
-      return { _id: id, ...update };
+      return { _id: filter._id, ...update };
     });
 
     const res = await call(`/api/students/${STUDENT_ID}`, 'PUT', { ...IDENTITY, ...SMUGGLED });

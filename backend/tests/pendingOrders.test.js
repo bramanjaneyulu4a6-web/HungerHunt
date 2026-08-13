@@ -276,7 +276,7 @@ describe('the console cannot raise a request for an archived product', () => {
   // check only sees the lines actually being priced, and by then that one
   // is gone.
   test('but a parent can still remove the offending line from an existing order', async () => {
-    mock.method(PendingOrder, 'findOne', async () => ({
+    const order = {
       _id: ORDER_ID,
       parentId: PARENT_ID,
       status: 'PENDING',
@@ -286,6 +286,11 @@ describe('the console cannot raise a request for an archived product', () => {
         { productId: '507f191e810c19729de860ff', name: 'Chips', quantity: 1, price: 15 },
       ],
       save: async function () { return this; },
+    };
+    mock.method(PendingOrder, 'findOne', async () => order);
+    mock.method(PendingOrder, 'findOneAndUpdate', async (_filter, update) => ({
+      ...order,
+      ...update.$set,
     }));
     stockedAt(20, 10);
 
@@ -391,7 +396,8 @@ describe('one unanswered request does not lock a student out for good', () => {
     const res = await send(
       'POST',
       `/api/pending-orders/${ORDER_ID}/approve`,
-      parentToken
+      parentToken,
+      { idempotencyKey: 'expiry-test-key' }
     );
 
     assert.equal(res.status, 410);
@@ -399,15 +405,22 @@ describe('one unanswered request does not lock a student out for good', () => {
 });
 
 describe('a parent may cut an order down but not build it up', () => {
-  const openOrder = () =>
-    mock.method(PendingOrder, 'findOne', async () => ({
+  const openOrder = () => {
+    const order = {
       _id: ORDER_ID,
       parentId: PARENT_ID,
       status: 'PENDING',
       expiresAt: new Date(Date.now() + 60_000),
       items: [{ productId: PRODUCT_ID, name: 'Samosa', quantity: 2, price: 20 }],
       save: async function () { return this; },
+    };
+
+    mock.method(PendingOrder, 'findOne', async () => order);
+    mock.method(PendingOrder, 'findOneAndUpdate', async (_filter, update) => ({
+      ...order,
+      ...update.$set,
     }));
+  };
 
   test('a product the till never rang up cannot be added', async () => {
     openOrder();

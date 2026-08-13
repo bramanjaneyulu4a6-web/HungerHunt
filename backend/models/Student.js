@@ -7,6 +7,13 @@ const studentSchema = new mongoose.Schema({
   grade: { type: String, required: true },
   parentPhoneNumber: { type: String, required: true },
 
+  // Student records are referenced by financial ledgers and approvals, so
+  // removal is an archive transition. Legacy rows without this field remain
+  // active until explicitly archived.
+  active: { type: Boolean, default: true, index: true },
+  archivedAt: { type: Date, default: null },
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+
   // The school's own ID for the student, imported from its roll. It is what a
   // student types to open a kiosk session, so it is unique — and sparse,
   // because every row from before the field exists has none, and two nulls
@@ -102,7 +109,7 @@ walletControl: {
 
 // Prevent duplicate entries for the exact same student setup
 studentSchema.index({ name: 1, fatherName: 1, parentPhoneNumber: 1 }, { unique: true });
+studentSchema.index({ active: 1, name: 1 });
 
 export default mongoose.model('Student', studentSchema);
-
 

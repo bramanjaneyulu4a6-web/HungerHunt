@@ -2,8 +2,10 @@ import PendingOrder, { pendingOrderExpiry } from "../models/PendingOrder.js";
 import Student from "../models/Student.js";
 import Parent from "../models/Parent.js";
 import Inventory from "../models/Inventory.js";
+import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
+import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -31,6 +33,16 @@ const asItems = (items) =>
 
 const isLive = (order) =>
   order.status === "PENDING" && order.expiresAt > new Date();
+
+class ApprovalError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const approvalKeyFrom = (req) =>
+  String(req.get("Idempotency-Key") || req.body?.idempotencyKey || "").trim();
 
 // A request nobody answered is not pending any more, whatever the column says.
 // Writing it down at the moment someone looks keeps the record honest without a
@@ -160,7 +172,7 @@ export const createPendingOrder = async (req, res) => {
 
     const student = await Student.findById(studentId);
 
-    if (!student) {
+    if (!student || student.active === false) {
       return res.status(404).json({ message: "Student record not found." });
     }
 
@@ -206,14 +218,27 @@ export const createPendingOrder = async (req, res) => {
       return res.status(priced.status).json({ message: priced.message });
     }
 
-    const pendingOrder = await PendingOrder.create({
-      studentId: student._id,
-      parentId: parent._id,
-      items: priced.orderItems,
-      totalAmount: priced.totalAmount,
-      expiresAt: pendingOrderExpiry(),
-      raisedBy: req.staff?.id ?? null,
-    });
+    let pendingOrder;
+
+    try {
+      pendingOrder = await PendingOrder.create({
+        studentId: student._id,
+        parentId: parent._id,
+        items: priced.orderItems,
+        totalAmount: priced.totalAmount,
+        expiresAt: pendingOrderExpiry(),
+        raisedBy: req.staff?.id ?? null,
+      });
+    } catch (err) {
+      // The unique active-order index closes the race between the friendly
+      // pre-check above and two tills creating at the same instant.
+      if (err?.code === 11000) {
+        return res.status(409).json({
+          message: `${student.name} already has an order waiting for approval.`,
+        });
+      }
+      throw err;
+    }
 
     // Not awaited: the counter gets its answer now. sendToParent never rejects.
     sendToParent(
@@ -330,51 +355,150 @@ export const updatePendingOrder = async (req, res) => {
       return res.status(priced.status).json({ message: priced.message });
     }
 
-    order.items = priced.orderItems;
-    order.totalAmount = priced.totalAmount;
+    const updated = await PendingOrder.findOneAndUpdate(
+      {
+        _id: order._id,
+        parentId: req.parent.id,
+        status: "PENDING",
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { items: priced.orderItems, totalAmount: priced.totalAmount } },
+      { new: true, runValidators: true }
+    );
 
-    await order.save();
+    if (!updated) {
+      return res.status(409).json({
+        message: "This order changed while it was being edited. Refresh and try again.",
+      });
+    }
 
-    res.json({ message: "Order updated.", order });
+    res.json({ message: "Order updated.", order: updated });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
 export const approvePendingOrder = async (req, res) => {
+  let claimedOrderId = null;
+  let committed = false;
+
   try {
-    const order = await loadAnswerable(req, res);
-    if (!order) return;
+    const approvalKey = approvalKeyFrom(req);
 
-    // Priced and charged against live inventory, not against the totals stored
-    // on the order: between the till and this tap, stock and prices move.
-    const charge = await chargeCart({
-      studentId: order.studentId,
-      items: order.items.map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity,
-      })),
-    });
-
-    if (!charge.ok) {
-      // The order stays open on a refusal — a balance too low today may be
-      // enough tomorrow, and the parent still has until it expires.
-      return res.status(charge.status).json({ message: charge.message });
+    if (!approvalKey || approvalKey.length > 100) {
+      return res.status(400).json({
+        message: "A valid Idempotency-Key is required to approve an order.",
+      });
     }
 
-    order.status = "APPROVED";
-    order.approvedAt = new Date();
+    const existing = await PendingOrder.findOne({
+      _id: req.params.id,
+      parentId: req.parent.id,
+    });
 
-    await order.save();
+    if (!existing) {
+      return res.status(404).json({ message: "This order could not be found." });
+    }
 
-    const student = charge.student;
+    if (existing.status === "APPROVED" && existing.approvalKey === approvalKey) {
+      const transaction = existing.transactionId
+        ? await Transaction.findById(existing.transactionId)
+        : await Transaction.findOne({ sourceType: "PARENT_APPROVAL", sourceId: existing._id });
+
+      return res.json({ message: "Order already approved.", transaction, replayed: true });
+    }
+
+    await expireIfLapsed(existing);
+
+    if (existing.status === "EXPIRED") {
+      return res.status(410).json({ message: "This request expired before it was answered." });
+    }
+
+    if (existing.status !== "PENDING") {
+      return res.status(409).json({
+        message:
+          existing.status === "PROCESSING"
+            ? "This order is already being processed. Retry with the same key shortly."
+            : `This order has already been ${existing.status.toLowerCase()}.`,
+      });
+    }
+
+    const result = await withMongoTransaction(async (session) => {
+      const now = new Date();
+      const order = await PendingOrder.findOneAndUpdate(
+        {
+          _id: existing._id,
+          parentId: req.parent.id,
+          status: "PENDING",
+          expiresAt: { $gt: now },
+        },
+        {
+          $set: {
+            status: "PROCESSING",
+            approvalKey,
+            processingAt: now,
+          },
+        },
+        { new: true, runValidators: true, ...sessionOptions(session) }
+      );
+
+      if (!order) {
+        throw new ApprovalError(
+          409,
+          "This order changed while approval was being processed. Refresh and try again."
+        );
+      }
+
+      claimedOrderId = order._id;
+
+      // The price is the immutable snapshot the parent saw. Stock and product
+      // availability are still checked live by chargeCart.
+      const charge = await chargeCart({
+        studentId: order.studentId,
+        items: order.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        session,
+        sourceType: "PARENT_APPROVAL",
+        sourceId: order._id,
+        idempotencyKey: approvalKey,
+      });
+
+      if (!charge.ok) {
+        throw new ApprovalError(charge.status, charge.message);
+      }
+
+      const approved = await PendingOrder.findOneAndUpdate(
+        { _id: order._id, status: "PROCESSING", approvalKey },
+        {
+          $set: {
+            status: "APPROVED",
+            approvedAt: new Date(),
+            transactionId: charge.transaction._id,
+          },
+          $unset: { processingAt: 1 },
+        },
+        { new: true, runValidators: true, ...sessionOptions(session) }
+      );
+
+      if (!approved) {
+        throw new ApprovalError(409, "The order could not be finalized safely.");
+      }
+
+      return { order: approved, ...charge };
+    });
+
+    committed = true;
+    const { order, student, transaction, fulfillmentOrder } = result;
     const parent = await Parent.findById(order.parentId);
 
     if (parent) {
       sendToParent(
         parent,
         "Order approved",
-        `₹${charge.transaction.totalAmount} spent. Balance ₹${student.pocketMoney}.`,
+        `₹${transaction.totalAmount} spent. Balance ₹${student.pocketMoney}.`,
         {
           type: "ORDER_APPROVED",
           orderId: order._id.toString(),
@@ -385,10 +509,25 @@ export const approvePendingOrder = async (req, res) => {
 
     res.json({
       message: "Order approved.",
-      transaction: charge.transaction,
+      transaction,
+      fulfillmentOrder,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    // With MongoDB this write is normally unnecessary because the transaction
+    // abort restores PENDING. It also makes the deliberately sessionless unit
+    // test path, and a deployment accidentally connected to standalone Mongo,
+    // fail open for a safe retry instead of leaving PROCESSING forever.
+    if (claimedOrderId && !committed) {
+      await PendingOrder.updateOne(
+        { _id: claimedOrderId, status: "PROCESSING" },
+        {
+          $set: { status: "PENDING" },
+          $unset: { approvalKey: 1, processingAt: 1 },
+        }
+      ).catch(() => {});
+    }
+
+    res.status(err.status || 500).json({ message: err.message });
   }
 };
 
@@ -397,10 +536,22 @@ export const rejectPendingOrder = async (req, res) => {
     const order = await loadAnswerable(req, res);
     if (!order) return;
 
-    order.status = "REJECTED";
-    order.rejectedAt = new Date();
+    const rejected = await PendingOrder.findOneAndUpdate(
+      {
+        _id: order._id,
+        parentId: req.parent.id,
+        status: "PENDING",
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { status: "REJECTED", rejectedAt: new Date() } },
+      { new: true, runValidators: true }
+    );
 
-    await order.save();
+    if (!rejected) {
+      return res.status(409).json({
+        message: "This order changed while it was being rejected. Refresh and try again.",
+      });
+    }
 
     res.json({ message: "Order rejected." });
   } catch (err) {

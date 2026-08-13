@@ -9,6 +9,7 @@ import {
   getStudentCount,
   getActiveStudentCount,
   topUpWallet,
+  restoreStudent,
   createKioskSession
 } from "../controllers/studentController.js";
 
@@ -44,6 +45,7 @@ router.route('/:id')
   .delete(protectAdmin, deleteStudent);
 
 router.post('/bulk', protectAdmin, bulkImportStudents);
+router.post('/:id/restore', protectAdmin, restoreStudent);
 
 router.put('/:id/topup', protectAdmin, topUpWallet);
 

@@ -54,10 +54,13 @@ export const issueAuthorization = async ({ studentId, items }) => {
 //
 // Returns a reason rather than a message so the caller decides what a bill
 // with no token at all means — which changes on the grace date below.
-export const consumeAuthorization = async ({ token, studentId, items }) => {
+export const consumeAuthorization = async ({ token, studentId, items, session = null }) => {
   if (!token || typeof token !== 'string') return { ok: false, reason: 'missing' };
 
-  const record = await PurchaseAuthorization.findOneAndDelete({ token });
+  const record = await PurchaseAuthorization.findOneAndDelete(
+    { token },
+    session ? { session } : undefined
+  );
 
   if (!record) return { ok: false, reason: 'unknown' };
   if (record.expiresAt.getTime() <= Date.now()) return { ok: false, reason: 'expired' };

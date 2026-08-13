@@ -74,7 +74,7 @@ const pendingOrderSchema = new mongoose.Schema(
     // status the reader derives cannot drift from the date beside it.
     status: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED", "EXPIRED"],
+      enum: ["PENDING", "PROCESSING", "APPROVED", "REJECTED", "EXPIRED"],
       default: "PENDING",
       index: true,
     },
@@ -97,6 +97,18 @@ const pendingOrderSchema = new mongoose.Schema(
     approvedAt: Date,
 
     rejectedAt: Date,
+
+    // A client reuses this key when an approval response is lost. Together
+    // with the atomic PENDING -> PROCESSING claim it makes one approval one
+    // charge across double taps, retries and multiple devices.
+    approvalKey: { type: String, maxlength: 100 },
+
+    transactionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Transaction",
+    },
+
+    processingAt: Date,
   },
   {
     timestamps: true,
@@ -107,5 +119,15 @@ const pendingOrderSchema = new mongoose.Schema(
 // requests, newest first".
 pendingOrderSchema.index({ studentId: 1, status: 1 });
 pendingOrderSchema.index({ parentId: 1, status: 1, createdAt: -1 });
+pendingOrderSchema.index(
+  { studentId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      $or: [{ status: "PENDING" }, { status: "PROCESSING" }],
+    },
+    name: "one_pending_order_per_student",
+  }
+);
 
 export default mongoose.model("PendingOrder", pendingOrderSchema);

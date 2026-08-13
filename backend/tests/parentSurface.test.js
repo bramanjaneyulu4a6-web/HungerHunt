@@ -18,6 +18,7 @@ const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
+const WalletReversal = (await import('../models/WalletReversal.js')).default;
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -144,6 +145,9 @@ describe('child history comes a page at a time', () => {
 
   test('recharges come newest first', async () => {
     ownsTheStudent();
+    mock.method(WalletReversal, 'find', () => ({
+      sort: () => ({ limit: () => ({ lean: async () => [] }) }),
+    }));
     mock.method(Student, 'findById', () => ({
       select: async () => ({
         rechargeHistory: [{ amount: 1 }, { amount: 2 }, { amount: 3 }],

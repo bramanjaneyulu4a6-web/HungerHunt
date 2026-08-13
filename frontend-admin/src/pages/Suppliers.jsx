@@ -10,7 +10,7 @@ import {
   Skeleton,
 } from "../components/ui";
 
-const EMPTY_FORM = { name: "", phone: "", contactPerson: "", notes: "" };
+const EMPTY_FORM = { name: "", phone: "", contactPerson: "", notes: "", leadTimeDays: "7" };
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -25,7 +25,7 @@ const Suppliers = () => {
     fetchSuppliers();
   }, []);
 
-  const fetchSuppliers = async () => {
+  async function fetchSuppliers() {
     setLoading(true);
     setLoadError(false);
 
@@ -40,7 +40,7 @@ const Suppliers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
@@ -54,6 +54,7 @@ const Suppliers = () => {
       phone: supplier.phone || "",
       contactPerson: supplier.contactPerson || "",
       notes: supplier.notes || "",
+      leadTimeDays: String(supplier.leadTimeDays ?? 7),
     });
     setEditingId(supplier._id);
     setIsFormOpen(true);
@@ -75,6 +76,7 @@ const Suppliers = () => {
         phone: form.phone.trim(),
         contactPerson: form.contactPerson.trim(),
         notes: form.notes.trim(),
+        leadTimeDays: Number(form.leadTimeDays),
       };
 
       if (editingId) {
@@ -115,10 +117,10 @@ const Suppliers = () => {
   };
 
   return (
-    <div className="page">
+    <div className="page warehouse-page">
       <PageHeader
-        title="Suppliers"
-        subtitle="Who the school buys from. Deactivate rather than delete — orders keep their history."
+        title="Supplier Directory"
+        subtitle="Manage procurement contacts and delivery lead times used by inventory recommendations."
         actions={<Button onClick={openAdd}>+ Add Supplier</Button>}
       />
 
@@ -152,6 +154,7 @@ const Suppliers = () => {
                 <th>Name</th>
                 <th>Contact Person</th>
                 <th>Phone</th>
+                <th>Lead time</th>
                 <th>Notes</th>
                 <th style={{ width: 200 }}>Actions</th>
               </tr>
@@ -169,6 +172,7 @@ const Suppliers = () => {
                   </td>
                   <td data-label="Contact">{s.contactPerson || "—"}</td>
                   <td data-label="Phone">{s.phone || "—"}</td>
+                  <td data-label="Lead time"><Badge variant="neutral">{s.leadTimeDays ?? 7} days</Badge></td>
                   <td data-label="Notes">{s.notes || ""}</td>
                   <td data-label="Actions">
                     <div style={{ display: "flex", gap: 8 }}>
@@ -231,6 +235,21 @@ const Suppliers = () => {
               style={{ marginBottom: 14 }}
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+
+            <label className="field-label" htmlFor="supplier-lead-time">
+              Delivery Lead Time (days)
+            </label>
+            <input
+              id="supplier-lead-time"
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              style={{ marginBottom: 14 }}
+              required
+              value={form.leadTimeDays}
+              onChange={(e) => setForm({ ...form, leadTimeDays: e.target.value })}
             />
 
             <label className="field-label" htmlFor="supplier-notes">

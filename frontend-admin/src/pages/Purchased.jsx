@@ -27,7 +27,7 @@ const Purchased = () => {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  async function loadData() {
     setLoading(true);
     setLoadError(false);
 
@@ -69,7 +69,7 @@ const Purchased = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleItemChange = (purchaseId, productId, key, value) => {
     setNewPurchases((prev) =>

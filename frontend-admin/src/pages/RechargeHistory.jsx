@@ -23,7 +23,7 @@ const RechargeHistory = () => {
     fetchStudents();
   }, []);
 
-  const fetchStudents = async () => {
+  async function fetchStudents() {
     setLoading(true);
     setLoadError(false);
 
@@ -36,7 +36,7 @@ const RechargeHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const filteredStudents = students.filter((st) => {
     const query = searchQuery.toLowerCase().trim();

@@ -50,12 +50,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # frontend-admin is absent on purpose: `eslint .` reports 10 errors
-        # there today, mostly react-hooks rules. A job parked on red teaches
-        # people to skim past the whole workflow, so it joins this list in the
-        # commit that clears them rather than before. The backend has no eslint
-        # config at all and so has nothing to run.
-        app: [frontend-parent, hungerhunt-kiosk, hungerhunt-warehouse]
+        # The backend has no eslint config yet; every shipped frontend is held
+        # to zero warnings here.
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

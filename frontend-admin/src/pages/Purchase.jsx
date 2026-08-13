@@ -23,7 +23,7 @@ const Purchase = () => {
       .catch((err) => console.error(err));
   }, []);
 
-  const fetchProducts = async () => {
+  async function fetchProducts() {
     setLoading(true);
     setLoadError(false);
 
@@ -54,7 +54,7 @@ const Purchase = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const updateQuantity = (id, value) => {
     setProducts((prev) =>

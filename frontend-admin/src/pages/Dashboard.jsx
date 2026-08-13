@@ -70,12 +70,13 @@ const Dashboard = () => {
   // Refresh transaction history every 30 seconds, plus whenever the window
   // regains focus.
   useEffect(() => {
-    fetchHistory();
+    const initial = setTimeout(fetchHistory, 0);
 
     const interval = setInterval(fetchHistory, 30000);
     window.addEventListener("focus", fetchHistory);
 
     return () => {
+      clearTimeout(initial);
       clearInterval(interval);
       window.removeEventListener("focus", fetchHistory);
     };

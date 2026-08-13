@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
@@ -13,7 +13,6 @@ const Billing = () => {
   const [products, setProducts] = useState([]);
   const [catalogError, setCatalogError] = useState(false);
   const [cart, setCart] = useState([]);
-  const [invoiceTotal, setInvoiceTotal] = useState(0);
   const [isSearched, setIsSearched] = useState(false);
   const [paying, setPaying] = useState(false);
 
@@ -26,14 +25,14 @@ const Billing = () => {
   // Staged quantities before appending to cart: { [productId]: quantity }
   const [stagedQuantities, setStagedQuantities] = useState({});
 
-  useEffect(() => {
+  const invoiceTotal = useMemo(() => {
     // A cleared quantity box prices as 1, which is what checkout posts and what
     // the steppers clamp to. Treating it as 0 here understated the bill.
     const total = cart.reduce(
       (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
       0
     );
-    setInvoiceTotal(total);
+    return total;
   }, [cart]);
 
   const fetchCatalog = async () => {

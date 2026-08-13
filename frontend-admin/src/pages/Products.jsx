@@ -17,6 +17,7 @@ const EMPTY_FORM = {
   unit: '',
   price: '',
   reorderLevel: '5',
+  safetyStock: '0',
   image: null,
 };
 
@@ -45,7 +46,7 @@ const Products = () => {
     fetchUnits();
   }, []);
 
-  const fetchProducts = async () => {
+  async function fetchProducts() {
     setLoading(true);
     setLoadError(false);
 
@@ -58,25 +59,25 @@ const Products = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const fetchStockGroups = async () => {
+  async function fetchStockGroups() {
     try {
       const res = await api.get('/stock-groups');
       setStockGroups(res.data);
     } catch (error) {
       console.error(error);
     }
-  };
+  }
 
-  const fetchUnits = async () => {
+  async function fetchUnits() {
     try {
       const res = await api.get('/units');
       setUnits(res.data);
     } catch (error) {
       console.error(error);
     }
-  };
+  }
 
   const openProductModal = () => {
     clearForm();
@@ -98,6 +99,7 @@ const Products = () => {
       data.append('unit', form.unit);
       data.append('price', form.price);
       data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
+      data.append('safetyStock', form.safetyStock === '' ? '0' : form.safetyStock);
       if (form.image) {
         data.append('image', form.image);
       }
@@ -128,6 +130,7 @@ const Products = () => {
       unit: product.unit?._id || '',
       price: product.price ?? '',
       reorderLevel: String(product.reorderLevel ?? 5),
+      safetyStock: String(product.safetyStock ?? 0),
       image: null,
     });
     setIsProductOpen(true);
@@ -228,7 +231,7 @@ const Products = () => {
   );
 
   return (
-    <div className="page">
+    <div className="page warehouse-page">
       <PageHeader
         title="Product Catalog"
         subtitle="Manage products, stock groups and measurement units."
@@ -295,7 +298,8 @@ const Products = () => {
                 <th>Stock Group</th>
                 <th>Unit</th>
                 <th style={{ width: 120 }}>Price</th>
-                <th style={{ width: 130 }}>Reorder level</th>
+                <th style={{ width: 130 }}>Reorder point</th>
+                <th style={{ width: 120 }}>Safety stock</th>
                 <th style={{ width: 180 }}>Actions</th>
               </tr>
             </thead>
@@ -332,6 +336,7 @@ const Products = () => {
                     {formatINR(p.price || 0)}
                   </td>
                   <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
+                  <td data-label="Safety stock">{p.safetyStock ?? 0}</td>
                   <td data-label="Actions">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button
@@ -474,6 +479,22 @@ const Products = () => {
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-safety-stock">
+                  Safety Stock Buffer
+                </label>
+                <input
+                  id="product-safety-stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input"
+                  required
+                  value={form.safetyStock}
+                  onChange={(e) => setForm({ ...form, safetyStock: e.target.value })}
                 />
               </div>
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
 import api from '../utils/api';
 import { formatINR } from '../utils/format';
 import {
@@ -31,6 +30,10 @@ const SORTABLE_COLUMNS = [
   { key: 'pocketMoney', label: 'Wallet Balance' },
 ];
 
+const newIdempotencyKey = () =>
+  globalThis.crypto?.randomUUID?.() ||
+  `topup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 const Students = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,7 @@ const Students = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [topupAmount, setTopupAmount] = useState('');
   const [topupStudent, setTopupStudent] = useState(null);
+  const [topupKey, setTopupKey] = useState('');
   const [topupSaving, setTopupSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -51,7 +55,7 @@ const Students = () => {
     fetchStudents();
   }, []);
 
-  const fetchStudents = async () => {
+  async function fetchStudents() {
     setLoading(true);
     setLoadError(false);
 
@@ -64,7 +68,7 @@ const Students = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -103,6 +107,7 @@ const Students = () => {
 
     reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx');
         const workbook = XLSX.read(evt.target.result, { type: 'binary' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(sheet);
@@ -142,11 +147,11 @@ const Students = () => {
       return;
     }
 
-    if (!window.confirm('Remove this student permanently?')) return;
+    if (!window.confirm('Archive this student? Their financial history will be retained.')) return;
 
     try {
       await api.delete(`/students/${id}`);
-      toast.success('Student removed');
+      toast.success('Student archived');
       fetchStudents();
     } catch (error) {
       console.error(error);
@@ -166,12 +171,15 @@ const Students = () => {
     setTopupSaving(true);
 
     try {
-      const res = await api.put(`/students/${topupStudent}/topup`, {
-        amount: Number(topupAmount),
-      });
+      const res = await api.put(
+        `/students/${topupStudent}/topup`,
+        { amount: Number(topupAmount) },
+        { headers: { 'Idempotency-Key': topupKey } }
+      );
 
       toast.success(`Wallet updated — new balance ${formatINR(res.data.newBalance)}`);
       setTopupStudent(null);
+      setTopupKey('');
       setTopupAmount('');
       fetchStudents();
     } catch (error) {
@@ -531,6 +539,7 @@ const Students = () => {
                             }}
                             onClick={() => {
                               setTopupStudent(st._id);
+                              setTopupKey(newIdempotencyKey());
                               setTopupAmount('');
                             }}
                           >

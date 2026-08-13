@@ -21,6 +21,7 @@ const Inventory = () => {
   const [editPrice, setEditPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [editReorderLevel, setEditReorderLevel] = useState("");
+  const [editSafetyStock, setEditSafetyStock] = useState("");
   const [adjusting, setAdjusting] = useState(null); // inventory row being adjusted
   const [adjustDelta, setAdjustDelta] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
@@ -32,7 +33,7 @@ const Inventory = () => {
     fetchInventory();
   }, []);
 
-  const fetchInventory = async () => {
+  async function fetchInventory() {
     setLoading(true);
     setLoadError(false);
 
@@ -45,7 +46,7 @@ const Inventory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const filteredInventory = inventory.filter((item) => {
     const query = searchQuery.toLowerCase().trim();
@@ -59,6 +60,7 @@ const Inventory = () => {
     setEditName(product.name || "");
     setEditPrice(product?.price ?? 0);
     setEditReorderLevel(product?.reorderLevel ?? 5);
+    setEditSafetyStock(product?.safetyStock ?? 0);
   };
 
   const saveEdit = async (e) => {
@@ -74,10 +76,12 @@ const Inventory = () => {
     try {
       const updatedPrice = parseFloat(editPrice);
       const level = parseInt(editReorderLevel, 10);
+      const safetyStock = parseInt(editSafetyStock, 10);
       await api.put(`/products/${editingProduct}`, {
         name: editName.trim(),
         price: isNaN(updatedPrice) ? 0 : updatedPrice,
         ...(isNaN(level) || level < 0 ? {} : { reorderLevel: level }),
+        ...(isNaN(safetyStock) || safetyStock < 0 ? {} : { safetyStock }),
       });
 
       await fetchInventory();
@@ -158,10 +162,10 @@ const Inventory = () => {
   };
 
   return (
-    <div className="page">
+    <div className="page warehouse-page">
       <PageHeader
-        title="Store Inventory"
-        subtitle="Track live stock levels and manage retail pricing."
+        title="Inventory Control"
+        subtitle="Monitor on-hand stock, thresholds, pricing, and audited manual adjustments."
       />
 
       <div style={{ marginBottom: 24 }}>
@@ -221,6 +225,19 @@ const Inventory = () => {
               className="input"
               value={editReorderLevel}
               onChange={(e) => setEditReorderLevel(e.target.value)}
+            />
+
+            <label className="field-label" htmlFor="edit-safety-stock" style={{ marginTop: 14 }}>
+              Safety stock buffer
+            </label>
+            <input
+              id="edit-safety-stock"
+              type="number"
+              min="0"
+              step="1"
+              className="input"
+              value={editSafetyStock}
+              onChange={(e) => setEditSafetyStock(e.target.value)}
             />
 
             <div className="modal-actions">

@@ -45,6 +45,37 @@ npx cap run ios --live-reload --external
 Note that `VITE_API_BASE_URL` is baked in at `npm run build`. A phone cannot
 reach `localhost`, so a device build needs the real API URL — and it must be
 **https**: both platforms block plaintext HTTP to anything but localhost.
+Neither shell asks for an exception — Android declares no
+`usesCleartextTraffic` and no network security config, iOS no ATS override —
+so an http URL fails on the device and nowhere else.
+
+### Building one to give someone
+
+```bash
+# .env must already hold the production https API URL. This is the step that
+# bakes it in; nothing downstream can change it. build:release is `build` with
+# a check in front of it that refuses http, a local host, or a live auth
+# bypass — use it rather than `build` for anything leaving this machine.
+npm run build:release
+npx cap sync
+
+# Neither of these should print anything. Each is a bundle that reaches nothing
+# from a phone if it does.
+grep -roE 'https?://(localhost|127\.0\.0\.1|192\.168\.[0-9.]+)(:[0-9]+)?' \
+  dist android/app/src/main/assets/public ios/App/App/public
+
+cd android && ./gradlew :app:bundleRelease   # unsigned without a keystore
+cd .. && npx cap open ios                    # Xcode → Archive → Distribute
+```
+
+The full release sequence, including signing and the store paperwork, is in
+[RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md).
+
+The native shells do not run on a web origin: Capacitor serves the bundle from
+inside the WebView and stamps `capacitor://localhost` (iOS) or
+`https://localhost` (Android) on every request. Both are in the backend's CORS
+allowlist in `backend/app.js`; without them the phone builds get a 403 on their
+first call and look broken with nothing in the logs to explain it.
 
 ## Push notifications
 
@@ -66,6 +97,11 @@ signed in on both their phone and a browser is notified on both.
 
 Web push works as soon as the `VITE_FIREBASE_*` and `VITE_VAPID_KEY` values in
 `.env` are filled in.
+
+Both native files below are ignored by git (`.gitignore` at the repo root), so
+dropping one into place does not also stage it. Neither is in the repo today,
+and until each is, its platform registers no token at all — the code is in
+place and does nothing.
 
 **Android** needs one file: Firebase Console → Project settings → *Your apps* →
 add an Android app with package name `com.hungerhunt.parent`, download

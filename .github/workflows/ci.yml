@@ -44,6 +44,25 @@ jobs:
       # the script uses only node builtins, so there is nothing to install.
       - run: node scripts/check-shared-files.mjs
 
+  frontend-tests:
+    name: Test ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [frontend-admin, hungerhunt-kiosk]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      - run: npm test
+        working-directory: ${{ matrix.app }}
+
   lint:
     name: Lint ${{ matrix.app }}
     runs-on: ubuntu-latest

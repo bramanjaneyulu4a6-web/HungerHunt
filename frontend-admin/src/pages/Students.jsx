@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { formatINR } from '../utils/format';
+import { readStudentSheet } from '../utils/readStudentSheet';
 import {
   Banner,
   Button,
@@ -95,6 +96,7 @@ const Students = () => {
 
   const handleBulkUpload = async (e) => {
     e.preventDefault();
+    const form = e.currentTarget;
 
     if (!excelFile) {
       toast.error('Select an Excel sheet first');
@@ -103,42 +105,29 @@ const Students = () => {
 
     setUploading(true);
 
-    const reader = new FileReader();
+    try {
+      const students = await readStudentSheet(excelFile);
+      const res = await api.post('/students/bulk', { students });
 
-    reader.onload = async (evt) => {
-      try {
-        const XLSX = await import('xlsx');
-        const workbook = XLSX.read(evt.target.result, { type: 'binary' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
+      toast.success('Bulk upload successful');
 
-        const res = await api.post('/students/bulk', { students: jsonData });
-
-        toast.success('Bulk upload successful');
-
-        // Columns the server would not import — say so, or the sheet looks
-        // like it applied in full.
-        const ignored = res.data?.ignoredColumns;
-        if (ignored?.length) {
-          toast.error(`Not imported: ${ignored.join(', ')}. Only name, father's name, hostel, grade and phone are read from the sheet.`);
-        }
-        setExcelFile(null);
-        e.target.reset?.();
-        fetchStudents();
-      } catch (error) {
-        console.error(error);
-        toast.error('Bulk import failed');
-      } finally {
-        setUploading(false);
+      // Columns the server would not import — say so, or the sheet looks
+      // like it applied in full.
+      const ignored = res.data?.ignoredColumns;
+      if (ignored?.length) {
+        toast.error(
+          `Not imported: ${ignored.join(', ')}. Only name, admissionNumber, fatherName, hostelNumber, grade and parentPhoneNumber are read from the sheet.`
+        );
       }
-    };
-
-    reader.onerror = () => {
-      toast.error('Could not read the selected file');
+      setExcelFile(null);
+      form.reset?.();
+      fetchStudents();
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || error?.message || 'Bulk import failed');
+    } finally {
       setUploading(false);
-    };
-
-    reader.readAsBinaryString(excelFile);
+    }
   };
 
   const handleDelete = async (id, walletBalance) => {
@@ -331,7 +320,7 @@ const Students = () => {
           >
             <input
               type="file"
-              accept=".xlsx, .xls"
+              accept=".xlsx"
               aria-label="Excel sheet for bulk upload"
               style={{ fontSize: 13, color: 'var(--ink-soft)' }}
               onChange={(e) => setExcelFile(e.target.files[0])}

@@ -10,6 +10,22 @@ build/
 firebase-service-account.json
 backend/uploads/
 
+# Store signing and platform credentials. None of these are in the repo yet;
+# they are named here so that the day someone follows the setup steps in
+# frontend-parent/README.md, dropping the file into place does not also stage
+# it. A keystore in particular is the one thing that cannot be re-issued —
+# losing it means never updating the Play listing again.
+frontend-parent/android/app/google-services.json
+frontend-parent/ios/App/App/GoogleService-Info.plist
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+keystore.properties
+
 # Native build output
 frontend-parent/ios/App/Pods/
 frontend-parent/ios/App/build/

@@ -104,9 +104,54 @@ These are open items, not formalities. Each one is a real gap today.
       it at the kiosk with their own code. Students whose parents have never
       registered cannot be billed from the console at all.
 
-- [ ] **Decide what the store listings say.** Screenshots, description, privacy
-      policy URL, and a support contact. An app that reads a child's spending
-      will be asked what it collects and who sees it.
+- [ ] **Decide what the store listings say.** Both stores ask the same
+      question in different words, and this app has an answer neither of them
+      treats lightly: it shows a named child's wallet balance and itemised
+      spending to an adult identified by a phone number. Everything below is
+      the store's requirement, not a legal opinion — the privacy answers in
+      particular need whoever owns the school's data policy to sign them off,
+      not whoever builds the app.
+
+      *Apple, in App Store Connect:*
+      - App record created under the right team, bundle id
+        `com.hungerhunt.parent`.
+      - Privacy policy URL and support URL. Both are required fields; neither
+        can be a placeholder.
+      - Privacy nutrition labels covering, at minimum, name, phone number,
+        purchase history and identifiers, and whether any of it is linked to
+        the user.
+      - Age rating, and an answer to whether the app is directed at children —
+        the data is *about* children, but the account holder is a parent, and
+        which of those Apple's Kids Category rules follow is the call to get
+        right before submitting rather than after a rejection.
+      - Screenshots for every required device class (6.9" and 6.5" iPhone at
+        least).
+      - A working demo parent account plus notes for App Review, since every
+        screen is behind a login they cannot create themselves.
+      - Export compliance: the app makes HTTPS calls and nothing more, which
+        is the standard exemption — declare it, do not skip it.
+      - Push notification purpose, if asked: transactional account activity,
+        not marketing.
+      - Account deletion. Apple requires an in-app route to delete the account
+        for any app that lets you create one. Parent accounts here are created
+        by the school, which is the argument for exemption — make that
+        argument deliberately.
+
+      *Google, in Play Console:*
+      - App record, and Play App Signing enrolled at creation (it cannot be
+        added later without a key reset).
+      - Data Safety form — separate from Apple's labels, asks about collection
+        *and* sharing *and* encryption in transit, and is cross-checked
+        against observed behaviour.
+      - Privacy policy URL, content rating questionnaire, and target audience.
+        Naming a child audience pulls in the Families policy and its own
+        review; naming an adult one has to be true of the actual listing.
+      - App access: reviewer credentials for a parent account, or the whole
+        app looks like a login screen.
+      - Screenshots and a 1024×500 feature graphic.
+      - Ship to the internal testing track first and install from it. It is
+        the only way to find out that the signed bundle behaves before
+        production does.
 
 ---
 
@@ -151,7 +196,7 @@ CI runs the first four of these on every push and pull request
 tagging anyway — CI does not build the native shells.
 
 ```bash
-npm test            --prefix backend            # 71 tests, all mocked; no database is touched
+npm test            --prefix backend            # 369 tests, all mocked; no database is touched
 npm run lint        --prefix frontend-parent    # must be 0 errors, 0 warnings
 npm run lint        --prefix hungerhunt-kiosk
 npm run build       --prefix frontend-parent
@@ -167,6 +212,19 @@ cd frontend-parent && npx cap sync              # copies dist/ into ios/ and and
       serve a copy of `dist/`, so a shell synced before the last build ships
       the previous bundle, and nothing about it looks wrong until someone
       notices the fix is missing.
+- [ ] **The bundle about to be wrapped does not mention `localhost`.** This is
+      the one check that catches a build made against the wrong `.env`, and it
+      catches it in seconds rather than on a tester's phone:
+
+      ```bash
+      cd frontend-parent
+      grep -roE 'https?://(localhost|127\.0\.0\.1|192\.168\.[0-9.]+)(:[0-9]+)?' \
+        dist android/app/src/main/assets/public ios/App/App/public
+      ```
+
+      No output is the pass. Any output means the `.env` was wrong at
+      `npm run build`, and both native shells now carry that same wrong bundle
+      — fix `.env`, rebuild, and re-run `npx cap sync` before going further.
 
 > Never point tests or scripts at the production database. The `.env` files in
 > this repo resolve to the live Atlas cluster; the backend tests are mock-based
@@ -174,17 +232,52 @@ cd frontend-parent && npx cap sync              # copies dist/ into ios/ and and
 
 ### 4. Ship
 
+The whole sequence, from a clean tree to two uploadable artifacts. Steps that
+need a human in a GUI are marked; nothing else is interactive.
+
 ```bash
 cd frontend-parent
-npx cap open ios          # Xcode → Product → Archive → Distribute
-npx cap open android      # Android Studio → Build → Generate Signed Bundle (.aab)
+
+# 1. The bundle. .env must already hold the production https API URL — this is
+#    the step that bakes it in, and no later step can change it. build:release
+#    is `build` with scripts/validate-frontend-release-env.mjs in front of it:
+#    it refuses http, a local host, and VITE_AUTH_BYPASS=true, so a misaimed
+#    build fails here in a second rather than on a tester's phone in a week.
+npm run build:release
+npx cap sync
+
+# 2. Android. Needs android/app/google-services.json and a release keystore
+#    (see "Signing", below) — without a keystore this produces an *unsigned*
+#    .aab that Play will reject on upload.
+cd android && ./gradlew :app:bundleRelease
+#    → app/build/outputs/bundle/release/app-release.aab
+
+# 3. iOS. Archiving is done from Xcode: the signing certificate and the Push
+#    Notifications capability both live in the Signing & Capabilities tab, and
+#    a command-line archive would need them configured there first anyway.
+cd .. && npx cap open ios
+#    Xcode → destination "Any iOS Device (arm64)" → Product → Archive
+#           → Distribute App → App Store Connect
 ```
 
+**Signing — manual, and not from this repo.**
+
+- [ ] Android: the release keystore is created once, with
+      `keytool -genkeypair -v -keystore <path outside the repo>.jks -alias upload
+      -keyalg RSA -keysize 2048 -validity 10000`, and referenced from a
+      `keystore.properties` that is **not** committed (`.gitignore` already
+      covers `*.jks`, `*.keystore` and `keystore.properties`). Type the
+      password at the prompt rather than passing it on the command line, where
+      it lands in shell history.
+- [ ] That keystore is backed up somewhere other than the machine that built
+      it. Losing it means losing the ability to update the app at all —
+      unless Play App Signing is enrolled, in which case the upload key can be
+      reset by Google and only the *upload* key is lost.
+- [ ] iOS: an Apple Developer team is selected on the *App* target, the
+      Distribution certificate exists, and the App ID
+      `com.hungerhunt.parent` carries the Push Notifications entitlement.
 - [ ] iOS archive is built against a **physical-device** destination, not a
       simulator. A simulator archive cannot be distributed.
-- [ ] Android bundle is signed with the release keystore, and that keystore is
-      backed up somewhere other than the machine that built it. Losing it means
-      losing the ability to update the app at all.
 - [ ] Tag the commit that produced the build, so a bug report naming a version
       can be traced to source.
 
@@ -221,10 +314,19 @@ Worth knowing when deciding how much the green checkmarks are worth.
   than parked on red, and belongs back in the moment those are fixed — the
   change is one word in [ci.yml](.github/workflows/ci.yml).
 - **The backend has no eslint config**, so nothing lints it.
-- **There are no frontend tests.** The 71 backend tests cover the parent API
+- **There are no frontend tests.** The 369 backend tests cover the parent API
   surface and auth; every screen is verified by hand, which is what section 5
   is for.
 - **Nothing tests the native shells.** CI runs on Linux and builds the web
   bundle only; iOS and Android are exercised only by an actual release.
-- **The web build is not installable as a PWA** — there is no manifest linked
-  from `index.html`. It is a website and two native apps, not three.
+- **`npm run build` still has a silent fallback.** `src/services/api.js`
+  defaults to `http://localhost:5000/api` when `VITE_API_BASE_URL` is unset —
+  and 5000 is the port this repo already moved off. A plain `build` with no env
+  file therefore succeeds, ships, and reaches nothing. `npm run build:release`
+  is the one that refuses; the plain target is left permissive because CI
+  builds without an env file on every push.
+- **The browser build is not an offline app.** `public/manifest.webmanifest`
+  now exists and `index.html` links it, so a browser can add it to a home
+  screen — but the only service worker is the Firebase push worker, which
+  caches nothing. Out of signal it is a blank page, where the two native
+  builds at least start.

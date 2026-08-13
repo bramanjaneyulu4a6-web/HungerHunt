@@ -138,6 +138,15 @@ const allowedOrigins = new Set([
   "http://localhost:5176", // hungerhunt-warehouse (port pinned in its vite.config)
   "http://localhost:3000",
 
+  // The native parent apps are not served from a web origin at all: Capacitor
+  // hosts the bundle inside the WebView and stamps these two on every request
+  // it makes (iOS keeps the capacitor: scheme, Android serves over https). They
+  // are fixed by the platform and identical for every device, so they are not
+  // deployment configuration — without them the phone builds get a 403 on the
+  // first call and the app looks broken with nothing in the logs to say why.
+  "capacitor://localhost",
+  "https://localhost",
+
   "https://hunger-hunt-beta.vercel.app",
   "https://hunger-hunt-parent.vercel.app",
   "https://hunger-hunt-kiosk.vercel.app",

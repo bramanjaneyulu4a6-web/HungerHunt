@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:release": "node ../scripts/validate-frontend-release-env.mjs && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

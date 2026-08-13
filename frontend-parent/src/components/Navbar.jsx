@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth';
 import Icon from './Icon';
@@ -12,12 +12,69 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const dialogRef = useRef(null);
+  const logoutButtonRef = useRef(null);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     await logout();
     navigate('/login', { replace: true });
   };
+
+  /* Opening the dialog is not the same as arriving in it. `aria-modal` only
+     fences the rest of the page off from a screen reader once focus is
+     actually inside, and without that focus a keyboard tab walks the app bar
+     and the bottom nav first and reaches the buttons behind the backdrop
+     afterwards. On a phone the app bar holds the only way to sign out, so this
+     is the dialog that has to work with no pointer at all. */
+  useEffect(() => {
+    if (!confirmingLogout) return undefined;
+
+    const dialog = dialogRef.current;
+    const trigger = logoutButtonRef.current;
+
+    const focusable = () =>
+      [...dialog.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => !el.disabled);
+
+    focusable()[0]?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setConfirmingLogout(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const items = focusable();
+      if (!items.length) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      // Wrap at both ends rather than letting Tab out into the page behind.
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      // Hand focus back to what opened it. Signing out unmounts the whole bar,
+      // so on that path there is nothing left to focus and this does nothing.
+      trigger?.focus();
+    };
+  }, [confirmingLogout]);
 
   if (!parent) return null;
 
@@ -48,6 +105,7 @@ export default function Navbar() {
           </span>
           <span className="parent-account-name">{parent.fatherName || 'Parent'}</span>
           <button
+            ref={logoutButtonRef}
             type="button"
             className="parent-logout"
             onClick={() => setConfirmingLogout(true)}
@@ -65,14 +123,12 @@ export default function Navbar() {
         <NavLink to="/accounts" className={navClass}>
           <Icon name="user" size={21} /> <span>Accounts</span>
         </NavLink>
-        <button type="button" className="parent-nav-link" onClick={() => setConfirmingLogout(true)}>
-          <Icon name="logout" size={21} /> <span>Sign out</span>
-        </button>
       </nav>
 
       {confirmingLogout && (
         <div className="parent-modal-backdrop" onClick={() => setConfirmingLogout(false)}>
           <div
+            ref={dialogRef}
             className="parent-modal"
             role="alertdialog"
             aria-modal="true"

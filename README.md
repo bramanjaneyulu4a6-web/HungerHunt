@@ -102,4 +102,4 @@ Shipping the parent app to the App Store or Play has its own list, including the
 
 Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, refunds and voids, manual inventory adjustments, and cost/margin reporting.
 
-Native push is written but delivers nothing until the manual Firebase and Xcode steps are done — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo). The 71 backend tests cover the parent API surface and auth; the frontends have no automated tests.
+Native push is written but delivers nothing until the manual Firebase and Xcode steps are done — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo). The 369 backend tests cover the parent API surface and auth; the frontends have no automated tests.

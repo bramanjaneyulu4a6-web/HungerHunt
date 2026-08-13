@@ -20,11 +20,24 @@ import stockGroupRoutes from './routes/stockGroupRoutes.js';
 import unitRoutes from './routes/unitRoutes.js';
 import supplierRoutes from './routes/supplierRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
+import purchaseOrderRoutes from './src/interfaces/http/routes/purchaseOrderRoutes.js';
+import analyticsRoutes from './src/interfaces/http/routes/analyticsRoutes.js';
+import fulfillmentOrderRoutes from './src/interfaces/http/routes/fulfillmentOrderRoutes.js';
+import accountingExportRoutes from './src/interfaces/http/routes/accountingExportRoutes.js';
+import replenishmentDraftRoutes from './src/interfaces/http/routes/replenishmentDraftRoutes.js';
+import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
+import { logger } from './src/shared/observability/logger.js';
+import { v1ProcurementEnabled } from './config/features.js';
 import { authBypassEnabled } from './middleware/devBypass.js';
 import { parentSecretChangeover, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
 const app = express();
+
+// Request ids and the structured error envelope travel with the v1 slice: they
+// change what *every* route logs and returns, so leaving them on with the flag
+// off would mean "deactivated" still differed from the behaviour before it.
+if (v1ProcurementEnabled) app.use(requestContext);
 
 // Behind a hosting proxy, req.ip is the proxy's own address unless Express is
 // told how many hops to trust — which would put every client in a single
@@ -108,7 +121,17 @@ if (unverifiedBillsAccepted()) {
 app.use(helmet());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-const allowedOrigins = [
+const configuredOrigins = [
+  process.env.ADMIN_CLIENT_URL,
+  process.env.PARENT_CLIENT_URL,
+  process.env.WAREHOUSE_CLIENT_URL,
+  process.env.KIOSK_CLIENT_URL,
+  ...(process.env.CORS_ORIGINS || '').split(','),
+]
+  .map((origin) => origin?.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
@@ -118,7 +141,8 @@ const allowedOrigins = [
   "https://hunger-hunt-beta.vercel.app",
   "https://hunger-hunt-parent.vercel.app",
   "https://hunger-hunt-kiosk.vercel.app",
-];
+  ...configuredOrigins,
+]);
 
 app.use(
   cors({
@@ -126,7 +150,7 @@ app.use(
       // Allow requests like Postman or server-to-server
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.has(origin.replace(/\/$/, ''))) {
         return callback(null, true);
       }
 
@@ -140,12 +164,18 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
+
+const readiness = (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    db: ready ? 'connected' : 'disconnected',
   });
-});
+};
+
+app.get('/health', readiness);
+app.get('/health/ready', readiness);
 
 // API Routes
 app.use('/api/admin', adminRoutes);
@@ -161,13 +191,56 @@ app.use('/api/units', unitRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/receipts', receiptRoutes);
 
+// Versioned enterprise contracts. The routes above remain compatibility
+// adapters until all existing clients have migrated.
+//
+// This is the only door into backend/src, and creating an order is the only way
+// one enters the PENDING_REVIEW workflow — so not mounting these leaves the
+// whole slice unreachable rather than half-live.
+if (v1ProcurementEnabled) {
+  app.use('/api/v1/purchase-orders', purchaseOrderRoutes);
+  app.use('/api/v1/analytics', analyticsRoutes);
+  app.use('/api/v1/fulfillment-orders', fulfillmentOrderRoutes);
+  app.use('/api/v1/accounting-exports', accountingExportRoutes);
+  app.use('/api/v1/replenishment-drafts', replenishmentDraftRoutes);
+}
+
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
-app.use((err, req, res, next) => {
+// The pre-slice handler, kept whole rather than reconstructed from the new one:
+// it echoes the real message at every status and prints the raw stack.
+const legacyErrorHandler = (err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
-});
+};
+
+const v1ErrorHandler = (err, req, res, next) => {
+  const status = err.status || 500;
+  const message = status >= 500 ? 'Internal Server Error' : err.message;
+  const logFailure = status >= 500 ? logger.error : logger.warn;
+  logFailure('http.request.failed', {
+    requestId: req.context?.requestId,
+    method: req.method,
+    path: req.originalUrl,
+    status,
+    errorCode: err.code || 'INTERNAL_ERROR',
+    error: err.message,
+    ...(process.env.NODE_ENV === 'production' ? {} : { stack: err.stack }),
+  });
+  res.status(status).json({
+    // Kept at the top level for existing clients; new clients consume error.
+    message,
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message,
+      ...(err.details ? { details: err.details } : {}),
+    },
+    meta: { requestId: req.context?.requestId },
+  });
+};
+
+app.use(v1ProcurementEnabled ? v1ErrorHandler : legacyErrorHandler);
 
 export default app;

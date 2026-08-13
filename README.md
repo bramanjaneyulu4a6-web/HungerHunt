@@ -1,5 +1,7 @@
 # HungerHunt
 
+Enterprise implementation and deployment status: [docs/architecture/implementation-status.md](docs/architecture/implementation-status.md)
+
 A school meal and pocket-money system. Students carry a wallet balance; staff bill purchases at a kiosk; parents watch spending and set limits from their phone.
 
 The whole stack is JavaScript — Node/Express on the server, React + Vite in the four clients.
@@ -85,6 +87,10 @@ backend/
 ```
 
 Each frontend follows the standard Vite layout: `src/pages`, `src/components`, `src/utils/api.js` (axios instance that attaches the token).
+
+The Warehouse–Accounts procurement boundary is migrating to Clean Architecture under `backend/src`: domain policies and deterministic analytics, application use cases/DTOs, Mongoose repository adapters, and versioned HTTP controllers/routes. Existing unversioned endpoints remain compatibility adapters. See [the architecture and analytics design](docs/architecture/warehouse-accounts.md) and the [OpenAPI 3.1 contract](docs/architecture/openapi.yaml).
+
+The whole slice sits behind `FEATURE_V1_PROCUREMENT`, off unless it is set to exactly `true`. Off, the `/api/v1` routes are not mounted, nothing under `backend/src` is reachable, no order can enter the `PENDING_REVIEW` workflow, and request ids and the structured error envelope stay off too — every existing route answers exactly as it did before the slice existed. What the flag does not undo is data: orders already in a v1 state stay in the database, invisible to the legacy warehouse inbox, until it is switched back on.
 
 ## Checks and releases
 

@@ -20,9 +20,16 @@ const paths = {
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
   trash: <><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7v13h12V7"/><path d="M10 11v6M14 11v6"/></>,
   upload: <><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v3h16v-3"/></>,
+  trendDown: <><path d="m3 7 6 6 4-4 5 5"/><path d="M18 14h4v-4"/></>,
   // Points down for descending and is flipped in CSS for ascending, so one
   // glyph carries both directions and only the sorted column shows it.
   caret: <path d="m6 9 6 6 6-6"/>,
+  /* The warehouse portal's three tabs. Each one is the thing itself — a taped
+     box going out, the shelf it came off, the lorry bringing more — so the
+     icon carries the screen even before the label underneath it is read. */
+  package: <><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5Z"/><path d="M3 7.5 12 12l9-4.5"/><path d="M12 12v9"/></>,
+  shelf: <><path d="M3 4h18"/><path d="M3 12h18"/><path d="M3 20h18"/><path d="M6.5 4v8"/><path d="M13.5 12v8"/></>,
+  truck: <><path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="7" cy="18.5" r="1.8"/><circle cx="17" cy="18.5" r="1.8"/></>,
 };
 
 export default function Icon({ name, size = 20, className, ...rest }) {

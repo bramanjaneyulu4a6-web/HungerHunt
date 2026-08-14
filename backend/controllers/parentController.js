@@ -1126,8 +1126,18 @@ const resetUrl =
     res.json({ message: "Reset link sent to email" });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+  console.error("❌ FORGOT PASSWORD ERROR");
+  console.error("Message:", err.message);
+  console.error("Code:", err.code);
+  console.error("Command:", err.command);
+  console.error("Response:", err.response);
+  console.error("Stack:", err.stack);
+
+  res.status(500).json({
+    success: false,
+    message: "Unable to send password reset email.",
+  });
+}
 };
 
 /* =========================================================

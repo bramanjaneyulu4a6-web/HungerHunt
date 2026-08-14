@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { AuthContext } from './auth';
-import { authBypassEnabled, bypassParent } from '../utils/authBypass';
 import { stopPush } from '../utils/push';
 
 /* Read once, at module scope, rather than in an effect after the first render.
@@ -9,8 +8,6 @@ import { stopPush } from '../utils/push';
    to synchronise and nothing to wait for, so there is no loading state and no
    render showing a signed-in parent as signed out. */
 const restoreSession = () => {
-  if (authBypassEnabled) return bypassParent;
-
   if (!localStorage.getItem('parentToken')) return null;
 
   try {

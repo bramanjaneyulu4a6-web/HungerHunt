@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 
 import ProtectedRoute from './components/ProtectedRoute';
-import { authBypassEnabled } from './utils/authBypass';
 
 const Login = lazy(() => import('./pages/Login'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -35,10 +34,7 @@ function App() {
       <Toaster position="top-center" />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route
-            path="/"
-            element={<Navigate to={authBypassEnabled ? '/dashboard' : '/login'} replace />}
-          />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
@@ -66,7 +62,7 @@ function App() {
             <Route path="/purchased" element={<Navigate to="/warehouse/orders" replace />} />
           </Route>
 
-          <Route path="*" element={<Navigate to={authBypassEnabled ? '/dashboard' : '/login'} replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
     </Router>

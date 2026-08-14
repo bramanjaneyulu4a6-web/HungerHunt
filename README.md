@@ -45,6 +45,16 @@ npm install --prefix hungerhunt-kiosk     && npm run dev --prefix hungerhunt-kio
 npm install --prefix hungerhunt-warehouse && npm run dev --prefix hungerhunt-warehouse
 ```
 
+With `NODE_ENV=development` and `MONGO_URI` configured in `backend/.env`, seed
+the fixed development identities with:
+
+```bash
+npm run seed:dev-accounts --prefix backend
+```
+
+The command is idempotent: it updates the same admin, warehouse, parent, and
+student records each time. It refuses to run outside development.
+
 `GET /health` on the backend reports server and database status.
 
 ## Environment variables

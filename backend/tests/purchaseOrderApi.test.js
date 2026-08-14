@@ -4,7 +4,6 @@ import { mock } from 'node:test';
 
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
-process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 // Set before app.js is imported: the flag is read once at module scope.
 process.env.FEATURE_V1_PROCUREMENT = 'true';

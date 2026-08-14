@@ -1,7 +1,5 @@
 import axios from "axios";
 
-import { authBypassEnabled } from "./authBypass";
-
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
@@ -21,8 +19,8 @@ api.interceptors.response.use(
   (error) => {
     // Only a dead session (401) ejects. A 403 is this account reaching past
     // the storeroom, which its own screens never do — but it must not sign
-    // anyone out. With the bypass on there is no login to return to.
-    if (error.response?.status === 401 && !authBypassEnabled) {
+    // anyone out.
+    if (error.response?.status === 401) {
       localStorage.removeItem("warehouseToken");
       localStorage.removeItem("staffRole");
       if (window.location.pathname !== "/login") {

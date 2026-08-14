@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
 process.env.NODE_ENV = 'test';
-process.env.AUTH_BYPASS = 'false';
 process.env.FEATURE_V1_PROCUREMENT = 'true';
 process.env.BUSINESS_TIME_ZONE = 'Asia/Kolkata';
 

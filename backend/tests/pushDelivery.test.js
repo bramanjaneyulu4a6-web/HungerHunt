@@ -12,7 +12,6 @@ import { mock } from 'node:test';
 
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
-process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 
 const Parent = (await import('../models/Parent.js')).default;

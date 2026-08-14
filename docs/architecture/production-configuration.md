@@ -27,7 +27,6 @@ The backend validates this configuration during startup and exits before serving
 For each web application, set:
 
 - `VITE_API_BASE_URL=https://<public-api-host>/api`
-- `VITE_AUTH_BYPASS=false`
 
 Build a release with `npm run build:release` from each frontend directory. This command rejects HTTP, localhost, embedded credentials, query strings, fragments, and API paths other than `/api` before invoking Vite.
 

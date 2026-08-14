@@ -1,7 +1,6 @@
 // The hardening that shipped without tests: the field allow-list on the three
-// routes that write a student, the select: false that keeps the purchase
-// password hash out of query results, and the two conditions the dev login
-// bypass insists on.
+// routes that write a student and the select: false that keeps the purchase
+// password hash out of query results.
 //
 // The auth suites cover who is let through. These cover what happens to a
 // request that has already been let through — which is where each of these
@@ -12,7 +11,6 @@ import { mock } from 'node:test';
 
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
-process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;
@@ -214,65 +212,5 @@ describe('the purchase password stays out of query results', () => {
 
     assert.match(joined, /\+purchasePassword/,
       'nothing opts back in, so the password comparisons cannot work');
-  });
-});
-
-// The bypass serves every admin and parent route unauthenticated. It is for a
-// developer's laptop, and the two conditions are what keep it there.
-describe('the dev login bypass insists on both conditions', () => {
-  const saved = { bypass: process.env.AUTH_BYPASS, env: process.env.NODE_ENV };
-
-  // authBypassEnabled is computed once at module load, so each case needs its
-  // own module instance. The query string is what defeats the ESM cache.
-  let instance = 0;
-  const loadWith = (bypass, nodeEnv) => {
-    process.env.AUTH_BYPASS = bypass;
-
-    if (nodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = nodeEnv;
-
-    instance += 1;
-    return import(`../middleware/devBypass.js?case=${instance}`);
-  };
-
-  const restore = () => {
-    process.env.AUTH_BYPASS = saved.bypass;
-    process.env.NODE_ENV = saved.env;
-  };
-
-  test('on, in development', async () => {
-    try {
-      assert.equal((await loadWith('true', 'development')).authBypassEnabled, true);
-    } finally { restore(); }
-  });
-
-  test('off when NODE_ENV is anything else, including a near miss', async () => {
-    try {
-      for (const nodeEnv of ['staging', 'prod', 'Development', 'test', undefined]) {
-        const { authBypassEnabled } = await loadWith('true', nodeEnv);
-        assert.equal(authBypassEnabled, false, `NODE_ENV=${nodeEnv} enabled the bypass`);
-      }
-    } finally { restore(); }
-  });
-
-  test('off when the flag is not exactly "true"', async () => {
-    try {
-      for (const flag of ['false', '1', 'yes', 'TRUE', '']) {
-        const { authBypassEnabled } = await loadWith(flag, 'development');
-        assert.equal(authBypassEnabled, false, `AUTH_BYPASS=${flag} enabled the bypass`);
-      }
-    } finally { restore(); }
-  });
-
-  // Reaching production with the flag still set is a configuration accident.
-  // The condition above already refuses to honour it; failing the boot says so
-  // instead of leaving someone to infer it from the absence of a symptom.
-  test('refuses to load at all in production', async () => {
-    try {
-      await assert.rejects(
-        () => loadWith('true', 'production'),
-        /AUTH_BYPASS must not be set in production/
-      );
-    } finally { restore(); }
   });
 });

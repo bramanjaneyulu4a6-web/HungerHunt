@@ -2,7 +2,6 @@ import test, { before, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
-process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 // The point of this file. Node runs each test file in its own process, so this
 // stays off even though the sibling API test turns it on.

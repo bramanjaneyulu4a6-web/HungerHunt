@@ -7,7 +7,6 @@ import { mock } from 'node:test';
 
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
-process.env.AUTH_BYPASS = 'false';
 process.env.NODE_ENV = 'test';
 process.env.LEGACY_TOKEN_GRACE_UNTIL = '2999-01-01T00:00:00Z';
 

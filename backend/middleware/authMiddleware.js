@@ -2,7 +2,6 @@ import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import Student from '../models/Student.js';
 import { verifyToken } from '../utils/tokens.js';
-import { authBypassEnabled, resolveBypassAdmin, resolveBypassParent } from './devBypass.js';
 
 const readToken = (req) => req.headers.authorization?.split(' ')[1];
 
@@ -29,19 +28,6 @@ const roleFilter = (allowed) => ({
 });
 
 const staffGate = (allowed, needsMessage) => async (req, res, next) => {
-  if (authBypassEnabled) {
-    const adminId = await resolveBypassAdmin();
-    if (!adminId) {
-      return res.status(503).json({
-        message: 'AUTH_BYPASS is on but there is no admin account to impersonate'
-      });
-    }
-
-    req.adminId = adminId;
-    req.staff = { id: adminId, role: 'admin' };
-    return next();
-  }
-
   const token = readToken(req);
   if (!token) return denied(res, 'Not authorized, no token');
 
@@ -134,11 +120,9 @@ export const protectStudent = async (req, res, next) => {
  * things to a warehouse account, and that distinction survives.
  *
  * A student-signed token takes the student path; everything else, including a
- * missing or unreadable one, falls through to the staff gate so its errors and
- * its bypass behaviour are unchanged. */
+ * missing or unreadable one, falls through to the staff gate so its errors are
+ * unchanged. */
 export const orStudent = (staffGate) => (req, res, next) => {
-  if (authBypassEnabled) return staffGate(req, res, next);
-
   const token = readToken(req);
 
   if (token && verifyToken(token, 'student')) {
@@ -164,7 +148,7 @@ export const protectAdminUnlessBootstrap = async (req, res, next) => {
 
   // Answer the common case in the caller's own terms; protectAdmin's generic
   // "no token" would not explain why a registration form stopped accepting.
-  if (!authBypassEnabled && !readToken(req)) {
+  if (!readToken(req)) {
     return denied(res, 'Only a signed-in admin can create additional admin accounts.');
   }
 
@@ -189,18 +173,6 @@ const atTokenVersion = ({ id, v }) => {
 };
 
 export const protectParent = async (req, res, next) => {
-  if (authBypassEnabled) {
-    const parent = await resolveBypassParent();
-    if (!parent) {
-      return res.status(503).json({
-        message: 'AUTH_BYPASS is on but there is no parent account to impersonate'
-      });
-    }
-
-    req.parent = parent;
-    return next();
-  }
-
   const token = readToken(req);
   if (!token) return denied(res, 'Not authorized, no token');
 

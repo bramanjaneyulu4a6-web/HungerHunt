@@ -174,8 +174,9 @@ student loses their cart and returns to login with the reason shown.
   from the session rather than from a lookup.
 - `utils/api.js` — send the student token.
 
-`authBypassEnabled` in `ProtectedRoute.jsx` must be removed before this ships.
-It is already on the release checklist.
+The development authentication bypass this design was written against has
+since been removed from every app, along with its release-checklist entry.
+`npm run seed:dev-accounts` provides the fixed local identities instead.
 
 ## Accepted risk
 

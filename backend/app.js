@@ -28,7 +28,6 @@ import replenishmentDraftRoutes from './src/interfaces/http/routes/replenishment
 import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
-import { authBypassEnabled } from './middleware/devBypass.js';
 import { parentSecretChangeover, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
@@ -56,13 +55,6 @@ if (trustProxy === 'true') {
 } else if (trustProxy) {
   const hops = Number(trustProxy);
   app.set('trust proxy', Number.isInteger(hops) ? hops : trustProxy);
-}
-
-if (authBypassEnabled) {
-  console.warn(
-    '\n*** AUTH_BYPASS IS ON — every admin and parent route is unauthenticated. ***' +
-    '\n*** Local development only. Unset AUTH_BYPASS before deploying. ***\n'
-  );
 }
 
 const parentSecret = parentSecretChangeover();

@@ -12,7 +12,6 @@ import jwt from 'jsonwebtoken';
 
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
-process.env.AUTH_BYPASS = 'false'; // the bypass would short-circuit everything below
 process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;

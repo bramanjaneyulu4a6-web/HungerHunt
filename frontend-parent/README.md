@@ -54,8 +54,8 @@ so an http URL fails on the device and nowhere else.
 ```bash
 # .env must already hold the production https API URL. This is the step that
 # bakes it in; nothing downstream can change it. build:release is `build` with
-# a check in front of it that refuses http, a local host, or a live auth
-# bypass — use it rather than `build` for anything leaving this machine.
+# a check in front of it that refuses http or a local host — use it rather than
+# `build` for anything leaving this machine.
 npm run build:release
 npx cap sync
 

@@ -66,8 +66,4 @@ if (apiUrl.search || apiUrl.hash) {
 if (apiUrl.pathname.replace(/\/$/, '') !== '/api') {
   throw new Error('VITE_API_BASE_URL must end with /api.');
 }
-if (env.VITE_AUTH_BYPASS === 'true') {
-  throw new Error('VITE_AUTH_BYPASS must not be true for a release build.');
-}
-
 console.log(`Release API target validated: ${apiUrl.origin}/api`);

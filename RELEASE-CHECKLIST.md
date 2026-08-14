@@ -29,16 +29,6 @@ These are open items, not formalities. Each one is a real gap today.
       [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo).
       Test on a physical iPhone; the simulator cannot register with APNs.
 
-- [ ] **Remove the dev auth bypass** when `Ashok-work` merges to `main`. It is
-      branch-scoped and deliberately still here: `frontend-parent/src/utils/authBypass.js`
-      and its use in `src/context/AuthContext.jsx`, `VITE_AUTH_BYPASS` in the
-      parent `.env`, and `backend/middleware/devBypass.js` with `AUTH_BYPASS`.
-      Both ends are already fenced — the frontend branch is dropped from any
-      production build by `import.meta.env.DEV`, and the backend refuses to
-      boot if `AUTH_BYPASS=true` meets `NODE_ENV=production` — so this is
-      hygiene rather than an emergency. Do it anyway: the fences are the last
-      line, not the plan.
-
 - [ ] **Size the purchase-code migration before you deploy, not after.** A
       student's only secret is a four-digit code, and the counter takes nothing
       else — so a code set before that rule stops working the moment this ships.
@@ -241,7 +231,7 @@ cd frontend-parent
 # 1. The bundle. .env must already hold the production https API URL — this is
 #    the step that bakes it in, and no later step can change it. build:release
 #    is `build` with scripts/validate-frontend-release-env.mjs in front of it:
-#    it refuses http, a local host, and VITE_AUTH_BYPASS=true, so a misaimed
+#    it refuses http and a local host, so a misaimed
 #    build fails here in a second rather than on a tester's phone in a week.
 npm run build:release
 npx cap sync

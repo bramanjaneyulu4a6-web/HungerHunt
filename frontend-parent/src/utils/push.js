@@ -95,15 +95,20 @@ const initNative = async () => {
       console.error('Push registration failed:', err);
     });
 
-    await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-      // iOS draws foreground notifications itself, because presentationOptions
-      // in capacitor.config.json asks it to. Android has no such setting: a
-      // push arriving while the app is open is handed to the app and drawn by
-      // nobody, so it gets redrawn here as a local notification to match.
-      if (platform() === 'android') {
-        await showLocalNotification(notification);
-      }
-
+    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      /* Nothing is drawn here, on either platform.
+       *
+       * This used to redraw the notification on Android, on the belief that a
+       * push arriving while the app is open is handed to the app and drawn by
+       * nobody. That is not what happens: every message the backend sends to a
+       * device carries a `notification` block, and the system draws it whether
+       * the app is open or not. The redraw made a second copy, so a parent with
+       * the app open saw every notification twice — measured on the emulator as
+       * two notification records for one send, against one when backgrounded.
+       *
+       * iOS draws its own foreground notification from presentationOptions in
+       * capacitor.config.json, so it never needed this either.
+       */
       pushHandler({ data: notification.data || {}, tapped: false });
     });
 
@@ -118,30 +123,6 @@ const initNative = async () => {
   // Re-registering on a later sign-in is the point: it re-fires 'registration',
   // which attaches this device to whichever parent is signed in now.
   await PushNotifications.register();
-};
-
-let localNotificationId = 0;
-
-const showLocalNotification = async (notification) => {
-  try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          // Must be a 32-bit int, and unique per notification or each one
-          // replaces the last.
-          id: (localNotificationId = (localNotificationId + 1) % 2147483647),
-          title: notification.title || 'Hunger Hunt',
-          body: notification.body || '',
-          channelId: CHANNEL_ID,
-          extra: notification.data || {},
-        },
-      ],
-    });
-  } catch (err) {
-    console.error('Could not display the notification:', err);
-  }
 };
 
 /* --------------------------------------------------------------------- web */

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The tint Android applies to the notification's small icon and title.
+      Matches the brand token in src/theme.css, which is the one warm colour the
+      apps share; leaving it unset hands the notification the system's default
+      grey and makes every one of them look like it came from the OS rather than
+      from the app.
+    -->
+    <color name="notification_accent">#FF6B35</color>
+</resources>

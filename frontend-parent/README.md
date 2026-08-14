@@ -25,6 +25,14 @@ npm run dev
 `VITE_API_BASE_URL` must point at the backend. Everything else is push
 notifications — the app runs fine without them.
 
+For local development, keep it at `http://localhost:5001/api`. Browser and iOS
+Simulator builds use that value directly. On Android Emulator the app maps the
+local hostname to `10.0.2.2`, Android's alias for the host computer, and the
+debug manifest permits that local HTTP connection. Release builds do not carry
+the cleartext exception. A physical phone still needs the computer's LAN IP or
+a reachable HTTPS development URL; `localhost` cannot refer to the computer
+from a separate device.
+
 ## Native builds
 
 ```bash
@@ -42,12 +50,11 @@ development, ask for it per-run instead of putting it back in the file:
 npx cap run ios --live-reload --external
 ```
 
-Note that `VITE_API_BASE_URL` is baked in at `npm run build`. A phone cannot
-reach `localhost`, so a device build needs the real API URL — and it must be
-**https**: both platforms block plaintext HTTP to anything but localhost.
-Neither shell asks for an exception — Android declares no
-`usesCleartextTraffic` and no network security config, iOS no ATS override —
-so an http URL fails on the device and nowhere else.
+Note that `VITE_API_BASE_URL` is baked in at `npm run build`. A physical phone
+cannot reach the development machine through `localhost`, so a device build
+needs the real API URL — and it must be **https**. The Android cleartext
+exception is debug-only and exists solely for the emulator's `10.0.2.2` host
+alias; release builds and the iOS shell retain their HTTPS-only policy.
 
 ### Building one to give someone
 

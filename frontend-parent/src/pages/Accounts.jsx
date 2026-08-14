@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
 import { formatINR } from '../utils/format';
-import { AnimateIn, Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
+import { AnimateIn, Badge, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import Icon from '../components/Icon';
+import { ErrorFeedback } from '../components/error/ErrorFeedback';
+import { presentError } from '../utils/errorPresentation';
 
 const LOW_BALANCE = 500;
 
@@ -22,6 +24,7 @@ export default function Accounts() {
   const [attempt, setAttempt] = useState(0);
 
   const retry = () => {
+    setError('');
     setLoading(true);
     setAttempt((value) => value + 1);
   };
@@ -55,7 +58,7 @@ export default function Accounts() {
     <div className="page">
       <PageHeader title="Student accounts" subtitle="Balances, purchase history and spending controls for each linked student." />
       {loading && <AccountsSkeleton />}
-      {!loading && error && <Banner variant="alert" icon="⚠️">{error}{' '}<button type="button" className="link-button" onClick={retry}>Try again</button></Banner>}
+      {!loading && error && <ErrorFeedback className="page-error-state" issue={presentError({ request: true, message: error })} action={{ label: 'Try again', onClick: retry }} />}
       {!loading && !error && children.length === 0 && <EmptyState icon="🎒" title="No students linked yet">Contact the school office to link a student to this parent account.</EmptyState>}
       {!loading && !error && children.length > 0 && (
         <div className="card-grid">

@@ -22,6 +22,27 @@ const badgeFor = (status) => {
 const totalOf = (order) =>
   order.items.reduce((sum, item) => sum + item.quantity * item.estimatedUnitCost, 0);
 
+const EMPTY_STATES = {
+  ACTIVE: {
+    title: "You're all caught up",
+    body: 'No purchase orders need attention right now. New warehouse requests will appear here automatically.',
+    success: true,
+  },
+  PENDING_REVIEW: {
+    title: 'Review queue is clear',
+    body: 'No warehouse requests are waiting for an Accounts decision.',
+    success: true,
+  },
+  APPROVED: {
+    title: 'No approved orders waiting',
+    body: 'Orders ready for supplier receiving will appear here.',
+    success: true,
+  },
+  RECEIVED: { title: 'No received orders yet', body: 'Completed supplier orders will be recorded here.' },
+  REJECTED: { title: 'No rejected orders', body: 'Orders declined by Accounts will be recorded here.' },
+  ALL: { title: 'No purchase orders yet', body: 'The ledger will begin when Warehouse raises its first request.' },
+};
+
 export default function ProcurementOrders() {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState('ACTIVE');
@@ -55,6 +76,7 @@ export default function ProcurementOrders() {
     }
     return orders.filter((order) => order.status === filter);
   }, [filter, orders]);
+  const emptyState = EMPTY_STATES[filter];
 
   return (
     <div className="page warehouse-page">
@@ -74,7 +96,9 @@ export default function ProcurementOrders() {
 
       {error && <Banner variant="alert" icon="⚠️">The order ledger could not be loaded.</Banner>}
       {loading ? <Skeleton height={240} radius={16} /> : visible.length === 0 ? (
-        <EmptyState icon="▤" title="No orders in this view">Choose another status or wait for Warehouse to raise a request.</EmptyState>
+        <EmptyState icon={emptyState.success ? '✓' : '▤'} title={emptyState.title} variant={emptyState.success ? 'success' : 'default'}>
+          {emptyState.body}
+        </EmptyState>
       ) : (
         <Card className="warehouse-ledger-card">
           <div className="table-wrap">

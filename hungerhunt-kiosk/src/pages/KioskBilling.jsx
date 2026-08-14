@@ -1,30 +1,56 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
-import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import { formatINR } from "../utils/format";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
+import KioskResultScreen from "../components/KioskResultScreen";
+import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
+import { presentError } from "../utils/errorPresentation";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
-// How long the ending is held before the screen returns to the gate. Long
-// enough to read twice, short enough that the next person in the queue is not
-// waiting on somebody else's receipt — and a touch skips it anyway.
-const RESULT_SECONDS = 5;
+const formatSessionTime = (seconds) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
+};
 
 // Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
 // actually enforces it. Here it only shapes the field.
 const PURCHASE_CODE_LENGTH = 4;
 
-// Stock group names arrive however they were typed into the admin console
+// Category names arrive however they were typed into the admin console
 // ("CHIPS", "biscuits"), so they are title-cased for display only. Filtering
 // still compares against the stored value.
 const titleCase = (s) =>
   String(s)
     .toLowerCase()
     .replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+const productNameCollator = new Intl.Collator('en', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+const sortProductsByName = (items) => [...items].sort((a, b) =>
+  productNameCollator.compare(a.name || '', b.name || '') ||
+  String(a._id).localeCompare(String(b._id))
+);
+
+const stockGroupNames = (products) => {
+  const groups = new Map();
+
+  products.forEach((product) => {
+    const group = product.stockGroup;
+    if (group?.name && !groups.has(group.name)) groups.set(group.name, group);
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
+    .map((group) => group.name);
+};
 
 // Nutrition is optional: the product schema has no field for it yet, so every
 // item renders without a strip until one is added. Anything incomplete counts
@@ -67,17 +93,50 @@ const toProduct = (item) => ({
   image: item.productId?.image,
   stock: item.stock,
   stockGroup: item.productId?.stockGroup,
+  subCategory: item.productId?.subCategory || "Others",
   nutrition: readNutrition(item.productId),
+  purchaseAllowance: item.purchaseAllowance || null,
 });
 
+const allowanceCeiling = (product) => {
+  const allowance = product?.purchaseAllowance;
+  if (!allowance?.enabled) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Number(allowance.remaining) || 0);
+};
+
+const allowancePeriod = (period) => ({
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+  TOTAL: "total",
+}[period] || "purchase");
+
+const limitMessage = (product) => {
+  const allowance = product.purchaseAllowance;
+  if (!allowance?.enabled) return "This item cannot be added.";
+  if (allowance.pending > 0) {
+    return `${product.name}'s ${allowancePeriod(allowance.period)} limit includes ${allowance.pending} awaiting parent approval.`;
+  }
+  return `${product.name}'s ${allowancePeriod(allowance.period)} limit has been reached.`;
+};
+
 const KioskBilling = ({ student, onLogout }) => {
+  const [walletBalance, setWalletBalance] = useState(
+    Number(student.wallet?.balance ?? student.pocketMoney ?? 0)
+  );
   const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [productWallScrolled, setProductWallScrolled] = useState(false);
   const [products, setProducts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [showCategoryWelcome, setShowCategoryWelcome] = useState(true);
+  const [openingCategory, setOpeningCategory] = useState("");
   const [cart, setCart] = useState([]);
   const [recentlyAdded, setRecentlyAdded] = useState(null);
   const [removingIds, setRemovingIds] = useState([]);
   const feedbackTimerRef = useRef(null);
+  const categoryTimerRef = useRef(null);
+  const searchInputRef = useRef(null);
   const removeTimersRef = useRef(new Map());
 
   /* How the sale ended: null while it is still going, then 'paid' or
@@ -93,12 +152,44 @@ const KioskBilling = ({ student, onLogout }) => {
 
   const [ticketFolded, setTicketFolded] = useState(false);
   const [nutritionFor, setNutritionFor] = useState(null);
-  const [confirmVoid, setConfirmVoid] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
 
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [purchasePassword, setPurchasePassword] = useState("");
   const [paying, setPaying] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [pinIssue, setPinIssue] = useState(null);
+  const [lockoutIssue, setLockoutIssue] = useState(null);
+
+  const showFeedback = (error, details = {}) => {
+    setFeedback((current) => ({ ...presentError(error, details), ...details, key: (current?.key || 0) + 1 }));
+  };
+
+  const refreshWallet = useCallback(async () => {
+    const { data } = await api.get('/students/me/wallet');
+    setWalletBalance(Number(data.wallet.balance));
+    return Number(data.wallet.balance);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const { data } = await api.get('/students/me/wallet');
+        if (active) setWalletBalance(Number(data.wallet.balance));
+      } catch (error) {
+        console.error('Could not refresh wallet balance', error);
+      }
+    };
+
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
 
   // `paying` drives the disabled state and the label, but it cannot be the
   // lock: setPaying does not apply until the next render, so taps landing in
@@ -144,7 +235,13 @@ const KioskBilling = ({ student, onLogout }) => {
   const applyInventory = useCallback(({ products: next, error }) => {
     // A failed load keeps whatever is already on screen rather than blanking
     // the wall mid-service; the banner says what happened.
-    if (!error) setProducts(next);
+    if (!error) {
+      setProducts(next);
+      const nextCategories = stockGroupNames(next);
+      setSelectedCategory((current) =>
+        nextCategories.includes(current) ? current : (nextCategories[0] || "")
+      );
+    }
     setInventoryError(error);
     setLoadingProducts(false);
   }, []);
@@ -165,6 +262,7 @@ const KioskBilling = ({ student, onLogout }) => {
   useEffect(
     () => () => {
       window.clearTimeout(feedbackTimerRef.current);
+      window.clearTimeout(categoryTimerRef.current);
       removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
       removeTimersRef.current.clear();
     },
@@ -203,16 +301,24 @@ const KioskBilling = ({ student, onLogout }) => {
             stock: latest.stock,
             quantity: Math.min(
               parseInt(cartItem.quantity, 10) || 1,
-              latest.stock
+              latest.stock,
+              allowanceCeiling(latest)
             ),
+            purchaseAllowance: latest.purchaseAllowance,
           };
         })
-        .filter((item) => item && item.stock > 0)
+        .filter((item) => item && item.stock > 0 && item.quantity > 0)
     );
   };
 
   const addToCart = (product) => {
     if (product.stock < 1) return;
+    if (allowanceCeiling(product) < 1) {
+      showFeedback({ message: limitMessage(product), code: 'PRODUCT_LIMIT' }, {
+        product,
+      });
+      return;
+    }
 
     setCart((prev) =>
       prev.some((item) => item._id === product._id)
@@ -249,12 +355,17 @@ const KioskBilling = ({ student, onLogout }) => {
         .map((item) => {
           if (item._id !== productId) return item;
 
-          const maxStock =
-            products.find((p) => p._id === productId)?.stock ?? item.stock;
+          const latest = products.find((p) => p._id === productId) || item;
+          const maxStock = latest.stock ?? item.stock;
+          const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
           const next = (parseInt(item.quantity, 10) || 0) + amount;
 
-          if (next > maxStock) {
-            toast.error(`Only ${maxStock} in stock.`);
+          if (next > maxAllowed) {
+            if (maxAllowed < maxStock) {
+              showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+              return item;
+            }
+            showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: next });
             return item;
           }
 
@@ -280,12 +391,17 @@ const KioskBilling = ({ student, onLogout }) => {
       prevCart.map((item) => {
         if (item._id !== productId) return item;
 
-        const maxStock =
-          products.find((p) => p._id === productId)?.stock ?? item.stock;
+        const latest = products.find((p) => p._id === productId) || item;
+        const maxStock = latest.stock ?? item.stock;
+        const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
 
         if (parsed < 1) return { ...item, quantity: 1 };
-        if (parsed > maxStock) {
-          toast.error(`Only ${maxStock} in stock.`);
+        if (parsed > maxAllowed) {
+          if (maxAllowed < maxStock) {
+            showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+            return { ...item, quantity: maxAllowed };
+          }
+          showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: parsed });
           return { ...item, quantity: maxStock };
         }
 
@@ -315,15 +431,15 @@ const KioskBilling = ({ student, onLogout }) => {
     removeTimersRef.current.set(productId, timer);
   };
 
-  // Empties the ticket without ending the session. Starting the basket again
+  // Empties the order without ending the session. Starting the basket again
   // is not the same as being finished — that is what Done is for.
-  const voidTicket = () => {
+  const cancelOrder = () => {
     removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     removeTimersRef.current.clear();
     setRemovingIds([]);
     setCart([]);
     setProductSearchQuery("");
-    setConfirmVoid(false);
+    setConfirmCancel(false);
   };
 
   // The ticket priced as lines the server can charge. A cleared quantity box
@@ -339,13 +455,6 @@ const KioskBilling = ({ student, onLogout }) => {
   // off the cart again — anything re-derived in between would not match, and
   // the server would refuse the charge.
   const handleCheckout = async (items, purchaseToken) => {
-    // The balance is the one the session was opened with. The server re-reads
-    // it before charging, so this only saves a round trip to be told no.
-    if (invoiceTotal > student.pocketMoney) {
-      toast.error("Not enough in your wallet for this.");
-      return;
-    }
-
     try {
       // No studentId: the session's token says whose wallet this is, and the
       // server reads it from there rather than from anything sent here.
@@ -358,11 +467,9 @@ const KioskBilling = ({ student, onLogout }) => {
       setResult("paid");
     } catch (err) {
       console.error("Checkout Error:", err);
-      toast.error(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Checkout failed"
-      );
+      const issue = presentError(err, { message: err.response?.data?.message || err.response?.data?.error || "Checkout failed" });
+      showFeedback(err, issue);
+      if (['staleData', 'insufficientStock'].includes(issue.presentation)) refreshPage();
     }
   };
 
@@ -377,10 +484,7 @@ const KioskBilling = ({ student, onLogout }) => {
       setResult("pending");
     } catch (err) {
       console.error("Approval request error:", err);
-      toast.error(
-        err.response?.data?.message || "Could not send the order for approval",
-        { duration: 8000 }
-      );
+      showFeedback(err, { message: err.response?.data?.message || "Could not send the order for approval" });
     }
   };
 
@@ -390,6 +494,7 @@ const KioskBilling = ({ student, onLogout }) => {
     if (payingRef.current) return;
     payingRef.current = true;
     setPaying(true);
+    setPinIssue(null);
 
     try {
       const items = billedItems();
@@ -411,6 +516,11 @@ const KioskBilling = ({ student, onLogout }) => {
       if (data?.requiresApproval) {
         await requestApproval(items, data?.purchaseToken);
       } else {
+        const liveBalance = await refreshWallet();
+        if (invoiceTotal > liveBalance) {
+          showFeedback({ message: "Not enough in your wallet for this." }, { available: liveBalance, required: invoiceTotal });
+          return;
+        }
         await handleCheckout(items, data?.purchaseToken);
       }
     } catch (err) {
@@ -419,15 +529,13 @@ const KioskBilling = ({ student, onLogout }) => {
          session ends rather than leaving a child tapping at a cart they cannot
          pay for, with a queue behind them. */
       if (err.response?.status === 423) {
-        toast.error(
-          err.response.data?.message || "Too many wrong codes.",
-          { duration: 7000 }
-        );
-        onLogout();
+        setShowVerifyModal(false);
+        setLockoutIssue(presentError(err));
         return;
       }
-
-      toast.error(err.response?.data?.message || "Verification Failed");
+      const issue = presentError(err);
+      setPinIssue((current) => ({ ...issue, key: (current?.key || 0) + 1 }));
+      setPurchasePassword("");
     } finally {
       payingRef.current = false;
       setPaying(false);
@@ -440,26 +548,60 @@ const KioskBilling = ({ student, onLogout }) => {
     if (payingRef.current) return;
     setShowVerifyModal(false);
     setPurchasePassword("");
+    setPinIssue(null);
   };
 
-  const categories = [
-    "All",
-    ...new Set(products.map((p) => p.stockGroup?.name).filter(Boolean)),
-  ];
-
-  const filteredProducts = products.filter((p) => {
-    const matchesCategory =
-      selectedCategory === "All" || p.stockGroup?.name === selectedCategory;
-
-    const matchesSearch = p.name
-      ?.toLowerCase()
-      .includes(productSearchQuery.toLowerCase());
-
-    return matchesCategory && matchesSearch;
+  const categories = stockGroupNames(products);
+  const categoryCards = categories.map((category) => {
+    const items = sortProductsByName(products.filter(
+      (product) => product.stockGroup?.name === category
+    ));
+    return {
+      name: category,
+      count: items.length,
+      image: items.find((item) => item.image)?.image || "",
+    };
   });
 
+  const openCategory = (category) => {
+    if (openingCategory) return;
+    setOpeningCategory(category);
+    setSelectedCategory(category);
+    setSearchOpen(false);
+    setProductSearchQuery("");
+    window.clearTimeout(categoryTimerRef.current);
+    categoryTimerRef.current = window.setTimeout(() => {
+      setShowCategoryWelcome(false);
+      setOpeningCategory("");
+    }, 440);
+  };
+
+  const categoryProducts = sortProductsByName(products.filter(
+    (product) => product.stockGroup?.name === selectedCategory
+  ));
+  const categorySubCategoryOrder = categoryProducts[0]?.stockGroup?.subCategories || [];
+  const normalizedSearch = productSearchQuery.trim().toLocaleLowerCase();
+  const filteredProducts = categoryProducts.filter((product) =>
+    product.name?.toLocaleLowerCase().includes(normalizedSearch)
+  );
+  const subCategoryNames = [...new Set(filteredProducts.map((product) => product.subCategory || "Others"))]
+    .sort((a, b) => {
+      const aIndex = categorySubCategoryOrder.indexOf(a);
+      const bIndex = categorySubCategoryOrder.indexOf(b);
+      if (aIndex >= 0 || bIndex >= 0) {
+        if (aIndex < 0) return 1;
+        if (bIndex < 0) return -1;
+        return aIndex - bIndex;
+      }
+      return (a === "Others") - (b === "Others") || a.localeCompare(b);
+    });
+  const subCategorySections = subCategoryNames.map((name) => ({
+    name,
+    products: filteredProducts.filter((product) => (product.subCategory || "Others") === name),
+  }));
+
   // The segmented lens is measured from the live segment rather than hardcoded,
-  // so it stays correct whatever the stock groups turn out to be called.
+  // so it stays correct whatever the categories turn out to be called.
   const segRef = useRef(null);
   const [lens, setLens] = useState({ x: 0, w: 0 });
   const categoryKey = categories.join("|");
@@ -472,9 +614,25 @@ const KioskBilling = ({ student, onLogout }) => {
     };
 
     seat();
+    const observer = new ResizeObserver(seat);
+    if (segRef.current) observer.observe(segRef.current);
     window.addEventListener("resize", seat);
-    return () => window.removeEventListener("resize", seat);
-  }, [selectedCategory, categoryKey]);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", seat);
+    };
+  }, [selectedCategory, categoryKey, showCategoryWelcome]);
+
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    const focus = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(focus);
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setProductSearchQuery("");
+  };
 
   /* The session's clocks. They stop once the sale has ended — the result
      screen is not part of the session, and asking "still there?" over
@@ -490,19 +648,9 @@ const KioskBilling = ({ student, onLogout }) => {
       isBusy: () => payingRef.current,
     });
 
-  /* The result screen's own clock. Declared up here with the other hooks
-     rather than beside the screen it belongs to, because that screen is an
-     early return and a hook after it would not run on every render. */
-  useEffect(() => {
-    if (!result) return undefined;
-
-    const exit = setTimeout(onLogout, RESULT_SECONDS * 1000);
-    return () => clearTimeout(exit);
-  }, [result, onLogout]);
-
   // A session always has its student, so none of this is conditional any more.
   const itemCount = cart.length;
-  const remaining = student.pocketMoney - invoiceTotal;
+  const remaining = walletBalance - invoiceTotal;
   const short = remaining < 0;
   const canPay = cart.length > 0 && !short;
 
@@ -512,40 +660,146 @@ const KioskBilling = ({ student, onLogout }) => {
      is already over, and this is only the telling. */
   if (result) {
     return (
-      <div
-        className={`kiosk-result kiosk-result--${result}`}
-        onClick={onLogout}
-        role="status"
-      >
-        <div className="kiosk-result-burst" aria-hidden="true">
-          {Array.from({ length: 10 }, (_, i) => (
-            <i key={i} style={{ "--particle": i }} />
-          ))}
-        </div>
-        <div className="kiosk-result-card">
-          <div
-            className={`kiosk-result-mark kiosk-result-mark--${result}`}
-            aria-hidden="true"
-          >
-            {result === "paid" ? "✓" : "⏳"}
+      <KioskResultScreen
+        variant={result}
+        mark={result === "paid" ? "✓" : "⏳"}
+        kicker={result === "paid" ? "All done" : "Request sent"}
+        title={result === "paid" ? "Order confirmed" : "Sent to your parent"}
+        body={result === "paid"
+          ? "Collect your items at the counter. Enjoy!"
+          : "Nothing has been charged yet — your parent has been asked to approve it."}
+        onDone={onLogout}
+        tapLabel="Tap anywhere for next order"
+      />
+    );
+  }
+
+  if (lockoutIssue) {
+    return (
+      <KioskResultScreen
+        variant="locked"
+        mark="🔒"
+        kicker="Purchase code paused"
+        title={lockoutIssue.title}
+        body="Try again when the lock ends, or ask your parent to set a new purchase code in the app."
+        onDone={onLogout}
+        seconds={12}
+      />
+    );
+  }
+
+  if (showCategoryWelcome) {
+    return (
+      <>
+        <main
+          className={`kiosk-category-welcome${openingCategory ? " kiosk-category-welcome--opening" : ""}`}
+          aria-busy={loadingProducts}
+        >
+          <div className="kiosk-category-ambient kiosk-category-ambient--one" aria-hidden="true" />
+          <div className="kiosk-category-ambient kiosk-category-ambient--two" aria-hidden="true" />
+
+          <header className="kiosk-category-topbar">
+            <div className="kiosk-wordmark kiosk-wordmark--category">Hunger Hunt</div>
+            <div className="kiosk-category-student">
+              <span aria-hidden="true">{student.name?.charAt(0).toUpperCase()}</span>
+              <div><small>Ordering for</small><strong>{student.name}</strong></div>
+            </div>
+            <div className="kiosk-category-wallet">
+              <small>Wallet balance</small>
+              <strong className="money">{formatINR(walletBalance)}</strong>
+            </div>
+            <button type="button" className="kiosk-category-exit" onClick={onLogout}>
+              End session
+            </button>
+            <div
+              className="kiosk-session-clock kiosk-session-clock--category"
+              role="timer"
+              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
+            >
+              <small>Session</small>
+              <strong>{formatSessionTime(capRemaining)}</strong>
+            </div>
+          </header>
+
+          <section className="kiosk-category-hero">
+            <p>Welcome, {student.name?.split(" ")[0]}</p>
+            <h1>What would you like to buy?</h1>
+            <span>Choose a category to start your order.</span>
+          </section>
+
+          {inventoryError && (
+            <ErrorFeedback
+              issue={presentError({ request: true, message: inventoryError })}
+              className="kiosk-category-message"
+              action={{ label: 'Try again', onClick: refreshPage }}
+            />
+          )}
+
+          {loadingProducts ? (
+            <div className="kiosk-category-grid kiosk-category-grid--loading" aria-label="Loading categories">
+              {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
+            </div>
+          ) : categoryCards.length === 0 ? (
+            <div className="kiosk-category-empty">
+              <span className="kiosk-category-empty__icon" aria-hidden="true">↻</span>
+              <strong>The shelves are being refreshed</strong>
+              <span>No products are available right now. Please ask a staff member or try again shortly.</span>
+            </div>
+          ) : (
+            <div className="kiosk-category-grid" role="tablist" aria-label="Product categories">
+              {categoryCards.map((category, index) => (
+                <button
+                  type="button"
+                  role="tab"
+                  className={`kiosk-category-card${openingCategory === category.name ? " kiosk-category-card--opening" : ""}`}
+                  key={category.name}
+                  style={{ "--category-index": index }}
+                  aria-selected={openingCategory === category.name}
+                  onClick={() => openCategory(category.name)}
+                >
+                  <span className="kiosk-category-card__image">
+                    {category.image ? (
+                      <img src={category.image} alt="" />
+                    ) : (
+                      <b aria-hidden="true">{titleCase(category.name).charAt(0)}</b>
+                    )}
+                  </span>
+                  <span className="kiosk-category-card__copy">
+                    <strong>{titleCase(category.name)}</strong>
+                    <small>{category.count} {category.count === 1 ? "item" : "items"}</small>
+                  </span>
+                  <span className="kiosk-category-card__arrow" aria-hidden="true">→</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {cart.length > 0 && (
+            <button
+              type="button"
+              className="kiosk-category-resume"
+              onClick={() => setShowCategoryWelcome(false)}
+            >
+              Resume order · {itemCount} {itemCount === 1 ? "item" : "items"} · {formatINR(invoiceTotal)}
+            </button>
+          )}
+        </main>
+
+        {capWarning && !idlePrompt && (
+          <div className="kiosk-cap-banner" role="status">
+            Session ending in {capRemaining}s
           </div>
-
-          <p className="kiosk-result-kicker">
-            {result === "paid" ? "All done" : "Request sent"}
-          </p>
-          <h1>
-            {result === "paid" ? "Order confirmed" : "Sent to your parent"}
-          </h1>
-
-          <p>
-            {result === "paid"
-              ? "Collect your items at the counter. Enjoy!"
-              : "Nothing has been charged yet — your parent has been asked to approve it."}
-          </p>
-          <span className="kiosk-result-skip">Tap anywhere for next order</span>
-        </div>
-        <div className="kiosk-result-timer" aria-hidden="true" />
-      </div>
+        )}
+        {idlePrompt && (
+          <div className="kiosk-idle-veil" role="alertdialog" aria-label="Are you still there?">
+            <div className="kiosk-idle-card">
+              <h2>Still there?</h2>
+              <p>Your session ends in {idleRemaining}s.</p>
+              <button type="button" className="kiosk-start" onClick={dismissIdle}>I&rsquo;m here</button>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -555,7 +809,7 @@ const KioskBilling = ({ student, onLogout }) => {
   return (
     <>
       <div
-        className={`till${cart.length === 0 ? " till--bare" : ""}${
+        className={`till till--category-enter${cart.length === 0 ? " till--bare" : ""}${
           stubVisible ? " till--folded" : ""
         }${ticketVisible ? " till--cart-open" : ""}`}
       >
@@ -598,7 +852,7 @@ const KioskBilling = ({ student, onLogout }) => {
                 </div>
                 <div className="ticket-wallet">
                   <span>Wallet</span>
-                  <b className="money">{formatINR(student.pocketMoney)}</b>
+                  <b className="money">{formatINR(walletBalance)}</b>
                 </div>
               </div>
 
@@ -657,7 +911,7 @@ const KioskBilling = ({ student, onLogout }) => {
                       className="ticket-line-drop"
                       onClick={() => removeFromCart(item._id)}
                       disabled={removingIds.includes(item._id)}
-                      aria-label={`Remove ${item.name} from the ticket`}
+                      aria-label={`Remove ${item.name} from the order`}
                     >
                       ×
                     </button>
@@ -680,6 +934,10 @@ const KioskBilling = ({ student, onLogout }) => {
                   <b className="money">{formatINR(Math.abs(remaining))}</b>
                 </div>
 
+                {short && (
+                  <BalanceMeter available={walletBalance} required={invoiceTotal} />
+                )}
+
                 <div className="ticket-grand">
                   <span>Total</span>
                   <b className="money" key={invoiceTotal}>
@@ -696,10 +954,10 @@ const KioskBilling = ({ student, onLogout }) => {
                 </Button>
 
                 <Button
-                  className="btn--void"
-                  onClick={() => setConfirmVoid(true)}
+                  className="btn--cancel"
+                  onClick={() => setConfirmCancel(true)}
                 >
-                  Void ticket
+                  Cancel order
                 </Button>
               </div>
             </div>
@@ -748,11 +1006,14 @@ const KioskBilling = ({ student, onLogout }) => {
           </aside>
         )}
 
-        <section className="wall">
-          <div className="wall-top">
-            {cart.length === 0 && (
-              <img className="wall-logo" src={hungerLogo} alt="Hunger Hunt" />
-            )}
+        <section className={`wall${productWallScrolled ? " wall--scrolled" : ""}`}>
+          <div
+            className="wall-scroll"
+            onScroll={(event) => setProductWallScrolled(event.currentTarget.scrollTop > 1)}
+          >
+            <div className="wall-fixed">
+              <div className="wall-top">
+            <div className="kiosk-wordmark kiosk-wordmark--wall">Hunger Hunt</div>
 
             {/* Where the student search used to be. Nobody is looked up here
                 any more — the session already knows who this is, so the bar
@@ -763,8 +1024,9 @@ const KioskBilling = ({ student, onLogout }) => {
               </span>
 
               <div className="serving-who">
+                <div className="serving-label">Ordering for</div>
                 <div className="serving-name">{student.name}</div>
-                <div className="serving-meta">№ {student.admissionNumber}</div>
+                <div className="serving-meta">Admission no. {student.admissionNumber}</div>
               </div>
 
             </div>
@@ -773,70 +1035,140 @@ const KioskBilling = ({ student, onLogout }) => {
               type="button"
               className="kiosk-exit"
               onClick={() => setConfirmExit(true)}
-              aria-label="Void order and end session"
+              aria-label="Cancel order and end session"
             >
               <span aria-hidden="true">×</span>
             </button>
-          </div>
-
-          {inventoryError && (
-            <div className="banner banner--alert" role="status">
-              <span aria-hidden="true">⚠️</span>
-              <span>{inventoryError}</span>
+            <div
+              className="kiosk-session-clock"
+              role="timer"
+              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
+            >
+              <small>Session</small>
+              <strong>{formatSessionTime(capRemaining)}</strong>
             </div>
-          )}
-
-          <div className="wall-scroll">
-            <div className="filterbar">
-              <div className="seg" ref={segRef} role="tablist">
-                <span
-                  className="seg-lens"
-                  aria-hidden="true"
-                  style={{ "--x": `${lens.x}px`, "--w": `${lens.w}px` }}
-                />
-
-                {categories.map((category) => (
-                  <button
-                    type="button"
-                    key={category}
-                    role="tab"
-                    className="seg-item"
-                    data-on={selectedCategory === category}
-                    aria-selected={selectedCategory === category}
-                    onClick={() => setSelectedCategory(category)}
-                  >
-                    {category === "All" ? "All" : titleCase(category)}
-                  </button>
-                ))}
               </div>
 
-              <div className="wall-filter glass">
-                <span aria-hidden="true">⌕</span>
+              {inventoryError && (
+                <ErrorFeedback
+                  issue={presentError({ request: true, message: inventoryError })}
+                  level="inline"
+                  action={{ label: 'Try again', onClick: refreshPage }}
+                />
+              )}
+
+            <div className={`filterbar${searchOpen ? " filterbar--searching" : ""}`}>
+              <div className="filterbar-groups">
+                <div
+                  className="seg"
+                  ref={segRef}
+                  role="tablist"
+                  aria-hidden={searchOpen}
+                >
+                  <span
+                    className="seg-lens"
+                    aria-hidden="true"
+                    style={{ "--x": `${lens.x}px`, "--w": `${lens.w}px` }}
+                  />
+
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category}
+                      role="tab"
+                      className="seg-item"
+                      data-on={selectedCategory === category}
+                      aria-selected={selectedCategory === category}
+                      tabIndex={searchOpen ? -1 : 0}
+                      onClick={() => setSelectedCategory(category)}
+                    >
+                      {titleCase(category)}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="filterbar-group-logo"
+                  aria-label="Close search and show categories"
+                  tabIndex={searchOpen ? 0 : -1}
+                  onClick={closeSearch}
+                >
+                  <img src={hungerLogo} alt="" />
+                </button>
+              </div>
+
+              <div className="wall-search glass">
                 <input
+                  ref={searchInputRef}
                   className="wall-filter-input"
                   placeholder="Find an item…"
                   aria-label="Find an item by name"
+                  tabIndex={searchOpen ? 0 : -1}
                   value={productSearchQuery}
                   onChange={(e) => setProductSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") closeSearch();
+                  }}
                 />
+                <button
+                  type="button"
+                  className="wall-search-toggle"
+                  aria-label={searchOpen ? "Close product search" : "Search products"}
+                  aria-expanded={searchOpen}
+                  onClick={() => searchOpen ? closeSearch() : setSearchOpen(true)}
+                >
+                  <span aria-hidden="true">{searchOpen ? "×" : "⌕"}</span>
+                </button>
               </div>
             </div>
+            </div>
+
+            {!loadingProducts && selectedCategory && (
+              <header className="wall-group-heading">
+                <div>
+                  <span>Category</span>
+                  <h2>{titleCase(selectedCategory)}</h2>
+                </div>
+                <p>
+                  {productSearchQuery.trim()
+                    ? `${filteredProducts.length} matching ${filteredProducts.length === 1 ? 'item' : 'items'}`
+                    : `${categoryProducts.length} ${categoryProducts.length === 1 ? 'item' : 'items'} · A–Z`}
+                </p>
+              </header>
+            )}
 
             {loadingProducts ? (
               <div className="wall-state">
                 <b>Loading products…</b>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="wall-state">
-                <b>Nothing matches</b>
-                <span>No items in stock match that category or search.</span>
+              <div className="wall-state wall-state--empty">
+                <span className="wall-state__icon" aria-hidden="true">{productSearchQuery.trim() ? '⌕' : '↻'}</span>
+                <b>{productSearchQuery.trim() ? 'No items found' : 'This category is being restocked'}</b>
+                <span>
+                  {productSearchQuery.trim()
+                    ? 'Try another product name or choose a different category.'
+                    : 'Choose another category or ask a staff member for help.'}
+                </span>
               </div>
             ) : (
-              <div className="wall-grid">
-                {filteredProducts.map((p, i) => {
+              <div className="kiosk-subcategory-shelves">
+                {subCategorySections.map((subCategory, sectionIndex) => (
+                  <section className="kiosk-subcategory" key={subCategory.name} aria-labelledby={`subcategory-${sectionIndex}`}>
+                    <header className="kiosk-subcategory__heading">
+                      <div>
+                        <h3 id={`subcategory-${sectionIndex}`}>{subCategory.name}</h3>
+                      </div>
+                      <p>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'} <b aria-hidden="true">→</b></p>
+                    </header>
+                    <div className="wall-grid wall-grid--rail" role="list">
+                {subCategory.products.map((p, i) => {
                   const line = cart.find((item) => item._id === p._id);
+                  const maxAllowed = Math.min(p.stock, allowanceCeiling(p));
+                  const limitReached = maxAllowed < 1;
                   const atCeiling =
-                    (parseInt(line?.quantity, 10) || 0) >= p.stock;
+                    (parseInt(line?.quantity, 10) || 0) >= maxAllowed;
 
                   return (
                     <article
@@ -844,7 +1176,8 @@ const KioskBilling = ({ student, onLogout }) => {
                         recentlyAdded === p._id ? " tile--just-added" : ""
                       }`}
                       key={p._id}
-                      style={{ "--i": i }}
+                      style={{ "--i": i + sectionIndex }}
+                      role="listitem"
                     >
                       <figure>
                         <img src={p.image || PLACEHOLDER} alt="" />
@@ -870,6 +1203,14 @@ const KioskBilling = ({ student, onLogout }) => {
                         {p.stockGroup?.name && (
                           <p className="tile-meta">
                             {titleCase(p.stockGroup.name)}
+                          </p>
+                        )}
+
+                        {p.purchaseAllowance?.enabled && (
+                          <p className={`tile-limit${limitReached ? " tile-limit--reached" : ""}`}>
+                            {limitReached
+                              ? `${allowancePeriod(p.purchaseAllowance.period)} limit reached`
+                              : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`}
                           </p>
                         )}
 
@@ -916,7 +1257,7 @@ const KioskBilling = ({ student, onLogout }) => {
                             <button
                               type="button"
                               className="tile-step-btn"
-                              disabled={atCeiling}
+                              aria-disabled={atCeiling}
                               onClick={() => stepQuantity(p._id, 1)}
                               aria-label={`One more ${p.name}`}
                             >
@@ -926,15 +1267,19 @@ const KioskBilling = ({ student, onLogout }) => {
                         ) : (
                           <Button
                             className="btn--add"
+                            aria-disabled={limitReached}
                             onClick={() => addToCart(p)}
                           >
-                            Add
+                            {limitReached ? "Limit reached" : "Add"}
                           </Button>
                         )}
                       </div>
                     </article>
                   );
                 })}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </div>
@@ -1042,36 +1387,36 @@ const KioskBilling = ({ student, onLogout }) => {
         </div>
       )}
 
-      {confirmVoid && (
+      {confirmCancel && (
         <div
           className="modal-backdrop till-modal-backdrop"
-          onClick={() => setConfirmVoid(false)}
+          onClick={() => setConfirmCancel(false)}
         >
           <div
             className="modal till-modal"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="void-title"
+            aria-labelledby="cancel-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title" id="void-title">
-              Void this ticket?
+            <h2 className="modal-title" id="cancel-title">
+              Cancel this order?
             </h2>
 
             <p className="verify-line">
-              The {itemCount} {itemCount === 1 ? "item" : "items"} on the ticket
-              and the selected student will be cleared. Nothing is charged.
+              The {itemCount} {itemCount === 1 ? "item" : "items"} in your cart
+              will be removed. Nothing will be charged, and you can keep shopping.
             </p>
 
             <div className="modal-actions">
               <Button
                 className="btn--quiet"
-                onClick={() => setConfirmVoid(false)}
+                onClick={() => setConfirmCancel(false)}
               >
-                Keep ticket
+                Keep order
               </Button>
-              <Button className="btn--confirm btn--destroy" onClick={voidTicket}>
-                Void ticket
+              <Button className="btn--confirm btn--destroy" onClick={cancelOrder}>
+                Cancel order
               </Button>
             </div>
           </div>
@@ -1093,15 +1438,15 @@ const KioskBilling = ({ student, onLogout }) => {
             <div className="exit-warning-mark" aria-hidden="true">×</div>
 
             <h2 className="modal-title" id="exit-title">
-              Void this order?
+              Cancel and exit?
             </h2>
 
             <p className="verify-line">
               {itemCount > 0
-                ? `The ${itemCount} ${
+                ? `Your ${itemCount} ${
                     itemCount === 1 ? "item" : "items"
-                  } in your cart will be removed and your session will end. Nothing will be charged.`
-                : "Your ordering session will end and return to the admission screen. Nothing will be charged."}
+                  } will be removed and your session will end. Nothing will be charged.`
+                : "Your session will end and return to the sign-in screen. Nothing will be charged."}
             </p>
 
             <div className="modal-actions">
@@ -1115,7 +1460,7 @@ const KioskBilling = ({ student, onLogout }) => {
                 className="btn--confirm btn--destroy"
                 onClick={onLogout}
               >
-                Void &amp; exit
+                Cancel &amp; exit
               </Button>
             </div>
           </div>
@@ -1132,7 +1477,7 @@ const KioskBilling = ({ student, onLogout }) => {
         </div>
       )}
 
-      {/* Thirty quiet seconds. Almost always a terminal somebody walked away
+      {/* One quiet minute. Almost always a terminal somebody walked away
           from; occasionally a child deciding. Ten seconds and a visible count
           is enough for the second case and quick enough for the first. Any
           touch anywhere dismisses it, including on this backdrop. */}
@@ -1199,7 +1544,7 @@ const KioskBilling = ({ student, onLogout }) => {
                   in the app, which needs only their own account password. */}
               <input
                 id="purchase-password"
-                className="input"
+                className={`input${pinIssue ? " field-has-error" : ""}`}
                 type="password"
                 inputMode="numeric"
                 autoComplete="off"
@@ -1207,22 +1552,26 @@ const KioskBilling = ({ student, onLogout }) => {
                 maxLength={PURCHASE_CODE_LENGTH}
                 placeholder="4-digit code"
                 value={purchasePassword}
-                onChange={(e) =>
-                  setPurchasePassword(
-                    e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH)
-                  )
-                }
+                aria-invalid={Boolean(pinIssue)}
+                aria-describedby={pinIssue ? 'purchase-code-error' : undefined}
+                onChange={(e) => {
+                  setPinIssue(null);
+                  setPurchasePassword(e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH));
+                }}
                 disabled={paying}
               />
 
+              <div className={`kiosk-pin-dots${pinIssue ? ' pin-error-shake' : ''}`} aria-hidden="true">
+                {Array.from({ length: PURCHASE_CODE_LENGTH }, (_, index) => (
+                  <i key={index} className={index < purchasePassword.length ? 'is-filled' : ''} />
+                ))}
+              </div>
+
+              {pinIssue && (
+                <ErrorFeedback id="purchase-code-error" key={pinIssue.key} issue={pinIssue} level="inline" className="kiosk-pin-feedback" />
+              )}
+
               <div className="modal-actions">
-                <Button
-                  className="btn--quiet"
-                  disabled={paying}
-                  onClick={closeVerify}
-                >
-                  Cancel
-                </Button>
                 <Button
                   type="submit"
                   className="btn--confirm"
@@ -1230,10 +1579,40 @@ const KioskBilling = ({ student, onLogout }) => {
                 >
                   {paying ? "Processing…" : "Verify & Pay"}
                 </Button>
+                <Button
+                  className="btn--quiet"
+                  disabled={paying}
+                  onClick={closeVerify}
+                >
+                  Cancel
+                </Button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {feedback && (
+        <ErrorFeedback
+          key={feedback.key}
+          issue={feedback}
+          className="error-feedback--kiosk-popover"
+          available={feedback.available}
+          required={feedback.required}
+          action={{ label: 'Got it', onClick: () => setFeedback(null) }}
+        >
+          {feedback.product && (
+            <LimitMeter
+              used={feedback.product.purchaseAllowance?.purchased}
+              pending={feedback.product.purchaseAllowance?.pending}
+              limit={feedback.product.purchaseAllowance?.quantity}
+              period={allowancePeriod(feedback.product.purchaseAllowance?.period)}
+            />
+          )}
+          {feedback.available !== undefined && feedback.required === undefined && (
+            <StockMeter available={feedback.available} requested={feedback.requested} />
+          )}
+        </ErrorFeedback>
       )}
 
       <RefreshButton onRefresh={refreshPage} loading={loadingProducts} />

@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import hungerLogo from "../assets/Logo.png";
-import { Banner } from "../components/ui";
+import KioskResultScreen from "../components/KioskResultScreen";
+import { ErrorFeedback } from "../components/error/ErrorFeedback";
+import { presentError } from "../utils/errorPresentation";
 
 /* The kiosk's resting state, and the whole of what it asks for: the number the
    school already gave the student. No secret here — the four-digit code is
@@ -13,10 +15,13 @@ import { Banner } from "../components/ui";
    a counter somebody stands behind. */
 const Login = () => {
   const navigate = useNavigate();
-  const [admissionNumber, setAdmissionNumber] = useState("");
+  const [digits, setDigits] = useState(["", "", "", "", ""]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [blockedScreen, setBlockedScreen] = useState(null);
+  const digitRefs = useRef([]);
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     if (!sessionReady) return undefined;
@@ -28,18 +33,17 @@ const Login = () => {
     return () => window.clearTimeout(enter);
   }, [navigate, sessionReady]);
 
-  const handleSubmit = async (e) => {
-    e?.preventDefault();
-
-    if (!admissionNumber.trim() || loading) return;
+  const startSession = async (admissionNumber) => {
+    if (!/^\d{5}$/.test(admissionNumber) || requestInFlight.current) return;
 
     setError("");
+    requestInFlight.current = true;
 
     try {
       setLoading(true);
 
       const { data } = await api.post("/students/kiosk-session", {
-        admissionNumber: admissionNumber.trim(),
+        admissionNumber,
       });
 
       localStorage.setItem("kioskToken", data.token);
@@ -49,72 +53,180 @@ const Login = () => {
       // The server's own words. An unknown number and a student whose parent
       // never set a code are different problems with different answers, and
       // only one of them is worth trying again.
-      setError(
-        err.response?.data?.message ||
-          "Could not start a session. Please try again."
-      );
+      const response = err.response?.data;
+      if (
+        ["KIOSK_WALLET_EMPTY", "KIOSK_ACTIVE_ORDER"].includes(response?.code) &&
+        response?.screen
+      ) {
+        setBlockedScreen(response.screen);
+      } else {
+        setError(
+          response?.message || "Could not start a session. Please try again."
+        );
+      }
+      setDigits(["", "", "", "", ""]);
       setLoading(false);
+      requestInFlight.current = false;
+      window.setTimeout(() => digitRefs.current[0]?.focus(), 0);
     }
   };
 
+  const returnToLogin = () => {
+    setBlockedScreen(null);
+    setError("");
+    setDigits(["", "", "", "", ""]);
+    requestInFlight.current = false;
+    window.setTimeout(() => digitRefs.current[0]?.focus(), 0);
+  };
+
+  const updateDigit = (index, rawValue) => {
+    if (loading || sessionReady) return;
+
+    const value = rawValue.replace(/\D/g, "").slice(-1);
+    const next = [...digits];
+    next[index] = value;
+    setDigits(next);
+    setError("");
+
+    if (value && index < next.length - 1) {
+      digitRefs.current[index + 1]?.focus();
+    }
+    if (next.every(Boolean)) startSession(next.join(""));
+  };
+
+  const handleKeyDown = (event, index) => {
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      const next = [...digits];
+
+      if (next[index]) {
+        next[index] = "";
+      } else if (index > 0) {
+        next[index - 1] = "";
+        digitRefs.current[index - 1]?.focus();
+      }
+      setDigits(next);
+      setError("");
+    } else if (event.key === "ArrowLeft" && index > 0) {
+      digitRefs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowRight" && index < digits.length - 1) {
+      digitRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (event) => {
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 5);
+    if (!pasted) return;
+
+    event.preventDefault();
+    const next = Array.from({ length: 5 }, (_, index) => pasted[index] || "");
+    setDigits(next);
+    setError("");
+
+    if (pasted.length === 5) {
+      startSession(pasted);
+    } else {
+      digitRefs.current[pasted.length]?.focus();
+    }
+  };
+
+  if (blockedScreen) {
+    return (
+      <KioskResultScreen
+        {...blockedScreen}
+        onDone={returnToLogin}
+      />
+    );
+  }
+
   return (
-    /* Built on .kiosk-welcome rather than beside it. The attract screen and
-       the login are now the same screen — one tap fewer, and the brand ground
-       it already had is kept, so restyling it onto the till's white remains
-       the open decision it was. */
     <div
-      className={`kiosk-welcome kiosk-gate${
-        sessionReady ? " kiosk-gate--ready" : ""
+      className={`kiosk-login${
+        sessionReady ? " kiosk-login--ready" : ""
       }`}
       aria-busy={loading}
     >
-      <div className="kiosk-gate-orb kiosk-gate-orb--one" aria-hidden="true" />
-      <div className="kiosk-gate-orb kiosk-gate-orb--two" aria-hidden="true" />
+      <div className="kiosk-login-glow kiosk-login-glow--one" aria-hidden="true" />
+      <div className="kiosk-login-glow kiosk-login-glow--two" aria-hidden="true" />
 
-      <div className="kiosk-gate-content">
-        <img className="kiosk-welcome-logo" src={hungerLogo} alt="Hunger Hunt" />
+      <header className="kiosk-login-brand">
+        <img src={hungerLogo} alt="Hunger Hunt" />
+        <span>Student self-service</span>
+      </header>
 
-        <p className="kiosk-gate-kicker">Ready when you are</p>
-        <h1 className="kiosk-gate-prompt">Enter your admission number</h1>
+      <main className="kiosk-login-shell">
+        <section className="kiosk-login-intro">
+          <p className="kiosk-login-eyebrow">Fresh picks. Your way.</p>
+          <h1>Welcome to<br />Hunger Hunt</h1>
+          <p className="kiosk-login-copy">
+            Sign in, choose what you like, and review your order before paying.
+          </p>
+          <ol className="kiosk-login-steps" aria-label="How ordering works">
+            <li><span>1</span>Sign in</li>
+            <li><span>2</span>Choose items</li>
+            <li><span>3</span>Place order</li>
+          </ol>
+        </section>
 
-        {error && (
-          <Banner variant="alert" icon="⚠️" style={{ marginBottom: 20 }}>
-            {error}
-          </Banner>
-        )}
+        <section className="kiosk-login-card" aria-labelledby="student-sign-in-title">
+          <div className="kiosk-login-card__icon" aria-hidden="true">#</div>
+          <p className="kiosk-login-card__kicker">Let&rsquo;s find your account</p>
+          <h2 id="student-sign-in-title">Enter admission number</h2>
+          <p>Use the five-digit number provided by your school.</p>
 
-        <form onSubmit={handleSubmit} className="kiosk-gate-form">
-        {/* Not restricted to digits: a school's admission numbers may carry a
-            letter or a dash, and a field that refuses them locks the student
-            out of the only screen they can start from. inputMode brings up the
-            number pad for the common case without ruling the rest out. */}
-          <input
-            className="kiosk-gate-input"
-            inputMode="numeric"
-            autoComplete="off"
-            autoFocus
-            aria-label="Admission number"
-            placeholder="Admission number"
-            value={admissionNumber}
-            onChange={(e) => setAdmissionNumber(e.target.value.trim())}
-            disabled={sessionReady}
-          />
+          {error && (
+            <ErrorFeedback
+              issue={presentError({ message: error })}
+              level="inline"
+              className="kiosk-login-error"
+            />
+          )}
 
-          <button
-            type="submit"
-            className="kiosk-start"
-            disabled={loading || !admissionNumber.trim()}
-          >
+          <fieldset className="kiosk-login-form" disabled={loading || sessionReady}>
+            <legend>Five-digit admission number</legend>
+            <div className="kiosk-login-otp" onPaste={handlePaste}>
+              {digits.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={(element) => { digitRefs.current[index] = element; }}
+                  className="kiosk-login-otp__digit"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength="1"
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
+                  autoFocus={index === 0}
+                  aria-label={`Admission number digit ${index + 1} of 5`}
+                  value={digit}
+                  aria-invalid={Boolean(error)}
+                  onChange={(event) => updateDigit(index, event.target.value)}
+                  onKeyDown={(event) => handleKeyDown(event, index)}
+                  onFocus={(event) => event.target.select()}
+                />
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="kiosk-login-status" aria-live="polite">
             {sessionReady ? (
               <><span className="kiosk-ready-check">✓</span> Welcome!</>
             ) : loading ? (
               <><span className="kiosk-button-spinner" /> Finding you…</>
             ) : (
-              "START ORDER"
+              <span>Enter all five digits to continue automatically</span>
             )}
-          </button>
-        </form>
-      </div>
+          </div>
+
+          <p className="kiosk-login-help">
+            Having trouble? Ask a staff member for help.
+          </p>
+        </section>
+      </main>
+
+      <footer className="kiosk-login-footer">
+        <span>Secure school ordering</span>
+        <span>Your purchase code is only requested at checkout</span>
+      </footer>
     </div>
   );
 };

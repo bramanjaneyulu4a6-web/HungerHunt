@@ -298,8 +298,8 @@ const Purchased = () => {
         </Banner>
       ) : activeTab === "new" ? (
         newPurchases.length === 0 ? (
-          <EmptyState icon="✨" title="No pending orders">
-            New purchase orders will appear here for receiving.
+          <EmptyState icon="✓" title="Receiving queue is clear" variant="success">
+            No supplier orders are waiting to be received. New approved orders will appear here automatically.
           </EmptyState>
         ) : (
           newPurchases.map((purchase) => {
@@ -460,8 +460,8 @@ const Purchased = () => {
           })
         )
       ) : completedPurchases.length === 0 ? (
-        <EmptyState icon="🗂️" title="No completed orders yet">
-          Orders you complete or cancel are archived here.
+        <EmptyState icon="🗂️" title="No order history yet">
+          Completed and cancelled supplier orders will be archived here.
         </EmptyState>
       ) : (
         completedPurchases.map((purchase) => {

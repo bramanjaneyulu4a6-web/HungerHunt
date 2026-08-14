@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { Banner, Button, Card, EmptyState, Skeleton } from '../components/ui';
 import { PURCHASE_CODE_LENGTH, purchaseCodeProblem } from '../utils/validation';
+import { ErrorFeedback } from '../components/error/ErrorFeedback';
+import { presentError } from '../utils/errorPresentation';
 
 export default function SetPurchasePassword() {
   const { id } = useParams();
@@ -157,17 +159,28 @@ export default function SetPurchasePassword() {
      the number pad comes up instead of a keyboard, and non-digits are dropped
      as they are typed rather than rejected on save. Still masked: it is typed
      at a counter with a queue behind it. */
-  const codeField = (label, value, onChange) =>
-    field(label, {
-      type: 'password',
-      inputMode: 'numeric',
-      autoComplete: 'new-password',
-      maxLength: PURCHASE_CODE_LENGTH,
-      placeholder: '••••',
-      value,
-      onChange: (e) =>
-        onChange(e.target.value.replace(/\D/g, '').slice(0, PURCHASE_CODE_LENGTH)),
-    });
+  const codeField = (label, value, onChange) => (
+    <div className={error ? 'pin-field pin-error-shake' : 'pin-field'}>
+      {field(label, {
+        type: 'password',
+        inputMode: 'numeric',
+        autoComplete: 'new-password',
+        maxLength: PURCHASE_CODE_LENGTH,
+        placeholder: '••••',
+        value,
+        'aria-invalid': Boolean(error),
+        onChange: (e) => {
+          setError('');
+          onChange(e.target.value.replace(/\D/g, '').slice(0, PURCHASE_CODE_LENGTH));
+        },
+      })}
+      <div className="parent-pin-dots" aria-hidden="true">
+        {Array.from({ length: PURCHASE_CODE_LENGTH }, (_, index) => (
+          <i key={index} className={index < value.length ? 'is-filled' : ''} />
+        ))}
+      </div>
+    </div>
+  );
 
   /* The parent's own account password — the only other secret in the system,
      and the one that recovers a child's code. Unrestricted, because it is a
@@ -217,12 +230,7 @@ export default function SetPurchasePassword() {
     return (
       <div className="page">
         <div style={{ maxWidth: 500, margin: '0 auto' }}>
-          <Banner variant="alert" icon="⚠️">
-            {loadError}
-          </Banner>
-          <Button variant="ghost" onClick={retry} style={{ marginTop: 16 }}>
-            Try again
-          </Button>
+          <ErrorFeedback issue={presentError({ request: true, message: loadError })} action={{ label: 'Try again', onClick: retry }} />
         </div>
       </div>
     );
@@ -287,9 +295,7 @@ export default function SetPurchasePassword() {
           )}
 
           {error && (
-            <Banner variant="alert" icon="⚠️" style={{ marginTop: 20 }}>
-              {error}
-            </Banner>
+            <ErrorFeedback issue={presentError({ status: 400, message: error })} level="inline" className="purchase-code-error" />
           )}
 
           {success && (

@@ -17,6 +17,12 @@ const paths = {
   plus: <><path d="M12 5v14M5 12h14"/></>,
   minus: <path d="M5 12h14"/>,
   refresh: <><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6 6.5L4 9M5.5 15A7 7 0 0 0 18 17.5l2-2.5"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
+  trash: <><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7v13h12V7"/><path d="M10 11v6M14 11v6"/></>,
+  upload: <><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v3h16v-3"/></>,
+  // Points down for descending and is flipped in CSS for ascending, so one
+  // glyph carries both directions and only the sorted column shows it.
+  caret: <path d="m6 9 6 6 6-6"/>,
 };
 
 export default function Icon({ name, size = 20, className, ...rest }) {

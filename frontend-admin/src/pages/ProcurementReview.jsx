@@ -74,7 +74,9 @@ export default function ProcurementReview() {
       {loading ? (
         <><Skeleton height={150} radius={16} /><Skeleton height={150} radius={16} style={{ marginTop: 14 }} /></>
       ) : orders.length === 0 && !error ? (
-        <EmptyState icon="✓" title="Review queue is clear">New warehouse requests will appear here.</EmptyState>
+        <EmptyState icon="✓" title="You're all caught up" variant="success">
+          No warehouse requests are waiting for review. New requests will appear here automatically.
+        </EmptyState>
       ) : (
         orders.map((order) => (
           <Card key={order.id} className="warehouse-review-card">

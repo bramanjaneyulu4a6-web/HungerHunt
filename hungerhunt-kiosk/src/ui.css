@@ -685,6 +685,45 @@ select.auth-input {
   line-height: 1.5;
 }
 
+.empty-state--success {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, var(--surface) 28%, var(--success-bg) 100%);
+  border: 1px solid var(--success-border);
+  box-shadow: 0 12px 36px rgba(22, 101, 52, 0.08);
+}
+
+.empty-state--success::after {
+  content: '';
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  right: -55px;
+  bottom: -70px;
+  border-radius: 50%;
+  background: var(--success-bg-strong);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.empty-state--success .empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  color: var(--white);
+  background: var(--success);
+  border: 6px solid var(--success-bg-strong);
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(22, 101, 52, 0.18);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.empty-state--success .empty-state__title {
+  color: var(--success-deep);
+}
+
 /* ---- motion ----------------------------------------------------------- */
 
 @keyframes rise-in {

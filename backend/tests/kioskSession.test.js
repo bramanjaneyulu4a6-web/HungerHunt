@@ -52,6 +52,7 @@ const Inventory = (await import('../models/Inventory.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
+const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 
 const STUDENT_ID = '507f191e810c19729de860ea';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
@@ -62,6 +63,7 @@ const queryFor = (value) => {
   const query = Promise.resolve(value);
   query.select = () => query;
   query.populate = () => query;
+  query.sort = () => query;
   return query;
 };
 
@@ -138,8 +140,14 @@ describe('opening a kiosk session', () => {
     hostelNumber: 'H-4',
   };
 
+  const noActiveOrder = () => {
+    mock.method(PendingOrder, 'findOne', () => queryFor(null));
+    mock.method(FulfillmentOrder, 'findOne', () => queryFor(null));
+  };
+
   test('a known admission number gets a token and only what the screen needs', async () => {
     mock.method(Student, 'findOne', () => queryFor(onRoll));
+    noActiveOrder();
 
     const res = await postSession({ admissionNumber: ' ADM-1042 ' });
     assert.equal(res.status, 200);
@@ -152,6 +160,12 @@ describe('opening a kiosk session', () => {
       name: 'Asha Rao',
       admissionNumber: 'ADM-1042',
       pocketMoney: 350,
+      wallet: {
+        studentId: STUDENT_ID,
+        balance: 350,
+        currency: 'INR',
+        updatedAt: null,
+      },
       requiresParentApproval: false,
     });
 
@@ -165,6 +179,7 @@ describe('opening a kiosk session', () => {
 
   test('the token it hands back is a session for that student', async () => {
     mock.method(Student, 'findOne', () => queryFor(onRoll));
+    noActiveOrder();
 
     const { token } = await (await postSession({ admissionNumber: 'ADM-1042' })).json();
     const payload = verifyToken(token, 'student');
@@ -187,6 +202,50 @@ describe('opening a kiosk session', () => {
     const res = await postSession({ admissionNumber: 'ADM-1042' });
     assert.equal(res.status, 403);
     assert.match((await res.json()).message, /purchase code/i);
+  });
+
+  test('an empty wallet gets the full-screen refusal payload and no token', async () => {
+    mock.method(Student, 'findOne', () => queryFor({ ...onRoll, pocketMoney: 0 }));
+
+    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const body = await res.json();
+
+    assert.equal(res.status, 403);
+    assert.equal(body.code, 'KIOSK_WALLET_EMPTY');
+    assert.equal(body.screen.variant, 'wallet-empty');
+    assert.equal(body.token, undefined);
+  });
+
+  test('an active fulfillment order blocks a new kiosk session', async () => {
+    const deliverBy = new Date('2026-08-16T10:00:00.000Z');
+    mock.method(Student, 'findOne', () => queryFor(onRoll));
+    mock.method(PendingOrder, 'findOne', () => queryFor(null));
+    mock.method(FulfillmentOrder, 'findOne', () => queryFor({ status: 'PACKED', deliverBy }));
+
+    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.code, 'KIOSK_ACTIVE_ORDER');
+    assert.equal(body.order.status, 'PACKED');
+    assert.equal(body.order.deliverBy, deliverBy.toISOString());
+    assert.equal(body.screen.variant, 'active-order');
+    assert.equal(body.screen.orderStatus, 'PACKED');
+    assert.equal(body.screen.estimatedDeliveryDate, deliverBy.toISOString());
+    assert.equal(body.token, undefined);
+  });
+
+  test('a pending parent request blocks a new kiosk session', async () => {
+    mock.method(Student, 'findOne', () => queryFor(onRoll));
+    mock.method(PendingOrder, 'findOne', () => queryFor({ status: 'PENDING' }));
+    mock.method(FulfillmentOrder, 'findOne', () => queryFor(null));
+
+    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const body = await res.json();
+
+    assert.equal(res.status, 409);
+    assert.equal(body.order.type, 'PARENT_APPROVAL');
+    assert.match(body.screen.title, /parent approval/i);
   });
 
   test('a missing admission number is answered without a query', async () => {

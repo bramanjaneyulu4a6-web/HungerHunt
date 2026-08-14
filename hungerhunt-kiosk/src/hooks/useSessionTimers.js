@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 
 export const HARD_CAP_SECONDS = 450; // 7:30
 export const WARNING_SECONDS = 30;
-export const IDLE_SECONDS = 30;
+export const IDLE_SECONDS = 60;
 export const PROMPT_SECONDS = 10;
 
 export const useSessionTimers = ({ active, onExpire, isBusy }) => {

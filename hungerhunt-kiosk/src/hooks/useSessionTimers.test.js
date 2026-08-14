@@ -2,7 +2,7 @@
  *
  * Worth testing properly because they fail quietly: nothing looks wrong until
  * a terminal in a corridor sits on somebody's logged-in wallet all afternoon,
- * or throws a child out mid-order every thirty seconds. Neither shows up in a
+ * or throws a child out mid-order every minute. Neither shows up in a
  * screenshot, and both are hard to notice by hand — the cap alone takes seven
  * and a half minutes to observe once.
  *
@@ -28,7 +28,7 @@ const touch = () => act(() => { window.dispatchEvent(new Event('pointerdown')); 
 /* Advance the clock with the student still present — a touch every ten
    seconds — so the idle prompt stays out of tests that are about the cap.
    Without this a "does the cap fire at 7:30" test would really be watching the
-   idle timer end the session at 0:40. */
+   idle timer end the session at 1:10. */
 const tickPresent = (seconds) => {
   for (let left = seconds; left > 0; left -= 10) {
     tick(Math.min(10, left));
@@ -99,21 +99,21 @@ describe('the hard cap', () => {
 });
 
 describe('the idle prompt', () => {
-  test('appears after thirty quiet seconds', () => {
+  test('appears after one quiet minute', () => {
     const { result } = start();
 
-    tick(29);
+    tick(59);
     expect(result.current.idlePrompt).toBe(false);
 
     tick(1);
     expect(result.current.idlePrompt).toBe(true);
-    expect(IDLE_SECONDS).toBe(30);
+    expect(IDLE_SECONDS).toBe(60);
   });
 
   test('a touch dismisses it and the session goes on', () => {
     const { result, onExpire } = start();
 
-    tick(30);
+    tick(60);
     expect(result.current.idlePrompt).toBe(true);
 
     touch();
@@ -124,7 +124,7 @@ describe('the idle prompt', () => {
   test('ignored for ten seconds, it ends the session', () => {
     const { result, onExpire } = start();
 
-    tick(30);
+    tick(60);
     expect(result.current.idlePrompt).toBe(true);
     expect(PROMPT_SECONDS).toBe(10);
 
@@ -138,7 +138,7 @@ describe('the idle prompt', () => {
   test('counts down visibly while it waits', () => {
     const { result } = start();
 
-    tick(30);
+    tick(60);
     expect(result.current.idleRemaining).toBe(10);
 
     tick(4);
@@ -149,9 +149,9 @@ describe('the idle prompt', () => {
   test('keystrokes count as being present', () => {
     const { result } = start();
 
-    tick(25);
+    tick(50);
     act(() => { window.dispatchEvent(new Event('keydown')); });
-    tick(25);
+    tick(50);
 
     expect(result.current.idlePrompt).toBe(false);
   });
@@ -161,10 +161,10 @@ describe('the idle prompt', () => {
   test('the quiet count starts over after a dismissal', () => {
     const { result } = start();
 
-    tick(30);
+    tick(60);
     touch();
 
-    tick(29);
+    tick(59);
     expect(result.current.idlePrompt).toBe(false);
 
     tick(1);

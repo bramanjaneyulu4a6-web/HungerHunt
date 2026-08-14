@@ -1,15 +1,33 @@
-// // // // // // import mongoose from 'mongoose';
+// // // // // // // import mongoose from 'mongoose';
 
-// // // // // // const productSchema = new mongoose.Schema({
-// // // // // //   name: { type: String, required: true, unique: true },
-// // // // // //   price: { type: Number, required: true },
-// // // // // //   stock: { type: Number, required: true, default: 0 }
-// // // // // // }, { timestamps: true });
+// // // // // // // const productSchema = new mongoose.Schema({
+// // // // // // //   name: { type: String, required: true, unique: true },
+// // // // // // //   price: { type: Number, required: true },
+// // // // // // //   stock: { type: Number, required: true, default: 0 }
+// // // // // // // }, { timestamps: true });
 
-// // // // // // export default mongoose.model('Product', productSchema);
+// // // // // // // export default mongoose.model('Product', productSchema);
 
 
 
+
+
+
+
+// // // // // // import mongoose from "mongoose";
+
+// // // // // // const productSchema = new mongoose.Schema(
+// // // // // // {
+// // // // // //   name: {
+// // // // // //     type: String,
+// // // // // //     required: true,
+// // // // // //     unique: true
+// // // // // //   }
+// // // // // // },
+// // // // // // { timestamps: true }
+// // // // // // );
+
+// // // // // // export default mongoose.model("Product", productSchema);
 
 
 
@@ -22,17 +40,28 @@
 // // // // //     type: String,
 // // // // //     required: true,
 // // // // //     unique: true
+// // // // //   },
+
+// // // // //   price: {
+// // // // //     type: Number,
+// // // // //     required: true,
+// // // // //     default: 0
 // // // // //   }
 // // // // // },
 // // // // // { timestamps: true }
 // // // // // );
 
-// // // // // export default mongoose.model("Product", productSchema);
+// // // // // export default mongoose.model(
+// // // // //   "Product",
+// // // // //   productSchema
+// // // // // );
 
 
 
 
-// // // // import mongoose from "mongoose";
+// // // // // 19-06-2026
+
+
 
 // // // // const productSchema = new mongoose.Schema(
 // // // // {
@@ -42,26 +71,30 @@
 // // // //     unique: true
 // // // //   },
 
+// // // //   stockGroup: {
+// // // //     type: String,
+// // // //     required: true
+// // // //   },
+
+// // // //   unit: {
+// // // //     type: String,
+// // // //     required: true
+// // // //   },
+
 // // // //   price: {
 // // // //     type: Number,
-// // // //     required: true,
 // // // //     default: 0
 // // // //   }
 // // // // },
 // // // // { timestamps: true }
 // // // // );
 
-// // // // export default mongoose.model(
-// // // //   "Product",
-// // // //   productSchema
-// // // // );
 
 
 
 
-// // // // 19-06-2026
 
-
+// // // import mongoose from "mongoose";
 
 // // // const productSchema = new mongoose.Schema(
 // // // {
@@ -72,25 +105,24 @@
 // // //   },
 
 // // //   stockGroup: {
-// // //     type: String,
+// // //     type: mongoose.Schema.Types.ObjectId,
+// // //     ref: "StockGroup",
 // // //     required: true
 // // //   },
 
 // // //   unit: {
-// // //     type: String,
+// // //     type: mongoose.Schema.Types.ObjectId,
+// // //     ref: "Unit",
 // // //     required: true
-// // //   },
-
-// // //   price: {
-// // //     type: Number,
-// // //     default: 0
 // // //   }
 // // // },
 // // // { timestamps: true }
 // // // );
 
-
-
+// // // export default mongoose.model(
+// // //   "Product",
+// // //   productSchema
+// // // );
 
 
 
@@ -114,15 +146,24 @@
 // //     type: mongoose.Schema.Types.ObjectId,
 // //     ref: "Unit",
 // //     required: true
+// //   },
+
+// //   price: {
+// //     type: Number,
+// //     default: 0
 // //   }
 // // },
 // // { timestamps: true }
 // // );
 
-// // export default mongoose.model(
-// //   "Product",
-// //   productSchema
-// // );
+// // export default mongoose.model("Product", productSchema);
+
+
+
+
+
+// // 08-07-2026
+
 
 
 
@@ -151,6 +192,11 @@
 //   price: {
 //     type: Number,
 //     default: 0
+//   },
+
+//   image: {
+//     type: String,
+//     default: ""
 //   }
 // },
 // { timestamps: true }
@@ -162,44 +208,65 @@
 
 
 
-// 08-07-2026
 
+
+
+// 14-08-2026
 
 
 
 import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
-{
-  name: {
-    type: String,
-    required: true,
-    unique: true
-  },
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true
+    },
 
-  stockGroup: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "StockGroup",
-    required: true
-  },
+    stockGroup: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "StockGroup",
+      required: true
+    },
 
-  unit: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Unit",
-    required: true
-  },
+    unit: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Unit",
+      required: true
+    },
 
-  price: {
-    type: Number,
-    default: 0
-  },
+    price: {
+      type: Number,
+      default: 0
+    },
 
-  image: {
-    type: String,
-    default: ""
-  }
-},
-{ timestamps: true }
+    image: {
+      type: String,
+      default: ""
+    },
+
+    purchaseLimit: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+
+      quantity: {
+        type: Number,
+        default: 0,
+        min: 0
+      },
+
+      period: {
+        type: String,
+        enum: ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"],
+        default: "DAILY"
+      }
+    }
+  },
+  { timestamps: true }
 );
 
 export default mongoose.model("Product", productSchema);

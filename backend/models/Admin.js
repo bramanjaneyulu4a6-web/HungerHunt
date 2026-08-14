@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const adminSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true, maxlength: 100 },
+  phone: { type: String, required: true, trim: true, maxlength: 30 },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 
@@ -16,8 +18,20 @@ const adminSchema = new mongoose.Schema({
   // the account should be deleted or made an admin.
   role: {
     type: String,
-    enum: ['admin', 'warehouse'],
+    enum: ['admin', 'warehouse', 'caretaker'],
     default: 'admin',
+  },
+
+  hostelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Hostel',
+    default: null,
+    validate: {
+      validator(value) {
+        return this.role === 'caretaker' ? Boolean(value) : value == null;
+      },
+      message: 'A hostel is required for caretaker accounts and is not allowed for other roles.',
+    },
   },
 
   resetPasswordToken: String,

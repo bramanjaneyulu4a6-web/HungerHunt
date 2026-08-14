@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { DEFAULT_SUBCATEGORY, SUBCATEGORY_MAX_LENGTH } from '../utils/productSubcategory.js';
 
 const productSchema = new mongoose.Schema(
 {
@@ -11,6 +12,19 @@ const productSchema = new mongoose.Schema(
   stockGroup: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "StockGroup",
+    required: true
+  },
+
+  // A shelf within the broad stock group shown on the kiosk. It stays a
+  // product field (rather than another global catalogue) because the same
+  // word can be useful under several groups and products move independently.
+  // Legacy rows resolve to Others until the backfill or an admin edit assigns
+  // something more specific.
+  subCategory: {
+    type: String,
+    trim: true,
+    maxlength: SUBCATEGORY_MAX_LENGTH,
+    default: DEFAULT_SUBCATEGORY,
     required: true
   },
 
@@ -99,5 +113,6 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ active: 1, name: 1 });
+productSchema.index({ stockGroup: 1, subCategory: 1, active: 1, name: 1 });
 
 export default mongoose.model("Product", productSchema);

@@ -186,7 +186,7 @@ const Purchase = () => {
             <thead>
               <tr>
                 <th>Product</th>
-                <th>Stock Group</th>
+                <th>Category</th>
                 <th>Unit</th>
                 <th style={{ width: 130 }}>Current Stock</th>
                 <th style={{ width: 160 }}>Purchase Quantity</th>
@@ -205,7 +205,7 @@ const Purchase = () => {
                   <td data-label="Product">
                     <strong>{product.name}</strong>
                   </td>
-                  <td data-label="Stock Group">
+                  <td data-label="Category">
                     {product.stockGroup?.name || (
                       <span style={{ color: "var(--muted-soft)" }}>None</span>
                     )}

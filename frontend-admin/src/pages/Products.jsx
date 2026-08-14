@@ -14,6 +14,7 @@ import { formatINR } from '../utils/format';
 const EMPTY_FORM = {
   name: '',
   stockGroup: '',
+  subCategory: 'Others',
   unit: '',
   price: '',
   reorderLevel: '5',
@@ -53,6 +54,15 @@ const Products = () => {
   const [groupName, setGroupName] = useState('');
   const [unitForm, setUnitForm] = useState({ name: '', symbol: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('kiosk');
+  const [selectedGroup, setSelectedGroup] = useState('All');
+  const [savingGroups, setSavingGroups] = useState(false);
+  const [draggedGroupId, setDraggedGroupId] = useState(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState(null);
+  const [editorCategoryId, setEditorCategoryId] = useState('');
+  const [subCategoryName, setSubCategoryName] = useState('');
+  const [draggedSubCategory, setDraggedSubCategory] = useState('');
+  const [dragOverSubCategory, setDragOverSubCategory] = useState('');
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -106,6 +116,15 @@ const Products = () => {
     if (units.length === 0) fetchUnits();
   };
 
+  const openCategoryEditor = () => {
+    setEditorCategoryId((current) =>
+      stockGroups.some((group) => group._id === current)
+        ? current
+        : (stockGroups[0]?._id || '')
+    );
+    setIsGroupOpen(true);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -114,6 +133,7 @@ const Products = () => {
       const data = new FormData();
       data.append('name', form.name);
       data.append('stockGroup', form.stockGroup);
+      data.append('subCategory', form.subCategory.trim() || 'Others');
       data.append('unit', form.unit);
       data.append('price', form.price);
       data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
@@ -152,6 +172,7 @@ const Products = () => {
     setForm({
       name: product.name || '',
       stockGroup: product.stockGroup?._id || '',
+      subCategory: product.subCategory || 'Others',
       unit: product.unit?._id || '',
       price: product.price ?? '',
       reorderLevel: String(product.reorderLevel ?? 5),
@@ -195,15 +216,196 @@ const Products = () => {
     e.preventDefault();
     if (!groupName.trim()) return;
 
+    setSavingGroups(true);
     try {
       await api.post('/stock-groups', { name: groupName });
       setGroupName('');
-      fetchStockGroups();
-      setIsGroupOpen(false);
-      toast.success('Stock group added');
+      await fetchStockGroups();
+      toast.success('Category added');
     } catch (error) {
       console.error(error);
-      toast.error('Failed to add stock group');
+      toast.error('Failed to add category');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const removeStockGroup = async (group) => {
+    const productCount = products.filter(
+      (product) => product.stockGroup?._id === group._id
+    ).length;
+
+    if (productCount > 0) {
+      toast.error('Move all products to another category before removing this category');
+      return;
+    }
+    if (!window.confirm(`Remove the empty category “${group.name}”?`)) return;
+
+    setSavingGroups(true);
+    try {
+      await api.delete(`/stock-groups/${group._id}`);
+      if (selectedGroup === group.name) setSelectedGroup('All');
+      await fetchStockGroups();
+      toast.success('Category removed');
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error.response?.data?.message || 'Failed to remove category'
+      );
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const reorderStockGroup = async (sourceId, targetId, position) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+
+    const reordered = [...stockGroups];
+    const sourceIndex = reordered.findIndex((group) => group._id === sourceId);
+    if (sourceIndex < 0) return;
+
+    const [movedGroup] = reordered.splice(sourceIndex, 1);
+    let targetIndex = reordered.findIndex((group) => group._id === targetId);
+    if (targetIndex < 0) return;
+    if (position === 'after') targetIndex += 1;
+    reordered.splice(targetIndex, 0, movedGroup);
+
+    setStockGroups(reordered);
+    setSavingGroups(true);
+
+    try {
+      await Promise.all(
+        reordered.map((group, order) =>
+          api.put(`/stock-groups/${group._id}`, { order })
+        )
+      );
+      toast.success('Category order updated');
+    } catch (error) {
+      console.error(error);
+      await fetchStockGroups();
+      toast.error('Failed to reorder categories');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const renameCategory = async (category) => {
+    const name = window.prompt('Rename category', category.name)?.trim();
+    if (!name || name === category.name) return;
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}`, { name });
+      await Promise.all([fetchStockGroups(), fetchProducts()]);
+      toast.success('Category renamed');
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to rename category');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const categorySubCategories = (category) => [
+    ...new Set([
+      ...(category?.subCategories || []),
+      ...products
+        .filter((product) => product.stockGroup?._id === category?._id)
+        .map((product) => product.subCategory || 'Others'),
+      'Others',
+    ]),
+  ];
+
+  const saveSubCategories = async (category, names, rename = {}) => {
+    const previous = stockGroups;
+    setStockGroups((current) => current.map((item) =>
+      item._id === category._id ? { ...item, subCategories: names } : item
+    ));
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}/subcategories`, {
+        subCategories: names,
+        ...rename,
+      });
+      await Promise.all([fetchStockGroups(), fetchProducts()]);
+    } catch (error) {
+      setStockGroups(previous);
+      toast.error(error.response?.data?.message || 'Failed to update sub-categories');
+      throw error;
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const addSubCategory = async (event) => {
+    event.preventDefault();
+    const category = stockGroups.find((group) => group._id === editorCategoryId);
+    const name = subCategoryName.trim();
+    if (!category || !name) return;
+    const current = categorySubCategories(category);
+    if (current.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      toast.error('That sub-category already exists in this category');
+      return;
+    }
+    try {
+      await saveSubCategories(category, [...current.filter((item) => item !== 'Others'), name, 'Others']);
+      setSubCategoryName('');
+      toast.success('Sub-category added');
+    } catch {
+      // saveSubCategories already restored state and explained the failure.
+    }
+  };
+
+  const renameSubCategory = async (category, currentName) => {
+    const name = window.prompt('Rename sub-category', currentName)?.trim();
+    if (!name || name === currentName) return;
+    const current = categorySubCategories(category);
+    if (current.some((item) => item !== currentName && item.toLowerCase() === name.toLowerCase())) {
+      toast.error('That sub-category name is already used in this category');
+      return;
+    }
+    try {
+      await saveSubCategories(
+        category,
+        current.map((item) => item === currentName ? name : item),
+        { renameFrom: currentName, renameTo: name }
+      );
+      toast.success('Sub-category renamed');
+    } catch {
+      // saveSubCategories handles the error.
+    }
+  };
+
+  const removeSubCategory = async (category, name) => {
+    if (name === 'Others') return;
+    const count = products.filter((product) =>
+      product.stockGroup?._id === category._id && (product.subCategory || 'Others') === name
+    ).length;
+    if (count) {
+      toast.error('Move these products to another sub-category before removing it');
+      return;
+    }
+    if (!window.confirm(`Remove the empty sub-category “${name}”?`)) return;
+    try {
+      await saveSubCategories(category, categorySubCategories(category).filter((item) => item !== name));
+      toast.success('Sub-category removed');
+    } catch {
+      // saveSubCategories handles the error.
+    }
+  };
+
+  const reorderSubCategory = async (category, source, target) => {
+    if (!source || !target || source === target) return;
+    const names = categorySubCategories(category);
+    const sourceIndex = names.indexOf(source);
+    const targetIndex = names.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const reordered = [...names];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    try {
+      await saveSubCategories(category, reordered);
+      toast.success('Sub-category order updated');
+    } catch {
+      // saveSubCategories handles the error.
     }
   };
 
@@ -225,8 +427,66 @@ const Products = () => {
 
   const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
-    return p.name?.toLowerCase().includes(query);
+    return (
+      p.name?.toLowerCase().includes(query) ||
+      p.subCategory?.toLowerCase().includes(query)
+    );
   });
+
+  const subCategorySuggestions = [
+    ...new Set(
+      (stockGroups.find((group) => group._id === form.stockGroup)?.subCategories || [])
+        .concat(products
+        .filter((product) => !form.stockGroup || product.stockGroup?._id === form.stockGroup)
+        .map((product) => product.subCategory || 'Others')
+        )
+        .concat(['Others'])
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const groupNames = [
+    ...new Set([
+      ...stockGroups.map((group) => group.name),
+      ...products.map((product) => product.stockGroup?.name).filter(Boolean),
+    ]),
+  ];
+  const catalogueGroups = ['All', ...groupNames];
+  const kioskProducts = filteredProducts.filter(
+    (product) =>
+      selectedGroup === 'All' || product.stockGroup?.name === selectedGroup
+  );
+  const visibleSections = (selectedGroup === 'All' ? groupNames : [selectedGroup])
+    .map((name) => ({
+      name,
+      products: kioskProducts.filter((product) => product.stockGroup?.name === name),
+    }))
+    .filter((section) => section.products.length > 0);
+
+  visibleSections.forEach((section) => {
+    const names = [...new Set(section.products.map((product) => product.subCategory || 'Others'))]
+      .sort((a, b) => (a === 'Others') - (b === 'Others') || a.localeCompare(b));
+    section.subCategories = names.map((name) => ({
+      name,
+      products: section.products.filter((product) => (product.subCategory || 'Others') === name),
+    }));
+  });
+  const ungroupedProducts =
+    selectedGroup === 'All'
+      ? kioskProducts.filter((product) => !product.stockGroup?.name)
+      : [];
+
+  if (ungroupedProducts.length > 0) {
+    const names = [...new Set(ungroupedProducts.map((product) => product.subCategory || 'Others'))]
+      .sort((a, b) => (a === 'Others') - (b === 'Others') || a.localeCompare(b));
+    visibleSections.push({
+      name: 'Unassigned',
+      products: ungroupedProducts,
+      subCategories: names.map((name) => ({
+        name,
+        products: ungroupedProducts.filter((product) => (product.subCategory || 'Others') === name),
+      })),
+    });
+  }
 
   const modalHeader = (title, onClose) => (
     <div
@@ -264,12 +524,9 @@ const Products = () => {
     <div className="page warehouse-page">
       <PageHeader
         title="Product Catalog"
-        subtitle="Manage products, stock groups and measurement units."
+        subtitle="Manage products, categories, sub-categories and measurement units."
         actions={
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Button variant="ghost" onClick={() => setIsGroupOpen(true)}>
-              + Stock Group
-            </Button>
             <Button variant="ghost" onClick={() => setIsUnitOpen(true)}>
               + Measurement Unit
             </Button>
@@ -278,10 +535,27 @@ const Products = () => {
         }
       />
 
-      <div style={{ marginBottom: 20 }}>
+      <div className="catalogue-controls">
+        <div className="catalogue-view-toggle" role="group" aria-label="Catalogue view">
+          <Button
+            variant={viewMode === 'kiosk' ? 'primary' : 'ghost'}
+            aria-pressed={viewMode === 'kiosk'}
+            onClick={() => setViewMode('kiosk')}
+          >
+            Kiosk View
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'primary' : 'ghost'}
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+          >
+            List View
+          </Button>
+        </div>
+
         <input
           type="search"
-          className="input"
+          className="input catalogue-search"
           aria-label="Search products"
           placeholder="🔍 Search products…"
           value={searchQuery}
@@ -318,14 +592,15 @@ const Products = () => {
             ? `Nothing matches "${searchQuery}".`
             : 'Add your first product to start selling.'}
         </EmptyState>
-      ) : (
+      ) : viewMode === 'list' ? (
         <div className="table-wrap">
           <table className="table table--stack table--hover">
             <thead>
               <tr>
                 <th style={{ width: 90 }}>Image</th>
                 <th>Product Name</th>
-                <th>Stock Group</th>
+                <th>Category</th>
+                <th>Sub-category</th>
                 <th>Unit</th>
                 <th style={{ width: 120 }}>Price</th>
                 <th style={{ width: 130 }}>Reorder point</th>
@@ -361,7 +636,8 @@ const Products = () => {
                       </Badge>
                     )}
                   </td>
-                  <td data-label="Stock Group">{p.stockGroup?.name}</td>
+                  <td data-label="Category">{p.stockGroup?.name}</td>
+                  <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
                   <td data-label="Unit">{p.unit?.symbol}</td>
                   <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
                     {formatINR(p.price || 0)}
@@ -391,39 +667,252 @@ const Products = () => {
             </tbody>
           </table>
         </div>
-      )}
-
-      {isGroupOpen && (
-        <div className="modal-backdrop" onClick={() => setIsGroupOpen(false)}>
-          <form
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={addStockGroup}
-          >
-            {modalHeader('Quick Add: Stock Group', () => setIsGroupOpen(false))}
-
-            <label className="field-label" htmlFor="group-name">
-              Stock Group Name
-            </label>
-            <input
-              id="group-name"
-              type="text"
-              className="input"
-              required
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., Bakery, Snacks"
-            />
-
-            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={() => setIsGroupOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Add Group</Button>
+      ) : (
+        <div className="catalogue-kiosk-view">
+          <div className="catalogue-group-toolbar">
+            <div className="catalogue-group-tabs" role="tablist" aria-label="Categories">
+              {catalogueGroups.map((group) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={group}
+                  className="catalogue-group-tab"
+                  aria-selected={selectedGroup === group}
+                  onClick={() => setSelectedGroup(group)}
+                >
+                  {group}
+                  <span>
+                    {group === 'All'
+                      ? products.length
+                      : products.filter((product) => product.stockGroup?.name === group).length}
+                  </span>
+                </button>
+              ))}
             </div>
-          </form>
+
+            <Button
+              variant="ghost"
+              className="catalogue-edit-list"
+              onClick={openCategoryEditor}
+            >
+              Edit
+            </Button>
+          </div>
+
+          {kioskProducts.length === 0 ? (
+            <EmptyState icon="📦" title="No products in this group">
+              {searchQuery.trim()
+                ? `Nothing in ${selectedGroup} matches "${searchQuery}".`
+                : 'Choose another category or add a product.'}
+            </EmptyState>
+          ) : (
+            <div className="catalogue-group-sections">
+              {visibleSections.map((section) => (
+                <section className="catalogue-group-section" key={section.name}>
+                  <header className="catalogue-group-heading">
+                    <div>
+                      <p>Category</p>
+                      <h2>{section.name}</h2>
+                    </div>
+                    <span>{section.products.length} {section.products.length === 1 ? 'item' : 'items'}</span>
+                  </header>
+
+                  <div className="catalogue-subcategory-sections">
+                    {section.subCategories.map((subCategory) => (
+                      <section className="catalogue-subcategory" key={subCategory.name}>
+                        <div className="catalogue-subcategory__heading">
+                          <h3>{subCategory.name}</h3>
+                          <span>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'}</span>
+                        </div>
+                        <div className="catalogue-product-grid catalogue-product-rail">
+                    {subCategory.products.map((product) => (
+                      <article
+                        className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
+                        key={product._id}
+                      >
+                        <div className="catalogue-product-image">
+                          {product.image ? (
+                            <img src={product.image} alt="" />
+                          ) : (
+                            <span aria-hidden="true">📦</span>
+                          )}
+                          {product.active === false && <Badge variant="neutral">Archived</Badge>}
+                          <div className="catalogue-product-hover-actions">
+                            <Button
+                              className="btn--sm"
+                              onClick={() => handleEditInit(product)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant={product.active === false ? 'success' : 'danger'}
+                              className="btn--sm"
+                              onClick={() => setArchived(product, product.active !== false)}
+                            >
+                              {product.active === false ? 'Restore' : 'Archive'}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="catalogue-product-body">
+                          <div className="catalogue-product-title">
+                            <h3>{product.name}</h3>
+                            <strong>{formatINR(product.price || 0)}</strong>
+                          </div>
+                          <p>
+                            {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
+                          </p>
+                          <dl>
+                            <div><dt>Safety stock</dt><dd>{product.safetyStock ?? 0}</dd></div>
+                            <div><dt>Student limit</dt><dd>{limitLabel(product)}</dd></div>
+                          </dl>
+
+                        </div>
+                      </article>
+                    ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       )}
+
+      {isGroupOpen && (() => {
+        const selectedCategory = stockGroups.find((group) => group._id === editorCategoryId) || stockGroups[0];
+        const subCategories = categorySubCategories(selectedCategory);
+        return (
+          <div className="modal-backdrop" onClick={() => setIsGroupOpen(false)}>
+            <div className="modal category-editor-modal" onClick={(e) => e.stopPropagation()}>
+              {modalHeader('Edit Categories', () => setIsGroupOpen(false))}
+
+              <p className="stock-group-editor__help">
+                Drag tabs and tiles to set the Kiosk order. Tap any category or sub-category name to rename it.
+              </p>
+
+              <div className="category-editor-tabs" role="tablist" aria-label="Category order">
+                {stockGroups.map((category) => (
+                  <div
+                    className={`category-editor-tab${editorCategoryId === category._id ? ' category-editor-tab--active' : ''}${draggedGroupId === category._id ? ' category-editor-tab--dragging' : ''}${dragOverGroupId === category._id ? ' category-editor-tab--target' : ''}`}
+                    key={category._id}
+                    draggable={!savingGroups}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', category._id);
+                      setDraggedGroupId(category._id);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragOverGroupId(category._id);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      reorderStockGroup(event.dataTransfer.getData('text/plain') || draggedGroupId, category._id, 'before');
+                      setDraggedGroupId(null);
+                      setDragOverGroupId(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedGroupId(null);
+                      setDragOverGroupId(null);
+                    }}
+                  >
+                    <span aria-hidden="true">⠿</span>
+                    <button type="button" role="tab" aria-selected={editorCategoryId === category._id} onClick={() => setEditorCategoryId(category._id)}>
+                      {category.name}
+                    </button>
+                    <button type="button" className="category-editor-rename" onClick={() => renameCategory(category)} aria-label={`Rename ${category.name}`}>✎</button>
+                  </div>
+                ))}
+              </div>
+
+              {selectedCategory && (
+                <section className="subcategory-editor" aria-labelledby="subcategory-editor-title">
+                  <header>
+                    <div>
+                      <p>Sub-categories in</p>
+                      <button type="button" id="subcategory-editor-title" onClick={() => renameCategory(selectedCategory)}>
+                        {selectedCategory.name} <span aria-hidden="true">✎</span>
+                      </button>
+                    </div>
+                    <Button
+                      variant="danger"
+                      className="btn--sm"
+                      disabled={savingGroups || products.some((product) => product.stockGroup?._id === selectedCategory._id)}
+                      onClick={() => removeStockGroup(selectedCategory)}
+                    >
+                      Remove category
+                    </Button>
+                  </header>
+
+                  <div className="subcategory-tile-grid">
+                    {subCategories.map((name) => {
+                      const count = products.filter((product) =>
+                        product.stockGroup?._id === selectedCategory._id && (product.subCategory || 'Others') === name
+                      ).length;
+                      return (
+                        <div
+                          className={`subcategory-editor-tile${draggedSubCategory === name ? ' subcategory-editor-tile--dragging' : ''}${dragOverSubCategory === name ? ' subcategory-editor-tile--target' : ''}`}
+                          key={name}
+                          draggable={!savingGroups}
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', name);
+                            setDraggedSubCategory(name);
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            setDragOverSubCategory(name);
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            reorderSubCategory(selectedCategory, event.dataTransfer.getData('text/plain') || draggedSubCategory, name);
+                            setDraggedSubCategory('');
+                            setDragOverSubCategory('');
+                          }}
+                          onDragEnd={() => {
+                            setDraggedSubCategory('');
+                            setDragOverSubCategory('');
+                          }}
+                        >
+                          <span className="subcategory-editor-tile__handle" aria-hidden="true">⠿</span>
+                          <button type="button" className="subcategory-editor-tile__name" onClick={() => renameSubCategory(selectedCategory, name)}>
+                            {name} <span aria-hidden="true">✎</span>
+                          </button>
+                          <small>{count} {count === 1 ? 'product' : 'products'}</small>
+                          {name !== 'Others' && (
+                            <button type="button" className="subcategory-editor-tile__remove" disabled={savingGroups || count > 0} onClick={() => removeSubCategory(selectedCategory, name)} aria-label={`Remove ${name}`}>×</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <form className="category-editor-add" onSubmit={addSubCategory}>
+                    <label className="field-label" htmlFor="subcategory-name">Add sub-category</label>
+                    <div>
+                      <input id="subcategory-name" className="input" value={subCategoryName} onChange={(event) => setSubCategoryName(event.target.value)} placeholder="e.g., Biscuits" maxLength="60" required />
+                      <Button type="submit" disabled={savingGroups}>Add</Button>
+                    </div>
+                  </form>
+                </section>
+              )}
+
+              <form className="category-editor-add category-editor-add--category" onSubmit={addStockGroup}>
+                <label className="field-label" htmlFor="group-name">Add category</label>
+                <div>
+                  <input id="group-name" className="input" required value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="e.g., Food & Snacks" />
+                  <Button type="submit" disabled={savingGroups}>Add</Button>
+                </div>
+              </form>
+
+              <div className="modal-actions"><Button variant="ghost" onClick={() => setIsGroupOpen(false)}>Done</Button></div>
+            </div>
+          </div>
+        );
+      })()}
 
       {isUnitOpen && (
         <div className="modal-backdrop" onClick={() => setIsUnitOpen(false)}>
@@ -532,24 +1021,41 @@ const Products = () => {
 
               <div>
                 <label className="field-label" htmlFor="product-group">
-                  Stock Group
+                  Category
                 </label>
                 <select
                   id="product-group"
                   className="select"
                   value={form.stockGroup}
                   onChange={(e) =>
-                    setForm({ ...form, stockGroup: e.target.value })
+                    setForm({ ...form, stockGroup: e.target.value, subCategory: 'Others' })
                   }
                   required
                 >
-                  <option value="">Select Stock Group</option>
+                  <option value="">Select Category</option>
                   {stockGroups.map((group) => (
                     <option key={group._id} value={group._id}>
                       {group.name}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-subcategory">
+                  Sub-category
+                </label>
+                <select
+                  id="product-subcategory"
+                  className="select"
+                  required
+                  value={form.subCategory}
+                  onChange={(e) => setForm({ ...form, subCategory: e.target.value })}
+                  disabled={!form.stockGroup}
+                >
+                  {subCategorySuggestions.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
+                <p className="field-help">Manage and reorder these options from Edit Categories.</p>
               </div>
 
               <div>

@@ -4,6 +4,7 @@ import Inventory from '../models/Inventory.js';
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { isNonNegativeNumber, isWholeNonNegative } from '../utils/quantities.js';
+import { normalizeSubCategory, SUBCATEGORY_MAX_LENGTH } from '../utils/productSubcategory.js';
 
 
 const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
@@ -111,6 +112,10 @@ export const addProduct = async (req, res) => {
     if (req.body.safetyStock !== undefined && !isWholeNonNegative(req.body.safetyStock)) {
       return res.status(400).json({ message: "Safety stock must be a whole number of zero or more." });
     }
+    const subCategory = normalizeSubCategory(req.body.subCategory);
+    if (subCategory.length > SUBCATEGORY_MAX_LENGTH) {
+      return res.status(400).json({ message: `Sub-category must be ${SUBCATEGORY_MAX_LENGTH} characters or fewer.` });
+    }
 
     const purchaseLimit = readPurchaseLimit(req.body);
 
@@ -123,6 +128,8 @@ export const addProduct = async (req, res) => {
       name: req.body.name,
 
       stockGroup: req.body.stockGroup,
+
+      subCategory,
 
       unit: req.body.unit,
 
@@ -199,6 +206,13 @@ export const updateProduct = async (req, res) => {
 
     if (req.body.name !== undefined) updateData.name = req.body.name;
     if (req.body.stockGroup !== undefined) updateData.stockGroup = req.body.stockGroup;
+    if (req.body.subCategory !== undefined) {
+      const subCategory = normalizeSubCategory(req.body.subCategory);
+      if (subCategory.length > SUBCATEGORY_MAX_LENGTH) {
+        return res.status(400).json({ message: `Sub-category must be ${SUBCATEGORY_MAX_LENGTH} characters or fewer.` });
+      }
+      updateData.subCategory = subCategory;
+    }
     if (req.body.unit !== undefined) updateData.unit = req.body.unit;
 
     if (req.body.price !== undefined) {
@@ -258,7 +272,6 @@ export const updateProduct = async (req, res) => {
     res.status(status).json({ error: error.message });
   }
 };
-
 
 
 

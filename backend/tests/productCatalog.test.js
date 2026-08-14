@@ -52,6 +52,7 @@ const post = (path, body) =>
 const NEW_PRODUCT = {
   name: 'Samosa',
   stockGroup: GROUP_ID,
+  subCategory: 'Savoury Snacks',
   unit: UNIT_ID,
   price: 12,
 };
@@ -68,6 +69,21 @@ describe('creating a product', () => {
     assert.equal(res.status, 201);
     assert.equal(String(shelf.productId), PRODUCT_ID);
     assert.equal(shelf.stock, 0);
+  });
+
+  test('stores a normalized sub-category and defaults legacy callers to Others', async () => {
+    accountIs('admin');
+    const created = [];
+    mock.method(Product, 'create', async (doc) => {
+      created.push(doc);
+      return { _id: PRODUCT_ID, ...doc };
+    });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    assert.equal((await post('/api/products', { ...NEW_PRODUCT, subCategory: '  Chips   & Crisps ' })).status, 201);
+    assert.equal((await post('/api/products', { ...NEW_PRODUCT, name: 'Plain item', subCategory: undefined })).status, 201);
+    assert.equal(created[0].subCategory, 'Chips & Crisps');
+    assert.equal(created[1].subCategory, 'Others');
   });
 
   test('a product whose shelf cannot be created is deleted again', async () => {
@@ -189,6 +205,17 @@ describe('updating a product', () => {
     accountIs('admin');
     const res = await put(`/api/products/${PRODUCT_ID}`, { price: -3 });
     assert.equal(res.status, 400);
+  });
+
+  test('normalizes a sub-category without overwriting unrelated fields', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { subCategory: '  Biscuits   & Cookies  ' });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { subCategory: 'Biscuits & Cookies' });
   });
 });
 

@@ -237,8 +237,9 @@ npm run build:release
 npx cap sync
 
 # 2. Android. Needs android/app/google-services.json and a release keystore
-#    (see "Signing", below) — without a keystore this produces an *unsigned*
-#    .aab that Play will reject on upload.
+#    (see "Signing", below). With no keystore configured this now refuses to
+#    start, in about a second, naming the values it could not find — rather
+#    than building an unsigned .aab that Play rejects at the end of the upload.
 cd android && ./gradlew :app:bundleRelease
 #    → app/build/outputs/bundle/release/app-release.aab
 
@@ -258,7 +259,15 @@ cd .. && npx cap open ios
       `keystore.properties` that is **not** committed (`.gitignore` already
       covers `*.jks`, `*.keystore` and `keystore.properties`). Type the
       password at the prompt rather than passing it on the command line, where
-      it lands in shell history.
+      it lands in shell history. Copy
+      [frontend-parent/android/keystore.properties.example](frontend-parent/android/keystore.properties.example)
+      to `keystore.properties` and fill in the four values; every one of them
+      can come from an environment variable instead, named in that file, which
+      is how a build machine supplies them.
+- [ ] `validity 10000` is not a formality. The key must outlive every update
+      the app will ever have: Play refuses an upload signed with an expired
+      certificate, and there is no way to re-sign an existing listing with a
+      new one.
 - [ ] That keystore is backed up somewhere other than the machine that built
       it. Losing it means losing the ability to update the app at all —
       unless Play App Signing is enrolled, in which case the upload key can be

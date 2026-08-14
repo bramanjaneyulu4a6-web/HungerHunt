@@ -10,7 +10,11 @@
     "seed:dev-accounts": "node scripts/seedDevAccounts.js",
     "audit:wallets": "node scripts/reconcileWallets.js",
     "load:test": "node scripts/loadTest.js",
-    "migrate:enterprise": "node scripts/migrateEnterpriseData.js"
+    "migrate:enterprise": "node scripts/migrateEnterpriseData.js",
+    "backfill:hostels": "node scripts/backfillHostels.js",
+    "backfill:product-subcategories": "node scripts/backfillProductSubcategories.js",
+    "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",
+    "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -47,6 +47,13 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
 
     req.adminId = payload.id;
     req.staff = { id: payload.id, role };
+
+    if (role === 'caretaker') {
+      const account = await Admin.findById(payload.id).select('email hostelId').lean();
+      if (!account?.hostelId) return denied(res, 'Not authorized');
+      req.staff.email = account.email;
+      req.staff.hostelId = String(account.hostelId);
+    }
     next();
   } catch (error) {
     denied(res, 'Token failed, invalid authorization');
@@ -73,6 +80,14 @@ export const protectStaff = staffGate(['admin'], 'This action needs a till accou
 // The storeroom's routes: see and raise purchase orders, receive deliveries,
 // read stock and suppliers.
 export const protectWarehouse = staffGate(['admin', 'warehouse'], 'This action needs a warehouse account.');
+
+// The two fulfillment operations a caretaker may use. This gate is deliberately
+// separate from protectWarehouse: adding the role here cannot open inventory,
+// suppliers, receipts or purchase orders.
+export const protectCaretaker = staffGate(
+  ['caretaker'],
+  'This action needs a caretaker account.'
+);
 
 /* Read-only surfaces every kind of staff needs (live stock).
  *

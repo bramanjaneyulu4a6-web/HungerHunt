@@ -111,8 +111,8 @@
   --chrome-ink: var(--slate-200);
   --chrome-muted: var(--slate-300);
 
-  /* Hunger Hunt's warm brand. Only the kiosk carries it today — the till is
-     the surface a student actually sees. */
+  /* Hunger Hunt's warm brand. Used on the student kiosk and the caretaker's
+     hostel-facing workspace; internal admin and warehouse chrome stay neutral. */
   --brand: #ff6b35;
   --brand-amber: #facc15;
   --brand-deep: #ea580c;

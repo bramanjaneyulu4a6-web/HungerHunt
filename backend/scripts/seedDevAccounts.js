@@ -6,15 +6,26 @@ import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import Student from '../models/Student.js';
+import Hostel from '../models/Hostel.js';
 
 export const DEV_ACCOUNTS = Object.freeze({
   admin: {
+    name: 'Dev Admin',
+    phone: '9000000011',
     email: 'admin.dev@hungerhunt.local',
     password: 'DevAdmin123!',
   },
   warehouse: {
+    name: 'Dev Warehouse Staff',
+    phone: '9000000012',
     email: 'warehouse.dev@hungerhunt.local',
     password: 'DevWarehouse123!',
+  },
+  caretaker: {
+    name: 'Dev Caretaker',
+    phone: '9000000013',
+    email: 'caretaker.dev@hungerhunt.local',
+    password: 'DevCaretaker123!',
   },
   parent: {
     fatherName: 'Dev Parent',
@@ -24,16 +35,19 @@ export const DEV_ACCOUNTS = Object.freeze({
   },
   student: {
     name: 'Dev Student',
-    admissionNumber: 'HH-DEV-001',
+    admissionNumber: '90001',
     purchaseCode: '1234',
   },
 });
 
-const ensureStaffAccount = async (role, credentials) => {
+const ensureStaffAccount = async (role, credentials, hostelId = null) => {
   const account = await Admin.findOne({ email: credentials.email }) ?? new Admin();
   account.email = credentials.email;
+  account.name = credentials.name;
+  account.phone = credentials.phone;
   account.password = credentials.password;
   account.role = role;
+  account.hostelId = hostelId;
   await account.save();
   return account;
 };
@@ -53,13 +67,26 @@ const seed = async () => {
   await ensureStaffAccount('warehouse', DEV_ACCOUNTS.warehouse);
 
   const { student: studentDetails, parent: parentDetails } = DEV_ACCOUNTS;
-  const student = await Student.findOne({ admissionNumber: studentDetails.admissionNumber })
+  const hostel = await Hostel.findOneAndUpdate(
+    { code: 'DEV-HOSTEL-01' },
+    { $setOnInsert: { code: 'DEV-HOSTEL-01', name: 'Development Hostel', active: true } },
+    { upsert: true, new: true }
+  );
+  await ensureStaffAccount('caretaker', DEV_ACCOUNTS.caretaker, hostel._id);
+
+  const student = await Student.findOne({
+    $or: [
+      { admissionNumber: studentDetails.admissionNumber },
+      { name: studentDetails.name, parentPhoneNumber: parentDetails.phone },
+    ],
+  })
     ?? new Student();
 
   Object.assign(student, {
     name: studentDetails.name,
     fatherName: parentDetails.fatherName,
     hostelNumber: 'DEV-HOSTEL-01',
+    hostelId: hostel._id,
     grade: 'DEV',
     parentPhoneNumber: parentDetails.phone,
     admissionNumber: studentDetails.admissionNumber,

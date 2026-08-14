@@ -5,6 +5,7 @@ const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
   { path: "/billing", label: "Point of Sale", icon: "◫" },
   { path: "/students", label: "Students", icon: "♙" },
+  { path: "/hostels", label: "Hostels", icon: "⌂" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },
   { path: "/accounting-export", label: "TallyPrime Export", icon: "⇩" },
 ];

@@ -81,12 +81,9 @@ export function Banner({ variant = 'warn', icon, className, children, ...rest })
 
 /* Shell shared by login, register, forgot-password and reset-password.
 
-   `logo` and `eyebrow` are both optional, and stay that way deliberately. The
-   parent app brands this screen because it faces a customer opening an app
-   they chose to install; the back office and the storeroom do not, because
-   their staff are already looking at a tab they trust. Hardcoding either one
-   here puts the parent app's branding on both of the others — and a logo they
-   do not ship the file for. */
+   `logo` and `eyebrow` are both optional, and stay that way deliberately.
+   Each app chooses whether its front door is branded; hardcoding either here
+   would require every frontend to ship the same asset and presentation. */
 export function AuthLayout({ logo, eyebrow, title, subtitle, children, footer }) {
   return (
     <div className="auth-page">
@@ -163,9 +160,9 @@ export function PasswordField({ id, label, aside, ...inputProps }) {
   );
 }
 
-export function EmptyState({ icon, title, children, action }) {
+export function EmptyState({ icon, title, children, action, variant = 'default', className, ...rest }) {
   return (
-    <div className="empty-state">
+    <div className={cx('empty-state', variant !== 'default' && `empty-state--${variant}`, className)} {...rest}>
       {icon && (
         <span className="empty-state__icon" aria-hidden="true">
           {icon}

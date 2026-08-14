@@ -19,7 +19,6 @@ import {
 } from '../../../domain/fulfillment/overdue.js';
 import {
   buildProofOfDelivery,
-  proofOfDeliveryProblem,
 } from '../../../domain/fulfillment/proofOfDelivery.js';
 import {
   ApplicationError,
@@ -47,13 +46,15 @@ const MAX_RANGE_DAYS = 93;
 const HISTORY_PAGE_SIZE = 25;
 const MAX_HISTORY_PAGE_SIZE = 100;
 
-const serialize = (order) => ({
+const serialize = (order, { includeMoney = true } = {}) => ({
   id: String(order._id),
   transactionId: String(order.transactionId),
   studentId: String(order.studentId),
   student: order.studentSnapshot,
-  items: order.items,
-  totalAmount: order.totalAmount,
+  items: includeMoney
+    ? order.items
+    : order.items.map(({ productId, name, quantity }) => ({ productId, name, quantity })),
+  ...(includeMoney ? { totalAmount: order.totalAmount } : {}),
   status: order.status,
   businessWeekStart: order.businessWeekStart,
   orderedAt: order.orderedAt,
@@ -97,16 +98,109 @@ const readObjectId = (value) => {
 };
 
 export const list = async (req, res) => {
-  const status = readStatus(req.query);
+  const caretaker = req.staff.role === 'caretaker';
+  const status = caretaker ? null : readStatus(req.query);
 
-  const filter = status ? { status } : { status: { $in: OPEN_STATUSES } };
-  const orders = await FulfillmentOrder.find(filter)
+  const filter = {
+    ...(status ? { status } : { status: { $in: OPEN_STATUSES } }),
+    ...(caretaker ? { 'studentSnapshot.hostelId': req.staff.hostelId } : {}),
+  };
+  const ordersQuery = FulfillmentOrder.find(filter)
     .sort({ deliverBy: 1 })
     .limit(MAX_ACTIVE)
     .lean();
+  const [orders, receivableCount] = caretaker
+    ? await Promise.all([
+        ordersQuery,
+        FulfillmentOrder.countDocuments({
+          status: OrderStatus.OUT_FOR_DELIVERY,
+          'studentSnapshot.hostelId': req.staff.hostelId,
+        }),
+      ])
+    : [await ordersQuery, undefined];
+
   res.json({
-    data: orders.map(serialize),
-    meta: { requestId: req.context.requestId, count: orders.length },
+    data: orders.map((order) => serialize(order, { includeMoney: !caretaker })),
+    meta: {
+      requestId: req.context.requestId,
+      count: orders.length,
+      ...(caretaker ? { receivableCount } : {}),
+    },
+  });
+};
+
+/* The caretaker's history has no date window: it is a receipt log for the
+   hostel, not an operational report. It stays bounded through pagination and
+   never includes prices or another hostel's packages. */
+export const caretakerHistory = async (req, res) => {
+  const { page, limit, skip } = readPaging(req.query);
+  const filter = {
+    status: OrderStatus.DELIVERED,
+    'studentSnapshot.hostelId': req.staff.hostelId,
+  };
+
+  const [orders, total] = await Promise.all([
+    FulfillmentOrder.find(filter)
+      .sort({ deliveredAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    FulfillmentOrder.countDocuments(filter),
+  ]);
+
+  res.json({
+    data: orders.map((order) => serialize(order, { includeMoney: false })),
+    meta: {
+      requestId: req.context.requestId,
+      count: orders.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit) || 1,
+      hasMore: page * limit < total,
+    },
+  });
+};
+
+/* One database operation receives the caretaker's current queue. The status
+   predicate makes it race-safe with individual confirmations: a package that
+   changed after the count was shown is not overwritten or recorded twice. */
+export const receiveAll = async (req, res) => {
+  const now = new Date();
+  const receivedBy = String(req.staff.email).trim().slice(0, 60);
+  const filter = {
+    status: OrderStatus.OUT_FOR_DELIVERY,
+    'studentSnapshot.hostelId': req.staff.hostelId,
+  };
+  const result = await FulfillmentOrder.updateMany(
+    filter,
+    {
+      $set: {
+        status: OrderStatus.DELIVERED,
+        deliveredAt: now,
+        deliveredBy: req.staff.id,
+        proofOfDelivery: buildProofOfDelivery({
+          receivedBy,
+          recordedBy: req.staff.id,
+          recordedAt: now,
+        }),
+        deliveryNote: '',
+      },
+      $push: {
+        transitions: {
+          from: OrderStatus.OUT_FOR_DELIVERY,
+          to: OrderStatus.DELIVERED,
+          at: now,
+          actorId: req.staff.id,
+          note: '',
+        },
+      },
+    },
+    { runValidators: true }
+  );
+
+  res.json({
+    data: { receivedCount: result.modifiedCount },
+    meta: { requestId: req.context.requestId },
   });
 };
 
@@ -265,6 +359,19 @@ export const transition = async (req, res) => {
   if (!orderStatuses.includes(to) || to === OrderStatus.PENDING) {
     throw new ValidationError([{ field: 'status', message: 'Unknown transition target.' }]);
   }
+  const caretaker = req.staff.role === 'caretaker';
+  if (caretaker && to !== OrderStatus.DELIVERED) {
+    throw new ApplicationError('Caretakers may only confirm delivered packages.', {
+      status: 403,
+      code: 'FORBIDDEN',
+    });
+  }
+  if (!caretaker && to === OrderStatus.DELIVERED) {
+    throw new ApplicationError(
+      'Warehouse staff may dispatch packages; only the assigned caretaker can mark them received.',
+      { status: 403, code: 'FORBIDDEN' }
+    );
+  }
   if (to === OrderStatus.CANCELLED) {
     const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
     const reason = String(req.body.reason || req.body.note || '').trim();
@@ -296,7 +403,12 @@ export const transition = async (req, res) => {
     });
   }
 
-  const current = await FulfillmentOrder.findById(req.params.id).lean();
+  const current = caretaker
+    ? await FulfillmentOrder.findOne({
+        _id: req.params.id,
+        'studentSnapshot.hostelId': req.staff.hostelId,
+      }).lean()
+    : await FulfillmentOrder.findById(req.params.id).lean();
   if (!current) throw new NotFoundError('Fulfilment order');
   if (!canTransitionOrder(current.status, to)) {
     throw new ConflictError(
@@ -310,14 +422,10 @@ export const transition = async (req, res) => {
   const note = String(req.body.note || '').trim().slice(0, 200);
   const set = { status: to, [timestampField]: now, [actorField]: req.staff.id };
 
-  /* Delivery is the one transition that asserts something about a person
-     outside the system, so it is the one that has to be proved. The receiver
-     note is required; the staff account and the time come from the session and
-     the clock rather than the request body, so neither can be typed in. */
+  /* Receipt is asserted only by the assigned caretaker. Their account and the
+     server clock are the proof; neither identity nor time comes from the body. */
   if (to === OrderStatus.DELIVERED) {
-    const receivedBy = req.body.receivedBy;
-    const problem = proofOfDeliveryProblem(receivedBy);
-    if (problem) throw new ValidationError([{ field: 'receivedBy', message: problem }]);
+    const receivedBy = String(req.staff.email).trim().slice(0, 60);
 
     set.proofOfDelivery = buildProofOfDelivery({
       receivedBy,
@@ -328,7 +436,11 @@ export const transition = async (req, res) => {
   }
 
   const updated = await FulfillmentOrder.findOneAndUpdate(
-    { _id: current._id, status: current.status },
+    {
+      _id: current._id,
+      status: current.status,
+      ...(caretaker ? { 'studentSnapshot.hostelId': req.staff.hostelId } : {}),
+    },
     {
       $set: set,
       $push: {
@@ -348,5 +460,8 @@ export const transition = async (req, res) => {
     throw new ConflictError('Fulfilment order changed while it was being updated. Refresh and retry.');
   }
 
-  res.json({ data: serialize(updated), meta: { requestId: req.context.requestId } });
+  res.json({
+    data: serialize(updated, { includeMoney: !caretaker }),
+    meta: { requestId: req.context.requestId },
+  });
 };

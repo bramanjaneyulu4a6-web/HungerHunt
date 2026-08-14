@@ -53,7 +53,7 @@ export const STUDENT_SESSION_SECONDS = 450;
 // their own, and the admin console raises orders for parents to approve. An
 // account for a counter with nobody behind it protects nothing, and the most
 // physically exposed device in the system no longer holds a staff token at all.
-export const STAFF_ROLES = ['admin', 'warehouse'];
+export const STAFF_ROLES = ['admin', 'warehouse', 'caretaker'];
 
 const isStaffRole = (role) => STAFF_ROLES.includes(role);
 

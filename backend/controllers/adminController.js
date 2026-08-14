@@ -3,15 +3,20 @@ import bcrypt from 'bcryptjs';
 import { signStaffToken, STAFF_ROLES } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
+import Hostel from '../models/Hostel.js';
+import Student from '../models/Student.js';
+import FulfillmentOrder from '../models/FulfillmentOrder.js';
 
 export const registerAdmin = async (req, res) => {
   try {
-    const email = req.body?.email;
+    const name = String(req.body?.name ?? '').trim();
+    const phone = String(req.body?.phone ?? '').trim();
+    const email = String(req.body?.email ?? '').trim().toLowerCase();
     const password = req.body?.password;
 
-    if (!email || !password) {
+    if (!name || !phone || !email || !password) {
       return res.status(400).json({
-        message: "Email and password are required"
+        message: "Name, phone, email and password are required"
       });
     }
 
@@ -33,6 +38,7 @@ export const registerAdmin = async (req, res) => {
     const LIMITS = {
       admin: parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3,
       warehouse: parseInt(process.env.MAX_WAREHOUSE_ACCOUNTS) || 5,
+      caretaker: parseInt(process.env.MAX_CARETAKER_ACCOUNTS) || 20,
     };
 
     const requested = req.body?.role;
@@ -48,6 +54,28 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
+    let hostelId = null;
+    if (role === 'caretaker') {
+      hostelId = req.body?.hostelId;
+      const hostel = hostelId ? await Hostel.findOne({ _id: hostelId, active: true }) : null;
+      if (!hostel) {
+        return res.status(400).json({ message: 'Choose an active hostel for the caretaker.' });
+      }
+      hostelId = hostel._id;
+
+      const [unlinkedStudent, unlinkedOrder] = await Promise.all([
+        Student.exists({ hostelId: { $exists: false } }),
+        FulfillmentOrder.exists({ 'studentSnapshot.hostelId': { $exists: false } }),
+      ]);
+      if (unlinkedStudent || unlinkedOrder) {
+        return res.status(409).json({
+          message: 'Run and verify the hostel backfill before creating a caretaker account.',
+        });
+      }
+    } else if (req.body?.hostelId) {
+      return res.status(400).json({ message: 'Only caretaker accounts may be assigned a hostel.' });
+    }
+
     const existingAdmin = await Admin.findOne({ email });
     if (existingAdmin) {
       return res.status(400).json({
@@ -55,7 +83,7 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const admin = new Admin({ email, password, role });
+    const admin = new Admin({ name, phone, email, password, role, hostelId });
     await admin.save();
 
     return res.status(201).json({
@@ -74,7 +102,8 @@ export const registerAdmin = async (req, res) => {
 
 export const loginAdmin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body?.email ?? '').trim().toLowerCase();
+    const password = req.body?.password;
     const admin = await Admin.findOne({ email });
     if (!admin || !(await bcrypt.compare(password, admin.password))) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -95,10 +124,49 @@ export const loginAdmin = async (req, res) => {
       });
     }
 
+    if (!admin.name?.trim() || !admin.phone?.trim()) {
+      return res.status(403).json({
+        message: 'This staff account needs a name and phone number before it can sign in.',
+      });
+    }
+
     // The role is returned as well as signed in, so each front door can turn
     // away an account that belongs at a different one, rather than signing it
     // in to a console where every screen answers 403.
-    res.json({ token: signStaffToken(admin._id, role), email: admin.email, role });
+    let hostel = null;
+    if (role === 'caretaker') {
+      if (!admin.hostelId) {
+        return res.status(403).json({ message: 'This caretaker account has no hostel assignment.' });
+      }
+
+      hostel = await Hostel.findById(admin.hostelId).select('code name').lean();
+      if (!hostel) {
+        return res.status(403).json({ message: 'This caretaker account is assigned to a missing hostel.' });
+      }
+    }
+
+    const staff = {
+      name: admin.name,
+      phone: admin.phone,
+      email: admin.email,
+      role,
+      ...(hostel ? {
+        hostel: { id: String(hostel._id), code: hostel.code, name: hostel.name || '' },
+      } : {}),
+    };
+
+    res.json({
+      token: signStaffToken(admin._id, role),
+      email: admin.email,
+      role,
+      name: admin.name,
+      phone: admin.phone,
+      staff,
+      ...(hostel ? {
+        hostelId: String(hostel._id),
+        hostel: staff.hostel,
+      } : {}),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

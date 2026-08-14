@@ -3,9 +3,12 @@ import Parent from "../models/Parent.js";
 import WalletAdjustment from "../models/WalletAdjustment.js";
 import PendingOrder from "../models/PendingOrder.js";
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
+import Hostel, { normalizeHostelCode } from '../models/Hostel.js';
 import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
+import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
+import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import {
   linkQuietly,
   findStudentsByIdentity,
@@ -17,7 +20,8 @@ import {
 // pocketMoney to topUpWallet, which records the movement in rechargeHistory;
 // purchasePassword and walletControl to the parent. Handing a request body
 // straight to the driver let these routes quietly set any of them.
-const WRITABLE_FIELDS = ['name', 'fatherName', 'hostelNumber', 'grade', 'parentPhoneNumber', 'admissionNumber'];
+const WRITABLE_FIELDS = ['name', 'fatherName', 'grade', 'parentPhoneNumber', 'admissionNumber'];
+const IMPORT_FIELDS = [...WRITABLE_FIELDS, 'hostelNumber'];
 
 const pickWritable = (body) => {
   const source = body ?? {};
@@ -29,9 +33,30 @@ const pickWritable = (body) => {
   );
 };
 
+const resolveHostel = async (source) => {
+  const hostelId = source?.hostelId;
+  const code = normalizeHostelCode(source?.hostelNumber);
+  const hostel = hostelId
+    ? await Hostel.findOne({ _id: hostelId, active: true }).lean()
+    : code
+      ? await Hostel.findOne({ code, active: true }).lean()
+      : null;
+
+  if (!hostel) {
+    const value = code || String(hostelId || '').trim() || '(blank)';
+    const error = new Error(`Unknown or inactive hostel: ${value}.`);
+    error.code = 'UNKNOWN_HOSTEL';
+    throw error;
+  }
+  return { hostelId: hostel._id, hostelNumber: hostel.code };
+};
+
 export const addStudent = async (req, res) => {
   try {
-    const student = await Student.create(pickWritable(req.body));
+    const student = await Student.create({
+      ...pickWritable(req.body),
+      ...(await resolveHostel(req.body)),
+    });
 
     // A child enrolled after their parent registered used to be linked to
     // nobody, and so was invisible in the parent app forever.
@@ -39,7 +64,7 @@ export const addStudent = async (req, res) => {
 
     res.status(201).json(student);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ message: error.message, error: error.message });
   }
 };
 
@@ -68,9 +93,12 @@ export const getStudents = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
+    const hostel = req.body?.hostelId !== undefined || req.body?.hostelNumber !== undefined
+      ? await resolveHostel(req.body)
+      : {};
     const student = await Student.findOneAndUpdate(
       { _id: req.params.id, active: { $ne: false } },
-      pickWritable(req.body),
+      { ...pickWritable(req.body), ...hostel },
       { new: true, runValidators: true }
     );
 
@@ -82,7 +110,7 @@ export const updateStudent = async (req, res) => {
 
     res.json(student);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ message: error.message, error: error.message });
   }
 };
 
@@ -178,13 +206,32 @@ export const bulkImportStudents = async (req, res) => {
 
     // Sheet column headings arrive as keys verbatim, so a column called
     // pocketMoney or purchasePassword would land on the new record as-is.
-    const rows = students.map(pickWritable);
+    const requestedCodes = students.map((row) => normalizeHostelCode(row?.hostelNumber));
+    const uniqueCodes = [...new Set(requestedCodes.filter(Boolean))];
+    const hostels = await Hostel.find({ code: { $in: uniqueCodes }, active: true }).lean();
+    const byCode = new Map(hostels.map((hostel) => [hostel.code, hostel]));
+    const unknownHostels = [...new Set(requestedCodes.filter((code) => !byCode.has(code)))];
+    if (unknownHostels.length) {
+      return res.status(400).json({
+        message: `Unknown or inactive hostels: ${unknownHostels.map((code) => code || '(blank)').join(', ')}. Add or correct them before importing.`,
+        unknownHostels,
+      });
+    }
+
+    const rows = students.map((row, index) => {
+      const hostel = byCode.get(requestedCodes[index]);
+      return {
+        ...pickWritable(row),
+        hostelId: hostel._id,
+        hostelNumber: hostel.code,
+      };
+    });
 
     // Dropping a column the uploader meant to import should not be silent —
     // otherwise the sheet looks like it applied and only the balances disagree.
     const ignoredColumns = [
       ...new Set(students.flatMap((row) => Object.keys(row ?? {}))),
-    ].filter((column) => !WRITABLE_FIELDS.includes(column));
+    ].filter((column) => !IMPORT_FIELDS.includes(column));
 
     await Student.insertMany(rows, { ordered: false });
 
@@ -211,7 +258,7 @@ export const bulkImportStudents = async (req, res) => {
 // whose parent has never registered, because nobody would be there to approve
 // the order, and the screen says so rather than letting the request fail.
 const SEARCH_FIELDS =
-  "_id name fatherName hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
+  "_id name fatherName hostelId hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -268,7 +315,7 @@ export const createKioskSession = async (req, res) => {
       admissionNumber,
       active: { $ne: false },
     })
-      .select('name admissionNumber pocketMoney requiresParentApproval +purchasePassword');
+      .select('name admissionNumber pocketMoney updatedAt requiresParentApproval +purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: 'No student found with that admission number.' });
@@ -281,6 +328,69 @@ export const createKioskSession = async (req, res) => {
       });
     }
 
+    // Eligibility is decided before a token is issued. The kiosk therefore
+    // cannot be entered by refreshing around the message screen, and every
+    // later API call still has its own wallet/order checks as normal.
+    if (Number(student.pocketMoney) <= 0) {
+      return res.status(403).json({
+        code: 'KIOSK_WALLET_EMPTY',
+        message: 'Your wallet is empty. Ask a parent or school staff member to add money.',
+        screen: {
+          variant: 'wallet-empty',
+          mark: '₹0',
+          kicker: 'Wallet unavailable',
+          title: 'Your wallet is empty',
+          body: 'Ask a parent or school staff member to add money before starting an order.',
+        },
+      });
+    }
+
+    const now = new Date();
+    const [pendingApproval, fulfillmentOrder] = await Promise.all([
+      PendingOrder.findOne({
+        studentId: student._id,
+        $or: [
+          { status: 'PENDING', expiresAt: { $gt: now } },
+          { status: 'PROCESSING' },
+        ],
+      }).select('status expiresAt'),
+      FulfillmentOrder.findOne({
+        studentId: student._id,
+        status: { $in: OPEN_STATUSES },
+      }).sort({ orderedAt: -1 }).select('status deliverBy'),
+    ]);
+
+    if (pendingApproval || fulfillmentOrder) {
+      const waitingForParent = Boolean(pendingApproval);
+
+      return res.status(409).json({
+        code: 'KIOSK_ACTIVE_ORDER',
+        message: waitingForParent
+          ? 'An order is already waiting for parent approval.'
+          : 'An order is already in progress for this student.',
+        order: waitingForParent
+          ? { type: 'PARENT_APPROVAL', status: pendingApproval.status }
+          : {
+              type: 'FULFILLMENT',
+              status: fulfillmentOrder.status,
+              deliverBy: fulfillmentOrder.deliverBy,
+            },
+        screen: {
+          variant: 'active-order',
+          mark: '⏳',
+          kicker: waitingForParent ? 'Request already sent' : 'Order in progress',
+          title: waitingForParent ? 'Waiting for parent approval' : 'Your order is in progress',
+          body: waitingForParent
+            ? 'You can start another order after your parent approves or cancels this request.'
+            : 'You can start another order after this one is delivered or cancelled.',
+          ...(!waitingForParent && {
+            orderStatus: fulfillmentOrder.status,
+            estimatedDeliveryDate: fulfillmentOrder.deliverBy,
+          }),
+        },
+      });
+    }
+
     res.json({
       token: signStudentToken(student._id.toString(), student.admissionNumber),
       expiresInSeconds: STUDENT_SESSION_SECONDS,
@@ -289,6 +399,7 @@ export const createKioskSession = async (req, res) => {
         name: student.name,
         admissionNumber: student.admissionNumber,
         pocketMoney: student.pocketMoney,
+        wallet: walletView(student),
         requiresParentApproval: Boolean(student.requiresParentApproval),
       },
     });
@@ -355,9 +466,11 @@ export const topUpWallet = async (req, res) => {
         });
       }
 
+      const wallet = await readWallet(studentId);
       return res.json({
         message: 'Wallet top-up already applied.',
         newBalance: prior.newBalance,
+        wallet,
         adjustment: prior,
         replayed: true,
       });
@@ -385,11 +498,7 @@ export const topUpWallet = async (req, res) => {
             idempotencyKey,
           })];
 
-      const student = await Student.findOneAndUpdate(
-        { _id: studentId, active: { $ne: false } },
-        { $inc: { pocketMoney: amount } },
-        { new: true, ...sessionOptions(session) }
-      );
+      const student = await creditWallet(studentId, amount, { activeOnly: true, session });
 
       if (!student) {
         const notFound = new Error('Student not found');
@@ -445,6 +554,7 @@ export const topUpWallet = async (req, res) => {
     return res.json({
       message: "Wallet recharged successfully",
       newBalance,
+      wallet: walletView(student),
       adjustment,
     });
   } catch (error) {
@@ -466,9 +576,11 @@ export const topUpWallet = async (req, res) => {
           });
         }
 
+        const wallet = await readWallet(req.params.id);
         return res.json({
           message: 'Wallet top-up already applied.',
           newBalance: prior.newBalance,
+          wallet,
           adjustment: prior,
           replayed: true,
         });

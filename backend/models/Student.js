@@ -4,6 +4,12 @@ const studentSchema = new mongoose.Schema({
   name: { type: String, required: true },
   fatherName: { type: String, required: true },
   hostelNumber: { type: String, required: true },
+  hostelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Hostel',
+    required: true,
+    index: true,
+  },
   grade: { type: String, required: true },
   parentPhoneNumber: { type: String, required: true },
 
@@ -112,4 +118,3 @@ studentSchema.index({ name: 1, fatherName: 1, parentPhoneNumber: 1 }, { unique: 
 studentSchema.index({ active: 1, name: 1 });
 
 export default mongoose.model('Student', studentSchema);
-

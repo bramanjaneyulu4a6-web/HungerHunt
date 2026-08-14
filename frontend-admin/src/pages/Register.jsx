@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
+import { isLiveToken } from '../utils/session';
 
 const Register = () => {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({ email: '', password: '', role: 'admin' });
+  const [formData, setFormData] = useState({
+    name: '', phone: '', email: '', password: '', role: 'admin', hostelId: '',
+  });
+  const [hostels, setHostels] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -15,11 +19,24 @@ const Register = () => {
      first account being created, which the server will make an admin whatever
      is asked for — there would otherwise be nobody left who could create one.
      Reached by a signed-in admin it is how the other accounts get made, and
-     that is the only time the choice means anything. */
-  const canChooseRole = Boolean(localStorage.getItem('adminToken'));
+     that is the only time the choice means anything.
+
+     An expired token is not a signed-in admin: offering the choice on the
+     strength of one would present a role picker whose submission the server is
+     about to refuse. */
+  const canChooseRole = isLiveToken(localStorage.getItem('adminToken'));
+
+  useEffect(() => {
+    if (!canChooseRole) return;
+    api.get('/hostels?active=1')
+      .then((response) => setHostels(response.data))
+      .catch(() => setError('Could not load hostels. Add a hostel before creating a caretaker.'));
+  }, [canChooseRole]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const next = { ...formData, [e.target.name]: e.target.value };
+    if (e.target.name === 'role' && e.target.value !== 'caretaker') next.hostelId = '';
+    setFormData(next);
   };
 
   const handleSubmit = async (e) => {
@@ -55,7 +72,7 @@ const Register = () => {
       title={canChooseRole ? 'New Account' : 'Admin Registration'}
       subtitle={
         canChooseRole
-          ? 'Create an account for the back office or the till'
+          ? 'Create an account for the back office, warehouse or a hostel'
           : 'Create the first admin account'
       }
       footer={
@@ -76,6 +93,30 @@ const Register = () => {
       )}
 
       <form onSubmit={handleSubmit} className="auth-form">
+        <AuthField
+          id="name"
+          label="Full Name"
+          type="text"
+          name="name"
+          autoComplete="name"
+          required
+          placeholder="Priya Sharma"
+          value={formData.name}
+          onChange={handleChange}
+        />
+
+        <AuthField
+          id="phone"
+          label="Phone Number"
+          type="tel"
+          name="phone"
+          autoComplete="tel"
+          required
+          placeholder="98765 43210"
+          value={formData.phone}
+          onChange={handleChange}
+        />
+
         <AuthField
           id="email"
           label="Email Address"
@@ -115,13 +156,29 @@ const Register = () => {
             >
               <option value="admin">Admin — full back office</option>
               <option value="warehouse">Warehouse — goods in only</option>
+              <option value="caretaker">Caretaker — one hostel’s deliveries</option>
             </select>
 
             <p className="auth-hint">
               {formData.role === 'warehouse'
                 ? 'Can raise purchase orders and receive deliveries in the warehouse app. Cannot touch students, wallets or prices.'
+                : formData.role === 'caretaker'
+                  ? 'Can see packages on the way to one hostel and confirm delivery. Cannot access stock, suppliers, orders or prices.'
                 : 'Full access, including student records, wallet top-ups, billing and creating other accounts.'}
             </p>
+          </div>
+        )}
+
+        {canChooseRole && formData.role === 'caretaker' && (
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="hostelId">Assigned hostel</label>
+            <select id="hostelId" name="hostelId" className="auth-input" required
+              value={formData.hostelId} onChange={handleChange}>
+              <option value="">Choose a hostel</option>
+              {hostels.map((hostel) => (
+                <option key={hostel._id} value={hostel._id}>{hostel.code}{hostel.name ? ` — ${hostel.name}` : ''}</option>
+              ))}
+            </select>
           </div>
         )}
 

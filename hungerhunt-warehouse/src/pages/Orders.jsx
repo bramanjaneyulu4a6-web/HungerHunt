@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import RefreshButton from "../components/RefreshButton";
+import ProductThumb from "../components/ProductThumb";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
 
+/* The first screen of the shift: what students and parents have paid for and
+   are waiting on. Each card is one package and offers exactly one next step,
+   so the job reads as a queue rather than a form. */
+
 const ACTIONS = {
   PENDING: { status: "PACKED", label: "Mark packed" },
   PACKED: { status: "OUT_FOR_DELIVERY", label: "Send to dorm" },
-  OUT_FOR_DELIVERY: { status: "DELIVERED", label: "Confirm delivery" },
 };
 
 const VIEWS = [
@@ -39,10 +43,11 @@ const deadlineText = (deliverBy, asOf) => {
   return `${overdue ? "Overdue since" : "Deliver by"} ${date.toLocaleString()}`;
 };
 
-const Packages = () => {
+const Orders = () => {
   const range = initialRange();
   const [view, setView] = useState("active");
   const [orders, setOrders] = useState([]);
+  const [images, setImages] = useState(() => new Map());
   const [alertMeta, setAlertMeta] = useState(null);
   const [report, setReport] = useState(null);
   const [from, setFrom] = useState(range.from);
@@ -51,6 +56,23 @@ const Packages = () => {
   const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [asOf, setAsOf] = useState(0);
+
+  /* A package line stores the name and price it was sold at, never a picture —
+     that would freeze a photo into a financial record. The catalogue is asked
+     once for the pictures instead, and a package whose product has since been
+     deleted simply falls back to its letter tile. */
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await api.get("/products");
+        setImages(
+          new Map(response.data.map((product) => [String(product._id), product.image || ""]))
+        );
+      } catch (error) {
+        console.error(error);
+      }
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,25 +111,12 @@ const Packages = () => {
     const action = ACTIONS[order.status];
     if (!action) return;
 
-    let receivedBy;
-    if (action.status === "DELIVERED") {
-      receivedBy = window.prompt(
-        "Who received the package? Enter a name or dorm role only; do not enter ID or phone details.",
-        ""
-      )?.trim();
-      if (!receivedBy) {
-        toast.error("A receiver name or dorm role is required to confirm delivery");
-        return;
-      }
-    }
-
     setBusyId(order.id);
     try {
       await api.post(`/v1/fulfillment-orders/${order.id}/transition`, {
         status: action.status,
-        ...(receivedBy ? { receivedBy } : {}),
       });
-      toast.success(action.status === "DELIVERED" ? "Delivery recorded" : "Package updated");
+      toast.success(action.status === "OUT_FOR_DELIVERY" ? "Package sent to caretaker" : "Package updated");
       await load();
     } catch (error) {
       console.error(error);
@@ -168,10 +177,10 @@ const Packages = () => {
       !["DELIVERED", "CANCELLED"].includes(order.status);
 
     return (
-      <article key={order.id} className="wh-card">
+      <article key={order.id} className="wh-card wh-order">
         <div className="wh-row">
           <div>
-            <span className="wh-product">{order.student.name}</span>
+            <span className="wh-who">{order.student.name}</span>
             <p className="wh-remaining" style={{ margin: "4px 0 0" }}>
               Room {order.student.hostelNumber} · {order.student.admissionNumber || "No admission number"}
             </p>
@@ -181,14 +190,20 @@ const Packages = () => {
           </span>
         </div>
 
-        <div className="wh-summary">
+        <div className="wh-summary wh-summary--lines">
           {order.items.map((item) => (
-            <div key={item.productId || item.name} className="wh-row">
-              <span>{item.name} × {item.quantity}</span>
+            <div key={item.productId || item.name} className="wh-order-line">
+              <ProductThumb
+                src={images.get(String(item.productId))}
+                name={item.name}
+                size={44}
+              />
+              <span className="wh-order-line-name">{item.name}</span>
+              <span className="wh-order-line-qty wh-num">×{item.quantity}</span>
               <strong>{formatINR(item.price * item.quantity)}</strong>
             </div>
           ))}
-          <div className="wh-row" style={{ marginTop: 10 }}>
+          <div className="wh-row wh-order-total">
             <span>Total paid</span><strong>{formatINR(order.totalAmount)}</strong>
           </div>
         </div>
@@ -244,12 +259,21 @@ const Packages = () => {
     </>
   );
 
+  const waiting = useMemo(
+    () => (view === "active" ? orders.filter((order) => order.status === "PENDING").length : 0),
+    [orders, view]
+  );
+
   return (
     <div className="wh-page">
       <div className="wh-row">
         <div>
-          <h1 className="wh-title">Dorm packages</h1>
-          <p className="wh-subtitle">Pack and deliver paid student orders within 48 hours</p>
+          <h1 className="wh-title">Orders</h1>
+          <p className="wh-subtitle">
+            {view === "active" && waiting > 0
+              ? `${waiting} still to pack · deliver within 48 hours`
+              : "Paid student orders to pack and dispatch"}
+          </p>
         </div>
         <RefreshButton onRefresh={load} />
       </div>
@@ -280,8 +304,16 @@ const Packages = () => {
       ) : view === "report" ? (
         reportView
       ) : orders.length === 0 && !loadError ? (
-        <EmptyState icon={view === "alerts" ? "✅" : "🛏️"} title={view === "alerts" ? "No unacknowledged overdue packages" : "No packages found"}>
-          {view === "active" ? "Paid kiosk orders will appear here automatically." : "Try another date range or refresh later."}
+        <EmptyState
+          icon={["active", "alerts"].includes(view) ? "✓" : "📦"}
+          title={view === "active" ? "You're all caught up" : view === "alerts" ? "No overdue packages need attention" : "No package history found"}
+          variant={["active", "alerts"].includes(view) ? "success" : "default"}
+        >
+          {view === "active"
+            ? "No paid orders are waiting to be packed or dispatched. New orders will appear here automatically."
+            : view === "alerts"
+              ? "Every overdue alert has been handled. Acknowledged alerts return after their snooze period."
+              : "Try another date range or check back after an order is completed."}
         </EmptyState>
       ) : (
         orders.map((order) => orderCard(order, {
@@ -293,4 +325,4 @@ const Packages = () => {
   );
 };
 
-export default Packages;
+export default Orders;

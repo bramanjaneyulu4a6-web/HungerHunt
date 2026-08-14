@@ -131,7 +131,7 @@ const Receive = () => {
       const res = await api.post(`/purchases/${id}/receipts`, body);
       const closed = res.data.purchase?.status === "COMPLETED";
       toast.success(closed ? "Delivery booked — order complete" : "Delivery booked — order stays open for the rest");
-      navigate("/", { replace: true });
+      navigate("/purchases", { replace: true });
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || "Could not book the delivery");

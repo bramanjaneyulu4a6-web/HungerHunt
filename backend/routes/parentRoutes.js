@@ -17,6 +17,7 @@ import {
   savePushToken,
   removePushToken
 } from "../controllers/parentController.js";
+import { getWalletBalance } from '../controllers/walletController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
 import { authLimiter } from '../middleware/rateLimit.js';
@@ -30,6 +31,7 @@ router.post('/reset-password/:token', authLimiter, resetPassword);
 
 router.get('/dashboard', protectParent, getParentDashboardDetails);
 router.get('/child/:id', protectParent, getChildDetails);
+router.get('/child/:id/wallet', protectParent, getWalletBalance);
 router.get('/child/:id/bills', protectParent, getChildBills);
 router.get('/child/:id/recharges', protectParent, getChildRecharges);
 router.get('/child/:id/packages', protectParent, getChildPackages);

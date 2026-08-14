@@ -70,6 +70,9 @@ describe('financial idempotency', () => {
     }));
     mock.method(WalletAdjustment, 'updateOne', async () => ({ modifiedCount: 1 }));
     mock.method(Student, 'updateOne', async () => ({ modifiedCount: 1 }));
+    mock.method(Student, 'findOne', () => ({
+      select: async () => ({ _id: STUDENT_ID, pocketMoney: 150 }),
+    }));
     mock.method(Parent, 'findOne', async () => null);
 
     const first = await request(

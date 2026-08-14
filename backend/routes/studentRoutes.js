@@ -12,8 +12,9 @@ import {
   restoreStudent,
   createKioskSession
 } from "../controllers/studentController.js";
+import { getWalletBalance } from '../controllers/walletController.js';
 
-import { protectAdmin, protectStaff } from '../middleware/authMiddleware.js';
+import { protectAdmin, protectStaff, protectStudent } from '../middleware/authMiddleware.js';
 import { kioskSessionLimiter, searchLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -24,6 +25,7 @@ const router = express.Router();
    stands in front of it, which is why it is tight — see the accepted risk in
    docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md. */
 router.post('/kiosk-session', kioskSessionLimiter, createKioskSession);
+router.get('/me/wallet', protectStudent, getWalletBalance);
 
 /* Search is the till's route: it returns the few fields needed to ring a
    student up, and the counter cannot work without it. Every other route here
@@ -39,6 +41,7 @@ router.route('/')
 
 router.get('/count', protectAdmin, getStudentCount);
 router.get('/active-count', protectAdmin, getActiveStudentCount);
+router.get('/:id/wallet', protectAdmin, getWalletBalance);
 
 router.route('/:id')
   .put(protectAdmin, updateStudent)

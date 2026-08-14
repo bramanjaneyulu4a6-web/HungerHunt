@@ -1,10 +1,10 @@
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import Inventory from '../models/Inventory.js';
-import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import WalletReversal from '../models/WalletReversal.js';
 import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { sessionOptions, withMongoTransaction } from './mongoTransaction.js';
+import { creditWallet } from './walletAccount.js';
 
 const cancellable = [OrderStatus.PENDING, OrderStatus.PACKED];
 
@@ -74,11 +74,7 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
         ? (await WalletReversal.create([reversalDocument], { session }))[0]
         : await WalletReversal.create(reversalDocument);
 
-      const student = await Student.findOneAndUpdate(
-        { _id: order.studentId },
-        { $inc: { pocketMoney: transaction.totalAmount } },
-        { new: true, ...sessionOptions(session) }
-      );
+      const student = await creditWallet(order.studentId, transaction.totalAmount, { session });
       if (!student) {
         const error = new Error('Student record not found.');
         error.status = 409;

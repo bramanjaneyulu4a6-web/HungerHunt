@@ -2,9 +2,10 @@ import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import Inventory from '../models/Inventory.js';
 import { businessPeriodStart } from './businessTime.js';
-import { createFulfillmentOrder, findWeeklyFulfillment } from './fulfillment.js';
+import { createFulfillmentOrder } from './fulfillment.js';
 import WalletReversal from '../models/WalletReversal.js';
 import { checkPurchaseLimits } from './purchaseLimits.js';
+import { creditWallet, debitWallet } from './walletAccount.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -53,21 +54,6 @@ export const chargeCart = async ({
 
   if (!student || student.active === false) {
     return { ok: false, status: 404, message: 'Student record not found.' };
-  }
-
-  // Running traffic always supplies a Mongo session through
-  // withMongoTransaction. The sessionless path exists only for model-stubbed
-  // unit tests, where there is no database in which a package could live.
-  if (session) {
-    const existingWeeklyOrder = await findWeeklyFulfillment({ studentId, session });
-    if (existingWeeklyOrder) {
-      return {
-        ok: false,
-        status: 409,
-        code: 'WEEKLY_ORDER_LIMIT',
-        message: 'This student has already placed an order this business week.',
-      };
-    }
   }
 
   let totalAmount = 0;
@@ -131,6 +117,7 @@ export const chargeCart = async ({
     studentId: student._id,
     entries: limitedEntries,
     session,
+    excludePendingOrderId: sourceType === 'PARENT_APPROVAL' ? sourceId : null,
   });
 
   if (!withinLimits.ok) return withinLimits;
@@ -190,11 +177,7 @@ export const chargeCart = async ({
   }
 
   // Same guard on the wallet: the balance must still cover the bill.
-  const debited = await Student.findOneAndUpdate(
-    { _id: studentId, pocketMoney: { $gte: totalAmount } },
-    { $inc: { pocketMoney: -totalAmount } },
-    { new: true, ...(session ? { session } : {}) }
-  );
+  const debited = await debitWallet(studentId, totalAmount, { session });
 
   if (!debited) {
     await restoreStock(applied, session);
@@ -227,11 +210,7 @@ export const chargeCart = async ({
     }
   } catch (err) {
     await restoreStock(applied, session);
-    await Student.updateOne(
-      { _id: studentId },
-      { $inc: { pocketMoney: totalAmount } },
-      session ? { session } : undefined
-    );
+    await creditWallet(studentId, totalAmount, { session });
     throw err;
   }
 

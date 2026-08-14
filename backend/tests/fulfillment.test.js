@@ -28,6 +28,7 @@ const app = (await import('../app.js')).default;
 
 const STAFF_ID = '507f1f77bcf86cd799439011';
 const STUDENT_ID = '507f191e810c19729de860eb';
+const HOSTEL_ID = '507f191e810c19729de860e1';
 const PRODUCT_ID = '507f191e810c19729de860ec';
 const TRANSACTION_ID = '507f191e810c19729de860ee';
 const ORDER_ID = '507f191e810c19729de860ef';
@@ -43,7 +44,7 @@ before(async () => {
 
 afterEach(() => mock.restoreAll());
 
-describe('weekly dorm fulfilment policy', () => {
+describe('dorm fulfilment policy', () => {
   test('uses the business week and a hard 48-hour delivery deadline', () => {
     const orderedAt = new Date('2026-08-13T10:00:00.000Z');
     const schedule = fulfillmentSchedule(orderedAt, 'Asia/Kolkata');
@@ -69,18 +70,19 @@ describe('weekly dorm fulfilment policy', () => {
         name: 'Asha',
         admissionNumber: 'A-10',
         hostelNumber: 'D-4',
+        hostelId: HOSTEL_ID,
       },
       orderedAt: new Date('2026-08-13T10:00:00.000Z'),
     });
 
     assert.equal(String(stored.transactionId), TRANSACTION_ID);
     assert.deepEqual(stored.studentSnapshot, {
-      name: 'Asha', admissionNumber: 'A-10', hostelNumber: 'D-4',
+      name: 'Asha', admissionNumber: 'A-10', hostelNumber: 'D-4', hostelId: HOSTEL_ID,
     });
     assert.equal(stored.status, OrderStatus.PENDING);
   });
 
-  test('turns a simultaneous weekly insert into a stable conflict', async () => {
+  test('does not misreport an unrelated duplicate as a weekly-order limit', async () => {
     const duplicate = Object.assign(new Error('duplicate key'), { code: 11000 });
     mock.method(FulfillmentOrder, 'create', async () => { throw duplicate; });
 
@@ -89,7 +91,7 @@ describe('weekly dorm fulfilment policy', () => {
         transaction: { _id: TRANSACTION_ID, totalAmount: 40, items: [] },
         student: { _id: STUDENT_ID, name: 'Asha', hostelNumber: 'D-4' },
       }),
-      (error) => error.status === 409 && error.code === 'WEEKLY_ORDER_LIMIT'
+      (error) => error === duplicate
     );
   });
 
@@ -152,11 +154,9 @@ describe('weekly dorm fulfilment policy', () => {
     assert.equal((await response.json()).data.status, 'PACKED');
   });
 
-  test('requires minimal receiver proof before delivery can be recorded', async () => {
+  test('warehouse cannot complete delivery without a caretaker', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
-    mock.method(FulfillmentOrder, 'findById', () => ({
-      lean: async () => ({ _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' }),
-    }));
+    const find = mock.method(FulfillmentOrder, 'findById', () => { throw new Error('must not run'); });
 
     const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
@@ -164,37 +164,16 @@ describe('weekly dorm fulfilment policy', () => {
       body: JSON.stringify({ status: 'DELIVERED' }),
     });
 
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error.details[0].field, 'receivedBy');
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).message, /only the assigned caretaker/i);
+    assert.equal(find.mock.callCount(), 0);
     assert.match(proofOfDeliveryProblem('Call 9876543210'), /Do not enter/);
     assert.equal(proofOfDeliveryProblem('Asha, dorm warden'), null);
   });
 
-  test('stores receiver, authenticated staff, and server time as proof of delivery', async () => {
+  test('warehouse cannot bypass the handoff by supplying receiver proof', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
-    mock.method(FulfillmentOrder, 'findById', () => ({
-      lean: async () => ({ _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' }),
-    }));
-    let update;
-    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
-      update = requestedUpdate;
-      return {
-        lean: async () => ({
-          _id: ORDER_ID,
-          transactionId: TRANSACTION_ID,
-          studentId: STUDENT_ID,
-          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
-          items: [],
-          totalAmount: 40,
-          status: 'DELIVERED',
-          businessWeekStart: new Date(),
-          orderedAt: new Date(),
-          deliverBy: new Date(),
-          deliveredAt: requestedUpdate.$set.deliveredAt,
-          proofOfDelivery: requestedUpdate.$set.proofOfDelivery,
-        }),
-      };
-    });
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => { throw new Error('must not run'); });
 
     const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
@@ -202,10 +181,8 @@ describe('weekly dorm fulfilment policy', () => {
       body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Asha, dorm warden' }),
     });
 
-    assert.equal(response.status, 200);
-    assert.equal(update.$set.proofOfDelivery.receivedBy, 'Asha, dorm warden');
-    assert.equal(String(update.$set.proofOfDelivery.recordedBy), STAFF_ID);
-    assert.ok(update.$set.proofOfDelivery.recordedAt instanceof Date);
+    assert.equal(response.status, 403);
+    assert.equal(update.mock.callCount(), 0);
   });
 
   test('acknowledged overdue alerts are suppressed until their snooze expires', () => {

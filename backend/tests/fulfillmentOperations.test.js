@@ -266,82 +266,20 @@ describe('delivery reporting', () => {
   });
 });
 
-describe('recording a delivery', () => {
-  const expectDelivered = () => {
-    mock.method(FulfillmentOrder, 'findById', () =>
-      query({ _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' })
-    );
-  };
-
-  test('refuses a delivery with no receiver recorded', async () => {
-    expectDelivered();
-    const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
-      method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED' }),
-    });
-
-    assert.equal(response.status, 400);
-    const body = await response.json();
-    assert.equal(body.error.details[0].field, 'receivedBy');
-  });
-
-  test('refuses a receiver note carrying an identity number', async () => {
-    expectDelivered();
-    const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
-      method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Asha 9876543210' }),
-    });
-
-    assert.equal(response.status, 400);
-    assert.match((await response.json()).error.details[0].message, /ID, admission, or phone/i);
-  });
-
-  test('stores the receiver, the staff account, and the time — and nothing else', async () => {
-    expectDelivered();
-    let update;
-    mock.method(FulfillmentOrder, 'findOneAndUpdate', (filter, requested) => {
-      update = requested;
-      return query(
-        orderFixture({
-          status: 'DELIVERED',
-          deliveredAt: new Date(),
-          proofOfDelivery: requested.$set.proofOfDelivery,
-        })
-      );
+describe('warehouse-to-caretaker handoff', () => {
+  test('warehouse cannot record delivery after dispatch', async () => {
+    const find = mock.method(FulfillmentOrder, 'findById', () => {
+      throw new Error('authorization must fail before reading the order');
     });
 
     const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: '  Asha, room 214  ' }),
+      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Warehouse supplied value' }),
     });
 
-    assert.equal(response.status, 200);
-
-    const proof = update.$set.proofOfDelivery;
-    assert.deepEqual(Object.keys(proof).sort(), ['receivedBy', 'recordedAt', 'recordedBy']);
-    assert.equal(proof.receivedBy, 'Asha, room 214');
-    // Taken from the session and the clock, never from the request body.
-    assert.equal(proof.recordedBy, STAFF_ID);
-    assert.ok(proof.recordedAt instanceof Date);
-
-    assert.equal((await response.json()).data.proofOfDelivery.receivedBy, 'Asha, room 214');
-  });
-
-  test('still updates only from the state it read, so two staff cannot both deliver', async () => {
-    expectDelivered();
-    let filter;
-    mock.method(FulfillmentOrder, 'findOneAndUpdate', (requestedFilter) => {
-      filter = requestedFilter;
-      return query(null);
-    });
-
-    const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
-      method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Asha' }),
-    });
-
-    assert.deepEqual(filter, { _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' });
-    assert.equal(response.status, 409);
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).message, /only the assigned caretaker/i);
+    assert.equal(find.mock.callCount(), 0);
   });
 });
 

@@ -4,6 +4,8 @@ import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import { RECEIVER_MAX_LENGTH } from '../src/domain/fulfillment/proofOfDelivery.js';
 
+export const WEEKLY_ORDER_INDEX = 'one_fulfillment_order_per_student_business_week';
+
 const itemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -69,6 +71,7 @@ const fulfillmentOrderSchema = new mongoose.Schema(
       name: { type: String, required: true },
       admissionNumber: { type: String, default: '' },
       hostelNumber: { type: String, required: true },
+      hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel', required: true },
     },
     items: { type: [itemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
@@ -101,16 +104,8 @@ const fulfillmentOrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-fulfillmentOrderSchema.index(
-  { studentId: 1, businessWeekStart: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      status: { $in: [OrderStatus.PENDING, OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED] },
-    },
-    name: 'one_fulfillment_order_per_student_business_week',
-  }
-);
+/* businessWeekStart remains reporting metadata. It is deliberately not
+   unique: a student may have any number of orders in the same week. */
 fulfillmentOrderSchema.index({ status: 1, deliverBy: 1 });
 
 // The overdue sweep: open packages past their deadline, newest deadline last.
@@ -126,5 +121,7 @@ fulfillmentOrderSchema.index(
 // of orders; the parent's own list is that range narrowed to one student.
 fulfillmentOrderSchema.index({ orderedAt: -1 });
 fulfillmentOrderSchema.index({ studentId: 1, orderedAt: -1 });
+fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliverBy: 1 });
+fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliveredAt: -1 });
 
 export default mongoose.model('FulfillmentOrder', fulfillmentOrderSchema);

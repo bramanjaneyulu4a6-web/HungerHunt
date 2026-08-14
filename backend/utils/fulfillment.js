@@ -13,12 +13,6 @@ export const fulfillmentSchedule = (
   deliverBy: new Date(orderedAt.getTime() + DELIVERY_WINDOW_MS),
 });
 
-export const findWeeklyFulfillment = ({ studentId, orderedAt = new Date(), session = null }) => {
-  const { businessWeekStart } = fulfillmentSchedule(orderedAt);
-  const query = FulfillmentOrder.findOne({ studentId, businessWeekStart, status: { $ne: OrderStatus.CANCELLED } });
-  return session ? query.session(session) : query;
-};
-
 export const createFulfillmentOrder = async ({
   transaction,
   student,
@@ -33,6 +27,7 @@ export const createFulfillmentOrder = async ({
       name: student.name,
       admissionNumber: student.admissionNumber || '',
       hostelNumber: student.hostelNumber,
+      ...(student.hostelId ? { hostelId: student.hostelId } : {}),
     },
     items: transaction.items.map((item) => ({
       productId: item.productId,
@@ -45,19 +40,9 @@ export const createFulfillmentOrder = async ({
     ...schedule,
   };
 
-  try {
-    if (session) {
-      const [order] = await FulfillmentOrder.create([document], { session });
-      return order;
-    }
-    return await FulfillmentOrder.create(document);
-  } catch (error) {
-    if (error?.code === 11000) {
-      const conflict = new Error('This student has already placed an order this business week.');
-      conflict.status = 409;
-      conflict.code = 'WEEKLY_ORDER_LIMIT';
-      throw conflict;
-    }
-    throw error;
+  if (session) {
+    const [order] = await FulfillmentOrder.create([document], { session });
+    return order;
   }
+  return FulfillmentOrder.create(document);
 };

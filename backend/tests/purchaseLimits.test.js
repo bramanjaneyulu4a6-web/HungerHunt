@@ -18,6 +18,7 @@ const Student = (await import('../models/Student.js')).default;
 const Product = (await import('../models/Product.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
+const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const { chargeCart } = await import('../utils/checkout.js');
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -66,7 +67,7 @@ const chocolate = (purchaseLimit) => ({
 // Stands the shelf and the wallet up, and records what the limit check asked
 // the database. Refusing at the stock decrement ends each run before wallets
 // and transactions come into it — reaching that call means the limit passed.
-const arrange = ({ product, alreadyBought = 0 }) => {
+const arrange = ({ product, alreadyBought = 0, awaitingApproval = 0 }) => {
   const pipelines = [];
 
   mock.method(Student, 'findById', async () => ({ _id: STUDENT_ID, pocketMoney: 5000 }));
@@ -75,6 +76,11 @@ const arrange = ({ product, alreadyBought = 0 }) => {
     pipelines.push(pipeline);
     return alreadyBought > 0 ? [{ _id: PRODUCT_ID, quantity: alreadyBought }] : [];
   });
+  mock.method(PendingOrder, 'aggregate', () =>
+    awaitingApproval > 0
+      ? [{ _id: PRODUCT_ID, quantity: awaitingApproval }]
+      : []
+  );
 
   const state = { pipelines, reachedDecrement: false };
 
@@ -137,6 +143,23 @@ describe('a product with a purchase limit', () => {
     });
 
     assert.equal(result.ok, false);
+    assert.match(result.message, /None can be added/);
+  });
+
+  test('reserves units already waiting for parent approval', async () => {
+    arrange({
+      product: chocolate({ enabled: true, quantity: 3, period: 'WEEKLY' }),
+      alreadyBought: 1,
+      awaitingApproval: 2,
+    });
+
+    const result = await chargeCart({
+      studentId: STUDENT_ID,
+      items: [{ productId: PRODUCT_ID, quantity: 1 }],
+    });
+
+    assert.equal(result.code, 'PRODUCT_LIMIT');
+    assert.match(result.message, /2 awaiting parent approval/);
     assert.match(result.message, /None can be added/);
   });
 

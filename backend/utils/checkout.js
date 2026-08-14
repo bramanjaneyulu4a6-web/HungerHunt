@@ -4,6 +4,7 @@ import Inventory from '../models/Inventory.js';
 import { businessPeriodStart } from './businessTime.js';
 import { createFulfillmentOrder, findWeeklyFulfillment } from './fulfillment.js';
 import WalletReversal from '../models/WalletReversal.js';
+import { checkPurchaseLimits } from './purchaseLimits.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -71,6 +72,7 @@ export const chargeCart = async ({
 
   let totalAmount = 0;
   const transactionItems = [];
+  const limitedEntries = [];
 
   for (const orderItem of items) {
     const inventoryQuery = Inventory.findOne({
@@ -117,7 +119,21 @@ export const chargeCart = async ({
       quantity: orderItem.quantity,
       price: unitPrice
     });
+
+    limitedEntries.push({ product: inventory.productId, quantity: orderItem.quantity });
   }
+
+  // Per-product limits are judged against the same populated rows the price
+  // came from, and before any stock or wallet is touched, so a refusal costs
+  // nothing to undo. Checked here rather than in either controller because
+  // the till and the parent's approval both arrive at this function.
+  const withinLimits = await checkPurchaseLimits({
+    studentId: student._id,
+    entries: limitedEntries,
+    session,
+  });
+
+  if (!withinLimits.ok) return withinLimits;
 
   if (student.walletControl?.enabled) {
     const spendingQuery = Transaction.aggregate([

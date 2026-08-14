@@ -6,6 +6,72 @@ import streamifier from "streamifier";
 import { isNonNegativeNumber, isWholeNonNegative } from '../utils/quantities.js';
 
 
+const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
+
+// Forms send strings; both spellings of true mean true, as with `active`.
+const asBoolean = (value) => value === true || value === "true";
+
+/* Reads the purchase-limit fields off a request body.
+ *
+ * They arrive flat — purchaseLimitEnabled / Quantity / Period — because the
+ * product form is multipart (it carries the image), and multipart has no
+ * nested objects to send. Returns { present: false } when the body never
+ * mentions the limit, which is how the archive toggle updates one field
+ * without dragging a default over a configured limit.
+ */
+const readPurchaseLimit = (body) => {
+  const mentions =
+    body.purchaseLimitEnabled !== undefined ||
+    body.purchaseLimitQuantity !== undefined ||
+    body.purchaseLimitPeriod !== undefined;
+
+  if (!mentions) return { present: false };
+
+  const enabled = asBoolean(body.purchaseLimitEnabled);
+
+  if (body.purchaseLimitPeriod !== undefined && !LIMIT_PERIODS.includes(body.purchaseLimitPeriod)) {
+    return { present: true, error: "Limit period must be DAILY, WEEKLY, MONTHLY or TOTAL." };
+  }
+
+  // Only meaningful when the limit is on: turning one off should not be
+  // refused because the box it leaves behind still reads blank.
+  if (enabled) {
+    if (!isWholeNonNegative(body.purchaseLimitQuantity) || Number(body.purchaseLimitQuantity) < 1) {
+      return {
+        present: true,
+        error: "A purchase limit needs a whole quantity of one or more. Archive the product to stop selling it.",
+      };
+    }
+  }
+
+  // `value` creates the row whole; `fields` edits only what was named, so
+  // switching a limit off leaves the quantity the office last chose sitting
+  // there for when they switch it back on.
+  const fields = {};
+
+  if (body.purchaseLimitEnabled !== undefined) fields["purchaseLimit.enabled"] = enabled;
+
+  if (isWholeNonNegative(body.purchaseLimitQuantity)) {
+    fields["purchaseLimit.quantity"] = Number(body.purchaseLimitQuantity);
+  }
+
+  if (body.purchaseLimitPeriod !== undefined) {
+    fields["purchaseLimit.period"] = body.purchaseLimitPeriod;
+  }
+
+  return {
+    present: true,
+    fields,
+    value: {
+      enabled,
+      quantity: isWholeNonNegative(body.purchaseLimitQuantity)
+        ? Number(body.purchaseLimitQuantity)
+        : 0,
+      period: body.purchaseLimitPeriod || "DAILY",
+    },
+  };
+};
+
 const uploadImage = (file) => {
   return new Promise((resolve, reject) => {
 
@@ -46,6 +112,12 @@ export const addProduct = async (req, res) => {
       return res.status(400).json({ message: "Safety stock must be a whole number of zero or more." });
     }
 
+    const purchaseLimit = readPurchaseLimit(req.body);
+
+    if (purchaseLimit.error) {
+      return res.status(400).json({ message: purchaseLimit.error });
+    }
+
     const product = await Product.create({
 
       name: req.body.name,
@@ -64,6 +136,8 @@ export const addProduct = async (req, res) => {
       ...(req.body.safetyStock !== undefined
         ? { safetyStock: Number(req.body.safetyStock) }
         : {}),
+
+      ...(purchaseLimit.present ? { purchaseLimit: purchaseLimit.value } : {}),
 
     });
 
@@ -150,7 +224,17 @@ export const updateProduct = async (req, res) => {
 
     // Forms send strings; both spellings of true mean true.
     if (req.body.active !== undefined) {
-      updateData.active = req.body.active === true || req.body.active === "true";
+      updateData.active = asBoolean(req.body.active);
+    }
+
+    const purchaseLimit = readPurchaseLimit(req.body);
+
+    if (purchaseLimit.error) {
+      return res.status(400).json({ message: purchaseLimit.error });
+    }
+
+    if (purchaseLimit.present) {
+      Object.assign(updateData, purchaseLimit.fields);
     }
 
     if (req.file) {

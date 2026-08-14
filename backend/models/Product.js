@@ -56,6 +56,43 @@ const productSchema = new mongoose.Schema(
     type: Number,
     min: 0,
     default: 0
+  },
+
+  // How much of this one product a single student may buy in a period —
+  // the rule that stops one child spending a whole week's allowance on
+  // chocolate. Distinct from walletControl, which caps rupees across the
+  // whole basket; this caps units of one line. Both are checked, and either
+  // can refuse a sale on its own.
+  //
+  // `enabled` is the on switch rather than "quantity 0 means unlimited", so
+  // that turning a limit off keeps the number the office last chose instead
+  // of making them type it again. Rows written before this field have no
+  // purchaseLimit at all, which reads as disabled through the defaults.
+  //
+  // The controller refuses an enabled limit of 0 — a product nobody may buy
+  // is an archived product, and letting a blank quantity mean that would
+  // take a product off sale without anyone saying so.
+  purchaseLimit: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+
+    quantity: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+
+    // TOTAL means "ever" — no period start, counted over the student's whole
+    // history. The other three resolve through businessPeriodStart, so they
+    // turn over at midnight in the configured business zone, not the
+    // server's.
+    period: {
+      type: String,
+      enum: ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"],
+      default: "DAILY"
+    }
   }
 },
 { timestamps: true }

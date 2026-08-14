@@ -18,7 +18,25 @@ const EMPTY_FORM = {
   price: '',
   reorderLevel: '5',
   safetyStock: '0',
+  purchaseLimitEnabled: false,
+  purchaseLimitQuantity: '',
+  purchaseLimitPeriod: 'DAILY',
   image: null,
+};
+
+const LIMIT_PERIODS = [
+  ['DAILY', 'per day'],
+  ['WEEKLY', 'per week'],
+  ['MONTHLY', 'per month'],
+  ['TOTAL', 'ever'],
+];
+
+const limitLabel = (product) => {
+  if (!product.purchaseLimit?.enabled) return '—';
+
+  const period = LIMIT_PERIODS.find(([value]) => value === product.purchaseLimit.period);
+
+  return `${product.purchaseLimit.quantity} ${period ? period[1] : 'per day'}`;
 };
 
 const Products = () => {
@@ -100,6 +118,13 @@ const Products = () => {
       data.append('price', form.price);
       data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
       data.append('safetyStock', form.safetyStock === '' ? '0' : form.safetyStock);
+      // Always sent, both fields included, so switching the limit off is a
+      // change the server sees rather than an omission it ignores.
+      data.append('purchaseLimitEnabled', form.purchaseLimitEnabled ? 'true' : 'false');
+      if (form.purchaseLimitQuantity !== '') {
+        data.append('purchaseLimitQuantity', form.purchaseLimitQuantity);
+      }
+      data.append('purchaseLimitPeriod', form.purchaseLimitPeriod);
       if (form.image) {
         data.append('image', form.image);
       }
@@ -131,6 +156,11 @@ const Products = () => {
       price: product.price ?? '',
       reorderLevel: String(product.reorderLevel ?? 5),
       safetyStock: String(product.safetyStock ?? 0),
+      purchaseLimitEnabled: Boolean(product.purchaseLimit?.enabled),
+      purchaseLimitQuantity: product.purchaseLimit?.quantity
+        ? String(product.purchaseLimit.quantity)
+        : '',
+      purchaseLimitPeriod: product.purchaseLimit?.period || 'DAILY',
       image: null,
     });
     setIsProductOpen(true);
@@ -300,6 +330,7 @@ const Products = () => {
                 <th style={{ width: 120 }}>Price</th>
                 <th style={{ width: 130 }}>Reorder point</th>
                 <th style={{ width: 120 }}>Safety stock</th>
+                <th style={{ width: 150 }}>Per-student limit</th>
                 <th style={{ width: 180 }}>Actions</th>
               </tr>
             </thead>
@@ -337,6 +368,7 @@ const Products = () => {
                   </td>
                   <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
                   <td data-label="Safety stock">{p.safetyStock ?? 0}</td>
+                  <td data-label="Per-student limit">{limitLabel(p)}</td>
                   <td data-label="Actions">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <Button
@@ -573,6 +605,76 @@ const Products = () => {
                   value={form.reorderLevel}
                   onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <label
+                  className="field-label"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                  htmlFor="product-limit-enabled"
+                >
+                  <input
+                    id="product-limit-enabled"
+                    type="checkbox"
+                    checked={form.purchaseLimitEnabled}
+                    onChange={(e) =>
+                      setForm({ ...form, purchaseLimitEnabled: e.target.checked })
+                    }
+                  />
+                  Cap how many one student may buy
+                </label>
+
+                {form.purchaseLimitEnabled && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 12,
+                      marginTop: 12,
+                    }}
+                  >
+                    <div>
+                      <label className="field-label" htmlFor="product-limit-quantity">
+                        Maximum quantity
+                      </label>
+                      {/* min 1: the server refuses an enabled limit of zero,
+                          because a product nobody may buy is one to archive. */}
+                      <input
+                        id="product-limit-quantity"
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="input"
+                        placeholder="e.g., 2"
+                        required
+                        value={form.purchaseLimitQuantity}
+                        onChange={(e) =>
+                          setForm({ ...form, purchaseLimitQuantity: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="field-label" htmlFor="product-limit-period">
+                        Counted
+                      </label>
+                      <select
+                        id="product-limit-period"
+                        className="select"
+                        value={form.purchaseLimitPeriod}
+                        onChange={(e) =>
+                          setForm({ ...form, purchaseLimitPeriod: e.target.value })
+                        }
+                      >
+                        {LIMIT_PERIODS.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -5,6 +5,7 @@ import Inventory from "../models/Inventory.js";
 import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
+import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
   AUTHORIZATION_MESSAGES,
@@ -75,9 +76,10 @@ const validItems = (items) =>
 
 /* Prices a cart against inventory without touching it. Approval re-does this
    against live stock; here it is only so the parent is shown real numbers. */
-const priceCart = async (items) => {
+const priceCart = async (items, studentId) => {
   let totalAmount = 0;
   const orderItems = [];
+  const limitedEntries = [];
 
   for (const item of items) {
     const inventory = await Inventory.findOne({
@@ -117,6 +119,19 @@ const priceCart = async (items) => {
       quantity: item.quantity,
       price: inventory.productId.price,
     });
+
+    limitedEntries.push({ product: inventory.productId, quantity: item.quantity });
+  }
+
+  // Same reason the archived check is here rather than left to chargeCart: a
+  // limit caught now is explained at the counter while the student is still
+  // standing there, instead of surfacing days later as a parent's approval
+  // failing for reasons they cannot act on. chargeCart checks again at the
+  // moment money moves, which is the answer that actually binds.
+  const withinLimits = await checkPurchaseLimits({ studentId, entries: limitedEntries });
+
+  if (!withinLimits.ok) {
+    return { ok: false, status: withinLimits.status, message: withinLimits.message };
   }
 
   return { ok: true, totalAmount, orderItems };
@@ -212,7 +227,7 @@ export const createPendingOrder = async (req, res) => {
       });
     }
 
-    const priced = await priceCart(items);
+    const priced = await priceCart(items, student._id);
 
     if (!priced.ok) {
       return res.status(priced.status).json({ message: priced.message });
@@ -349,7 +364,7 @@ export const updatePendingOrder = async (req, res) => {
       });
     }
 
-    const priced = await priceCart(kept);
+    const priced = await priceCart(kept, order.studentId);
 
     if (!priced.ok) {
       return res.status(priced.status).json({ message: priced.message });

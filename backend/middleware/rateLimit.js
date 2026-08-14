@@ -1,9 +1,16 @@
 import rateLimit from "express-rate-limit";
 
+// Local testing should never lock a developer out. Keep this tied to the exact
+// development environment so an unset, misspelled, staging, or production
+// NODE_ENV continues to receive the normal brute-force protection.
+export const skipAuthLimitsInDevelopment = () =>
+  process.env.NODE_ENV === "development";
+
 // Credential endpoints: slow down brute-force and reset-email spam.
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  skip: skipAuthLimitsInDevelopment,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many attempts. Please try again in a few minutes." },
@@ -20,6 +27,7 @@ export const authLimiter = rateLimit({
 export const kioskSessionLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  skip: skipAuthLimitsInDevelopment,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many attempts. Please wait a moment and try again." },

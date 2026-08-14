@@ -3,6 +3,9 @@ import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
 import { AnimateIn, Banner, EmptyState, PageHeader, Skeleton, Card } from '../components/ui';
 import PendingApprovalCard from '../components/PendingApprovalCard';
+import OrderCard from '../components/OrderCard';
+import { ErrorFeedback } from '../components/error/ErrorFeedback';
+import { presentError } from '../utils/errorPresentation';
 
 const DashboardSkeleton = () => (
   <>
@@ -17,7 +20,8 @@ const DashboardSkeleton = () => (
 );
 
 export default function Dashboard() {
-  const [orders, setOrders] = useState([]);
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [ongoingOrders, setOngoingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -25,6 +29,7 @@ export default function Dashboard() {
 
   const reload = (message = '') => {
     if (message) setNotice(message);
+    setError('');
     setLoading(true);
     setAttempt((value) => value + 1);
   };
@@ -33,15 +38,19 @@ export default function Dashboard() {
     let ignore = false;
     const load = async () => {
       try {
-        const response = await API.get('/pending-orders/parent');
+        const [pendingResponse, dashboardResponse] = await Promise.all([
+          API.get('/pending-orders/parent'),
+          API.get('/parent/dashboard'),
+        ]);
         if (ignore) return;
-        setOrders(response.data.orders || []);
+        setPendingOrders(pendingResponse.data.orders || []);
+        setOngoingOrders(dashboardResponse.data.ongoingOrders || []);
         setError('');
       } catch (err) {
         if (ignore) return;
         setError(
           err.response?.data?.message ||
-            "Couldn't load pending approvals. Check your connection."
+            "Couldn't load your dashboard. Check your connection."
         );
       } finally {
         if (!ignore) setLoading(false);
@@ -61,27 +70,58 @@ export default function Dashboard() {
   return (
     <div className="page dashboard-page">
       <PageHeader
-        title="Pending approvals"
-        subtitle="Review purchases waiting for your approval across all linked students."
+        title="Dashboard"
+        subtitle="Track ongoing orders and review purchases waiting for your approval."
       />
 
       {notice && <Banner variant="success" icon="✅" style={{ marginBottom: 20 }}>{notice}</Banner>}
       {error && (
-        <Banner variant="alert" icon="⚠️" style={{ marginBottom: 20 }}>
-          {error}{' '}<button type="button" className="link-button" onClick={() => reload()}>Try again</button>
-        </Banner>
+        <ErrorFeedback className="page-error-state" issue={presentError({ request: true, message: error })} action={{ label: 'Try again', onClick: () => reload() }} />
       )}
       {loading && <DashboardSkeleton />}
-      {!loading && !error && orders.length === 0 && (
-        <EmptyState icon="✅" title="All caught up">
-          There are no pending purchase approvals for any linked student.
+      {!loading && !error && ongoingOrders.length > 0 && (
+        <section className="dashboard-section" aria-labelledby="ongoing-orders-title">
+          <div className="section-heading-row">
+            <div>
+              <p className="section-eyebrow">Live updates</p>
+              <h2 className="section-title" id="ongoing-orders-title">Ongoing orders</h2>
+              <p className="section-copy">Follow each order until it reaches the dorm.</p>
+            </div>
+          </div>
+
+          <div className="dashboard-orders-grid">
+            {ongoingOrders.map((order, index) => (
+              <AnimateIn key={order.id} index={index}>
+                <OrderCard order={order} index={index} showStudent />
+              </AnimateIn>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && !error && pendingOrders.length > 0 && (
+        <section className="dashboard-section" aria-labelledby="pending-approvals-title">
+          <div className="section-heading-row">
+            <div>
+              <p className="section-eyebrow">Action needed</p>
+              <h2 className="section-title" id="pending-approvals-title">Pending approvals</h2>
+              <p className="section-copy">Review these purchases before they expire.</p>
+            </div>
+          </div>
+
+          {pendingOrders.map((order, index) => (
+            <AnimateIn key={order._id} index={index}>
+              <PendingApprovalCard order={order} onResolved={reload} compact />
+            </AnimateIn>
+          ))}
+        </section>
+      )}
+
+      {!loading && !error && pendingOrders.length === 0 && ongoingOrders.length === 0 && (
+        <EmptyState icon="✓" title="You're all caught up" variant="success">
+          No orders need your review, and there are no active deliveries. New activity will appear here automatically.
         </EmptyState>
       )}
-      {!loading && !error && orders.map((order, index) => (
-        <AnimateIn key={order._id} index={index}>
-          <PendingApprovalCard order={order} onResolved={reload} />
-        </AnimateIn>
-      ))}
     </div>
   );
 }

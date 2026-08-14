@@ -18,6 +18,7 @@ const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -74,11 +75,15 @@ describe('the dashboard sends what the dashboard renders', () => {
         studentIds: [{ _id: STUDENT_ID, name: 'Child', pocketMoney: 500 }],
       }),
     }));
+    mock.method(FulfillmentOrder, 'find', () => ({
+      sort: () => ({ lean: async () => [] }),
+    }));
 
     const body = await (await get('/api/parent/dashboard')).json();
 
-    assert.deepEqual(Object.keys(body), ['children']);
+    assert.deepEqual(Object.keys(body), ['children', 'ongoingOrders']);
     assert.equal(body.children.length, 1);
+    assert.deepEqual(body.ongoingOrders, []);
   });
 
   test('only the fields the cards show are selected', async () => {
@@ -97,6 +102,47 @@ describe('the dashboard sends what the dashboard renders', () => {
     // sent on a screen that shows a balance.
     assert.equal(populateArg.select.includes('rechargeHistory'), false);
     assert.equal(populateArg.select.includes('pocketMoney'), true);
+  });
+
+  test('ongoing orders are limited to this parent and carry their display status', async () => {
+    let orderFilter;
+    let orderSort;
+
+    mock.method(Parent, 'findById', () => ({
+      populate: async () => ({
+        _id: PARENT_ID,
+        studentIds: [{ _id: STUDENT_ID, name: 'Child', pocketMoney: 500 }],
+      }),
+    }));
+    mock.method(FulfillmentOrder, 'find', (filter) => {
+      orderFilter = filter;
+      return {
+        sort: (sort) => {
+          orderSort = sort;
+          return {
+            lean: async () => [{
+              _id: '507f191e810c19729de860ef',
+              studentId: STUDENT_ID,
+              studentSnapshot: { name: 'Child', hostelNumber: 'D-4' },
+              status: 'PACKED',
+              items: [{ name: 'Notebook', quantity: 1, price: 100 }],
+              totalAmount: 100,
+              orderedAt: new Date('2026-08-14T08:00:00.000Z'),
+              deliverBy: new Date('2999-08-16T08:00:00.000Z'),
+            }],
+          };
+        },
+      };
+    });
+
+    const body = await (await get('/api/parent/dashboard')).json();
+
+    assert.deepEqual(orderFilter.studentId.$in, [STUDENT_ID]);
+    assert.deepEqual([...orderFilter.status.$in].sort(), ['OUT_FOR_DELIVERY', 'PACKED', 'PENDING']);
+    assert.deepEqual(orderSort, { orderedAt: -1 });
+    assert.equal(body.ongoingOrders[0].status, 'PACKED');
+    assert.equal(body.ongoingOrders[0].studentName, 'Child');
+    assert.equal(body.ongoingOrders[0].studentId, STUDENT_ID);
   });
 });
 

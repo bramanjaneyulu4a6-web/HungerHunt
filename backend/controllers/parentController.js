@@ -5,7 +5,7 @@ import WalletReversal from '../models/WalletReversal.js';
 import Parent from "../models/Parent.js";
 
 import bcrypt from "bcryptjs";
-import { isOverdue } from "../src/domain/fulfillment/overdue.js";
+import { isOverdue, OPEN_STATUSES } from "../src/domain/fulfillment/overdue.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
@@ -145,7 +145,20 @@ export const getParentDashboardDetails = async (req, res) => {
       return res.status(404).json({ message: "Parent not found" });
     }
 
-    res.json({ children: parent.studentIds });
+    const childIds = parent.studentIds.map((student) => student._id);
+    const orders = childIds.length
+      ? await FulfillmentOrder.find({
+          studentId: { $in: childIds },
+          status: { $in: OPEN_STATUSES },
+        }).sort({ orderedAt: -1 }).lean()
+      : [];
+
+    const now = new Date();
+
+    res.json({
+      children: parent.studentIds,
+      ongoingOrders: orders.map((order) => parentPackageView(order, now)),
+    });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -381,6 +394,8 @@ export const getChildRecharges = async (req, res) => {
  * 48-hour rule or the business timezone to display it. */
 const parentPackageView = (order, now) => ({
   id: String(order._id),
+  studentId: String(order.studentId),
+  studentName: order.studentSnapshot?.name || "",
   status: order.status,
   items: (order.items || []).map(({ name, quantity, price }) => ({ name, quantity, price })),
   totalAmount: order.totalAmount,

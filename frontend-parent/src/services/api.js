@@ -1,7 +1,31 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
+
+const configuredApiUrl =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+
+/* Android Emulator owns its own loopback interface, so localhost there cannot
+   reach the backend running on the developer's computer. 10.0.2.2 is the
+   emulator's stable alias for the host loopback. Keep the configured URL for
+   browsers, iOS Simulator, physical devices, and every non-local deployment. */
+export const resolveApiBaseUrl = (configured = configuredApiUrl) => {
+  if (Capacitor.getPlatform() !== 'android') return configured;
+
+  try {
+    const url = new URL(configured);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = '10.0.2.2';
+      return url.toString().replace(/\/$/, '');
+    }
+  } catch {
+    // Axios will surface the original invalid URL as it did before.
+  }
+
+  return configured;
+};
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: resolveApiBaseUrl(),
 });
 
 // Automatically inject JWT token into headers for secured routes

@@ -43,7 +43,7 @@ const pageTitle = (pathname) => {
   if (pathname === '/register') return 'Create account';
   if (pathname === '/forgot-password') return 'Forgot password';
   if (pathname.startsWith('/reset-password/')) return 'Reset password';
-  return 'Pending approvals';
+  return 'Dashboard';
 };
 
 function RouteEffects() {

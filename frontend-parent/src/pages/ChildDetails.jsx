@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
 import { formatINR } from '../utils/format';
@@ -13,9 +13,12 @@ import {
 } from '../components/ui';
 import Icon from '../components/Icon';
 import PendingApprovalCard from '../components/PendingApprovalCard';
+import OrderCard from '../components/OrderCard';
+import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
+import { presentError } from '../utils/errorPresentation';
 
 const BASE_TABS = [
-  { id: 'packages', icon: '📦', label: 'Packages' },
+  { id: 'orders', icon: '📦', label: 'Orders' },
   { id: 'purchases', icon: '🛒', label: 'Purchases' },
   { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
@@ -27,23 +30,6 @@ const formatDate = (value) =>
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
-
-const formatDateTime = (value) =>
-  new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value));
-
-const PACKAGE_LABELS = {
-  PENDING: 'Order received',
-  PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'On the way to the dorm',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled and refunded',
-};
 
 const DetailsSkeleton = () => (
   <>
@@ -182,12 +168,15 @@ const usePagedList = (path, key, enabled) => {
 
 export default function ChildDetails() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('purchases');
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'orders' ? 'orders' : 'purchases'
+  );
   const [pendingOrders, setPendingOrders] = useState([]);
   const [pendingNotice, setPendingNotice] = useState('');
 
@@ -217,12 +206,20 @@ export default function ChildDetails() {
       setLoadError('');
 
       try {
-        const res = await API.get(`/parent/child/${id}`);
+        const [res, walletRes] = await Promise.all([
+          API.get(`/parent/child/${id}`),
+          API.get(`/parent/child/${id}/wallet`),
+        ]);
         if (ignore) return;
 
-        setApprovalRequired(Boolean(res.data.student?.requiresParentApproval));
+        const student = {
+          ...res.data.student,
+          pocketMoney: walletRes.data.wallet.balance,
+        };
 
-        const control = res.data.student?.walletControl;
+        setApprovalRequired(Boolean(student.requiresParentApproval));
+
+        const control = student.walletControl;
 
         if (control) {
           setWalletEnabled(control.enabled);
@@ -230,7 +227,7 @@ export default function ChildDetails() {
           setWalletType(control.limitType || 'WEEKLY');
         }
 
-        setData(res.data);
+        setData({ ...res.data, student, wallet: walletRes.data.wallet });
 
         // Approval availability enhances this screen but must not make the
         // child's balance and history unavailable if that secondary request
@@ -292,10 +289,10 @@ export default function ChildDetails() {
     activeTab === 'recharges'
   );
 
-  const packages = usePagedList(
+  const fulfillmentOrders = usePagedList(
     `/parent/child/${id}/packages`,
     'packages',
-    activeTab === 'packages'
+    activeTab === 'orders'
   );
 
   /* Saved on the switch rather than behind a button. There is one thing to
@@ -378,12 +375,7 @@ export default function ChildDetails() {
     return (
       <div className="page">
         {backLink}
-        <Banner variant="alert" icon="⚠️">
-          {loadError}{' '}
-          <button type="button" className="link-button" onClick={retry}>
-            Try again
-          </button>
-        </Banner>
+        <ErrorFeedback issue={presentError({ request: true, message: loadError })} action={{ label: 'Try again', onClick: retry }} />
       </div>
     );
   }
@@ -430,12 +422,7 @@ export default function ChildDetails() {
 
     if (list.error && list.items.length === 0) {
       return (
-        <Banner variant="alert" icon="⚠️">
-          {list.error}{' '}
-          <button type="button" className="link-button" onClick={list.reload}>
-            Try again
-          </button>
-        </Banner>
+        <ErrorFeedback issue={presentError({ request: true, message: list.error })} action={{ label: 'Try again', onClick: list.reload }} />
       );
     }
 
@@ -531,8 +518,8 @@ export default function ChildDetails() {
 
           {renderList(bills, {
             empty: (
-              <EmptyState icon="🧾" title="No purchases yet">
-                Nothing has been bought on this account so far.
+              <EmptyState icon="🧾" title="No purchase history yet">
+                Completed kiosk purchases will appear here.
               </EmptyState>
             ),
             children: bills.items.map((bill, i) => (
@@ -584,61 +571,26 @@ export default function ChildDetails() {
         </div>
       )}
 
-      {activeTab === 'packages' && (
-        <div role="tabpanel" id="panel-packages" aria-labelledby="tab-packages" tabIndex={0}>
+      {activeTab === 'orders' && (
+        <div role="tabpanel" id="panel-orders" aria-labelledby="tab-orders" tabIndex={0}>
           <div className="section-heading-row">
             <div>
-              <h2 className="section-title">Dorm Packages</h2>
+              <h2 className="section-title">Orders</h2>
               <p className="section-copy">
-                Paid orders are delivered to the student&apos;s dorm within 48 hours.
+                Track paid orders from confirmation through dorm delivery.
               </p>
             </div>
           </div>
 
-          {renderList(packages, {
+          {renderList(fulfillmentOrders, {
             empty: (
-              <EmptyState icon="📦" title="No packages yet">
-                A package will appear here after an order is paid.
+              <EmptyState icon="📦" title="No orders to track yet">
+                Paid orders will appear here with live delivery updates.
               </EmptyState>
             ),
-            children: packages.items.map((item, i) => (
+            children: fulfillmentOrders.items.map((item, i) => (
               <AnimateIn key={item.id} index={i}>
-                <Card className="card--tight" style={{ marginBottom: 16 }}>
-                  <div className="ledger-head">
-                    <strong style={{ color: 'var(--ink)' }}>
-                      {PACKAGE_LABELS[item.status] || item.status}
-                    </strong>
-                    <span>{formatDate(item.orderedAt)}</span>
-                  </div>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
-                    {(item.items || []).map((product, idx) => (
-                      <li key={`${product.name}-${idx}`} className="ledger-row">
-                        <span>{product.name} × {product.quantity}</span>
-                        <span>{formatINR(product.price * product.quantity)}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="ledger-row">
-                    <span>{item.deliveredAt ? 'Delivered' : item.overdue ? 'Delivery overdue since' : 'Deliver by'}</span>
-                    <strong style={{ color: item.overdue ? 'var(--danger)' : 'var(--ink)' }}>
-                      {formatDateTime(item.deliveredAt || item.deliverBy)}
-                    </strong>
-                  </div>
-
-                  <div className="ledger-row">
-                    <span>Dorm room</span>
-                    <span>{item.hostelNumber || '—'}</span>
-                  </div>
-
-                  {item.receivedBy && (
-                    <div className="ledger-row">
-                      <span>Received by</span>
-                      <span>{item.receivedBy}</span>
-                    </div>
-                  )}
-                </Card>
+                <OrderCard order={item} index={i} />
               </AnimateIn>
             )),
           })}
@@ -651,8 +603,8 @@ export default function ChildDetails() {
 
           {renderList(recharges, {
             empty: (
-              <EmptyState icon="⚡" title="No recharges yet">
-                Top-ups made at the school accounts counter will appear here.
+              <EmptyState icon="⚡" title="No wallet activity yet">
+                Top-ups and cancellation refunds will appear here.
               </EmptyState>
             ),
             // Already newest-first from the server, which is what the reversed
@@ -772,14 +724,19 @@ export default function ChildDetails() {
                 </label>
                 <input
                   id="wallet-limit"
-                  className="input"
+                  className={`input${walletBanner.type === 'error' ? ' field-has-error' : ''}`}
                   type="number"
                   min="0"
                   value={walletLimit}
                   disabled={!walletEnabled || saving}
                   onChange={(e) => setWalletLimit(Number(e.target.value))}
                   placeholder="Enter amount"
+                  aria-invalid={walletBanner.type === 'error'}
+                  aria-describedby={walletBanner.type === 'error' ? 'wallet-limit-error' : undefined}
                 />
+                {walletBanner.type === 'error' && walletBanner.message === 'Enter a spending limit greater than ₹0.' && (
+                  <InlineFieldError id="wallet-limit-error">{walletBanner.message}</InlineFieldError>
+                )}
               </div>
 
               <div>

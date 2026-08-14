@@ -57,6 +57,14 @@ const SHARED = [
     file: 'src/components/RefreshButton.jsx',
     apps: ['frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
+  // Reading a stored JWT's expiry, for the two apps holding a staff session.
+  // The storage key is a parameter rather than baked in, which is what lets
+  // these stay identical — and the reason to keep them so is that the mistake
+  // this file guards against is one both apps made independently.
+  {
+    file: 'src/utils/session.js',
+    apps: ['frontend-admin', 'hungerhunt-warehouse'],
+  },
 ];
 
 const digest = (path) =>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../utils/api';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
 
@@ -9,6 +9,11 @@ const Login = () => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Set by the 401 interceptor and by ProtectedRoute, so a day-old session says
+  // so instead of dropping staff on a bare login screen with no explanation.
+  const expired = searchParams.get('expired') === '1';
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -46,6 +51,12 @@ const Login = () => {
         </>
       }
     >
+      {expired && !error && (
+        <Banner variant="warn" icon="🔒" style={{ marginBottom: 28 }}>
+          Your session has expired. Please sign in again.
+        </Banner>
+      )}
+
       {error && (
         <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
           {error}

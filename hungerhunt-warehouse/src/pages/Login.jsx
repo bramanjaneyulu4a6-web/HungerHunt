@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../utils/api";
 import { AuthField, AuthLayout, Banner, Button } from "../components/ui";
 
@@ -9,6 +9,11 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  // Set by the 401 interceptor and by ProtectedRoute, so a day-old session says
+  // so instead of dropping the storeroom on a bare login screen.
+  const expired = searchParams.get("expired") === "1";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,12 +23,17 @@ const Login = () => {
       setLoading(true);
       const res = await api.post("/admin/login", { email, password });
 
-      // Only two staff roles remain and both belong here — a warehouse account
-      // because this is its app, an admin because admins outrank the storeroom.
-      // The server turns away anything else at the door, including a retired
-      // cashier row left over from before the till went self-serve.
+      // Warehouse staff and caretakers share this front door, then get separate
+      // route trees. The caretaker tree never mounts procurement screens.
       localStorage.setItem("warehouseToken", res.data.token);
       localStorage.setItem("staffRole", res.data.role || "admin");
+      localStorage.setItem("staffProfile", JSON.stringify(res.data.staff || {
+        name: res.data.name,
+        phone: res.data.phone,
+        email: res.data.email,
+        role: res.data.role,
+        hostel: res.data.hostel,
+      }));
       navigate("/", { replace: true });
     } catch (err) {
       setError(
@@ -36,7 +46,18 @@ const Login = () => {
   };
 
   return (
-    <AuthLayout title="Warehouse" subtitle="Sign in to receive stock">
+    <AuthLayout
+      logo="/Logo.jpeg"
+      eyebrow="Hunger Hunt"
+      title="Warehouse & dorm delivery"
+      subtitle="Sign in to continue"
+    >
+      {expired && !error && (
+        <Banner variant="warn" icon="🔒" style={{ marginBottom: 28 }}>
+          Your session has expired. Please sign in again.
+        </Banner>
+      )}
+
       {error && (
         <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
           {error}

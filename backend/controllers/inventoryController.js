@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Inventory from "../models/Inventory.js";
 import StockAdjustment from "../models/StockAdjustment.js";
 import { getPurchaseAllowances } from "../utils/purchaseLimits.js";
+import { availabilityOf } from "../utils/availability.js";
 
 export const getInventory = async (req, res) => {
   try {
@@ -20,7 +21,12 @@ export const getInventory = async (req, res) => {
       })
     );
 
-    if (!req.student?.id) return res.json(inventory);
+    if (!req.student?.id) {
+      return res.json(inventory.map((row) => ({
+        ...row.toObject(),
+        availability: availabilityOf(row.productId, row.stock),
+      })));
+    }
 
     const products = inventory.map((row) => row.productId).filter(Boolean);
     const allowances = await getPurchaseAllowances({
@@ -34,6 +40,7 @@ export const getInventory = async (req, res) => {
 
       return {
         ...item,
+        availability: availabilityOf(row.productId, row.stock),
         purchaseAllowance: productId
           ? allowances.get(String(productId)) ?? null
           : null,

@@ -161,6 +161,8 @@ describe('the catalogue list', () => {
     accountIs('admin');
     const filters = [];
     mock.method(Product, 'find', (filter) => { filters.push(filter); return findChain([]); });
+    // getProducts now joins the shelf onto every row; give it an empty one.
+    mock.method(Inventory, 'find', () => ({ lean: async () => [] }));
 
     assert.equal((await get('/api/products')).status, 200);
     assert.equal((await get('/api/products?all=1')).status, 200);

@@ -5,6 +5,7 @@ import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { isNonNegativeNumber, isPositiveNumber, isWholeNonNegative } from '../utils/quantities.js';
 import { normalizeSubCategory, SUBCATEGORY_MAX_LENGTH } from '../utils/productSubcategory.js';
+import { availabilityOf } from '../utils/availability.js';
 
 
 const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
@@ -280,7 +281,22 @@ export const getProducts = async (req, res) => {
       .populate("stockGroup")
       .populate("unit");
 
-    res.json(products);
+    // The shelf count and its meaning ride along so no screen has to join
+    // the two lists or reinvent a threshold. A product with no shelf row
+    // (only possible for rows older than the backfill) reads as empty.
+    const shelves = await Inventory.find({}, { productId: 1, stock: 1 }).lean();
+    const stockByProduct = new Map(
+      shelves.map((row) => [String(row.productId), row.stock])
+    );
+
+    res.json(products.map((product) => {
+      const stock = stockByProduct.get(String(product._id)) ?? 0;
+      return {
+        ...product.toObject(),
+        stock,
+        availability: availabilityOf(product, stock),
+      };
+    }));
   } catch (error) {
     res.status(500).json({
       error: error.message

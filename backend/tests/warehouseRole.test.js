@@ -52,7 +52,9 @@ const accountIs = accountMatcher(Admin, STAFF_ID);
 
 beforeEach(() => {
   accountIs('warehouse');
-  mock.method(Inventory, 'find', () => ({ populate: async () => [] }));
+  // Shared by two callers: getInventory chains .populate(), getProducts now
+  // joins the shelf with a projected .find().lean() — both have to resolve.
+  mock.method(Inventory, 'find', () => ({ populate: async () => [], lean: async () => [] }));
   mock.method(Supplier, 'find', () => ({ sort: async () => [] }));
   mock.method(Purchase, 'find', () => {
     const chain = { populate: () => chain, sort: async () => [] };

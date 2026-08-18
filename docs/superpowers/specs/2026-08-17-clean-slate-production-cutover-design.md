@@ -1,7 +1,7 @@
 # Clean-slate production cutover — design
 
 **Date:** 2026-08-17
-**Status:** Approved approach (A), pending spec review
+**Status:** Phase 1 complete 2026-08-18 (rehearsed production boot, founding admin created, credentials split) — awaiting Render/Vercel access for Phases 2–3
 **Supersedes:** the migration-shaped plan in
 [docs/backend-production-deploy.md](../../backend-production-deploy.md) — kept for
 reference; its sections 3, 4 and 7 no longer apply because no data is carried over.
@@ -86,19 +86,20 @@ Phase 2, not Phase 1 — the old deployment still uses it until then.
 - `JWT_SECRET`, `PARENT_JWT_SECRET`, `STUDENT_JWT_SECRET` — all three regenerated
   (64 chars, distinct). The old `JWT_SECRET` is in git history; the other two are
   regenerated because rotation is free while nothing live depends on them.
-- Rotated in Phase 1 — **their dashboards are accessible** (owner clicks, new values
-  land in `.env.production.local`):
-  - **Gmail app password:** Google Account → Security → App passwords → create a new
-    one for the backend; **revoke the old one immediately** (the old deployment is
-    dormant — losing its email sending costs nothing).
-  - **Firebase service-account key:** Firebase console → Project settings → Service
-    accounts → Generate new private key (feeds `FIREBASE_CLIENT_EMAIL` /
-    `FIREBASE_PRIVATE_KEY`); then delete the old key under Google Cloud IAM →
-    Service Accounts → Keys. The parent app's `VITE_FIREBASE_*` values need no
-    rotation — those are public client config by design.
-- Carried over for now, **rotation deferred**: the Cloudinary API secret only. It is
-  in git history and remains a live risk on that service until rotated — a known,
-  accepted gap, tracked under Security below.
+- Rotated in Phase 1:
+  - **Firebase service-account key:** DONE 2026-08-18 — new key `461f2109…` generated
+    and spliced into `.env.production.local`; proven at boot (`✅ Firebase initialized`).
+    The old key still needs deleting in Google Cloud IAM.
+  - **Gmail app password:** NOT rotated — deferred by owner decision on 2026-08-18. The
+    existing app password was carried over and is proven working (Gmail returned
+    `250 OK`, recipient accepted). It remains exposed in git history.
+    (Procedure, for the outstanding revocation: Firebase console → Project settings →
+    Service accounts generates the key; the old one is deleted under Google Cloud IAM →
+    Service Accounts → Keys. The parent app's `VITE_FIREBASE_*` values need no rotation
+    — those are public client config by design.)
+- Carried over, **rotation deferred**: the Cloudinary API secret and the Gmail app
+  password. Both are in git history and remain a live risk on those services until
+  rotated — known, accepted gaps, tracked under Security below.
 
 **3. Production env manifest** — contents of `.env.production.local`:
 
@@ -114,7 +115,7 @@ Phase 2, not Phase 1 — the old deployment still uses it until then.
 | `ADMIN_CLIENT_URL` | `https://hunger-hunt-beta.vercel.app` (candidate) |
 | `KIOSK_CLIENT_URL` | `https://hunger-hunt-kiosk.vercel.app` (candidate) |
 | `WAREHOUSE_CLIENT_URL` | new Vercel project URL, placeholder HTTPS origin until Phase 3 |
-| `EMAIL_USER` / `EMAIL_PASS` | `EMAIL_PASS` freshly rotated (new Gmail app password) |
+| `EMAIL_USER` / `EMAIL_PASS` | carried from the previous `.env` — rotation deferred (see Security) |
 | `CLOUDINARY_*` (3) | carried from current `.env` — rotation deferred (no dashboard access yet) |
 | `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` | freshly rotated (new service-account key) |
 | `MAX_ADMIN_ACCOUNTS` | carried (optional) |
@@ -189,15 +190,24 @@ Exit criteria for Phase 1: all five observations above, plus the negative check 
 
 ## Security notes
 
-- **Closed by this design:** Mongo credential exposure (new scoped user; old user
-  deleted at Phase 2 end), JWT secret exposure (regenerated), Gmail app password and
-  Firebase service-account key (rotated in Phase 1, old ones revoked),
-  bootstrap-registration window (founding admin created before the API is ever
-  public), local-dev-hits-prod footgun (env split).
-- **Open, tracked:** the Cloudinary API secret remains compromised-in-history until
-  that dashboard is accessible — rotate on access, then update
-  `.env.production.local` and Render. Atlas network access list tightening
-  (Render egress IPs) is a post-launch hardening task.
+- **Closed as of Phase 1 (2026-08-18):** Mongo credential exposure (new `graarr_app`
+  user, scoped `readWrite@graarr_ecommerce`, proven unable to read
+  `hungerhunt_production`; old user deleted at Phase 2 end), JWT secret exposure (all
+  three regenerated, 64 chars, distinct), Firebase service-account key (rotated),
+  bootstrap-registration window (founding admin created and anonymous registration
+  verified to return 401), local-dev-hits-prod footgun (`backend/.env` retargeted at
+  local Mongo; both credential backups deleted).
+- **Open, tracked:**
+  - The **Cloudinary API secret** and the **Gmail app password** remain
+    compromised-in-history. Rotate on access, then update `.env.production.local`
+    and Render.
+  - The **old Firebase key** is still active in Google Cloud IAM and should be
+    deleted now that the new one is proven.
+  - **`backend/.env-backend`** (untracked leftover from `main`) still contains the old
+    `MONGO_URI`, `JWT_SECRET` and Firebase key. It cannot be committed, but
+    `node --env-file=.env-backend` would reach production. Delete it.
+  - Atlas network access list tightening (Render egress IPs) is a post-launch
+    hardening task.
 - The old admin accounts, students, and transactions in `hungerhunt_production` do
   not exist in the new world. Anyone using old credentials against the new API is a
   stranger to it.

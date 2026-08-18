@@ -2617,7 +2617,19 @@
 }
 
 .kiosk-login-error {
+  --error-accent: #b94b4b;
   margin-top: 18px;
+  border-color: #efcaca;
+  background: #fff8f7;
+  box-shadow: inset 3px 0 0 rgba(185, 75, 75, 0.72);
+}
+
+.kiosk-login-error h2 {
+  color: #8f2f2f;
+}
+
+.kiosk-login-error p {
+  color: #754d4d;
 }
 
 .kiosk-login-form {
@@ -2662,6 +2674,17 @@
   border-color: var(--brand);
   box-shadow: 0 0 0 5px rgba(255, 107, 53, 0.12);
   transform: translateY(-2px);
+}
+
+.kiosk-login-otp__digit[aria-invalid="true"] {
+  border-color: #d98a8a;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(185, 75, 75, 0.08);
+}
+
+.kiosk-login-otp__digit[aria-invalid="true"]:focus {
+  border-color: #b94b4b;
+  box-shadow: 0 0 0 5px rgba(185, 75, 75, 0.12);
 }
 
 .kiosk-login-otp__digit:disabled {

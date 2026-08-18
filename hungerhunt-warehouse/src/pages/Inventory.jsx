@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import api from "../utils/api";
+import { availabilityOf } from "../utils/availability";
 import Icon from "../components/Icon";
 import ProductThumb from "../components/ProductThumb";
 import RefreshButton from "../components/RefreshButton";
@@ -94,8 +95,10 @@ const Inventory = () => {
       setRows(
         productsRes.data.map((product) => {
           const id = String(product._id);
-          const onShelf = stock.get(id) ?? 0;
-          const reorderLevel = Number(product.reorderLevel) || 0;
+          // The backend now sends the shelf count on the product row itself;
+          // the inventory merge stays as the fallback for a stale backend.
+          const onShelf = typeof product.stock === "number" ? product.stock : (stock.get(id) ?? 0);
+          const availability = product.availability ?? availabilityOf(product, onShelf);
           return {
             id,
             name: product.name,
@@ -103,8 +106,8 @@ const Inventory = () => {
             unit: product.unit?.name || "",
             group: product.stockGroup?.name || "",
             stock: onShelf,
-            low: reorderLevel > 0 && onShelf <= reorderLevel && onShelf > 0,
-            empty: onShelf === 0,
+            low: availability === "LOW",
+            empty: availability === "OUT_OF_STOCK",
           };
         })
       );

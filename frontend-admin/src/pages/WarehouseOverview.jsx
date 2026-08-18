@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
 import { Badge, Banner, Button, Card, PageHeader, Skeleton } from '../components/ui';
+import { resolveAvailability } from '../utils/availability';
 
 const FLOW = [
   { number: '01', title: 'Warehouse requests stock', copy: 'The warehouse team raises a replenishment request from its own app.' },
@@ -39,14 +40,12 @@ export default function WarehouseOverview() {
   }, [load]);
 
   const metrics = useMemo(() => {
-    const lowStock = inventory.filter((row) => {
-      const product = row.productId;
-      return product?.active !== false && row.stock < (product?.reorderLevel ?? 5);
-    }).length;
+    const availabilities = inventory.map(resolveAvailability);
     return {
       review: orders.filter((order) => order.status === 'PENDING_REVIEW').length,
       inbound: orders.filter((order) => ['APPROVED', 'PARTIALLY_RECEIVED'].includes(order.status)).length,
-      lowStock,
+      outOfStock: availabilities.filter((a) => a === 'OUT_OF_STOCK').length,
+      lowStock: availabilities.filter((a) => a === 'LOW').length,
       received: orders.filter((order) => order.status === 'RECEIVED').length,
     };
   }, [inventory, orders]);
@@ -65,7 +64,7 @@ export default function WarehouseOverview() {
 
       {loading ? (
         <div className="warehouse-metrics">
-          {[1, 2, 3, 4].map((item) => <Skeleton key={item} height={124} radius={16} />)}
+          {[1, 2, 3, 4, 5].map((item) => <Skeleton key={item} height={124} radius={16} />)}
         </div>
       ) : (
         <div className="warehouse-metrics">
@@ -77,9 +76,23 @@ export default function WarehouseOverview() {
             <span className="warehouse-metric__icon" aria-hidden="true">⇢</span>
             <div><span>Inbound orders</span><strong>{metrics.inbound}</strong><small>Approved or partly received</small></div>
           </Card>
+          <Card className="warehouse-metric warehouse-metric--attention">
+            <span className="warehouse-metric__icon" aria-hidden="true">⛔</span>
+            <div>
+              <span>Out of stock</span>
+              <strong>{metrics.outOfStock}</strong>
+              <small>Off sale until replenished</small>
+              <Button to="/warehouse/inventory?filter=out" variant="ghost" className="btn--sm">View items</Button>
+            </div>
+          </Card>
           <Card className="warehouse-metric warehouse-metric--warning">
             <span className="warehouse-metric__icon" aria-hidden="true">!</span>
-            <div><span>Low-stock items</span><strong>{metrics.lowStock}</strong><small>Below configured threshold</small></div>
+            <div>
+              <span>Low-stock items</span>
+              <strong>{metrics.lowStock}</strong>
+              <small>Below configured threshold</small>
+              <Button to="/warehouse/inventory?filter=low" variant="ghost" className="btn--sm">View items</Button>
+            </div>
           </Card>
           <Card className="warehouse-metric">
             <span className="warehouse-metric__icon" aria-hidden="true">▤</span>

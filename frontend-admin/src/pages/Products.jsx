@@ -10,6 +10,7 @@ import {
   Skeleton,
 } from '../components/ui';
 import { formatINR } from '../utils/format';
+import { resolveAvailability } from '../utils/availability';
 
 const EMPTY_FORM = {
   name: '',
@@ -636,8 +637,10 @@ const Products = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((p) => (
-                <tr key={p._id}>
+              {filteredProducts.map((p) => {
+                const availability = resolveAvailability(p);
+                return (
+                  <tr key={p._id} style={availability === 'OUT_OF_STOCK' ? { opacity: 0.55 } : undefined}>
                   <td data-label="Image">
                     {p.image ? (
                       <img
@@ -659,6 +662,11 @@ const Products = () => {
                     {p.active === false && (
                       <Badge variant="neutral" style={{ marginLeft: 8 }}>
                         Archived
+                      </Badge>
+                    )}
+                    {availability === 'OUT_OF_STOCK' && (
+                      <Badge variant="alert" style={{ marginLeft: 8 }}>
+                        Out of stock
                       </Badge>
                     )}
                   </td>
@@ -688,8 +696,9 @@ const Products = () => {
                       </Button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -751,11 +760,14 @@ const Products = () => {
                           <span>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'}</span>
                         </div>
                         <div className="catalogue-product-grid catalogue-product-rail">
-                    {subCategory.products.map((product) => (
-                      <article
-                        className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
-                        key={product._id}
-                      >
+                    {subCategory.products.map((product) => {
+                      const availability = resolveAvailability(product);
+                      return (
+                        <article
+                          className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
+                          style={availability === 'OUT_OF_STOCK' ? { opacity: 0.55 } : undefined}
+                          key={product._id}
+                        >
                         <div className="catalogue-product-image">
                           {product.image ? (
                             <img src={product.image} alt="" />
@@ -763,6 +775,7 @@ const Products = () => {
                             <span aria-hidden="true">📦</span>
                           )}
                           {product.active === false && <Badge variant="neutral">Archived</Badge>}
+                          {availability === 'OUT_OF_STOCK' && <Badge variant="alert">Out of stock</Badge>}
                           <div className="catalogue-product-hover-actions">
                             <Button
                               className="btn--sm"
@@ -794,8 +807,9 @@ const Products = () => {
                           </dl>
 
                         </div>
-                      </article>
-                    ))}
+                        </article>
+                      );
+                    })}
                         </div>
                       </section>
                     ))}

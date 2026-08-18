@@ -6,6 +6,7 @@ import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
+import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
 
@@ -202,7 +203,7 @@ const KioskBilling = ({ student, onLogout }) => {
 
   // Fetching and applying are kept apart so the mount effect can await before
   // it touches state — no synchronous setState, no cascading render.
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     try {
       const res = await api.get("/inventory");
 
@@ -233,11 +234,11 @@ const KioskBilling = ({ student, onLogout }) => {
         error: "Failed to load inventory. Please try refreshing.",
       };
     }
-  };
+  }, []);
 
   const applyInventory = useCallback(({ products: next, error }) => {
-    // A failed load keeps whatever is already on screen rather than blanking
-    // the wall mid-service; the banner says what happened.
+    // Preserve the last good catalogue until a successful refresh replaces it;
+    // the availability guard below keeps stale products off screen meanwhile.
     if (!error) {
       setProducts(next);
       const nextCategories = stockGroupNames(next);
@@ -260,7 +261,7 @@ const KioskBilling = ({ student, onLogout }) => {
     return () => {
       cancelled = true;
     };
-  }, [applyInventory]);
+  }, [applyInventory, loadInventory]);
 
   useEffect(
     () => () => {
@@ -279,7 +280,7 @@ const KioskBilling = ({ student, onLogout }) => {
     0
   );
 
-  const refreshPage = async () => {
+  const refreshPage = useCallback(async () => {
     setLoadingProducts(true);
     // Named for what it is rather than `result`, which now means how the sale
     // ended and is in scope here.
@@ -312,7 +313,7 @@ const KioskBilling = ({ student, onLogout }) => {
         })
         .filter((item) => item && item.stock > 0 && item.quantity > 0)
     );
-  };
+  }, [applyInventory, loadInventory]);
 
   const addToCart = (product) => {
     if (product.stock < 1) return;
@@ -691,6 +692,19 @@ const KioskBilling = ({ student, onLogout }) => {
     );
   }
 
+  // The catalogue is the store's front door. A failed inventory request means
+  // the backend/store cannot safely take an order, while a successful empty
+  // response means there is nothing available to sell. In either case, stop
+  // here instead of opening an empty or stale product wall.
+  if (inventoryError || (!loadingProducts && categoryCards.length === 0)) {
+    return (
+      <KioskResultScreen
+        {...TECHNICAL_DIFFICULTIES_SCREEN}
+        onDone={onLogout}
+      />
+    );
+  }
+
   if (showCategoryWelcome) {
     return (
       <>
@@ -730,23 +744,9 @@ const KioskBilling = ({ student, onLogout }) => {
             <span>Choose a category to start your order.</span>
           </section>
 
-          {inventoryError && (
-            <ErrorFeedback
-              issue={presentError({ request: true, message: inventoryError })}
-              className="kiosk-category-message"
-              action={{ label: 'Try again', onClick: refreshPage }}
-            />
-          )}
-
           {loadingProducts ? (
             <div className="kiosk-category-grid kiosk-category-grid--loading" aria-label="Loading categories">
               {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
-            </div>
-          ) : categoryCards.length === 0 ? (
-            <div className="kiosk-category-empty">
-              <span className="kiosk-category-empty__icon" aria-hidden="true">↻</span>
-              <strong>The shelves are being refreshed</strong>
-              <span>No products are available right now. Please ask a staff member or try again shortly.</span>
             </div>
           ) : (
             <div className="kiosk-category-grid" role="tablist" aria-label="Product categories">

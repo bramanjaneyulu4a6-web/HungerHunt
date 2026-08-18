@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
+import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { ErrorFeedback } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
 
@@ -59,6 +60,8 @@ const Login = () => {
         response?.screen
       ) {
         setBlockedScreen(response.screen);
+      } else if (!err.response || err.response.status >= 500) {
+        setBlockedScreen(TECHNICAL_DIFFICULTIES_SCREEN);
       } else {
         setError(
           response?.message || "Could not start a session. Please try again."

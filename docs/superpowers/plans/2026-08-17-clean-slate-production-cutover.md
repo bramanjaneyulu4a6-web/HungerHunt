@@ -538,9 +538,9 @@ git commit -m "Record Phase 1 of the production cutover as complete"
 
 ---
 
-### Task 11: Deploy the backend — DONE 2026-08-18 except Step 7 (see below)
+### Task 11: Deploy the backend — DONE 2026-08-18 (Step 7 closed 2026-08-18)
 
-Executed 2026-08-18. Steps 1–6 complete; **Step 7 failed and stays open** — the auth rate limiter does not trip in production. Details at the end of this task.
+Executed 2026-08-18. All steps complete. Step 7 failed on first attempt and was closed later the same day; the investigation is kept at the end of this task because the wrong answer was recorded first.
 
 Do not start until the owner confirms Render login. Every value pasted comes from `backend/.env.production.local`; every setting mirrors `render.yaml`.
 
@@ -555,41 +555,59 @@ Run: `curl -s https://hungerhunt-dbat.onrender.com/health && curl -s -o /dev/nul
 Expected: `{"status":"ready","db":"connected"}` and ` v1:401` — `/health` does not exist on the old code, so a ready response IS the proof of cutover; `401` (not `404`) proves the v1 surface is mounted and auth-gated. (Corrected 2026-08-18: the probe path must be `/api/v1/analytics/inventory` — the router mounts no root route, so bare `/api/v1/analytics` legitimately 404s even when the slice is live. Verified against the local rehearsal.)
 - [x] **Step 5 (OWNER): One real login** — sign in with the founding admin at the API via any frontend pointed at it (or curl the login route over HTTPS). Expect success; the account was created in Task 9 into this same database.
 - [x] **Step 6 (OWNER): Retire the old Atlas user** — Atlas → Database Access → delete `bramanjaneyulu4a6_db_user`. Nothing uses it anymore: the new service uses `graarr_app`, and the old service stops existing as a going concern at this moment. The old `hungerhunt_production` data stays untouched as an archive.
-- [ ] **Step 7: Rate-limiter sanity (TRUST_PROXY)** — ❌ **OPEN, see findings below** — from two different networks (e.g. Wi-Fi and phone hotspot), one failed login each: both must get `401` (per-client buckets). Then several rapid failed logins from ONLY the hotspot until a `429` appears, and confirm the Wi-Fi network still receives `401` — proving buckets are per-IP. Safe now precisely because there are no real users yet to lock out.
+- [x] **Step 7: Rate-limiter sanity (TRUST_PROXY)** — ✅ **CLOSED 2026-08-18, `TRUST_PROXY=3`, see findings below** — from two different networks (e.g. Wi-Fi and phone hotspot), one failed login each: both must get `401` (per-client buckets). Then several rapid failed logins from ONLY the hotspot until a `429` appears, and confirm the Wi-Fi network still receives `401` — proving buckets are per-IP. Safe now precisely because there are no real users yet to lock out.
 
-**Step 7 result (2026-08-18): FAILED — limiter never trips in production.**
+**Step 7 (2026-08-18): failed, then closed. `TRUST_PROXY` 1 → 3.**
 
-Observed: one failed login from Wi-Fi (`103.159.248.208`) → 401. Twelve consecutive failed
-logins from a phone hotspot (`27.59.55.143`) → twelve 401s, **no 429**, where `authLimiter`
-(`max: 10`, 15-minute window) should have returned 429 on the 11th. A follow-up Wi-Fi request
-also returned 401, so the cross-network bleed this step was written to detect did NOT occur —
-but nothing proved the limiter counts at all.
+Twelve consecutive failed logins returned twelve 401s where the eleventh should have
+been a 429. `NODE_ENV` was `production`, so the development skip was not firing, and a
+local probe of the real `authLimiter` produced `401 x10` then `429`, so the code was
+correct.
 
-Ruled out:
-- `NODE_ENV` is `production` on Render, so `skipAuthLimitsInDevelopment` is not skipping.
-- The code is correct. A local probe of the real `authLimiter` (express-rate-limit 8.6.2,
-  `app.set('trust proxy', 1)`, fixed `X-Forwarded-For`) produced
-  `401 ×10` then `429` on the 11th, with `ratelimit-limit: 10`, `ratelimit-policy: 10;w=900`.
-  `max` is still honored in v8.
+Two readings fitted the outside evidence: a hop count that resolved `req.ip` to a
+rotating edge address, or more than one process each holding its own in-memory store.
+The second was recorded as the leading answer and was wrong. What settled it:
 
-Leading hypothesis: **key scattering.** If `TRUST_PROXY=1` trusts fewer hops than Render
-actually places in front of the service, `req.ip` resolves to a varying internal proxy address,
-so every request opens a fresh bucket. Diagnostic: three consecutive requests and read
-`RateLimit-Remaining` — `9,8,7` means one bucket (healthy); `9,9,9` confirms scattering, and the
-fix is a `TRUST_PROXY` value change in the dashboard (`runtimeEnv.js:98` accepts 1–10) plus a
-redeploy — no code change.
+- `npm start` is `node server.js` — no cluster, no pm2 — so one process per instance.
+- A local probe established the rule: under `trust proxy = N`, Express returns the
+  **N-th entry from the right** of `X-Forwarded-For`.
+- `TRUST_PROXY=1` produced two or three stable buckets (the rightmost hop is a small
+  pool of edge addresses). `TRUST_PROXY=2` produced a **fresh bucket on every request**
+  (that position varies per request). Only a three-entry chain explains both.
+- `TRUST_PROXY=3` produced one bucket: `401` with remaining 9,8,7,6,5,4,3,2,1,0 on a
+  single reset clock, then `429` on the eleventh and twelfth. Verified in production.
 
-**Impact while open:** `/api/admin/login` has no brute-force protection, and neither does the
-kiosk session route (`kioskSessionLimiter` shares the same skip helper), which returns a
-student's name and wallet balance for an admission number. Acceptable only because the system
-has no users yet. **This must close before parents or students are onboarded.**
+So Render fronts the service with **three** hops, not the one the variable assumed.
+No code change was required. A diagnostic route reporting the real chain was written
+and committed on a branch in case a fixed hop count proved unreliable; it was never
+deployed and can be discarded.
+
+Also verified along the way: client-supplied `X-Forwarded-For` does **not** control the
+limiter key — injected values are pushed left of the client address Cloudflare appends
+— so there is no spoofing bypass at any of these settings.
+
+Every limiter keys on `req.ip`, so `kioskSessionLimiter` and `searchLimiter` were fixed
+by the same change.
 
 ---
 
-### Task 12: [BLOCKED — needs Vercel access] Deploy the four frontends
+### Task 12: Deploy the four frontends — Steps 1–2 DONE 2026-08-18
 
-- [ ] **Step 1 (OWNER): Four Vercel projects** from this repo — root directories `frontend-parent`, `frontend-admin`, `hungerhunt-kiosk`, `hungerhunt-warehouse` (warehouse is net-new; the other three may reuse the existing `hunger-hunt-*` projects if they're in reach, or be created fresh). Framework preset: Vite. Each project gets env var `VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api`. `frontend-parent` additionally gets every `VITE_FIREBASE_*` and `VITE_VAPID_KEY` value from `frontend-parent/.env` — these are public client config, safe in Vercel's env UI.
-- [ ] **Step 2: Reconcile origins** — collect the four final `https://…vercel.app` URLs. For any that differ from the four `*_CLIENT_URL` values in Render, update: the Render env var, `backend/.env.production.local`, and `render.yaml` (commit that change: `git add render.yaml && git commit -m "Record the final frontend origins"`), then redeploy the service. CORS and password-reset links both flow from these variables — no code change.
+All four are live and verified from outside: each bundle carries
+`https://hungerhunt-dbat.onrender.com/api` and no `localhost`, each answers a
+nonsense deep link with the app's own HTML (Vercel's Vite preset supplies the
+single-page fallback, so no `vercel.json` rewrite was needed), and the backend
+returns an `access-control-allow-origin` for each of the four origins while
+refusing an unknown one.
+
+`hunger-hunt-parent`, `hunger-hunt-beta` and `hunger-hunt-kiosk` already existed and
+redeployed themselves from `main` when PR #1 merged, with their API URL already set.
+Only the warehouse project was new. Naming it `hunger-hunt-warehouse` — the value the
+manifest and `render.yaml` already carried — meant **no Render change and no redeploy**
+for Step 2.
+
+- [x] **Step 1 (OWNER): Four Vercel projects** from this repo — root directories `frontend-parent`, `frontend-admin`, `hungerhunt-kiosk`, `hungerhunt-warehouse` (warehouse is net-new; the other three may reuse the existing `hunger-hunt-*` projects if they're in reach, or be created fresh). Framework preset: Vite. Each project gets env var `VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api`. `frontend-parent` additionally gets every `VITE_FIREBASE_*` and `VITE_VAPID_KEY` value from `frontend-parent/.env` — these are public client config, safe in Vercel's env UI.
+- [x] **Step 2: Reconcile origins** — no change required; the four live URLs match the four `*_CLIENT_URL` values already in Render, the manifest and `render.yaml`.
 - [ ] **Step 3 (OWNER): End-to-end login per role** — founding admin via the deployed admin app; then create warehouse/caretaker staff accounts from the admin UI and sign into the warehouse app. Parent/student flows follow data setup (students, products) which is normal admin work, not cutover work.
 - [ ] **Step 4: Final sweep** — executor re-runs Task 11 Step 4's curls; owner confirms each deployed frontend loads over HTTPS with no CORS errors in the browser console. The system is live.
 

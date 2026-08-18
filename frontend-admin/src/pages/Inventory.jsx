@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
+import { resolveAvailability } from "../utils/availability";
+import RefreshButton from "../components/RefreshButton";
 import {
   Badge,
   Banner,
@@ -11,11 +14,26 @@ import {
   Skeleton,
 } from "../components/ui";
 
+const FILTER_MATCHES = {
+  all: () => true,
+  out: (a) => a === "OUT_OF_STOCK",
+  low: (a) => a === "LOW",
+  archived: (a) => a === "ARCHIVED",
+};
+
 const Inventory = () => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // The availability filter lives in the URL so the overview tiles and the
+  // stock banner can link straight to "what is out" / "what is low".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = ["out", "low", "archived"].includes(searchParams.get("filter"))
+    ? searchParams.get("filter")
+    : "all";
+  const setFilter = (value) =>
+    setSearchParams(value === "all" ? {} : { filter: value }, { replace: true });
   const [editingProduct, setEditingProduct] = useState(null);
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -49,6 +67,7 @@ const Inventory = () => {
   }
 
   const filteredInventory = inventory.filter((item) => {
+    if (!FILTER_MATCHES[filter](resolveAvailability(item))) return false;
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
     return item.productId?.name?.toLowerCase().includes(query);
@@ -71,15 +90,20 @@ const Inventory = () => {
       return;
     }
 
+    const updatedPrice = parseFloat(editPrice);
+    if (isNaN(updatedPrice) || updatedPrice <= 0) {
+      toast.error("Enter a selling price above zero.");
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const updatedPrice = parseFloat(editPrice);
       const level = parseInt(editReorderLevel, 10);
       const safetyStock = parseInt(editSafetyStock, 10);
       await api.put(`/products/${editingProduct}`, {
         name: editName.trim(),
-        price: isNaN(updatedPrice) ? 0 : updatedPrice,
+        price: updatedPrice,
         ...(isNaN(level) || level < 0 ? {} : { reorderLevel: level }),
         ...(isNaN(safetyStock) || safetyStock < 0 ? {} : { safetyStock }),
       });
@@ -166,17 +190,31 @@ const Inventory = () => {
       <PageHeader
         title="Inventory Control"
         subtitle="Monitor on-hand stock, thresholds, pricing, and audited manual adjustments."
+        actions={<RefreshButton onRefresh={fetchInventory} loading={loading} />}
       />
 
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <input
           type="search"
           className="input"
+          style={{ flex: "1 1 260px" }}
           aria-label="Search inventory"
           placeholder="🔍 Search inventory by product name…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        <select
+          className="input"
+          style={{ flex: "0 1 200px" }}
+          aria-label="Filter by availability"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="all">All items</option>
+          <option value="out">Out of stock</option>
+          <option value="low">Low stock</option>
+          <option value="archived">Archived</option>
+        </select>
       </div>
 
       {editingProduct && (
@@ -207,7 +245,7 @@ const Inventory = () => {
               id="edit-price"
               type="number"
               step="0.01"
-              min="0"
+              min="0.01"
               className="input"
               placeholder="0.00"
               value={editPrice}
@@ -393,18 +431,15 @@ const Inventory = () => {
                 <th>Product</th>
                 <th style={{ width: 180 }}>Price</th>
                 <th style={{ width: 180 }}>Stock</th>
+                <th style={{ width: 140 }}>Reorder at</th>
                 <th style={{ width: 220 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredInventory.map((item, index) => {
                 const reorderLevel = item.productId?.reorderLevel ?? 5;
-                const archived = item.productId?.active === false;
-                // An archived product does not appear on either ordering
-                // screen, so a reorder badge on one is a reorder nobody can
-                // act on — it just tells the office to chase stock for
-                // something no longer sold.
-                const isLowStock = !archived && (item.stock || 0) < reorderLevel;
+                const availability = resolveAvailability(item);
+                const archived = availability === "ARCHIVED";
 
                 return (
                   <tr key={item._id}>
@@ -427,10 +462,20 @@ const Inventory = () => {
                       {formatINR(item.productId?.price || 0)}
                     </td>
                     <td data-label="Stock">
-                      <Badge variant={isLowStock ? "alert" : "neutral"}>
-                        {isLowStock && <span aria-hidden="true">⚠︎</span>}
-                        {item.stock || 0} units
-                      </Badge>
+                      {availability === "OUT_OF_STOCK" ? (
+                        <Badge variant="alert">
+                          <span aria-hidden="true">⛔︎</span> Out of stock
+                        </Badge>
+                      ) : availability === "LOW" ? (
+                        <Badge variant="warn">
+                          <span aria-hidden="true">⚠︎</span> {item.stock || 0} units — low
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral">{item.stock || 0} units</Badge>
+                      )}
+                    </td>
+                    <td data-label="Reorder at" style={{ color: "var(--muted-soft)" }}>
+                      {reorderLevel === 0 ? "Never flags" : `${reorderLevel} units`}
                     </td>
                     <td data-label="Actions">
                       <div style={{ display: "flex", gap: 8 }}>

@@ -538,22 +538,51 @@ git commit -m "Record Phase 1 of the production cutover as complete"
 
 ---
 
-### Task 11: [BLOCKED — needs Render dashboard access] Deploy the backend
+### Task 11: Deploy the backend — DONE 2026-08-18 except Step 7 (see below)
+
+Executed 2026-08-18. Steps 1–6 complete; **Step 7 failed and stays open** — the auth rate limiter does not trip in production. Details at the end of this task.
 
 Do not start until the owner confirms Render login. Every value pasted comes from `backend/.env.production.local`; every setting mirrors `render.yaml`.
 
 **Files:** none (dashboard + verification)
 
-- [ ] **Step 1 (OWNER): Mirror `render.yaml` into the existing service** — dashboard → `hungerhunt-dbat` → Settings: branch `Ashok-work`, root directory `backend`, build `npm ci`, start `npm start`, health check path `/health`, auto-deploy **off**.
-- [ ] **Step 2 (OWNER): Environment** — add every variable from `.env.production.local` EXCEPT `PORT` (Render supplies it). **`FIREBASE_PRIVATE_KEY` is the one value not pasted verbatim:** in the file it is wrapped in double quotes (jq wrote it that way). `node --env-file` strips those quotes, but Render's env UI stores exactly what you paste — so paste it **without** the surrounding quotes, keeping the literal `\n` sequences. A leading `"` survives into `config/firebase.js` and breaks the PEM parse. Verified locally 2026-08-18: after unescaping, the key yields 28 newlines and a correct `-----BEGIN PRIVATE KEY-----` prefix.
-- [ ] **Step 3 (OWNER): Push the branch, then Manual Deploy** — `git push origin Ashok-work` (first push of the cutover; auto-deploy is off, so the push itself deploys nothing), then dashboard → Manual Deploy → latest commit. Watch the deploy log for the same three boot lines as Task 8 Step 3.
-- [ ] **Step 4: Executor verifies the new code is live (read-only)**
+- [x] **Step 1 (OWNER): Mirror `render.yaml` into the existing service** — dashboard → `hungerhunt-dbat` → Settings: branch `Ashok-work`, root directory `backend`, build `npm ci`, start `npm start`, health check path `/health`, auto-deploy **off**.
+- [x] **Step 2 (OWNER): Environment** — add every variable from `.env.production.local` EXCEPT `PORT` (Render supplies it). **`FIREBASE_PRIVATE_KEY` is the one value not pasted verbatim:** in the file it is wrapped in double quotes (jq wrote it that way). `node --env-file` strips those quotes, but Render's env UI stores exactly what you paste — so paste it **without** the surrounding quotes, keeping the literal `\n` sequences. A leading `"` survives into `config/firebase.js` and breaks the PEM parse. Verified locally 2026-08-18: after unescaping, the key yields 28 newlines and a correct `-----BEGIN PRIVATE KEY-----` prefix.
+- [x] **Step 3 (OWNER): Push the branch, then Manual Deploy** — `git push origin Ashok-work` (first push of the cutover; auto-deploy is off, so the push itself deploys nothing), then dashboard → Manual Deploy → latest commit. Watch the deploy log for the same three boot lines as Task 8 Step 3.
+- [x] **Step 4: Executor verifies the new code is live (read-only)**
 
-Run: `curl -s https://hungerhunt-dbat.onrender.com/health && curl -s -o /dev/null -w ' v1:%{http_code}\n' https://hungerhunt-dbat.onrender.com/api/v1/analytics`
-Expected: `{"status":"ready","db":"connected"}` and ` v1:401` — `/health` does not exist on the old code, so a ready response IS the proof of cutover; `401` (not `404`) proves the v1 surface is mounted and auth-gated.
-- [ ] **Step 5 (OWNER): One real login** — sign in with the founding admin at the API via any frontend pointed at it (or curl the login route over HTTPS). Expect success; the account was created in Task 9 into this same database.
-- [ ] **Step 6 (OWNER): Retire the old Atlas user** — Atlas → Database Access → delete `bramanjaneyulu4a6_db_user`. Nothing uses it anymore: the new service uses `graarr_app`, and the old service stops existing as a going concern at this moment. The old `hungerhunt_production` data stays untouched as an archive.
-- [ ] **Step 7: Rate-limiter sanity (TRUST_PROXY)** — from two different networks (e.g. Wi-Fi and phone hotspot), one failed login each: both must get `401` (per-client buckets). Then several rapid failed logins from ONLY the hotspot until a `429` appears, and confirm the Wi-Fi network still receives `401` — proving buckets are per-IP. Safe now precisely because there are no real users yet to lock out.
+Run: `curl -s https://hungerhunt-dbat.onrender.com/health && curl -s -o /dev/null -w ' v1:%{http_code}\n' https://hungerhunt-dbat.onrender.com/api/v1/analytics/inventory`
+Expected: `{"status":"ready","db":"connected"}` and ` v1:401` — `/health` does not exist on the old code, so a ready response IS the proof of cutover; `401` (not `404`) proves the v1 surface is mounted and auth-gated. (Corrected 2026-08-18: the probe path must be `/api/v1/analytics/inventory` — the router mounts no root route, so bare `/api/v1/analytics` legitimately 404s even when the slice is live. Verified against the local rehearsal.)
+- [x] **Step 5 (OWNER): One real login** — sign in with the founding admin at the API via any frontend pointed at it (or curl the login route over HTTPS). Expect success; the account was created in Task 9 into this same database.
+- [x] **Step 6 (OWNER): Retire the old Atlas user** — Atlas → Database Access → delete `bramanjaneyulu4a6_db_user`. Nothing uses it anymore: the new service uses `graarr_app`, and the old service stops existing as a going concern at this moment. The old `hungerhunt_production` data stays untouched as an archive.
+- [ ] **Step 7: Rate-limiter sanity (TRUST_PROXY)** — ❌ **OPEN, see findings below** — from two different networks (e.g. Wi-Fi and phone hotspot), one failed login each: both must get `401` (per-client buckets). Then several rapid failed logins from ONLY the hotspot until a `429` appears, and confirm the Wi-Fi network still receives `401` — proving buckets are per-IP. Safe now precisely because there are no real users yet to lock out.
+
+**Step 7 result (2026-08-18): FAILED — limiter never trips in production.**
+
+Observed: one failed login from Wi-Fi (`103.159.248.208`) → 401. Twelve consecutive failed
+logins from a phone hotspot (`27.59.55.143`) → twelve 401s, **no 429**, where `authLimiter`
+(`max: 10`, 15-minute window) should have returned 429 on the 11th. A follow-up Wi-Fi request
+also returned 401, so the cross-network bleed this step was written to detect did NOT occur —
+but nothing proved the limiter counts at all.
+
+Ruled out:
+- `NODE_ENV` is `production` on Render, so `skipAuthLimitsInDevelopment` is not skipping.
+- The code is correct. A local probe of the real `authLimiter` (express-rate-limit 8.6.2,
+  `app.set('trust proxy', 1)`, fixed `X-Forwarded-For`) produced
+  `401 ×10` then `429` on the 11th, with `ratelimit-limit: 10`, `ratelimit-policy: 10;w=900`.
+  `max` is still honored in v8.
+
+Leading hypothesis: **key scattering.** If `TRUST_PROXY=1` trusts fewer hops than Render
+actually places in front of the service, `req.ip` resolves to a varying internal proxy address,
+so every request opens a fresh bucket. Diagnostic: three consecutive requests and read
+`RateLimit-Remaining` — `9,8,7` means one bucket (healthy); `9,9,9` confirms scattering, and the
+fix is a `TRUST_PROXY` value change in the dashboard (`runtimeEnv.js:98` accepts 1–10) plus a
+redeploy — no code change.
+
+**Impact while open:** `/api/admin/login` has no brute-force protection, and neither does the
+kiosk session route (`kioskSessionLimiter` shares the same skip helper), which returns a
+student's name and wallet balance for an admission number. Acceptable only because the system
+has no users yet. **This must close before parents or students are onboarded.**
 
 ---
 

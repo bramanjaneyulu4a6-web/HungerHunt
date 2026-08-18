@@ -1,7 +1,7 @@
 # Clean-slate production cutover — design
 
 **Date:** 2026-08-17
-**Status:** Phase 1 complete 2026-08-18 (rehearsed production boot, founding admin created, credentials split) — awaiting Render/Vercel access for Phases 2–3
+**Status:** Phase 2 complete 2026-08-18 — the backend is LIVE on Render from `Ashok-work` against `graarr_ecommerce`. One open defect: the auth rate limiter does not trip in production (Task 11 Step 7). Phase 3 (Vercel) not started.
 **Supersedes:** the migration-shaped plan in
 [docs/backend-production-deploy.md](../../backend-production-deploy.md) — kept for
 reference; its sections 3, 4 and 7 no longer apply because no data is carried over.
@@ -173,7 +173,24 @@ touched:
 Exit criteria for Phase 1: all five observations above, plus the negative check that
 `graarr_app` cannot read `hungerhunt_production`.
 
-## Phase 2 — Render (runbook; blocked on access)
+## Phase 2 — Render (executed 2026-08-18)
+
+As executed, three things differed from the runbook and are recorded here rather than
+silently absorbed:
+
+1. **Saving env vars on Render triggers a deploy** — `autoDeploy: false` only suppresses
+   deploys from git pushes. So the branch push had to come *before* the env save, inverting
+   the runbook's order. The first save deployed `main` (`a637256`, the pre-rewrite codebase)
+   because the branch rebind had not been made yet; that build ran old code against the new
+   database for a few minutes. No writes occurred (verified: 20 collections, 1 admin, 0
+   students/products/transactions).
+2. **Build command is `npm install`, not `npm ci`** as `render.yaml` specifies. The lockfile
+   is committed, so `npm ci` is available; switching is a pending cleanup. `npm install` may
+   resolve versions the test suite never saw.
+3. **Two old env vars were deleted** during the paste: `PORT` (Render supplies its own) and
+   `PARENT_FRONTEND_URL` (a dead name from the pre-rewrite codebase).
+
+Also noted: `backend/package.json` has no `engines` field, so Render chooses the Node version.
 
 1. Dashboard → the `hungerhunt-dbat` service → Environment: paste every variable
    from `.env.production.local`.
@@ -209,12 +226,19 @@ Exit criteria for Phase 1: all five observations above, plus the negative check 
   bootstrap-registration window (founding admin created and anonymous registration
   verified to return 401), local-dev-hits-prod footgun (`backend/.env` retargeted at
   local Mongo; both credential backups deleted).
+- **Closed as of Phase 2 (2026-08-18):** the old Firebase service-account key was deleted
+  in Google Cloud IAM (only `461f2109…` remains, proven at boot); the old Atlas user
+  `bramanjaneyulu4a6_db_user` was deleted, so no live credential can reach
+  `hungerhunt_production` — the archive is now reachable only by creating a fresh Atlas user.
 - **Open, tracked:**
+  - **The production auth rate limiter does not trip.** Twelve consecutive failed logins
+    returned 401 with no 429. `NODE_ENV` is `production` and the code is proven correct by
+    local probe, so the leading hypothesis is `req.ip` scattering from a `TRUST_PROXY` hop
+    count that understates Render's proxy chain. Until fixed, `/api/admin/login` and the
+    kiosk session route have no brute-force protection. **Blocks onboarding real users.**
   - The **Cloudinary API secret** and the **Gmail app password** remain
     compromised-in-history. Rotate on access, then update `.env.production.local`
     and Render.
-  - The **old Firebase key** is still active in Google Cloud IAM and should be
-    deleted now that the new one is proven.
   - **`backend/.env-backend`** (untracked leftover from `main`) still contains the old
     `MONGO_URI`, `JWT_SECRET` and Firebase key. It cannot be committed, but
     `node --env-file=.env-backend` would reach production. Delete it.

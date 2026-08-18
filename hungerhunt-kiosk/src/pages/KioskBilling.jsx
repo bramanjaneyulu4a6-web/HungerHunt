@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
 import { formatINR } from "../utils/format";
+import { sellable } from "../utils/availability";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
@@ -216,13 +217,7 @@ const KioskBilling = ({ student, onLogout }) => {
 
       return {
         products: res.data
-          .filter(
-            (item) =>
-              item.stock > 0 &&
-              item.productId &&
-              // Archived is off sale; absent means the row predates the flag.
-              item.productId.active !== false
-          )
+          .filter(sellable)
           .map(toProduct)
           .filter((item) => item._id),
         error: "",

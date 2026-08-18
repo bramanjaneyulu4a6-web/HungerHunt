@@ -112,6 +112,7 @@ describe('the stock alerts feed', () => {
     invRow('p4', 'Lays', 20),
     invRow('p5', 'Old Bar', 0, { active: false }),   // archived: never an alert
     { _id: 'row-x', productId: null, stock: 0, toObject() { return this; } }, // unlinked: never an alert
+    invRow('p6', 'apple juice', 0),   // lowercase leading letter: sorts first only under sensitivity:"base"
   ];
 
   test('splits the shelf into out-of-stock and low, name-sorted, archived excluded', async () => {
@@ -122,9 +123,9 @@ describe('the stock alerts feed', () => {
     assert.equal(res.status, 200);
     const body = await res.json();
 
-    assert.deepEqual(body.outOfStock.map((e) => e.name), ['Dairy Milk', 'frooti']);
+    assert.deepEqual(body.outOfStock.map((e) => e.name), ['apple juice', 'Dairy Milk', 'frooti']);
     assert.deepEqual(body.low.map((e) => e.name), ['Good Day']);
-    assert.deepEqual(body.outOfStock[1], {
+    assert.deepEqual(body.outOfStock[2], {
       productId: 'p1', name: 'frooti', stock: 0, reorderLevel: 5,
     });
   });

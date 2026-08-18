@@ -1,0 +1,45 @@
+<!--
+  The small icon Android draws in the status bar and beside the notification
+  title. It is not the launcher icon and cannot be: the platform keeps only the
+  alpha channel of this drawable and fills the rest, so anything with colour or
+  detail arrives as a featureless white square. Without a default_notification_icon
+  in the manifest, FCM falls back to the launcher icon and that square is exactly
+  what a parent sees.
+
+  A silhouette of the full brand mark — a face, a wordmark — is illegible at
+  24dp once flattened. The fries survive the treatment and are recognisably
+  Hunger Hunt, so they carry it alone.
+
+  White fill throughout, on purpose. The colour a parent actually sees is the
+  tint from default_notification_color in AndroidManifest.xml.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Fries, fanned outwards from the middle, uneven heights so the shape
+         reads as a handful rather than as a comb. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5.9,10.1 L4.1,7.0 L5.9,6.0 L7.7,9.1 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8.4,9.6 L7.1,4.4 L9.1,3.9 L10.4,9.1 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.0,9.0 L11.0,2.6 L13.0,2.6 L13.0,9.0 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13.6,9.1 L14.9,3.9 L16.9,4.4 L15.6,9.6 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.3,9.1 L18.1,6.0 L19.9,7.0 L18.1,10.1 Z" />
+
+    <!-- The carton: a tapered box, drawn as one solid so the mask cannot break
+         it into pieces at small sizes. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.8,10.6 L19.2,10.6 L17.6,21.0 C17.52,21.57 17.03,22.0 16.45,22.0 L7.55,22.0 C6.97,22.0 6.48,21.57 6.4,21.0 Z" />
+</vector>

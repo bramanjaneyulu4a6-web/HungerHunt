@@ -1,32 +1,3 @@
-// import express from 'express';
-// import {
-//   generateBill,
-//   getAllTransactions,
-//   verifyPayment
-// } from "../controllers/transactionController.js";
-// import { protectAdmin } from '../middleware/authMiddleware.js';
-
-// const router = express.Router();
-// router.post("/verify-payment", verifyPayment);
-// // Secure all transaction processing capabilities to school terminal operators
-// router.use(protectAdmin);
-
-// // @route   POST /api/transactions/bill
-// // @desc    Process custom store checkout, deduct wallet money, adjust current stock
-// router.post('/bill', generateBill);
-
-// // @route   GET /api/transactions/history
-// // @desc    Get master log of all school store transactions for administrative audit
-// router.get('/history', getAllTransactions);
-
-
-
-// export default router;
-
-
-
-
-
 import express from "express";
 import {
   generateBill,
@@ -34,17 +5,21 @@ import {
   verifyPayment,
 } from "../controllers/transactionController.js";
 
-import { protectAdmin } from "../middleware/authMiddleware.js";
+import { orStudent, protectAdmin, protectStaff } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Public kiosk routes
-router.post("/verify-payment", verifyPayment);
-router.post("/bill", generateBill);
+/* Taking a payment is the till's whole job, and the till is now two things:
+   the kiosk, where a student holds their own session, and the admin console.
+   Neither can be driven from the token alone — the student's own 4-digit code
+   has to clear verify-payment first, and the purchase token it issues is
+   single-use, expires in two minutes and is bound to that exact cart.
 
-// Admin routes
-router.use(protectAdmin);
+   The ledger is a different matter — every purchase every student has ever
+   made is a report, not a step in a sale, and it stays with the back office. */
 
-router.get("/history", getAllTransactions);
+router.post("/verify-payment", orStudent(protectStaff), verifyPayment);
+router.post("/bill", orStudent(protectStaff), generateBill);
+router.get("/history", protectAdmin, getAllTransactions);
 
 export default router;

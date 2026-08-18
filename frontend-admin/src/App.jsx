@@ -1,94 +1,72 @@
-// import React from 'react';
-// import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
-// import Login from './pages/Login';
-// import ForgotPassword from './pages/ForgotPassword';
-// import Register from './pages/Register';
-
-// import Dashboard from './pages/Dashboard';
-// import Students from './pages/Students';
-// import Products from './pages/Products';
-// import Inventory from './pages/Inventory';
-// import Billing from './pages/Billing';
-
-// import Layout from './components/Layout';
-// import ProtectedRoute from './components/ProtectedRoute';
-
-// function App() {
-//   return (
-//     <Router>
-//       <Routes>
-
-//         {/* Public Routes */}
-//         <Route path="/" element={<Navigate to="/login" replace />} />
-//         <Route path="/login" element={<Login />} />
-//         <Route path="/forgot-password" element={<ForgotPassword />} />
-//         <Route path="/register" element={<Register />} />
-
-//         {/* Protected Routes */}
-//         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-//           <Route path="/dashboard" element={<Dashboard />} />
-//           <Route path="/students" element={<Students />} />
-//           <Route path="/products" element={<Products />} />
-//           <Route path="/inventory" element={<Inventory />} />
-//           <Route path="/billing" element={<Billing />} />
-//         </Route>
-
-//       </Routes>
-//     </Router>
-//   );
-// }
-
-// export default App;
-
-
-
-
-
-import React from 'react';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import Register from './pages/Register';
-
-import Dashboard from './pages/Dashboard';
-import Students from './pages/Students';
-import Products from './pages/Products';
-import Inventory from './pages/Inventory';
-import Billing from './pages/Billing';
-
-import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import RechargeHistory from './pages/RechargeHistory';
-import Purchase from "./pages/Purchase";
-import Purchased from "./pages/Purchased";
-import KioskBilling from "./pages/KioskBilling";
+
+const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Register = lazy(() => import('./pages/Register'));
+const Layout = lazy(() => import('./components/Layout'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Students = lazy(() => import('./pages/Students'));
+const Hostels = lazy(() => import('./pages/Hostels'));
+const Billing = lazy(() => import('./pages/Billing'));
+const RechargeHistory = lazy(() => import('./pages/RechargeHistory'));
+const WarehouseOverview = lazy(() => import('./pages/WarehouseOverview'));
+const ProcurementReview = lazy(() => import('./pages/ProcurementReview'));
+const ProcurementOrders = lazy(() => import('./pages/ProcurementOrders'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Products = lazy(() => import('./pages/Products'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
+const AccountingExport = lazy(() => import('./pages/AccountingExport'));
+
+const RouteFallback = () => (
+  <div className="route-fallback" role="status" aria-live="polite">
+    <span className="route-fallback__spinner" aria-hidden="true" />
+    <span>Loading workspace…</span>
+  </div>
+);
 
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/register" element={<Register />} />
+      <Toaster position="top-center" />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Protected Nested Routes */}
-        <Route path="/kiosk" element={<KioskBilling />} />
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/students" element={<Students />} />
+            <Route path="/hostels" element={<Hostels />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/recharge-history" element={<RechargeHistory />} />
+            <Route path="/accounting-export" element={<AccountingExport />} />
+            <Route path="/warehouse" element={<WarehouseOverview />} />
+            <Route path="/warehouse/review" element={<ProcurementReview />} />
+            <Route path="/warehouse/orders" element={<ProcurementOrders />} />
+            <Route path="/warehouse/inventory" element={<Inventory />} />
+            <Route path="/warehouse/products" element={<Products />} />
+            <Route path="/warehouse/suppliers" element={<Suppliers />} />
 
-<Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-  <Route path="/dashboard" element={<Dashboard />} />
-  <Route path="/students" element={<Students />} />
-  <Route path="/products" element={<Products />} />
-  <Route path="/inventory" element={<Inventory />} />
-  <Route path="/billing" element={<Billing />} />
-  <Route path="/purchase" element={<Purchase />} />
-  <Route path="/purchased" element={<Purchased />} />
-  <Route path="/recharge-history" element={<RechargeHistory />} />
-</Route>
-      </Routes>
+            {/* Preserve bookmarks while keeping one canonical Warehouse workspace. */}
+            <Route path="/products" element={<Navigate to="/warehouse/products" replace />} />
+            <Route path="/inventory" element={<Navigate to="/warehouse/inventory" replace />} />
+            <Route path="/suppliers" element={<Navigate to="/warehouse/suppliers" replace />} />
+            <Route path="/procurement-review" element={<Navigate to="/warehouse/review" replace />} />
+            <Route path="/purchase" element={<Navigate to="/warehouse" replace />} />
+            <Route path="/purchased" element={<Navigate to="/warehouse/orders" replace />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

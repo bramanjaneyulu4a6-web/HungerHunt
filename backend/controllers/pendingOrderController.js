@@ -1,1362 +1,603 @@
-// import PendingOrder from "../models/PendingOrder.js";
-// import Student from "../models/Student.js";
-// import Parent from "../models/Parent.js";
-// import Product from "../models/Product.js";
-// import Inventory from "../models/Inventory.js";
-// import Transaction from "../models/Transaction.js";
-// import { sendNotification } from "../utils/sendNotification.js";
-
-
-// export const createPendingOrder = async (req, res) => {
-//   try {
-//     const { studentId, items } = req.body;
-
-//     if (!studentId || !items || !items.length) {
-//       return res.status(400).json({
-//         message: "Student and items are required."
-//       });
-//     }
-
-//     // Find student
-//     const student = await Student.findById(studentId);
-//     const existingOrder = await PendingOrder.findOne({
-//     studentId,
-//     status: "PENDING"
-// });
-
-// if (existingOrder) {
-//     return res.status(400).json({
-//         success: false,
-//         message: "Student already has a pending order."
-//     });
-// }
-
-//     if (!student) {
-//       return res.status(404).json({
-//         message: "Student not found."
-//       });
-//     }
-
-//     // Find parent linked to student
-//     const parent = await Parent.findOne({
-//       studentIds: student._id
-//     });
-
-//     if (!parent) {
-//       return res.status(404).json({
-//         message: "Parent not registered."
-//       });
-//     }
-
-//     let totalAmount = 0;
-
-//     const orderItems = [];
-
-//     for (const item of items) {
-
-//       const product = await Product.findById(item.productId);
-
-//       if (!product) {
-//         return res.status(404).json({
-//           message: `Product not found`
-//         });
-//       }
-
-//       const quantity = Number(item.quantity);
-
-//       if (quantity <= 0) {
-//         return res.status(400).json({
-//           message: "Invalid quantity."
-//         });
-//       }
-
-//      const inventory = await Inventory.findOne({
-//   productId: product._id
-// });
-
-// if (!inventory) {
-//   return res.status(404).json({
-//     message: `Inventory not found for ${product.name}`
-//   });
-// }
-
-// if (inventory.stock < quantity) {
-//   return res.status(400).json({
-//     message: `Insufficient stock for ${product.name}`
-//   });
-// }
-
-// const price = product.price;
-
-// totalAmount += price * quantity;
-
-//       orderItems.push({
-//         productId: product._id,
-//         name: product.name,
-//         quantity,
-//         price
-//       });
-//     }
-
-//     const pendingOrder = await PendingOrder.create({
-//   studentId: student._id,
-//   parentId: parent._id,
-//   items: orderItems,
-//   totalAmount
-// });
-
-// // Send FCM notification to parent
-// if (parent?.fcmToken) {
-//   try {
-//     await sendNotification(
-//       parent.fcmToken,
-//       "Purchase Approval Required",
-//       `${student.name} has requested a purchase of ₹${totalAmount}.`,
-//       {
-//         type: "PENDING_ORDER",
-//         orderId: pendingOrder._id.toString(),
-//         studentId: student._id.toString(),
-//       }
-//     );
-//   } catch (notificationError) {
-//     console.error(
-//       "FCM notification failed:",
-//       notificationError
-//     );
-//   }
-// }
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Approval request sent to parent.",
-//       pendingOrder
-//     });
-
-//   } catch (err) {
-//     console.error(err);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: err.message
-//     });
-//   }
-// };
-
-
-
-
-
-
-// export const getParentPendingOrders = async (req, res) => {
-//   try {
-//     const parentId = req.parent.id;// From auth middleware
-
-//     const orders = await PendingOrder.find({
-//       parentId,
-//       status: "PENDING"
-//     })
-//       .populate("studentId", "name grade hostelNumber pocketMoney")
-//       .populate("items.productId", "image")
-//       .sort({ createdAt: -1 });
-
-//     return res.status(200).json({
-//       success: true,
-//       count: orders.length,
-//       orders,
-//     });
-
-//   } catch (err) {
-//     console.error(err);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: err.message,
-//     });
-//   }
-// };
-
-
-
-
-
-// export const updatePendingOrder = async (req, res) => {
-//     try {
-
-//         const { id } = req.params;
-//         const { items } = req.body;
-
-//         const order = await PendingOrder.findOne({
-//             _id: id,
-//             parentId: req.parent.id,
-//             status: "PENDING"
-//         });
-
-//         if (!order) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Pending order not found."
-//             });
-//         }
-
-//         let totalAmount = 0;
-
-//         const updatedItems = [];
-
-//         for (const item of items) {
-
-//             const product = await Product.findById(item.productId);
-
-//             if (!product) {
-//                 return res.status(404).json({
-//                     success: false,
-//                     message: `Product not found`
-//                 });
-//             }
-
-//             const quantity = Number(item.quantity);
-
-//             // Parent removed item
-//             if (quantity <= 0) continue;
-
-//             updatedItems.push({
-//                 productId: product._id,
-//                 name: product.name,
-//                 quantity,
-//                 price: product.price
-//             });
-
-//             totalAmount += product.price * quantity;
-//         }
-
-//         if (!updatedItems.length) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Order must contain at least one item."
-//             });
-//         }
-
-//         order.items = updatedItems;
-//         order.totalAmount = totalAmount;
-
-//         await order.save();
-
-//         return res.json({
-//             success: true,
-//             message: "Order updated successfully.",
-//             order
-//         });
-
-//     } catch (err) {
-
-//         console.error(err);
-
-//         return res.status(500).json({
-//             success: false,
-//             message: err.message
-//         });
-
-//     }
-// };
-
-
-// export const approvePendingOrder = async (req, res) => {
-// try {
-
-//     const { id } = req.params;
-
-//    const order = await PendingOrder.findOne({
-//   _id: id,
-//   parentId: req.parent.id,
-//   status: "PENDING"
-// });
-
-//     if (!order) {
-//         return res.status(404).json({
-//             message: "Pending order not found."
-//         });
-//     }
-
-   
-
-//     const student = await Student.findById(order.studentId);
-
-//     if (!student) {
-//         return res.status(404).json({
-//             message: "Student not found."
-//         });
-//     }
-// let totalAmount = 0;
-
-// let transactionItems = [];
-
-// for (const orderItem of order.items) {
-
-//     const inventory = await Inventory.findOne({
-//         productId: orderItem.productId
-//     }).populate("productId");
-
-//     if (!inventory) {
-//         return res.status(404).json({
-//             message: "Inventory record not found."
-//         });
-//     }
-
-//     if (inventory.stock < orderItem.quantity) {
-//         return res.status(400).json({
-//             message: `Insufficient stock for ${inventory.productId.name}`
-//         });
-//     }
-
-//     totalAmount += inventory.productId.price * orderItem.quantity;
-
-//     transactionItems.push({
-//         productId: inventory.productId._id,
-//         name: inventory.productId.name,
-//         quantity: orderItem.quantity,
-//         price: inventory.productId.price
-//     });
-
-// }
-// if (student.walletControl?.enabled) {
-
-//     const now = new Date();
-//     let startDate;
-
-//     if (student.walletControl.limitType === "DAILY") {
-
-//         startDate = new Date(
-//             now.getFullYear(),
-//             now.getMonth(),
-//             now.getDate()
-//         );
-
-//     } else if (student.walletControl.limitType === "WEEKLY") {
-
-//         startDate = new Date(now);
-
-//         startDate.setDate(
-//             now.getDate() - now.getDay()
-//         );
-
-//         startDate.setHours(0, 0, 0, 0);
-
-//     } else {
-
-//         startDate = new Date(
-//             now.getFullYear(),
-//             now.getMonth(),
-//             1
-//         );
-
-//     }
-
-//     const spent = await Transaction.aggregate([
-//         {
-//             $match: {
-//                 studentId: student._id,
-//                 createdAt: {
-//                     $gte: startDate
-//                 }
-//             }
-//         },
-//         {
-//             $group: {
-//                 _id: null,
-//                 total: {
-//                     $sum: "$totalAmount"
-//                 }
-//             }
-//         }
-//     ]);
-
-//     const alreadySpent =
-//         spent.length > 0
-//             ? spent[0].total
-//             : 0;
-
-//     const remainingLimit = Math.max(
-//         0,
-//         student.walletControl.limitAmount - alreadySpent
-//     );
-
-//     if (totalAmount > remainingLimit) {
-
-//         return res.status(400).json({
-//             message:
-//                 `${student.walletControl.limitType} limit exceeded. Remaining limit ₹${remainingLimit}`
-//         });
-
-//     }
-
-// }
-// if (student.pocketMoney < totalAmount) {
-//     return res.status(400).json({
-//         message: "Insufficient pocket money balance!"
-//     });
-// }
-// for (const orderItem of order.items) {
-
-//     await Inventory.findOneAndUpdate(
-//         {
-//             productId: orderItem.productId
-//         },
-//         {
-//             $inc: {
-//                 stock: -orderItem.quantity
-//             }
-//         }
-//     );
-
-// }
-// const previousBalance = student.pocketMoney;
-
-// student.pocketMoney -= totalAmount;
-
-// await student.save();
-// const transaction = await Transaction.create({
-
-//     studentId: student._id,
-
-//     items: transactionItems,
-
-//     totalAmount,
-
-//     previousBalance,
-
-//     remainingBalance: student.pocketMoney
-
-// });
-// order.status = "APPROVED";
-// order.approvedAt = new Date();
-
-// await order.save();
-// const parent = await Parent.findById(order.parentId);
-
-// if (parent?.fcmToken) {
-//     await sendNotification(
-//         parent.fcmToken,
-//         "Order Approved",
-//         `₹${totalAmount} has been deducted. Remaining balance ₹${student.pocketMoney}`,
-//         {
-//             type: "ORDER_APPROVED",
-//             orderId: order._id.toString(),
-//             studentId: student._id.toString()
-//         }
-//     );
-// }
-// return res.status(200).json({
-//     success: true,
-//     message: "Order approved successfully.",
-//     transaction
-// });
-// } catch(err){
-
-//     console.log(err);
-
-//     res.status(500).json({
-//         message: err.message
-//     });
-
-// }
-
-
-
-// }
-
-
-
-
-// export const rejectPendingOrder = async (req, res) => {
-
-//     try {
-
-//         const { id } = req.params;
-
-//     const order = await PendingOrder.findOne({
-//   _id: id,
-//   parentId: req.parent.id,
-//   status: "PENDING"
-// });
-
-//         if (!order) {
-//             return res.status(404).json({
-//                 message: "Pending order not found."
-//             });
-//         }
-
-       
-
-//         order.status = "REJECTED";
-//         order.rejectedAt = new Date();
-
-//         await order.save();
-
-//         const parent = await Parent.findById(order.parentId);
-
-//         if (parent?.fcmToken) {
-//             await sendNotification(
-//                 parent.fcmToken,
-//                 "Order Rejected",
-//                 "Your order request has been rejected.",
-//                 {
-//                     type: "ORDER_REJECTED",
-//                     orderId: order._id.toString()
-//                 }
-//             );
-//         }
-
-//         res.json({
-//             success: true,
-//             message: "Order rejected."
-//         });
-
-//     } catch (err) {
-
-//         res.status(500).json({
-//             message: err.message
-//         });
-
-//     }
-
-// };
-
-
-// export const getPendingOrderStatus = async (req, res) => {
-//     try {
-
-//         const { id } = req.params;
-
-//         const order = await PendingOrder.findById(id);
-
-//         if (!order) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Order not found."
-//             });
-//         }
-
-//         return res.json({
-//             success: true,
-//             status: order.status,
-//             approvedAt: order.approvedAt,
-//             rejectedAt: order.rejectedAt
-//         });
-
-//     } catch (err) {
-
-//         return res.status(500).json({
-//             success: false,
-//             message: err.message
-//         });
-
-//     }
-// };
-
-
-
-
-
-
-
-
-
-// 14-08-2026
-
-
-
-
-
-import PendingOrder from "../models/PendingOrder.js";
+import PendingOrder, { pendingOrderExpiry } from "../models/PendingOrder.js";
 import Student from "../models/Student.js";
 import Parent from "../models/Parent.js";
-import Product from "../models/Product.js";
 import Inventory from "../models/Inventory.js";
 import Transaction from "../models/Transaction.js";
-import { sendNotification } from "../utils/sendNotification.js";
+import { sendToParent } from "../utils/sendNotification.js";
+import { chargeCart } from "../utils/checkout.js";
+import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
+import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
+import {
+  AUTHORIZATION_MESSAGES,
+  consumeAuthorization,
+} from "../utils/purchaseAuthorization.js";
 
+/* Purchases that need the parent to say yes before the wallet is touched.
+ *
+ * The password and the approval answer different questions and both are asked.
+ * The purchase password, taken at the counter, says this order really is for
+ * this student — without it anyone who knows a name could raise requests
+ * against a stranger's child and fill a parent's phone with them. The approval,
+ * given in the parent's own signed-in app, is what spends the money.
+ *
+ * So the till's authorisation token is consumed here, when the request is
+ * raised, not when it is charged: it is bound to a cart and lives two minutes,
+ * which is the right shape for "the password was just entered for this basket"
+ * and the wrong shape for "a parent will get to this by Monday".
+ */
 
+const asItems = (items) =>
+  items.map((item) => ({
+    productId: item.productId,
+    quantity: Number(item.quantity),
+  }));
 
-const getPurchaseLimitStartDate = (period) => {
+const isLive = (order) =>
+  order.status === "PENDING" && order.expiresAt > new Date();
 
-  const now = new Date();
-
-  if (period === "DAILY") {
-
-    return new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
-
+class ApprovalError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
   }
+}
 
-  if (period === "WEEKLY") {
+const approvalKeyFrom = (req) =>
+  String(req.get("Idempotency-Key") || req.body?.idempotencyKey || "").trim();
 
-    const start = new Date(now);
+// A request nobody answered is not pending any more, whatever the column says.
+// Writing it down at the moment someone looks keeps the record honest without a
+// scheduled job, and means the student is free the instant the window passes.
+const expireIfLapsed = async (order) => {
+  if (order.status !== "PENDING" || order.expiresAt > new Date()) return order;
 
-    start.setDate(
-      now.getDate() - now.getDay()
-    );
+  order.status = "EXPIRED";
+  await order.save();
 
-    start.setHours(0, 0, 0, 0);
-
-    return start;
-
-  }
-
-  if (period === "MONTHLY") {
-
-    return new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      1
-    );
-
-  }
-
-  // TOTAL has no starting date
-  return null;
-
+  return order;
 };
 
+const findLiveOrderForStudent = async (studentId) => {
+  const existing = await PendingOrder.findOne({ studentId, status: "PENDING" });
 
+  if (!existing) return null;
 
+  await expireIfLapsed(existing);
 
+  return isLive(existing) ? existing : null;
+};
 
-const checkProductPurchaseLimit = async ({
-  studentId,
-  product,
-  requestedQuantity
-}) => {
-
-  // No limit configured
-  if (
-    !product.purchaseLimit?.enabled ||
-    !product.purchaseLimit?.quantity
-  ) {
-
-    return {
-      allowed: true
-    };
-
-  }
-
-  const limit = Number(
-    product.purchaseLimit.quantity
+const validItems = (items) =>
+  Array.isArray(items) &&
+  items.length > 0 &&
+  items.every(
+    (i) => i.productId && Number.isInteger(Number(i.quantity)) && Number(i.quantity) > 0
   );
 
-  const period =
-    product.purchaseLimit.period || "DAILY";
+/* Prices a cart against inventory without touching it. Approval re-does this
+   against live stock; here it is only so the parent is shown real numbers. */
+const priceCart = async (items, studentId) => {
+  let totalAmount = 0;
+  const orderItems = [];
+  const limitedEntries = [];
 
-  const match = {
+  for (const item of items) {
+    const inventory = await Inventory.findOne({
+      productId: item.productId,
+    }).populate("productId");
 
-    studentId,
+    if (!inventory || !inventory.productId) {
+      return { ok: false, status: 404, message: "Inventory record not found." };
+    }
 
-    "items.productId": product._id
+    // Archived is off sale everywhere, including a console screen that loaded
+    // its menu this morning and still shows the product. Caught here, the
+    // refusal lands at the counter while the student is still standing
+    // there — approvePendingOrder re-checks against live stock, but by then
+    // the wrong person (the parent, days later) is the one being told.
+    if (inventory.productId.active === false) {
+      return {
+        ok: false,
+        status: 400,
+        message: `${inventory.productId.name} is no longer sold.`,
+      };
+    }
 
-  };
+    if (inventory.stock < item.quantity) {
+      return {
+        ok: false,
+        status: 400,
+        message: `Insufficient stock for ${inventory.productId.name}`,
+      };
+    }
 
-  const startDate =
-    getPurchaseLimitStartDate(period);
+    totalAmount += inventory.productId.price * item.quantity;
 
-  if (startDate) {
+    orderItems.push({
+      productId: inventory.productId._id,
+      name: inventory.productId.name,
+      quantity: item.quantity,
+      price: inventory.productId.price,
+    });
 
-    match.createdAt = {
-      $gte: startDate
-    };
-
+    limitedEntries.push({ product: inventory.productId, quantity: item.quantity });
   }
 
-  const result =
-    await Transaction.aggregate([
+  // Same reason the archived check is here rather than left to chargeCart: a
+  // limit caught now is explained at the counter while the student is still
+  // standing there, instead of surfacing days later as a parent's approval
+  // failing for reasons they cannot act on. chargeCart checks again at the
+  // moment money moves, which is the answer that actually binds.
+  const withinLimits = await checkPurchaseLimits({ studentId, entries: limitedEntries });
 
-      {
-        $match: match
-      },
-
-      {
-        $unwind: "$items"
-      },
-
-      {
-        $match: {
-          "items.productId": product._id
-        }
-      },
-
-      {
-        $group: {
-
-          _id: null,
-
-          quantity: {
-            $sum: "$items.quantity"
-          }
-
-        }
-      }
-
-    ]);
-
-  const alreadyPurchased =
-    result.length > 0
-      ? Number(result[0].quantity)
-      : 0;
-
-  const remaining = Math.max(
-    0,
-    limit - alreadyPurchased
-  );
-
-  const totalAfterPurchase =
-    alreadyPurchased +
-    Number(requestedQuantity);
-
-  if (totalAfterPurchase > limit) {
-
-    return {
-
-      allowed: false,
-
-      alreadyPurchased,
-
-      remaining,
-
-      limit,
-
-      period
-
-    };
-
+  if (!withinLimits.ok) {
+    return { ok: false, status: withinLimits.status, message: withinLimits.message };
   }
 
-  return {
-
-    allowed: true,
-
-    alreadyPurchased,
-
-    remaining,
-
-    limit,
-
-    period
-
-  };
-
+  return { ok: true, totalAmount, orderItems };
 };
 
-const getPurchaseLimitPeriodLabel = (period) => {
-
-  if (period === "DAILY") {
-    return "day";
-  }
-
-  if (period === "WEEKLY") {
-    return "week";
-  }
-
-  if (period === "MONTHLY") {
-    return "month";
-  }
-
-  return "total";
-
-};
-
+/* =========================================================
+   RAISED BY THE TILL
+========================================================= */
 export const createPendingOrder = async (req, res) => {
   try {
-    const { studentId, items } = req.body;
+    // A student session names its own student; the admin console says which
+    // one it is serving. Same rule as the two transaction routes.
+    const studentId = req.student?.id ?? req.body.studentId;
+    const { purchaseToken } = req.body;
 
-    if (!studentId || !items || !items.length) {
+    if (!studentId || !validItems(req.body.items)) {
       return res.status(400).json({
-        message: "Student and items are required."
+        message: "A student and at least one item are required.",
       });
     }
 
-    // Find student
+    const items = asItems(req.body.items);
+
+    /* Two callers, and what authorizes them differs.
+
+       A student at the kiosk presents a purchase token, which is what their
+       four-digit code bought a moment ago. That is the only thing standing
+       between an unattended terminal and somebody else's wallet, so it stays.
+
+       An admin at the console presents nothing but their own sign-in, and that
+       is deliberate: the console stopped asking children for their code, and
+       what replaced it is stronger — every order an admin raises goes to the
+       parent, who sees the exact items and answers. Nothing is charged here
+       either way. */
+    const raisedByAdmin = Boolean(req.staff) && !req.student;
+
+    if (!raisedByAdmin) {
+      const authorization = await consumeAuthorization({
+        token: purchaseToken,
+        studentId,
+        items,
+      });
+
+      if (!authorization.ok) {
+        // Not 401: the till is properly signed in, it is this request that is
+        // unauthorised. No grace window — nothing older than this endpoint
+        // exists to be kind to.
+        return res
+          .status(403)
+          .json({ message: AUTHORIZATION_MESSAGES[authorization.reason] });
+      }
+    }
+
     const student = await Student.findById(studentId);
-    const existingOrder = await PendingOrder.findOne({
-    studentId,
-    status: "PENDING"
-});
 
-if (existingOrder) {
-    return res.status(400).json({
-        success: false,
-        message: "Student already has a pending order."
-    });
-}
+    if (!student || student.active === false) {
+      return res.status(404).json({ message: "Student record not found." });
+    }
 
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found."
+    /* The setting binds the kiosk, not the console. A student who needs no
+       approval pays at the kiosk with their code and is charged there, so
+       reaching this route is a mistake worth naming. An admin-raised order
+       waits for the parent regardless — that is the whole of what replaced the
+       code at the console. */
+    if (!raisedByAdmin && !student.requiresParentApproval) {
+      return res.status(400).json({
+        message:
+          "This student does not need parent approval. Charge the sale at the counter instead.",
       });
     }
 
-    // Find parent linked to student
-    const parent = await Parent.findOne({
-      studentIds: student._id
-    });
+    const parent = await Parent.findOne({ studentIds: student._id });
 
     if (!parent) {
+      // Named with a code as well as a message: the console disables its own
+      // pay button on this, and matching on prose is not a contract.
       return res.status(404).json({
-        message: "Parent not registered."
+        code: "NO_PARENT",
+        message:
+          "No parent account is linked to this student, so there is nobody to approve the order." +
+          " The student can still buy at the kiosk with their purchase code.",
       });
     }
 
-    let totalAmount = 0;
+    const live = await findLiveOrderForStudent(student._id);
 
-    const orderItems = [];
-
-    for (const item of items) {
-
-      const product = await Product.findById(item.productId);
-
-      if (!product) {
-        return res.status(404).json({
-          message: `Product not found`
-        });
-      }
-
-      const quantity = Number(item.quantity);
-
-      if (quantity <= 0) {
-        return res.status(400).json({
-          message: "Invalid quantity."
-        });
-      }
-
-     const inventory = await Inventory.findOne({
-  productId: product._id
-});
-
-if (!inventory) {
-  return res.status(404).json({
-    message: `Inventory not found for ${product.name}`
-  });
-}
-
-if (inventory.stock < quantity) {
-  return res.status(400).json({
-    message: `Insufficient stock for ${product.name}`
-  });
-}
-
-const limitCheck = await checkProductPurchaseLimit({
-  studentId: student._id,
-  product,
-  requestedQuantity: quantity
-});
-
-if (!limitCheck.allowed) {
-
-  const periodLabel =
-    getPurchaseLimitPeriodLabel(
-      limitCheck.period
-    );
-
-  return res.status(400).json({
-
-    success: false,
-
-    message:
-      `${product.name} purchase limit reached. ` +
-      `Already purchased: ${limitCheck.alreadyPurchased}. ` +
-      `Maximum allowed: ${limitCheck.limit} per ${periodLabel}. ` +
-      `Remaining: ${limitCheck.remaining}.`
-
-  });
-
-}
-
-const price = product.price;
-
-totalAmount += price * quantity;
-
-      orderItems.push({
-        productId: product._id,
-        name: product.name,
-        quantity,
-        price
+    if (live) {
+      return res.status(409).json({
+        message:
+          `${student.name} already has an order waiting for approval.` +
+          ` No new order can be placed until ${live.expiresAt.toLocaleString("en-IN")}.`,
+        expiresAt: live.expiresAt,
       });
     }
 
-    const pendingOrder = await PendingOrder.create({
-  studentId: student._id,
-  parentId: parent._id,
-  items: orderItems,
-  totalAmount
-});
+    const priced = await priceCart(items, student._id);
 
-// Send FCM notification to parent
-if (parent?.fcmToken) {
-  try {
-    await sendNotification(
-      parent.fcmToken,
-      "Purchase Approval Required",
-      `${student.name} has requested a purchase of ₹${totalAmount}.`,
+    if (!priced.ok) {
+      return res.status(priced.status).json({ message: priced.message });
+    }
+
+    let pendingOrder;
+
+    try {
+      pendingOrder = await PendingOrder.create({
+        studentId: student._id,
+        parentId: parent._id,
+        items: priced.orderItems,
+        totalAmount: priced.totalAmount,
+        expiresAt: pendingOrderExpiry(),
+        raisedBy: req.staff?.id ?? null,
+      });
+    } catch (err) {
+      // The unique active-order index closes the race between the friendly
+      // pre-check above and two tills creating at the same instant.
+      if (err?.code === 11000) {
+        return res.status(409).json({
+          message: `${student.name} already has an order waiting for approval.`,
+        });
+      }
+      throw err;
+    }
+
+    // Not awaited: the counter gets its answer now. sendToParent never rejects.
+    sendToParent(
+      parent,
+      "Approval needed",
+      `${student.name} wants to spend ₹${priced.totalAmount}. Tap to review.`,
       {
         type: "PENDING_ORDER",
         orderId: pendingOrder._id.toString(),
         studentId: student._id.toString(),
       }
     );
-  } catch (notificationError) {
-    console.error(
-      "FCM notification failed:",
-      notificationError
-    );
-  }
-}
 
-    return res.status(201).json({
-      success: true,
-      message: "Approval request sent to parent.",
-      pendingOrder
+    res.status(201).json({
+      message: "Approval request sent to the parent.",
+      pendingOrder,
     });
-
   } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    res.status(500).json({ message: err.message });
   }
 };
 
-
-
-
-
-
+/* =========================================================
+   READ AND ANSWERED BY THE PARENT
+========================================================= */
 export const getParentPendingOrders = async (req, res) => {
   try {
-    const parentId = req.parent.id;// From auth middleware
-
     const orders = await PendingOrder.find({
-      parentId,
-      status: "PENDING"
+      parentId: req.parent.id,
+      status: "PENDING",
+      expiresAt: { $gt: new Date() },
     })
       .populate("studentId", "name grade hostelNumber pocketMoney")
-      .populate("items.productId", "image")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({
-      success: true,
-      count: orders.length,
-      orders,
-    });
-
+    res.json({ count: orders.length, orders });
   } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ message: err.message });
   }
 };
 
-
-
-
-
-export const updatePendingOrder = async (req, res) => {
-    try {
-
-        const { id } = req.params;
-        const { items } = req.body;
-
-        const order = await PendingOrder.findOne({
-            _id: id,
-            parentId: req.parent.id,
-            status: "PENDING"
-        });
-
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Pending order not found."
-            });
-        }
-
-        let totalAmount = 0;
-
-        const updatedItems = [];
-
-        for (const item of items) {
-
-            const product = await Product.findById(item.productId);
-
-            if (!product) {
-                return res.status(404).json({
-                    success: false,
-                    message: `Product not found`
-                });
-            }
-
-            const quantity = Number(item.quantity);
-
-            // Parent removed item
-            if (quantity <= 0) continue;
-
-            updatedItems.push({
-                productId: product._id,
-                name: product.name,
-                quantity,
-                price: product.price
-            });
-
-            totalAmount += product.price * quantity;
-        }
-
-        if (!updatedItems.length) {
-            return res.status(400).json({
-                success: false,
-                message: "Order must contain at least one item."
-            });
-        }
-
-        order.items = updatedItems;
-        order.totalAmount = totalAmount;
-
-        await order.save();
-
-        return res.json({
-            success: true,
-            message: "Order updated successfully.",
-            order
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-};
-
-
-export const approvePendingOrder = async (req, res) => {
-try {
-
-    const { id } = req.params;
-
-   const order = await PendingOrder.findOne({
-  _id: id,
-  parentId: req.parent.id,
-  status: "PENDING"
-});
-
-    if (!order) {
-        return res.status(404).json({
-            message: "Pending order not found."
-        });
-    }
-
-   
-
-    const student = await Student.findById(order.studentId);
-
-    if (!student) {
-        return res.status(404).json({
-            message: "Student not found."
-        });
-    }
-let totalAmount = 0;
-
-let transactionItems = [];
-
-for (const orderItem of order.items) {
-
-    const inventory = await Inventory.findOne({
-        productId: orderItem.productId
-    }).populate("productId");
-
-    if (!inventory) {
-        return res.status(404).json({
-            message: "Inventory record not found."
-        });
-    }
-
-    if (inventory.stock < orderItem.quantity) {
-        return res.status(400).json({
-            message: `Insufficient stock for ${inventory.productId.name}`
-        });
-    }
-const limitCheck = await checkProductPurchaseLimit({
-  studentId: student._id,
-  product: inventory.productId,
-  requestedQuantity: orderItem.quantity
-});
-
-if (!limitCheck.allowed) {
-
-  const periodLabel =
-    getPurchaseLimitPeriodLabel(
-      limitCheck.period
-    );
-
-  return res.status(400).json({
-
-    success: false,
-
-    message:
-      `${inventory.productId.name} purchase limit reached. ` +
-      `Already purchased: ${limitCheck.alreadyPurchased}. ` +
-      `Maximum allowed: ${limitCheck.limit} per ${periodLabel}. ` +
-      `Remaining: ${limitCheck.remaining}.`
-
+// The parent's own copy of the order, or an explanation of why it cannot be
+// acted on. Every route below needs the same three checks.
+const loadAnswerable = async (req, res) => {
+  const order = await PendingOrder.findOne({
+    _id: req.params.id,
+    parentId: req.parent.id,
   });
 
-}
-    totalAmount += inventory.productId.price * orderItem.quantity;
+  if (!order) {
+    res.status(404).json({ message: "This order could not be found." });
+    return null;
+  }
 
-    transactionItems.push({
-        productId: inventory.productId._id,
-        name: inventory.productId.name,
-        quantity: orderItem.quantity,
-        price: inventory.productId.price
+  await expireIfLapsed(order);
+
+  if (order.status === "EXPIRED") {
+    res.status(410).json({
+      message: "This request expired before it was answered.",
     });
+    return null;
+  }
 
-}
-if (student.walletControl?.enabled) {
-
-    const now = new Date();
-    let startDate;
-
-    if (student.walletControl.limitType === "DAILY") {
-
-        startDate = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate()
-        );
-
-    } else if (student.walletControl.limitType === "WEEKLY") {
-
-        startDate = new Date(now);
-
-        startDate.setDate(
-            now.getDate() - now.getDay()
-        );
-
-        startDate.setHours(0, 0, 0, 0);
-
-    } else {
-
-        startDate = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1
-        );
-
-    }
-
-    const spent = await Transaction.aggregate([
-        {
-            $match: {
-                studentId: student._id,
-                createdAt: {
-                    $gte: startDate
-                }
-            }
-        },
-        {
-            $group: {
-                _id: null,
-                total: {
-                    $sum: "$totalAmount"
-                }
-            }
-        }
-    ]);
-
-    const alreadySpent =
-        spent.length > 0
-            ? spent[0].total
-            : 0;
-
-    const remainingLimit = Math.max(
-        0,
-        student.walletControl.limitAmount - alreadySpent
-    );
-
-    if (totalAmount > remainingLimit) {
-
-        return res.status(400).json({
-            message:
-                `${student.walletControl.limitType} limit exceeded. Remaining limit ₹${remainingLimit}`
-        });
-
-    }
-
-}
-if (student.pocketMoney < totalAmount) {
-    return res.status(400).json({
-        message: "Insufficient pocket money balance!"
+  if (order.status !== "PENDING") {
+    res.status(409).json({
+      message: `This order has already been ${order.status.toLowerCase()}.`,
     });
-}
-for (const orderItem of order.items) {
+    return null;
+  }
 
-    await Inventory.findOneAndUpdate(
-        {
-            productId: orderItem.productId
-        },
-        {
-            $inc: {
-                stock: -orderItem.quantity
-            }
-        }
-    );
-
-}
-const previousBalance = student.pocketMoney;
-
-student.pocketMoney -= totalAmount;
-
-await student.save();
-const transaction = await Transaction.create({
-
-    studentId: student._id,
-
-    items: transactionItems,
-
-    totalAmount,
-
-    previousBalance,
-
-    remainingBalance: student.pocketMoney
-
-});
-order.status = "APPROVED";
-order.approvedAt = new Date();
-
-await order.save();
-const parent = await Parent.findById(order.parentId);
-
-if (parent?.fcmToken) {
-    await sendNotification(
-        parent.fcmToken,
-        "Order Approved",
-        `₹${totalAmount} has been deducted. Remaining balance ₹${student.pocketMoney}`,
-        {
-            type: "ORDER_APPROVED",
-            orderId: order._id.toString(),
-            studentId: student._id.toString()
-        }
-    );
-}
-return res.status(200).json({
-    success: true,
-    message: "Order approved successfully.",
-    transaction
-});
-} catch(err){
-
-    console.log(err);
-
-    res.status(500).json({
-        message: err.message
-    });
-
-}
-
-
-
-}
-
-
-
-
-export const rejectPendingOrder = async (req, res) => {
-
-    try {
-
-        const { id } = req.params;
-
-    const order = await PendingOrder.findOne({
-  _id: id,
-  parentId: req.parent.id,
-  status: "PENDING"
-});
-
-        if (!order) {
-            return res.status(404).json({
-                message: "Pending order not found."
-            });
-        }
-
-       
-
-        order.status = "REJECTED";
-        order.rejectedAt = new Date();
-
-        await order.save();
-
-        const parent = await Parent.findById(order.parentId);
-
-        if (parent?.fcmToken) {
-            await sendNotification(
-                parent.fcmToken,
-                "Order Rejected",
-                "Your order request has been rejected.",
-                {
-                    type: "ORDER_REJECTED",
-                    orderId: order._id.toString()
-                }
-            );
-        }
-
-        res.json({
-            success: true,
-            message: "Order rejected."
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            message: err.message
-        });
-
-    }
-
+  return order;
 };
 
-
-export const getPendingOrderStatus = async (req, res) => {
-    try {
-
-        const { id } = req.params;
-
-        const order = await PendingOrder.findById(id);
-
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Order not found."
-            });
-        }
-
-        return res.json({
-            success: true,
-            status: order.status,
-            approvedAt: order.approvedAt,
-            rejectedAt: order.rejectedAt
-        });
-
-    } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
+/* A parent can trim the order before agreeing to it — drop the fizzy drink,
+   halve the quantity — so that answering is not all-or-nothing. Prices are
+   re-read rather than carried over from the till's version, so an edit cannot
+   be used to hold an old price. */
+export const updatePendingOrder = async (req, res) => {
+  try {
+    if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+      return res.status(400).json({ message: "An order needs at least one item." });
     }
+
+    // A quantity of zero is how the app says "remove this line".
+    const kept = asItems(req.body.items).filter((item) => item.quantity > 0);
+
+    if (kept.length === 0) {
+      return res.status(400).json({
+        message: "An order needs at least one item. Reject it instead to cancel it.",
+      });
+    }
+
+    if (kept.some((item) => !Number.isInteger(item.quantity))) {
+      return res.status(400).json({ message: "Quantities must be whole numbers." });
+    }
+
+    const order = await loadAnswerable(req, res);
+    if (!order) return;
+
+    // Only lines the till rang up may be adjusted. Without this a parent could
+    // add anything in the catalogue to an order the student never asked for,
+    // and the counter would have no idea the basket had changed.
+    const rung = new Set(order.items.map((item) => String(item.productId)));
+
+    if (kept.some((item) => !rung.has(String(item.productId)))) {
+      return res.status(400).json({
+        message: "An order can only be reduced, not added to.",
+      });
+    }
+
+    const priced = await priceCart(kept, order.studentId);
+
+    if (!priced.ok) {
+      return res.status(priced.status).json({ message: priced.message });
+    }
+
+    const updated = await PendingOrder.findOneAndUpdate(
+      {
+        _id: order._id,
+        parentId: req.parent.id,
+        status: "PENDING",
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { items: priced.orderItems, totalAmount: priced.totalAmount } },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(409).json({
+        message: "This order changed while it was being edited. Refresh and try again.",
+      });
+    }
+
+    res.json({ message: "Order updated.", order: updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const approvePendingOrder = async (req, res) => {
+  let claimedOrderId = null;
+  let committed = false;
+
+  try {
+    const approvalKey = approvalKeyFrom(req);
+
+    if (!approvalKey || approvalKey.length > 100) {
+      return res.status(400).json({
+        message: "A valid Idempotency-Key is required to approve an order.",
+      });
+    }
+
+    const existing = await PendingOrder.findOne({
+      _id: req.params.id,
+      parentId: req.parent.id,
+    });
+
+    if (!existing) {
+      return res.status(404).json({ message: "This order could not be found." });
+    }
+
+    if (existing.status === "APPROVED" && existing.approvalKey === approvalKey) {
+      const transaction = existing.transactionId
+        ? await Transaction.findById(existing.transactionId)
+        : await Transaction.findOne({ sourceType: "PARENT_APPROVAL", sourceId: existing._id });
+
+      return res.json({ message: "Order already approved.", transaction, replayed: true });
+    }
+
+    await expireIfLapsed(existing);
+
+    if (existing.status === "EXPIRED") {
+      return res.status(410).json({ message: "This request expired before it was answered." });
+    }
+
+    if (existing.status !== "PENDING") {
+      return res.status(409).json({
+        message:
+          existing.status === "PROCESSING"
+            ? "This order is already being processed. Retry with the same key shortly."
+            : `This order has already been ${existing.status.toLowerCase()}.`,
+      });
+    }
+
+    const result = await withMongoTransaction(async (session) => {
+      const now = new Date();
+      const order = await PendingOrder.findOneAndUpdate(
+        {
+          _id: existing._id,
+          parentId: req.parent.id,
+          status: "PENDING",
+          expiresAt: { $gt: now },
+        },
+        {
+          $set: {
+            status: "PROCESSING",
+            approvalKey,
+            processingAt: now,
+          },
+        },
+        { new: true, runValidators: true, ...sessionOptions(session) }
+      );
+
+      if (!order) {
+        throw new ApprovalError(
+          409,
+          "This order changed while approval was being processed. Refresh and try again."
+        );
+      }
+
+      claimedOrderId = order._id;
+
+      // The price is the immutable snapshot the parent saw. Stock and product
+      // availability are still checked live by chargeCart.
+      const charge = await chargeCart({
+        studentId: order.studentId,
+        items: order.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        session,
+        sourceType: "PARENT_APPROVAL",
+        sourceId: order._id,
+        idempotencyKey: approvalKey,
+      });
+
+      if (!charge.ok) {
+        throw new ApprovalError(charge.status, charge.message);
+      }
+
+      const approved = await PendingOrder.findOneAndUpdate(
+        { _id: order._id, status: "PROCESSING", approvalKey },
+        {
+          $set: {
+            status: "APPROVED",
+            approvedAt: new Date(),
+            transactionId: charge.transaction._id,
+          },
+          $unset: { processingAt: 1 },
+        },
+        { new: true, runValidators: true, ...sessionOptions(session) }
+      );
+
+      if (!approved) {
+        throw new ApprovalError(409, "The order could not be finalized safely.");
+      }
+
+      return { order: approved, ...charge };
+    });
+
+    committed = true;
+    const { order, student, transaction, fulfillmentOrder } = result;
+    const parent = await Parent.findById(order.parentId);
+
+    if (parent) {
+      sendToParent(
+        parent,
+        "Order approved",
+        `₹${transaction.totalAmount} spent. Balance ₹${student.pocketMoney}.`,
+        {
+          type: "ORDER_APPROVED",
+          orderId: order._id.toString(),
+          studentId: String(order.studentId),
+        }
+      );
+    }
+
+    res.json({
+      message: "Order approved.",
+      transaction,
+      fulfillmentOrder,
+    });
+  } catch (err) {
+    // With MongoDB this write is normally unnecessary because the transaction
+    // abort restores PENDING. It also makes the deliberately sessionless unit
+    // test path, and a deployment accidentally connected to standalone Mongo,
+    // fail open for a safe retry instead of leaving PROCESSING forever.
+    if (claimedOrderId && !committed) {
+      await PendingOrder.updateOne(
+        { _id: claimedOrderId, status: "PROCESSING" },
+        {
+          $set: { status: "PENDING" },
+          $unset: { approvalKey: 1, processingAt: 1 },
+        }
+      ).catch(() => {});
+    }
+
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+export const rejectPendingOrder = async (req, res) => {
+  try {
+    const order = await loadAnswerable(req, res);
+    if (!order) return;
+
+    const rejected = await PendingOrder.findOneAndUpdate(
+      {
+        _id: order._id,
+        parentId: req.parent.id,
+        status: "PENDING",
+        expiresAt: { $gt: new Date() },
+      },
+      { $set: { status: "REJECTED", rejectedAt: new Date() } },
+      { new: true, runValidators: true }
+    );
+
+    if (!rejected) {
+      return res.status(409).json({
+        message: "This order changed while it was being rejected. Refresh and try again.",
+      });
+    }
+
+    res.json({ message: "Order rejected." });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================================================
+   POLLED BY THE TILL
+========================================================= */
+// The counter prints its slip and moves on rather than waiting, so nothing
+// calls this today. It is kept, and behind the till's own token rather than
+// open, because "did that order go through?" is the obvious next question and
+// an order id should not be enough on its own to answer it.
+export const getPendingOrderStatus = async (req, res) => {
+  try {
+    const order = await PendingOrder.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found." });
+    }
+
+    await expireIfLapsed(order);
+
+    res.json({
+      status: order.status,
+      expiresAt: order.expiresAt,
+      approvedAt: order.approvedAt,
+      rejectedAt: order.rejectedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };

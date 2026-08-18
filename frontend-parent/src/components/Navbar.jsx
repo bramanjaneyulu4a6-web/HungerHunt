@@ -1,236 +1,156 @@
-// import { useAuth } from '../context/AuthContext';
-// import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/auth';
+import Icon from './Icon';
+import { Button } from './ui';
 
-// export default function Navbar() {
-//   const { parent, logout } = useAuth();
-//   const navigate = useNavigate();
-
-//   const handleLogout = () => {
-//     logout();
-//     navigate('/login');
-//   };
-
-//   return (
-//     <nav className="bg-blue-600 text-white shadow-md px-6 py-4 flex justify-between items-center">
-//       <Link to="/" className="text-xl font-bold tracking-wide">👨‍👩‍👦 Parent Portal</Link>
-//       {parent && (
-//         <div className="flex items-center gap-4">
-//           <span className="text-sm bg-blue-700 px-3 py-1 rounded-full">Welcome, {parent.fatherName}</span>
-//           <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 px-4 py-1.5 text-sm font-semibold rounded transitions duration-200">
-//             Logout
-//           </button>
-//         </div>
-//       )}
-//     </nav>
-//   );
-// }
-
-
-
-
-// import React from 'react';
-// import { useAuth } from '../context/AuthContext';
-// import { useNavigate, Link } from 'react-router-dom';
-
-// export default function Navbar() {
-//   const { parent, logout } = useAuth();
-//   const navigate = useNavigate();
-
-//   const handleLogout = () => {
-//     logout();
-//     navigate('/login');
-//   };
-
-//   // Shared Styles Blueprint matching the administrative system layout
-//   const styles = {
-//     navbar: {
-//       backgroundColor: "#ffffff",
-//       borderBottom: "1px solid #e2e8f0",
-//       padding: "16px 32px",
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-//       boxSizing: "border-box",
-//       boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-//     },
-//     brandLink: {
-//       fontSize: "18px",
-//       fontWeight: "700",
-//       color: "#0f172a",
-//       textDecoration: "none",
-//       display: "flex",
-//       alignItems: "center",
-//       gap: "8px",
-//       letterSpacing: "-0.25px",
-//     },
-//     rightContainer: {
-//       display: "flex",
-//       alignItems: "center",
-//       gap: "16px",
-//     },
-//     userBadge: {
-//       fontSize: "13px",
-//       fontWeight: "600",
-//       color: "#334155",
-//       backgroundColor: "#f1f5f9",
-//       padding: "6px 14px",
-//       borderRadius: "20px",
-//       border: "1px solid #e2e8f0",
-//     },
-//     logoutBtn: {
-//       backgroundColor: "#be123c",
-//       color: "#ffffff",
-//       border: "none",
-//       padding: "8px 16px",
-//       borderRadius: "10px",
-//       fontSize: "13px",
-//       fontWeight: "600",
-//       cursor: "pointer",
-//       transition: "background-color 0.15s ease",
-//     }
-//   };
-
-//   return (
-//     <nav style={styles.navbar}>
-//       {/* Brand Navigation Header */}
-//       <Link to="/" style={styles.brandLink}>
-//         <span>👨‍👩‍👦 Portal Portal</span>
-//       </Link>
-
-//       {/* Conditional Right-Side Actions Block */}
-//       {parent && (
-//         <div style={styles.rightContainer}>
-//           {/* Dynamically reads user metrics fallback string safely */}
-//           <span style={styles.userBadge}>
-//             Welcome, {parent.fatherName || parent.motherName || "Parent"}
-//           </span>
-          
-//           <button 
-//             onClick={handleLogout} 
-//             style={styles.logoutBtn}
-//             onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#9f1239")}
-//             onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#be123c")}
-//           >
-//             Logout
-//           </button>
-//         </div>
-//       )}
-//     </nav>
-//   );
-// }
-
-
-
-// 08-08-2026
-
-
-
-
-
-
-import React from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+const navClass = ({ isActive }) =>
+  `parent-nav-link${isActive ? ' parent-nav-link--active' : ''}`;
 
 export default function Navbar() {
   const { parent, logout } = useAuth();
   const navigate = useNavigate();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const dialogRef = useRef(null);
+  const logoutButtonRef = useRef(null);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await logout();
+    navigate('/login', { replace: true });
   };
 
-  // Shared Styles Blueprint matching the administrative system layout
-  const styles = {
-    navbar: {
-      backgroundColor: "#ffffff",
-      borderBottom: "1px solid #e2e8f0",
-      padding: "16px 32px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      boxSizing: "border-box",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-    },
-    brandLink: {
-      fontSize: "18px",
-      fontWeight: "700",
-      color: "#0f172a",
-      textDecoration: "none",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      letterSpacing: "-0.25px",
-    },
-    rightContainer: {
-      display: "flex",
-      alignItems: "center",
-      gap: "16px",
-    },
-    userBadge: {
-      fontSize: "13px",
-      fontWeight: "600",
-      color: "#334155",
-      backgroundColor: "#f1f5f9",
-      padding: "6px 14px",
-      borderRadius: "20px",
-      border: "1px solid #e2e8f0",
-    },
-    logoutBtn: {
-      backgroundColor: "#be123c",
-      color: "#ffffff",
-      border: "none",
-      padding: "8px 16px",
-      borderRadius: "10px",
-      fontSize: "13px",
-      fontWeight: "600",
-      cursor: "pointer",
-      transition: "background-color 0.15s ease",
-    }
-  };
+  /* Opening the dialog is not the same as arriving in it. `aria-modal` only
+     fences the rest of the page off from a screen reader once focus is
+     actually inside, and without that focus a keyboard tab walks the app bar
+     and the bottom nav first and reaches the buttons behind the backdrop
+     afterwards. On a phone the app bar holds the only way to sign out, so this
+     is the dialog that has to work with no pointer at all. */
+  useEffect(() => {
+    if (!confirmingLogout) return undefined;
+
+    const dialog = dialogRef.current;
+    const trigger = logoutButtonRef.current;
+
+    const focusable = () =>
+      [...dialog.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])')]
+        .filter((el) => !el.disabled);
+
+    focusable()[0]?.focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setConfirmingLogout(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const items = focusable();
+      if (!items.length) return;
+
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      // Wrap at both ends rather than letting Tab out into the page behind.
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      // Hand focus back to what opened it. Signing out unmounts the whole bar,
+      // so on that path there is nothing left to focus and this does nothing.
+      trigger?.focus();
+    };
+  }, [confirmingLogout]);
+
+  if (!parent) return null;
 
   return (
-    <nav style={styles.navbar}>
-      {/* Brand Navigation Header */}
-      <Link to="/" style={styles.brandLink}>
-        <span>👨‍👩‍👦 Portal Portal</span>
-      </Link>
-
-      {/* Conditional Right-Side Actions Block */}
-      {parent && (
-        <div style={styles.rightContainer}>
-          {/* Dynamically reads user metrics fallback string safely */}
-         <Link
-  to="/pending-orders"
-  style={{
-    textDecoration: "none",
-    background: "#F59E0B",
-    color: "#fff",
-    padding: "8px 14px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    fontWeight: 700,
-  }}
->
-  🛒 Pending Orders
-</Link>
-          <span style={styles.userBadge}>
-            Welcome, {parent.fatherName || parent.motherName || "Parent"}
+    <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <header className="parent-appbar">
+        <NavLink to="/" className="parent-brand" aria-label="Hunger Hunt home">
+          <img src="/Logo.jpeg" alt="" />
+          <span>
+            <b>Hunger Hunt</b>
+            <small>Parent</small>
           </span>
-          
-          <button 
-            onClick={handleLogout} 
-            style={styles.logoutBtn}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#9f1239")}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#be123c")}
+        </NavLink>
+
+        <nav className="parent-desktop-nav" aria-label="Primary navigation">
+          <NavLink to="/" end className={navClass}>
+            <Icon name="home" size={18} /> Dashboard
+          </NavLink>
+          <NavLink to="/accounts" className={navClass}>
+            <Icon name="user" size={18} /> Accounts
+          </NavLink>
+        </nav>
+
+        <div className="parent-account">
+          <span className="parent-account-avatar" aria-hidden="true">
+            {(parent.fatherName || 'P').charAt(0).toUpperCase()}
+          </span>
+          <span className="parent-account-name">{parent.fatherName || 'Parent'}</span>
+          <button
+            ref={logoutButtonRef}
+            type="button"
+            className="parent-logout"
+            onClick={() => setConfirmingLogout(true)}
+            aria-label="Sign out"
           >
-            Logout
+            <Icon name="logout" size={19} />
           </button>
         </div>
+      </header>
+
+      <nav className="parent-bottom-nav" aria-label="Primary navigation">
+        <NavLink to="/" end className={navClass}>
+          <Icon name="home" size={21} /> <span>Dashboard</span>
+        </NavLink>
+        <NavLink to="/accounts" className={navClass}>
+          <Icon name="user" size={21} /> <span>Accounts</span>
+        </NavLink>
+      </nav>
+
+      {confirmingLogout && (
+        <div className="parent-modal-backdrop" onClick={() => setConfirmingLogout(false)}>
+          <div
+            ref={dialogRef}
+            className="parent-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="logout-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="parent-modal-icon parent-modal-icon--alert" aria-hidden="true">
+              <Icon name="logout" size={24} />
+            </span>
+            <h2 id="logout-title">Sign out of Hunger Hunt?</h2>
+            <p>You’ll stop receiving account notifications on this device until you sign in again.</p>
+            <div className="parent-modal-actions">
+              <Button variant="ghost" block disabled={loggingOut} onClick={() => setConfirmingLogout(false)}>
+                Stay signed in
+              </Button>
+              <Button variant="alert" block disabled={loggingOut} onClick={handleLogout}>
+                {loggingOut ? 'Signing out…' : 'Sign out'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
-    </nav>
+    </>
   );
 }

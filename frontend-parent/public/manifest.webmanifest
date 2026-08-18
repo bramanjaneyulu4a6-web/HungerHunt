@@ -1,0 +1,26 @@
+{
+  "name": "Hunger Hunt Parent",
+  "short_name": "Hunger Hunt",
+  "description": "Manage child wallet balances, purchase approvals and spending controls.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f5f0",
+  "theme_color": "#ffffff",
+  "orientation": "any",
+  "categories": ["finance", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "/Logo.jpeg",
+      "sizes": "1000x1000",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

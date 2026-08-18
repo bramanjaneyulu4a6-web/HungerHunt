@@ -1,88 +1,3 @@
-// // // import axios from 'axios';
-
-// // // const api = axios.create({
-// // //   baseURL: import.meta.env.VITE_API_BASE_URL,
-// // // });
-
-// // // // Interceptor to attach Auth token automatically
-// // // api.interceptors.request.use((config) => {
-// // //   const token = localStorage.getItem("adminToken");
-
-// // //   if (token) {
-// // //     config.headers.Authorization = `Bearer ${token}`;
-// // //   }
-
-// // //   return config;
-// // // });
-
-
-
-
-
-// // // export default api;
-
-
-
-
-
-
-
-
-
-// // import axios from "axios";
-
-// // console.log("API BASE URL =", import.meta.env.VITE_API_BASE_URL);
-
-// // const api = axios.create({
-// //   baseURL: import.meta.env.VITE_API_BASE_URL,
-// // });
-
-// // api.interceptors.request.use((config) => {
-// //   const token = localStorage.getItem("adminToken");
-
-// //   if (token) {
-// //     config.headers.Authorization = `Bearer ${token}`;
-// //   }
-
-// //   return config;
-// // });
-
-// // export default api;
-
-
-
-
-
-
-
-
-
-
-
-// import axios from "axios";
-
-// const api = axios.create({
-//   baseURL: "http://localhost:5000/api",
-// });
-
-// api.interceptors.request.use((config) => {
-//   const token = localStorage.getItem("adminToken");
-
-//   console.log("TOKEN:", token);
-
-//   if (token) {
-//     config.headers.Authorization = `Bearer ${token}`;
-//   }
-
-//   console.log(config.headers);
-
-//   return config;
-// });
-
-// export default api;
-
-
-
 import axios from "axios";
 
 const api = axios.create({
@@ -90,9 +5,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("adminToken");
-
-  console.log("TOKEN:", token);
+  const token = localStorage.getItem("kioskToken");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -100,5 +13,24 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // A 401 out here is the session's own token reaching its 450 seconds, or a
+    // student removed from the roll mid-order. Either way the session is over
+    // and the screen belongs to the next person.
+    if (error.response?.status === 401) {
+      localStorage.removeItem("kioskToken");
+      localStorage.removeItem("kioskStudent");
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;

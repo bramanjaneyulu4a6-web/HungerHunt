@@ -1,5 +1,52 @@
 apply plugin: 'com.android.application'
 
+/* Release signing.
+ *
+ * None of this is in the repo and none of it can be. The keystore is the one
+ * artifact in the whole release that cannot be re-issued — lose it and the Play
+ * listing can never be updated again, short of Play App Signing letting Google
+ * reset the upload key — and a password in a tracked file is a password in
+ * every clone, forever, including the ones made before it was removed.
+ *
+ * Two sources, first one wins per value: a keystore.properties next to this
+ * project, for a person building on their own machine, and environment
+ * variables for anything automated, which has no file to place. Mixing them is
+ * allowed and occasionally useful — the path in the file, the passwords in the
+ * environment.
+ *
+ * Absent credentials do not quietly degrade. Before this existed a release
+ * build with no keystore anywhere still succeeded, and what it produced was an
+ * unsigned bundle: the first thing to notice was Play, at the end of the
+ * upload, by which point the build looked finished. Now the release refuses to
+ * start and names the values it could not find.
+ */
+def SIGNING_SOURCES = [
+    storeFile    : 'ANDROID_KEYSTORE_PATH',
+    storePassword: 'ANDROID_KEYSTORE_PASSWORD',
+    keyAlias     : 'ANDROID_KEY_ALIAS',
+    keyPassword  : 'ANDROID_KEY_PASSWORD',
+]
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+// A property present but blank is treated as absent. A half-filled template is
+// the likeliest way to arrive here, and "" would otherwise sign nothing with a
+// key of no name and report no problem doing it.
+def readCredential = { String key, String envName ->
+    def value = keystoreProperties.getProperty(key) ?: System.getenv(envName)
+    return value?.trim() ? value.trim() : null
+}
+
+def signingCredentials = SIGNING_SOURCES.collectEntries { key, envName ->
+    [(key): readCredential(key, envName)]
+}
+def missingCredentials = SIGNING_SOURCES.findAll { key, envName -> !signingCredentials[key] }
+def canSignRelease = missingCredentials.isEmpty()
+
 android {
     namespace = "com.hungerhunt.parent"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,12 +63,61 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        // Declared only when there is something to declare. An empty config
+        // with a null storeFile fails later, deeper, and in Gradle's words
+        // rather than in terms of the setup step that was actually skipped.
+        if (canSignRelease) {
+            release {
+                storeFile file(signingCredentials.storeFile)
+                storePassword signingCredentials.storePassword
+                keyAlias signingCredentials.keyAlias
+                keyPassword signingCredentials.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (canSignRelease) {
+                signingConfig signingConfigs.release
+            }
+
+            /* Left off deliberately. Capacitor and its plugins reach for classes
+               by name, which R8 cannot see and will strip, and the resulting
+               failure appears only in the signed build — the one artifact that
+               gets least testing before it reaches a store. Turning this on is
+               a change to make after a release has shipped, with a device in
+               hand, not on the way to a first submission. */
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+/* Refuse the release rather than produce an unsigned one.
+ *
+ * whenReady runs once the task graph is settled and before any task in it has
+ * executed, so this costs nothing on a debug build and fails a release
+ * immediately rather than after several minutes of work that cannot be used. */
+gradle.taskGraph.whenReady { graph ->
+    if (canSignRelease) return
+
+    def buildsRelease = graph.allTasks.any { task ->
+        task.project == project && task.name ==~ /(?i).*(assemble|bundle|package).*release.*/
+    }
+    if (!buildsRelease) return
+
+    def wanted = missingCredentials.collect { key, envName -> "  - ${key}  (or \$${envName})" }.join('\n')
+
+    throw new GradleException(
+        "Cannot build a release: the signing key is not configured.\n\n" +
+        "Missing:\n${wanted}\n\n" +
+        "Set them in ${keystorePropertiesFile}, or export them into the\n" +
+        "environment. See keystore.properties.example beside this project, and\n" +
+        "the Signing section of RELEASE-CHECKLIST.md for creating the keystore.\n\n" +
+        "This is deliberate. Building on without them produces an unsigned\n" +
+        "bundle that Play rejects at the end of the upload."
+    )
 }
 
 repositories {

@@ -1,255 +1,73 @@
-// import React, { useEffect, useState } from "react";
-// import api from "../utils/api";
-
-// const Purchase = () => {
-//   const [products, setProducts] = useState([]);
-//   const [loading, setLoading] = useState(false);
-
-//   useEffect(() => {
-//     fetchProducts();
-//   }, []);
-
-//   const fetchProducts = async () => {
-//     try {
-//       const res = await api.get("/products");
-
-//       const formattedProducts = res.data.map((product) => ({
-//         ...product,
-//         quantity: 0,
-//       }));
-
-//       setProducts(formattedProducts);
-//     } catch (err) {
-//       console.error(err);
-//       alert("Failed to load products");
-//     }
-//   };
-
-//   const updateQuantity = (id, value) => {
-//     setProducts((prev) =>
-//       prev.map((product) =>
-//         product._id === id
-//           ? {
-//               ...product,
-//               quantity: Number(value),
-//             }
-//           : product
-//       )
-//     );
-//   };
-
-//   const createPurchase = async () => {
-//     const selectedItems = products
-//       .filter((p) => p.quantity > 0)
-//       .map((p) => ({
-//         productId: p._id,
-//         quantity: p.quantity,
-//       }));
-
-//     if (selectedItems.length === 0) {
-//       return alert("Select at least one product");
-//     }
-
-//     try {
-//       setLoading(true);
-
-//       await api.post("/purchases", {
-//         items: selectedItems,
-//       });
-
-//       alert("Purchase request created successfully");
-
-//       setProducts((prev) =>
-//         prev.map((p) => ({
-//           ...p,
-//           quantity: 0,
-//         }))
-//       );
-//     } catch (err) {
-//       console.error(err);
-//       alert("Failed to create purchase");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div
-//       style={{
-//         padding: "24px",
-//         minHeight: "100vh",
-//         background: "#f8fafc",
-//       }}
-//     >
-//       <h1
-//         style={{
-//           marginBottom: "20px",
-//         }}
-//       >
-//         Purchase Products
-//       </h1>
-
-//       <div
-//         style={{
-//           background: "#fff",
-//           borderRadius: "12px",
-//           padding: "20px",
-//           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-//         }}
-//       >
-//         <table
-//           style={{
-//             width: "100%",
-//             borderCollapse: "collapse",
-//           }}
-//         >
-//           <thead>
-//             <tr>
-//               <th
-//                 style={{
-//                   textAlign: "left",
-//                   padding: "12px",
-//                 }}
-//               >
-//                 Product
-//               </th>
-
-//               <th
-//                 style={{
-//                   textAlign: "left",
-//                   padding: "12px",
-//                 }}
-//               >
-//                 Quantity
-//               </th>
-//             </tr>
-//           </thead>
-
-//           <tbody>
-//             {products.map((product) => (
-//               <tr key={product._id}>
-//                 <td
-//                   style={{
-//                     padding: "12px",
-//                     borderTop: "1px solid #e5e7eb",
-//                   }}
-//                 >
-//                   {product.name}
-//                 </td>
-
-//                 <td
-//                   style={{
-//                     padding: "12px",
-//                     borderTop: "1px solid #e5e7eb",
-//                   }}
-//                 >
-//                   <input
-//                     type="number"
-//                     min="0"
-//                     value={product.quantity}
-//                     onChange={(e) =>
-//                       updateQuantity(
-//                         product._id,
-//                         e.target.value
-//                       )
-//                     }
-//                     style={{
-//                       width: "120px",
-//                       padding: "8px",
-//                       border: "1px solid #d1d5db",
-//                       borderRadius: "6px",
-//                     }}
-//                   />
-//                 </td>
-//               </tr>
-//             ))}
-//           </tbody>
-//         </table>
-
-//         <button
-//           onClick={createPurchase}
-//           disabled={loading}
-//           style={{
-//             marginTop: "20px",
-//             background: "#2563eb",
-//             color: "#fff",
-//             border: "none",
-//             padding: "12px 20px",
-//             borderRadius: "8px",
-//             cursor: "pointer",
-//           }}
-//         >
-//           {loading
-//             ? "Creating..."
-//             : "Create Purchase Request"}
-//         </button>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Purchase;
-
-
-
-
-
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
+import { Badge, Banner, Button, EmptyState, PageHeader, Skeleton } from "../components/ui";
 
 const Purchase = () => {
   const [products, setProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-const refreshPage = async () => {
-  setLoading(true);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierId, setSupplierId] = useState("");
 
-  try {
-    await fetchProducts();
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    api.get("/suppliers")
+      .then((res) => setSuppliers(res.data))
+      .catch((err) => console.error(err));
+  }, []);
+
+  async function fetchProducts() {
+    setLoading(true);
+    setLoadError(false);
+
     try {
-      const res = await api.get("/products");
+      const [productsRes, inventoryRes] = await Promise.all([
+        api.get("/products"),
+        api.get("/inventory"),
+      ]);
 
-      const formattedProducts = res.data.map((product) => ({
-        ...product,
-        quantity: 0,
-      }));
+      // Stock keyed by product so each order line can show the shelf it is
+      // reordering for. A product with no row yet reads as 0.
+      const stockByProduct = {};
+      (Array.isArray(inventoryRes.data) ? inventoryRes.data : []).forEach((row) => {
+        if (row.productId?._id) stockByProduct[row.productId._id] = row.stock || 0;
+      });
 
-      setProducts(formattedProducts);
+      setProducts(
+        productsRes.data.map((product) => ({
+          ...product,
+          quantity: 0,
+          purchasePrice: "",
+          currentStock: stockByProduct[product._id] ?? 0,
+        }))
+      );
     } catch (err) {
       console.error(err);
-      alert("Failed to load products");
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-  };
-// const refreshPage = async () => {
-//   setLoading(true);
+  }
 
-//   try {
-//     await fetchProducts();
-//   } finally {
-//     setLoading(false);
-//   }
-// };
   const updateQuantity = (id, value) => {
     setProducts((prev) =>
       prev.map((product) =>
-        product._id === id
-          ? {
-              ...product,
-              quantity: Number(value),
-            }
-          : product
+        product._id === id ? { ...product, quantity: Number(value) } : product
+      )
+    );
+  };
+
+  const updatePurchasePrice = (id, value) => {
+    setProducts((prev) =>
+      prev.map((product) =>
+        product._id === id ? { ...product, purchasePrice: value } : product
       )
     );
   };
@@ -257,267 +75,192 @@ const refreshPage = async () => {
   const createPurchase = async () => {
     const selectedItems = products
       .filter((p) => p.quantity > 0)
-      .map((p) => ({
-        productId: p._id,
-        quantity: p.quantity,
-      }));
+      .map((p) => {
+        const cost = parseFloat(p.purchasePrice);
+        return {
+          productId: p._id,
+          quantity: p.quantity,
+          ...(p.purchasePrice !== "" && !isNaN(cost) && cost >= 0
+            ? { purchasePrice: cost }
+            : {}),
+        };
+      });
 
     if (selectedItems.length === 0) {
-      return alert("Select at least one product with a quantity greater than 0");
+      toast.error("Select at least one product with a quantity greater than 0");
+      return;
     }
 
-    try {
-      setLoading(true);
+    setSubmitting(true);
 
+    try {
       await api.post("/purchases", {
         items: selectedItems,
+        ...(supplierId ? { supplierId } : {}),
       });
-console.log("Purchase created successfully");
-      alert("Purchase request created successfully!");
-
-      setProducts((prev) =>
-        prev.map((p) => ({
-          ...p,
-          quantity: 0,
-        }))
-      );
+      toast.success("Purchase request created");
+      setProducts((prev) => prev.map((p) => ({ ...p, quantity: 0, purchasePrice: "" })));
     } catch (err) {
       console.error(err);
-      alert("Failed to create purchase request");
+      toast.error("Failed to create purchase request");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
+    // Without the empty-query guard, a product with no name returns undefined
+    // here and vanishes from the list even when nothing is being searched.
+    if (!query) return true;
     return p.name?.toLowerCase().includes(query);
   });
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
-      padding: "40px 24px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box",
-    },
-    container: {
-      width: "100%",
-      maxWidth: "1400px",
-      margin: "0 auto",
-    },
-    headerBlock: {
-      marginBottom: "32px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "20px"
-    },
-    title: {
-      fontSize: "32px",
-      fontWeight: "800",
-      color: "#0f172a",
-      letterSpacing: "-0.5px",
-      margin: 0,
-    },
-    subtitle: {
-      fontSize: "15px",
-      color: "#64748b",
-      marginTop: "6px",
-      marginBottom: 0,
-    },
-    input: {
-      width: "100%",
-      padding: "10px 14px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "8px",
-      fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
-      outline: "none",
-      transition: "all 0.2s",
-      boxSizing: "border-box",
-    },
-    quantityInput: {
-      width: "120px",
-      padding: "8px 12px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "8px",
-      fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
-      outline: "none",
-      transition: "all 0.2s",
-      boxSizing: "border-box",
-      textAlign: "center"
-    },
-    alertBanner: {
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      color: "#166534",
-      padding: "12px 16px",
-      borderRadius: "8px",
-      fontSize: "14px",
-      fontWeight: "500",
-      marginBottom: "20px",
-    },
-    tableContainer: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "16px",
-      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-      overflow: "hidden",
-      marginBottom: "24px"
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      textAlign: "left",
-    },
-    th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
-      fontWeight: "600",
-      padding: "16px",
-      fontSize: "13px",
-      borderBottom: "1px solid #e2e8f0",
-    },
-    td: {
-      padding: "16px",
-      fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
-    },
-    emptyState: {
-      padding: "40px",
-      textAlign: "center",
-      color: "#64748b",
-      fontSize: "15px"
-    },
-    submitBtn: {
-      padding: "12px 24px",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      transition: "all 0.2s",
-      boxShadow: "0 4px 6px -1px rgba(37, 99, 235, 0.2)",
-    }
-  };
-
-  const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
-    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-  };
-
-  const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
-    e.currentTarget.style.boxShadow = "none";
-  };
-
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        
-        {/* Page Header Layout Container */}
-        <div style={styles.headerBlock}>
-          <div>
-            <h1 style={styles.title}>Purchase Products</h1>
-            <p style={styles.subtitle}>Log standard inventory acquisitions, adjust structural processing quantities, and update stocks.</p>
-          </div>
-          
-          <div>
-            <button
-              onClick={createPurchase}
-              disabled={loading}
-              style={{
-                ...styles.submitBtn,
-                backgroundColor: loading ? "#93c5fd" : "#2563eb",
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Processing..." : "Submit Purchase Order"}
-            </button>
-          </div>
-        </div>
+    <div className="page">
+      <PageHeader
+        title="Purchase Products"
+        subtitle="Log inventory acquisitions and update stock quantities."
+        actions={
+          <Button onClick={createPurchase} disabled={submitting || loading}>
+            {submitting ? "Processing…" : "Submit Purchase Order"}
+          </Button>
+        }
+      />
 
-        {/* Global Live Filtering Input Context */}
-        <div style={{ marginBottom: "20px" }}>
-          <input
-            type="text"
-            style={styles.input}
-            placeholder="🔍 Search or filter product items for quick entry request..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-          />
-        </div>
-
-        {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-          <div style={styles.alertBanner}>
-            ✨ <strong>Matches Found:</strong> Displaying {filteredProducts.length} items matching your query.
-          </div>
-        )}
-
-        {/* Full View Table Catalog Layout Wrapper */}
-        <div style={styles.tableContainer}>
-          {filteredProducts.length === 0 ? (
-            <div style={styles.emptyState}>
-              {searchQuery.trim() !== ""
-                ? `No matching items found for "${searchQuery}". Verify your target product entry settings.`
-                : "No products available inside the catalog system database."}
-            </div>
-          ) : (
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Product Details</th>
-                  <th style={styles.th}>Stock Group</th>
-                  <th style={styles.th}>Unit Type</th>
-                  <th style={{ ...styles.th, width: "160px" }}>Purchase Quantity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product) => (
-                  <tr 
-                    key={product._id}
-                    style={{ backgroundColor: product.quantity > 0 ? '#f0fdf4' : 'transparent' }}
-                  >
-                    <td style={styles.td}>
-                      <strong>{product.name}</strong>
-                    </td>
-                    <td style={styles.td}>
-                      {product.stockGroup?.name || <span style={{ color: '#94a3b8' }}>None</span>}
-                    </td>
-                    <td style={styles.td}>
-                      {product.unit?.symbol || <span style={{ color: '#94a3b8' }}>None</span>}
-                    </td>
-                    <td style={styles.td}>
-                      <input
-                        type="number"
-                        min="0"
-                        value={product.quantity}
-                        onChange={(e) => updateQuantity(product._id, e.target.value)}
-                        onFocus={handleFocus}
-                        onBlur={handleBlur}
-                        style={styles.quantityInput}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-<RefreshButton
-  onRefresh={refreshPage}
-  loading={loading}
-/>
+      <div style={{ maxWidth: 420, marginBottom: 20 }}>
+        <label className="field-label" htmlFor="po-supplier">
+          Supplier
+        </label>
+        <select
+          id="po-supplier"
+          className="select"
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+        >
+          <option value="">— no supplier —</option>
+          {suppliers.map((s) => (
+            <option key={s._id} value={s._id}>{s.name}</option>
+          ))}
+        </select>
       </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <input
+          type="search"
+          className="input"
+          aria-label="Search products"
+          placeholder="🔍 Search products…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {loading ? (
+        <div className="card">
+          <Skeleton height={22} width="40%" />
+          <Skeleton height={16} style={{ marginTop: 16 }} />
+          <Skeleton height={16} style={{ marginTop: 10 }} />
+          <Skeleton height={16} style={{ marginTop: 10 }} />
+        </div>
+      ) : loadError ? (
+        <Banner variant="alert" icon="⚠️">
+          Couldn't load the product catalog. Check your connection and{" "}
+          <button type="button" className="link-button" onClick={fetchProducts}>
+            try again
+          </button>
+          .
+        </Banner>
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState
+          icon="📦"
+          title={searchQuery.trim() ? "No matching products" : "No products yet"}
+        >
+          {searchQuery.trim()
+            ? `Nothing matches "${searchQuery}".`
+            : "Add products before logging a purchase."}
+        </EmptyState>
+      ) : (
+        <div className="table-wrap">
+          <table className="table table--stack">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th style={{ width: 130 }}>Current Stock</th>
+                <th style={{ width: 160 }}>Purchase Quantity</th>
+                <th style={{ width: 160 }}>Expected Unit Cost (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((product) => (
+                <tr
+                  key={product._id}
+                  style={{
+                    background:
+                      product.quantity > 0 ? "var(--success-bg)" : undefined,
+                  }}
+                >
+                  <td data-label="Product">
+                    <strong>{product.name}</strong>
+                  </td>
+                  <td data-label="Category">
+                    {product.stockGroup?.name || (
+                      <span style={{ color: "var(--muted-soft)" }}>None</span>
+                    )}
+                  </td>
+                  <td data-label="Unit">
+                    {product.unit?.symbol || (
+                      <span style={{ color: "var(--muted-soft)" }}>None</span>
+                    )}
+                  </td>
+                  <td data-label="Current Stock">
+                    {product.currentStock < (product.reorderLevel ?? 5) ? (
+                      <Badge variant="alert">
+                        <span aria-hidden="true">⚠︎</span>
+                        {product.currentStock} left
+                      </Badge>
+                    ) : (
+                      <span>{product.currentStock}</span>
+                    )}
+                  </td>
+                  <td data-label="Quantity">
+                    <input
+                      type="number"
+                      min="0"
+                      /* Whole units only, because receipts are counted in
+                         whole units: an order for 2.5 could never be
+                         received to the end. The server refuses one too. */
+                      step="1"
+                      className="input"
+                      style={{ width: 120, textAlign: "center" }}
+                      aria-label={`Purchase quantity for ${product.name}`}
+                      value={product.quantity}
+                      onChange={(e) => updateQuantity(product._id, e.target.value)}
+                    />
+                  </td>
+                  <td data-label="Unit Cost">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="—"
+                      className="input"
+                      style={{ width: 120, textAlign: "center" }}
+                      aria-label={`Expected unit cost for ${product.name}`}
+                      value={product.purchasePrice}
+                      onChange={(e) => updatePurchasePrice(product._id, e.target.value)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <RefreshButton onRefresh={fetchProducts} loading={loading} />
     </div>
   );
 };

@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Ashok-work]
+  pull_request:
+
+# A second push supersedes the first; nothing is learned from finishing a run
+# against a commit that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      # The auth tests stub the model calls they depend on, so no MongoDB
+      # service is needed and no .env has to exist. JWT_SECRET only has to be
+      # set and consistent; the tests supply their own values for the rest.
+      - run: npm test
+        working-directory: backend
+        env:
+          JWT_SECRET: ci-test-secret
+
+  shared-files:
+    name: Shared files in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Guards the files deliberately duplicated across apps. No dependencies —
+      # the script uses only node builtins, so there is nothing to install.
+      - run: node scripts/check-shared-files.mjs
+
+  frontend-tests:
+    name: Test ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [frontend-admin, hungerhunt-kiosk]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      - run: npm test
+        working-directory: ${{ matrix.app }}
+
+  lint:
+    name: Lint ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The backend has no eslint config yet; every shipped frontend is held
+        # to zero warnings here.
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      # --max-warnings 0 because a warning that fails nothing is a warning that
+      # accumulates. Both apps are at zero errors and zero warnings today, so
+      # the bar this holds is the one they already meet.
+      - run: npm run lint -- --max-warnings 0
+        working-directory: ${{ matrix.app }}
+
+  build:
+    name: Build ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One app failing to build should not hide whether the other two do.
+      fail-fast: false
+      matrix:
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      - run: npx vite build
+        working-directory: ${{ matrix.app }}

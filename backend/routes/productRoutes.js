@@ -1,14 +1,14 @@
 import express from 'express';
-import { addProduct, getProducts, updateProduct, deleteProduct } from '../controllers/productController.js';
-import { protectAdmin } from '../middleware/authMiddleware.js';
+import { addProduct, getProducts, updateProduct } from '../controllers/productController.js';
+import { protectAdmin, protectWarehouse } from '../middleware/authMiddleware.js';
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-router.get('/', getProducts);
+// The storeroom reads the catalogue to raise an order from it; only the back
+// office changes it.
+router.get('/', protectWarehouse, getProducts);
 
-
-// router.post('/', protectAdmin, addProduct);
 router.post(
   '/',
   protectAdmin,
@@ -16,12 +16,11 @@ router.post(
   addProduct
 );
 
-router.route('/:id')
-  .put(
+router.put(
+  '/:id',
   protectAdmin,
   upload.single("image"),
   updateProduct
-)
-  .delete(protectAdmin, deleteProduct);
+);
 
 export default router;

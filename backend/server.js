@@ -1,228 +1,71 @@
-// import express from 'express';
-// import cors from 'cors';
-// import dotenv from 'dotenv';
-// import mongoose from 'mongoose';
+// Loads .env before any other module is evaluated. Must stay the first import:
+// config/firebase.js reads process.env at module scope.
+import 'dotenv/config';
 
-// import adminRoutes from './routes/adminRoutes.js';
-// import parentRoutes from './routes/parentRoutes.js';
-// import studentRoutes from './routes/studentRoutes.js';
-// import productRoutes from './routes/productRoutes.js';
-// import transactionRoutes from './routes/transactionRoutes.js';
-// import purchaseRoutes from "./routes/purchaseRoutes.js";
-// import inventoryRoutes from "./routes/inventoryRoutes.js";
-
-// // import authRoutes from './routes/authRoutes.js';
-
-// dotenv.config();
-// const app = express();
-
-// // Middleware
-// app.use(cors());
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
-
-// // Database Connection
-// mongoose.connect(process.env.MONGO_URI)
-//   .then(() => console.log('MongoDB Connected Successfully'))
-//   .catch(err => console.error('MongoDB Connection Error:', err));
-
-// // API Routes
-// app.use('/api/admin', adminRoutes);
-// app.use('/api/parent', parentRoutes);
-// app.use('/api/students', studentRoutes);
-// app.use('/api/products', productRoutes);
-// app.use('/api/transactions', transactionRoutes);
-// app.use("/api/purchases", purchaseRoutes);
-// app.use("/api/inventory", inventoryRoutes);
-// // app.use('/api/auth', authRoutes);
-// // Global Error Handler
-// app.use((err, req, res, next) => {
-//   console.error(err.stack);
-//   res.status(500).json({ message: err.message || 'Internal Server Error' });
-// });
-
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
-// 19-06-2026
-
-
-
-
-// import express from 'express';
-// import cors from 'cors';
-// import dotenv from 'dotenv';
-// import mongoose from 'mongoose';
-
-// import adminRoutes from './routes/adminRoutes.js';
-// import parentRoutes from './routes/parentRoutes.js';
-// import studentRoutes from './routes/studentRoutes.js';
-// import productRoutes from './routes/productRoutes.js';
-// import transactionRoutes from './routes/transactionRoutes.js';
-// import purchaseRoutes from "./routes/purchaseRoutes.js";
-// import inventoryRoutes from "./routes/inventoryRoutes.js";
-// import stockGroupRoutes from "./routes/stockGroupRoutes.js";
-// import unitRoutes from "./routes/unitRoutes.js";
-
-
-
-
-// dotenv.config();
-// const app = express();
-
-// // Middleware
-// const allowedOrigins = [
-//   "http://localhost:5173",
-//   "http://localhost:5174",
-//   "http://localhost:3000",
-
-//   "https://hunger-hunt-beta.vercel.app",
-//   "https://hunger-hunt-parent.vercel.app",
-//   "https://hunger-hunt-kiosk.vercel.app",
-// ];
-
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       // Allow requests like Postman or server-to-server
-//       if (!origin) return callback(null, true);
-
-//       if (allowedOrigins.includes(origin)) {
-//         return callback(null, true);
-//       }
-
-//       return callback(new Error("Not allowed by CORS"));
-//     },
-//     credentials: true,
-//   })
-// );
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
-
-// // Database Connection
-// mongoose.connect(process.env.MONGO_URI)
-//   .then(() => console.log('MongoDB Connected Successfully'))
-//   .catch(err => console.error('MongoDB Connection Error:', err));
-
-// // API Routes
-// app.use('/api/admin', adminRoutes);
-// app.use('/api/parent', parentRoutes);
-// app.use('/api/students', studentRoutes);
-// app.use('/api/products', productRoutes);
-
-// // import stockGroupRoutes from "./routes/stockGroupRoutes.js";
-// // import unitRoutes from "./routes/unitRoutes.js";
-// app.use('/api/transactions', transactionRoutes);
-// app.use("/api/purchases", purchaseRoutes);
-// app.use("/api/inventory", inventoryRoutes);
-// app.use("/api/stock-groups", stockGroupRoutes);
-// app.use("/api/units", unitRoutes);
-
-
-
-
-// app.use((err, req, res, next) => {
-//   console.error(err.stack);
-//   res.status(500).json({ message: err.message || 'Internal Server Error' });
-// });
-
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
-
-// 08-08-2026
-
-
-
-
-
-
-
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-import adminRoutes from './routes/adminRoutes.js';
-import parentRoutes from './routes/parentRoutes.js';
-import studentRoutes from './routes/studentRoutes.js';
-import productRoutes from './routes/productRoutes.js';
-import transactionRoutes from './routes/transactionRoutes.js';
-import purchaseRoutes from "./routes/purchaseRoutes.js";
-import inventoryRoutes from "./routes/inventoryRoutes.js";
-import stockGroupRoutes from "./routes/stockGroupRoutes.js";
-import unitRoutes from "./routes/unitRoutes.js";
-import pendingOrderRoutes from "./routes/pendingOrderRoutes.js";
+import app from './app.js';
+import FulfillmentOrder, { WEEKLY_ORDER_INDEX } from './models/FulfillmentOrder.js';
+import { startPushRetrySweep } from './utils/sendNotification.js';
+import { validateRuntimeEnv } from './config/runtimeEnv.js';
 
+// The app itself is built in app.js and exported without a database connection
+// or a listening socket, so the tests can mount it directly. This file is the
+// part that only makes sense when actually running the server.
 
+/* The database half of the disabled weekly-order rule.
+ *
+ * The schema stops declaring the unique index, but a database that already
+ * carries it goes on enforcing it — the application would stop asking and
+ * students would go on being refused. So it is dropped here, once, where the
+ * connection is known good and autoIndex has nothing left to rebuild from.
+ *
+ * Already gone is the normal state of every boot after the first. Anything
+ * else is fatal on purpose: a server that came up believing the rule was
+ * lifted while the database still holds it would refuse students with a
+ * duplicate-key error nobody is expecting.
+ */
+const releaseWeeklyOrderIndex = async () => {
+  try {
+    await FulfillmentOrder.collection.dropIndex(WEEKLY_ORDER_INDEX);
+    console.warn(
+      `Weekly order limit disabled — dropped ${WEEKLY_ORDER_INDEX}.` +
+        ' Students may now place more than one package order per business week.'
+    );
+  } catch (error) {
+    // IndexNotFound / NamespaceNotFound: nothing to drop, which is the goal.
+    if (error?.codeName === 'IndexNotFound' || error?.code === 27 || error?.code === 26) return;
+    throw error;
+  }
+};
 
+const start = async () => {
+  const { port } = validateRuntimeEnv();
 
-dotenv.config();
-const app = express();
+  // Never accept traffic before the database is usable. Money workflows use
+  // MongoDB transactions and cannot safely run in a degraded database state.
+  await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10_000 });
+  console.log('MongoDB Connected Successfully');
 
-// Middleware
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:3000",
+  await releaseWeeklyOrderIndex();
 
-  "https://hunger-hunt-beta.vercel.app",
-  "https://hunger-hunt-parent.vercel.app",
-  "https://hunger-hunt-kiosk.vercel.app",
-];
+  startPushRetrySweep();
+  const server = app.listen(port, () => console.log(`Server running on port ${port}`));
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests like Postman or server-to-server
-      if (!origin) return callback(null, true);
+  const shutdown = (signal) => {
+    console.log(`${signal} received; draining HTTP connections.`);
+    server.close(async () => {
+      await mongoose.disconnect();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+};
 
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB Connected Successfully'))
-  .catch(err => console.error('MongoDB Connection Error:', err));
-
-// API Routes
-app.use('/api/admin', adminRoutes);
-app.use('/api/parent', parentRoutes);
-app.use('/api/students', studentRoutes);
-app.use('/api/products', productRoutes);
-
-// import stockGroupRoutes from "./routes/stockGroupRoutes.js";
-// import unitRoutes from "./routes/unitRoutes.js";
-app.use('/api/transactions', transactionRoutes);
-app.use("/api/purchases", purchaseRoutes);
-app.use("/api/inventory", inventoryRoutes);
-app.use("/api/stock-groups", stockGroupRoutes);
-app.use("/api/units", unitRoutes);
-app.use("/api/pending-orders", pendingOrderRoutes);
-
-
-
-
-
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: err.message || 'Internal Server Error' });
+start().catch((err) => {
+  console.error('Server startup failed:', err);
+  process.exit(1);
 });
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

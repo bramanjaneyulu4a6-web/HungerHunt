@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only overlay. Android's manifest merger applies this to the debug
+  variant and nothing else, so a release build is byte-for-byte unaffected by
+  it and cannot be weakened by forgetting to revert something.
+
+  Cleartext HTTP is off by default from Android 9, and correctly so: the
+  production app talks to an https API and the release-env validator refuses
+  to build against anything else. But a developer's backend runs on
+  http://10.0.2.2:5001 (the host machine, as seen from the emulator), which
+  that default blocks — the request never leaves the device, and the symptom
+  is a login that hangs rather than an error naming the cause.
+
+  This exception exists so a debug build can reach that local backend. It is
+  the reason the file is scoped to src/debug/ rather than added to the main
+  manifest.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true" />
+</manifest>

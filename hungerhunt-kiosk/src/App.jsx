@@ -1,83 +1,62 @@
-// // import KioskBilling from "./pages/KioskBilling";
-
-// // function App() {
-// //   return <KioskBilling />;
-// // }
-
-// // export default App;
-
-
-
-
-
-
-
-// import React from 'react';
-// import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
-// // // import Login from './pages/Login';
-// // // import ForgotPassword from './pages/ForgotPassword';
-// // // import Register from './pages/Register';
-
-// // import Dashboard from './pages/Dashboard';
-// // import Students from './pages/Students';
-// // import Products from './pages/Products';
-// import Inventory from './pages/Inventory';
-// // import Billing from './pages/Billing';
-
-// // import Layout from './components/Layout';
-// // import ProtectedRoute from './components/ProtectedRoute';
-// // import RechargeHistory from './pages/RechargeHistory';
-// // import Purchase from "./pages/Purchase";
-// // import Purchased from "./pages/Purchased";
-// import KioskBilling from "./pages/KioskBilling";
-
-// function App() {
-//   return (
-//     <Router>
-//       <Routes>
-//         {/* Public Routes */}
-//         <Route path="/" element={<Navigate to="/login" replace />} />
-//         {/* <Route path="/login" element={<Login />} />
-//         <Route path="/forgot-password" element={<ForgotPassword />} />
-//         <Route path="/register" element={<Register />} /> */}
-
-//         {/* Protected Nested Routes */}
-//         <Route path="/kiosk" element={<KioskBilling />} />
-
-// <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-//   <Route path="/dashboard" element={<Dashboard />} />
-//   <Route path="/students" element={<Students />} />
-//   <Route path="/products" element={<Products />} />
-//   <Route path="/inventory" element={<Inventory />} />
-//   <Route path="/billing" element={<Billing />} />
-//   <Route path="/purchase" element={<Purchase />} />
-//   <Route path="/purchased" element={<Purchased />} />
-//   <Route path="/recharge-history" element={<RechargeHistory />} />
-// </Route>
-//       </Routes>
-//     </Router>
-//   );
-// }
-
-// export default App;
-
-
-
-
-
-
-
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 import KioskBilling from "./pages/KioskBilling";
+import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+/* The kiosk owns the end of a session, and there are four ways to reach it:
+   the student taps Done, the idle prompt runs out, the hard cap arrives, or
+   the sale finishes. All of them come through here, so there is one place
+   where the token and the student are let go together. */
+function KioskScreen() {
+  const navigate = useNavigate();
+
+  // Read once per mount rather than held in state: nothing in a session
+  // changes who it belongs to, and the next student gets a fresh mount.
+  const student = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("kioskStudent")) ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const handleLogout = () => {
+    localStorage.removeItem("kioskToken");
+    localStorage.removeItem("kioskStudent");
+    navigate("/login", { replace: true });
+  };
+
+  // A token with no student beside it is a half-cleared session — send it back
+  // to the gate rather than render a till with nobody at it.
+  if (!student) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <KioskBilling student={student} onLogout={handleLogout} />;
+}
 
 function App() {
   return (
     <Router>
+      <Toaster position="top-center" />
       <Routes>
-        <Route path="/" element={<KioskBilling />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <KioskScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/login" element={<Login />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

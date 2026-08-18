@@ -1,5126 +1,1616 @@
-
-
-
-// // import React, { useState, useEffect } from "react";
-// // import { ShoppingCart, X } from "lucide-react";
-// // import api from "../utils/api";
-// // import RefreshButton from "../components/RefreshButton";
-// // import hungerLogo from "../assets/Logo.png";
-
-// // const KioskBilling = () => {
-// //   const [searchQuery, setSearchQuery] = useState("");
-// //   const [productSearchQuery, setProductSearchQuery] = useState("");
-// //   const [selectedStudent, setSelectedStudent] = useState(null);
-// //   const [searchResults, setSearchResults] = useState([]);
-// //   const [products, setProducts] = useState([]);
-// //   const [selectedCategory, setSelectedCategory] = useState("All");
-// //   const [cart, setCart] = useState([]);
-// //   const [invoiceTotal, setInvoiceTotal] = useState(0);
-// //   const [isSearched, setIsSearched] = useState(false); // Tracks if a search has been executed
- 
-// //   // Track configurations for staging quantities before appending to cart
-// //   // Format: { [productId]: quantity }
-// //   const [stagedQuantities, setStagedQuantities] = useState({});
-
-// // const [loadingProducts, setLoadingProducts] = useState(false);
-// // const [showWelcome, setShowWelcome] = useState(true);
-// // const [showCart, setShowCart] = useState(false);
-// //  const [showVerifyModal, setShowVerifyModal] = useState(false);
-
-// // const [purchasePassword, setPurchasePassword] = useState("");
-// // const refreshPage = async () => {
-// //   try {
-// //     setLoadingProducts(true);
-
-// //    const res = await api.get("/inventory/public");
-
-// // console.log("Response:", res);
-// // console.log("Response Data:", res.data);
-// // console.log("Is Array:", Array.isArray(res.data));
-// // const data = Array.isArray(res.data) ? res.data : [];
-
-// // const inventoryProducts = data
-// //   .filter(item => item.stock > 0)
-// //   .map(item => ({
-// //     _id: item.productId._id,
-// //     name: item.productId.name,
-// //     price: item.productId.price,
-// //     image: item.productId.image,
-// //     stock: item.stock,
-// //     stockGroup: item.productId.stockGroup,
-// //   }));
-
-// //     // Refresh product list
-// //     setProducts(inventoryProducts);
-
-// //     // Reset staged quantities
-// //     const initialQuantities = {};
-// //     inventoryProducts.forEach(product => {
-// //       initialQuantities[product._id] = 1;
-// //     });
-// //     setStagedQuantities(initialQuantities);
-
-// //     // ✅ Refresh cart items too
-// //     setCart(prevCart =>
-// //       prevCart
-// //         .map(cartItem => {
-// //           const latest = inventoryProducts.find(
-// //             p => p._id === cartItem._id
-// //           );
-
-// //           // Product removed from stock
-// //           if (!latest) return null;
-
-// //           return {
-// //             ...cartItem,
-// //             price: latest.price,
-// //             stock: latest.stock,
-// //             quantity: Math.min(cartItem.quantity, latest.stock),
-// //           };
-// //         })
-// //         .filter(item => item && item.stock > 0)
-// //     );
-// // // Refresh selected student details
-// // // Clear student details
-// // setSelectedStudent(null);
-// // setSearchResults([]);
-// // setSearchQuery("");
-// // setIsSearched(false);
-// // setCart([]);
-// //   } catch (err) {
-// //     console.error(err);
-// //     alert("Failed to refresh products.");
-// //   } finally {
-// //     setLoadingProducts(false);
-// //   }
-// // };
-
-// //   useEffect(() => {
-// //     const total = cart.reduce(
-// //       (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 0),
-// //       0
-// //     );
-// //     setInvoiceTotal(total);
-// //   }, [cart]);
-
-// // useEffect(() => {
-// //   fetchCatalog();
-// // }, []);
-
-
-// // const fetchCatalog = async () => {
-// //   try {
-// //     setLoadingProducts(true);
-
-// //     const res = await api.get("/inventory/public");
-
-// //     console.log("STATUS:", res.status);
-// //     console.log("DATA:", res.data);
-// //     console.log("IS ARRAY:", Array.isArray(res.data));
-
-// //     if (!Array.isArray(res.data)) {
-// //       alert("Inventory API did not return an array. Check console.");
-// //       return;
-// //     }
-
-// //     const inventoryProducts = res.data
-// //       .filter(item => item.stock > 0)
-// //       .map(item => ({
-// //         _id: item.productId._id,
-// //         name: item.productId.name,
-// //         price: item.productId.price,
-// //         image: item.productId.image,
-// //         stock: item.stock,
-// //         stockGroup: item.productId.stockGroup,
-// //       }));
-
-// //     setProducts(inventoryProducts);
-
-// //   } catch (err) {
-// //     console.error(err);
-// //   } finally {
-// //     setLoadingProducts(false);
-// //   }
-// // };
-
-
-
-// //   const handleStudentSearch = async () => {
-// //     if (!searchQuery.trim()) {
-// //       alert("Please enter student name or hostel number");
-// //       return;
-// //     }
-
-// //     try {
-// //      const res = await api.get(
-// //   `/students/public-search?q=${encodeURIComponent(searchQuery)}`
-// // );
-
-// //       setIsSearched(true);
-
-// //       if (res.data.length === 0) {
-// //         setSelectedStudent(null);
-// //         setSearchResults([]);
-// //         // setProducts([]);
-// //         setCart([]);
-// //         alert("No student found matching that name or hostel number");
-// //         return;
-// //       }
-
-// //       if (res.data.length === 1) {
-// //   setSelectedStudent(res.data[0]);
-// //   setSearchResults([]);
-// //   return;
-// // }
-
-// //       // Multiple students found
-// //       setSelectedStudent(null);
-// //       setSearchResults(res.data);
-// //       // setProducts([]);
-// //       setCart([]);
-// //     } catch (error) {
-// //       console.error(error);
-// //       alert("Student search failed");
-// //     }
-// //   };
-
-// //   const updateStagedQuantity = (productId, amount, maxStock) => {
-// //     setStagedQuantities(prev => {
-// //       const current = parseInt(prev[productId], 10) || 0;
-// //       const updated = current + amount;
-// //       if (updated < 1) return prev;
-// //       if (updated > maxStock) {
-// //         alert(`Only ${maxStock} items available in stock!`);
-// //         return prev;
-// //       }
-// //       return { ...prev, [productId]: updated };
-// //     });
-// //   };
-
-// //   const handleManualQuantityChange = (productId, value, maxStock) => {
-// //     if (value === "") {
-// //       setStagedQuantities(prev => ({ ...prev, [productId]: "" }));
-// //       return;
-// //     }
-
-// //     const parsed = parseInt(value, 10);
-// //     if (isNaN(parsed)) return;
-
-// //     if (parsed < 1) {
-// //       setStagedQuantities(prev => ({ ...prev, [productId]: 1 }));
-// //       return;
-// //     }
-// //     if (parsed > maxStock) {
-// //       alert(`Only ${maxStock} items available in stock!`);
-// //       setStagedQuantities(prev => ({ ...prev, [productId]: maxStock }));
-// //       return;
-// //     }
-// //     setStagedQuantities(prev => ({ ...prev, [productId]: parsed }));
-// //   };
-
-// //   const addToCart = (product) => {
-// //     const qtyToAdd = parseInt(stagedQuantities[product._id], 10) || 1;
-// //     const exists = cart.find((item) => item._id === product._id);
-// //     const currentCartQty = exists ? parseInt(exists.quantity, 10) || 0 : 0;
-
-// //     if (currentCartQty + qtyToAdd > product.stock) {
-// //       return alert(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
-// //     }
-
-// //     if (exists) {
-// //       setCart(
-// //         cart.map((item) =>
-// //           item._id === product._id
-// //             ? { ...item, quantity: (parseInt(item.quantity, 10) || 0) + qtyToAdd }
-// //             : item
-// //         )
-// //       );
-// //     } else {
-// //       setCart([...cart, { ...product, quantity: qtyToAdd }]);
-// //     }
-    
-// //    if (!cart.find(item => item._id === product._id)) {
-// //   setStagedQuantities(prev => ({
-// //     ...prev,
-// //     [product._id]: 1,
-// //   }));
-// // }
-// //   };
-
-// //   const updateCartItemQuantity = (productId, amount) => {
-// //     const targetProduct = products.find(p => p._id === productId);
-// //     const maxStock = targetProduct ? targetProduct.stock : 999;
-
-// //     setCart(prevCart => {
-// //       return prevCart.map(item => {
-// //         if (item._id === productId) {
-// //           const currentQty = parseInt(item.quantity, 10) || 0;
-// //           const updatedQty = currentQty + amount;
-          
-// //           if (updatedQty > maxStock) {
-// //             alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-// //             return item;
-// //           }
-          
-// //           if (updatedQty < 1) {
-// //             return null;
-// //           }
-          
-// //           return { ...item, quantity: updatedQty };
-// //         }
-// //         return item;
-// //       }).filter(Boolean);
-// //     });
-// //   };
-
-// //   const handleCartManualQuantityChange = (productId, value) => {
-// //     if (value === "") {
-// //       setCart(prevCart => prevCart.map(item => 
-// //         item._id === productId ? { ...item, quantity: "" } : item
-// //       ));
-// //       return;
-// //     }
-
-// //     const targetProduct = products.find(p => p._id === productId);
-// //     const maxStock = targetProduct ? targetProduct.stock : 999;
-// //     const parsed = parseInt(value, 10);
-
-// //     if (isNaN(parsed)) return;
-
-// //     setCart(prevCart => {
-// //       return prevCart.map(item => {
-// //         if (item._id === productId) {
-// //           if (parsed < 1) {
-// //             return { ...item, quantity: 1 };
-// //           }
-// //           if (parsed > maxStock) {
-// //             alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-// //             return { ...item, quantity: maxStock };
-// //           }
-// //           return { ...item, quantity: parsed };
-// //         }
-// //         return item;
-// //       });
-// //     });
-// //   };
-
-// //   const removeFromCart = (productId) => {
-// //     setCart(prevCart => prevCart.filter(item => item._id !== productId));
-// //   };
-
-// //   const handleCancelPayment = () => {
-// //     if (window.confirm("Are you sure you want to cancel payment? This will reset the terminal.")) {
-// //       setCart([]);
-// //       setSelectedStudent(null);
-// //       setSearchResults([]);
-// //       setSearchQuery("");
-// //       setProductSearchQuery("");
-// //       setIsSearched(false);
-// //     }
-// //   };
-
-// //   const handleCheckout = async () => {
-// //    if (!selectedStudent) {
-// //   alert("Please search and select a student first.");
-// //   return;
-// // }
-
-// //     const calibratedCart = cart.map(item => ({
-// //       ...item,
-// //       quantity: parseInt(item.quantity, 10) || 1
-// //     }));
-
-// //     if (invoiceTotal > selectedStudent.pocketMoney) {
-// //       return alert("Insufficient wallet balance!");
-// //     }
-
-// //     try {
-// //       await api.post("/transactions/bill", {
-// //         studentId: selectedStudent._id,
-// //         items: calibratedCart.map((item) => ({
-// //           productId: item._id,
-// //           quantity: item.quantity,
-// //         })),
-// //         totalAmount: invoiceTotal,
-// //       });
-
-// //       alert("Payment successful!");
-
-// // await fetchCatalog();
-
-// // setCart([]);
-// // setSelectedStudent(null);
-// // setSearchQuery("");
-// // setProductSearchQuery("");
-// // setIsSearched(false);
-// //     } catch {
-// //       alert("Checkout failed");
-// //     }
-// //   };
-// // const getCartQuantity = (productId) => {
-// //   const item = cart.find((c) => c._id === productId);
-// //   return item ? item.quantity : 0;
-// // };
-// //   const filteredProducts = products.filter((p) => {
-
-// //   const matchesCategory =
-// //     selectedCategory === "All" ||
-// //     p.stockGroup?.name === selectedCategory;
-
-// //   const matchesSearch =
-// //     p.name
-// //       .toLowerCase()
-// //       .includes(productSearchQuery.toLowerCase());
-
-// //   return matchesCategory && matchesSearch;
-// // });
-// // const categories = [
-// //   "All",
-// //   ...new Set(
-// //     products.map(p => p.stockGroup?.name).filter(Boolean)
-// //   ),
-// // ];
-// //   const styles = {
-// //     page: {
-// //       minHeight: "100vh",
-// //       backgroundColor: "#f8fafc",
-// //       padding: "32px",
-// //       fontFamily: "system-ui, -apple-system, sans-serif",
-// //       boxSizing: "border-box",
-// //     },
-// //     topSection: {
-// //       marginBottom: "24px",
-// //     },
-// //    bottomGrid: {
-// //     display: "grid",
-// //     gridTemplateColumns: "1fr",
-// // },
-// //     card: {
-// //       width: "100%",
-// //       background: "#ffffff",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "14px",
-// //       padding: "20px",
-// //       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-// //       boxSizing: "border-box",
-// //     },
-// //     lookupFlex: {
-// //       display: "flex",
-// //       gap: "16px",
-// //       alignItems: "center",
-// //     },
-// //    panelTitle: {
-// //   fontSize: "42px",
-// //   fontWeight: "900",
-// //   fontFamily: "'Arial Black', 'Montserrat', 'Poppins', sans-serif",
-// //   color: "#2563EB",
-// //   letterSpacing: "2px",
-// //   textTransform: "uppercase",
-// //   textShadow: "2px 2px 6px rgba(37,99,235,0.25)",
-// //   marginTop: 0,
-// //   marginBottom: "16px",
-// // },
-// //     input: {
-// //       flex: 1,
-// //       padding: "12px 14px",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "10px",
-// //       fontSize: "14px",
-// //       color: "#0f172a",
-// //       backgroundColor: "#ffffff",
-// //       outline: "none",
-// //       transition: "border-color 0.2s",
-// //       boxSizing: "border-box",
-// //     },
-// //     productSearchInput: {
-// //       width: "100%",
-// //       padding: "10px 12px",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "8px",
-// //       fontSize: "13px",
-// //       color: "#0f172a",
-// //       backgroundColor: "#f8fafc",
-// //       outline: "none",
-// //       transition: "border-color 0.2s, background-color 0.2s",
-// //       boxSizing: "border-box",
-// //       marginBottom: "16px",
-// //     },
-// //     primaryBtn: {
-// //       padding: "12px 24px",
-// //       background: "#2563eb",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "10px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //       whiteSpace: "nowrap",
-// //     },
-// //     resultsSection: {
-// //       marginTop: "20px",
-// //     },
-// //     resultsTitle: {
-// //       fontSize: "15px",
-// //       fontWeight: "600",
-// //       color: "#1e293b",
-// //       marginBottom: "12px",
-// //     },
-// //     table: {
-// //       width: "100%",
-// //       borderCollapse: "collapse",
-// //       marginTop: "8px",
-// //       textAlign: "left",
-// //     },
-// //     th: {
-// //       backgroundColor: "#f1f5f9",
-// //       color: "#334155",
-// //       fontWeight: "600",
-// //       padding: "12px",
-// //       fontSize: "13px",
-// //       borderBottom: "2px solid #e2e8f0",
-// //     },
-// //     tr: {
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //     },
-// //     td: {
-// //       padding: "12px",
-// //       fontSize: "14px",
-// //       color: "#0f172a",
-// //       borderBottom: "1px solid #e2e8f0",
-// //     },
-// //     selectBtn: {
-// //       padding: "6px 12px",
-// //       background: "#0284c7",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "6px",
-// //       fontWeight: "600",
-// //       fontSize: "12px",
-// //       cursor: "pointer",
-// //     },
-// //     studentRowDetails: {
-// //       display: "flex",
-// //       gap: "24px",
-// //       alignItems: "center",
-// //       marginTop: "16px",
-// //       paddingTop: "16px",
-// //       borderTop: "1px solid #f1f5f9",
-// //     },
-// //     studentInlineBanner: {
-// //       display: "flex",
-// //       gap: "16px",
-// //       fontSize: "14px",
-// //       color: "#475569",
-// //       fontWeight: "500",
-// //       backgroundColor: "#f1f5f9",
-// //       padding: "10px 14px",
-// //       borderRadius: "8px",
-// //       marginBottom: "16px",
-// //     },
-// //     studentName: {
-// //       fontSize: "15px",
-// //       fontWeight: "600",
-// //       color: "#0f172a",
-// //     },
-// //     studentMeta: {
-// //       fontSize: "13px",
-// //       color: "#334155",
-// //       fontWeight: "500",
-// //     },
-// //     walletBadge: {
-// //       padding: "8px 14px",
-// //       background: "#fef3c7",
-// //       color: "#92400e",
-// //       borderRadius: "8px",
-// //       fontSize: "14px",
-// //       fontWeight: "600",
-// //       marginLeft: "auto",
-// //     },
-// //     scrollContainer: {
-// //   maxHeight: "750px",
-// //       overflowY: "auto",
-// //       paddingRight: "6px",
-// //     },
-// //     productItem: {
-// //       display: "flex",
-// //       justifyContent: "space-between",
-// //       alignItems: "center",
-// //       padding: "12px 14px",
-// //       background: "#ffffff",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "10px",
-// //       marginBottom: "10px",
-// //     },
-// //     productName: {
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       color: "#0f172a",
-// //     },
-// //     productStock: {
-// //       fontSize: "12px",
-// //       color: "#64748b",
-// //       marginTop: "2px",
-// //     },
-// //     actionControlWrap: {
-// //       display: "flex",
-// //       alignItems: "center",
-// //       gap: "12px",
-// //     },
-// //     qtySelector: {
-// //       display: "flex",
-// //       alignItems: "center",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "8px",
-// //       overflow: "hidden",
-// //       backgroundColor: "#f8fafc",
-// //     },
-// //     qtyBtn: {
-// //       width: "32px",
-// //       height: "32px",
-// //       border: "none",
-// //       background: "transparent",
-// //       color: "#334155",
-// //       fontSize: "16px",
-// //       fontWeight: "600",
-// //       cursor: "pointer",
-// //       display: "flex",
-// //       alignItems: "center",
-// //       justifyContent: "center",
-// //       transition: "background-color 0.15s",
-// //     },
-// //     qtyInput: {
-// //       width: "40px",
-// //       height: "32px",
-// //       borderTop: "none",
-// //       borderBottom: "none",
-// //       borderLeft: "1px solid #e2e8f0",
-// //       borderRight: "1px solid #e2e8f0",
-// //       background: "#ffffff",
-// //       textAlign: "center",
-// //       fontSize: "13px",
-// //       fontWeight: "600",
-// //       color: "#0f172a",
-// //       outline: "none",
-// //     },
-// //     addBtn: {
-// //       padding: "8px 14px",
-// //       background: "#2563eb",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "8px",
-// //       fontWeight: "600",
-// //       fontSize: "13px",
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //     },
-// //     checkoutSection: {
-// //       marginTop: "24px",
-// //       paddingTop: "16px",
-// //       borderTop: "1px solid #e2e8f0",
-// //     },
-// //     totalRow: {
-// //       display: "flex",
-// //       justifyContent: "space-between",
-// //       alignItems: "center",
-// //     },
-// //     totalLabel: {
-// //       fontSize: "16px",
-// //       fontWeight: "600",
-// //       color: "#64748b",
-// //     },
-// //     totalAmount: {
-// //       fontSize: "22px",
-// //       fontWeight: "700",
-// //       color: "#0f172a",
-// //     },
-// //     remainingBalance: (isNegative) => ({
-// //       fontSize: "13px",
-// //       color: isNegative ? "#dc2626" : "#16a34a",
-// //       fontWeight: "500",
-// //       marginTop: "4px",
-// //       textAlign: "right",
-// //     }),
-// //     btnActionGroup: {
-// //       display: "flex",
-// //       gap: "12px",
-// //       marginTop: "16px",
-// //     },
-// //     successBtn: {
-// //       flex: 1,
-// //       padding: "12px",
-// //       background: "#16a34a",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "10px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //     },
-// //     cancelBtn: {
-// //       padding: "12px 20px",
-// //       background: "#dc2626",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "10px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //     },
-// //     highlightPrice: {
-// //       color: "#0f172a",
-// //       fontWeight: "700",
-// //       fontSize: "14px",
-// //       marginRight: "8px",
-// //     },
-// //     emptyState: {
-// //       color: "#64748b",
-// //       fontSize: "14px",
-// //       margin: 0,
-// //     },
-// //     cartQtyText: {
-// //       width: "35px",
-// //       height: "24px",
-// //       textAlign: "center",
-// //       fontSize: "13px",
-// //       fontWeight: "600",
-// //       color: "#0f172a",
-// //       border: "1px solid #cbd5e1",
-// //       borderRadius: "4px",
-// //       outline: "none",
-// //       backgroundColor: "#ffffff",
-// //     },
-// //     cartQtyBtn: {
-// //       width: "24px",
-// //       height: "24px",
-// //       borderRadius: "4px",
-// //       border: "1px solid #cbd5e1",
-// //       background: "#f8fafc",
-// //       cursor: "pointer",
-// //       display: "inline-flex",
-// //       alignItems: "center",
-// //       justifyContent: "center",
-// //       fontWeight: "700",
-// //       fontSize: "12px",
-// //       color: "#475569",
-// //     },
-// //     removeBtn: {
-// //   width: "26px",
-// //   height: "26px",
-// //   display: "inline-flex",
-// //   alignItems: "center",
-// //   justifyContent: "center",
-// //   background: "#fee2e2",
-// //   color: "#ef4444",
-// //   border: "none",
-// //   borderRadius: "6px",
-// //   fontSize: "16px",
-// //   fontWeight: "600",
-// //   cursor: "pointer",
-// //   transition: "all 0.2s ease",
-// //   lineHeight: "1",
-// //   padding: 0,
-// // },
-
-// // welcomeScreen: {
-// //   minHeight: "100vh",
-// //   display: "flex",
-// //   flexDirection: "column",
-// //   justifyContent: "center",
-// //   alignItems: "center",
-// //   textAlign: "center",
-
-// //   background:
-// //     "linear-gradient(135deg,#FF6B35 0%, #F59E0B 50%, #FACC15 100%)",
-
-// //   color: "#ffffff",
-// //   overflow: "hidden",
-// // },
-
-// // welcomeTitle: {
-// //   fontSize: "72px",
-// //   fontWeight: "900",
-// //   letterSpacing: "2px",
-// //   color: "#ffffff",
-// //   textShadow: "3px 3px 10px rgba(0,0,0,.25)",
-// //   marginTop: 25,
-// //   marginBottom: 15,
-// // },
-
-// // welcomeSubTitle: {
-// //   fontSize: "28px",
-// //   fontWeight: "500",
-// //   color: "#FFF7ED",
-// //   // marginBottom: "45px",
-// // },
-
-// // startButton: {
-// //   padding: "22px 85px",
-// //   fontSize: "28px",
-// //   fontWeight: "700",
-// //   border: "none",
-// //   borderRadius: "60px",
-// //   background: "#ffffff",
-// //   color: "#EA580C",
-// //   cursor: "pointer",
-// //   boxShadow: "0 15px 30px rgba(0,0,0,.25)",
-// //   transition: ".3s",
-// //   marginTop: 0,       // remove top margin
-// // },
-
-
-
-// // productGrid: {
-// //   display: "grid",
-// //   gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-// //   gap: 22,
-// // },
-
-// // productCard: {
-// //   background: "#fff",
-// //   borderRadius: 18,
-// //   overflow: "hidden",
-// //   boxShadow: "0 8px 25px rgba(0,0,0,.08)",
-// //   border: "1px solid #eee",
-// //   transition: ".25s",
-// // },
-
-// // productImage: {
-// //   width: "100%",
-// //   height: 170,
-// //   objectFit: "cover",
-// // },
-
-// // productBody: {
-// //   padding: 15,
-// // },
-
-// // productTitle: {
-// //   fontWeight: 700,
-// //   fontSize: 18,
-// //   marginBottom: 8,
-// // },
-
-// // priceText: {
-// //   color: "#2563EB",
-// //   fontWeight: 700,
-// //   fontSize: 20,
-// // },
-
-// // stockBadge: {
-// //   display: "inline-block",
-// //   background: "#DCFCE7",
-// //   color: "#166534",
-// //   padding: "4px 10px",
-// //   borderRadius: 20,
-// //   fontSize: 12,
-// //   marginTop: 6,
-// // },
-
-// // cardFooter: {
-// //   display: "flex",
-// //   justifyContent: "space-between",
-// //   alignItems: "center",
-// //   marginTop: 14,
-// // },
-
-    
-// //   };
-// // if (showWelcome) {
-// //   return (
-// //     <div style={styles.welcomeScreen}>
-      
-// //      <img
-// //   src={hungerLogo}
-// //   alt="Hunger Hunt"
-// //   style={{
-// //     width: "420px",
-// //     maxWidth: "85%",
-// //     height: "auto",
-// //     marginBottom: "20px",
-// //   }}
-// // />
-
-// // {/* <h1 style={styles.welcomeTitle}>
-// //   HUNGER HUNT
-// // </h1> */}
-
-// // <div
-// //   style={{
-// //     display: "flex",
-// //     flexDirection: "column",
-// //     alignItems: "center",
-// //     gap: "0px", // No gap between text and button
-// //   }}
-// // >
-// //   {/* <p
-// //     style={{
-// //       fontSize: "28px",
-// //       fontWeight: "500",
-// //       color: "#FFF7ED",
-// //       margin: 0,
-// //       lineHeight: 1.4,
-// //       textAlign: "center",
-// //     }}
-// //   >
-// //    • Fresh • Fast • Delicious
-  
-// //   </p> */}
-
-// //   <button
-// //     style={{
-// //       ...styles.startButton,
-// //       marginTop: 0,
-// //     }}
-// //     onClick={() => setShowWelcome(false)}
-// //   >
-// //     START ORDER
-// //   </button>
-// // </div>
-// //     </div>
-// //   );
-// // }
-// //   return (
-// //     <div style={styles.page}>
-// //       <style>{`
-// //         ::-webkit-scrollbar {
-// //           width: 10px;
-// //           height: 10px;
-// //         }
-// //         ::-webkit-scrollbar-track {
-// //           background: #f1f5f9;
-// //           border-radius: 8px;
-// //         }
-// //         ::-webkit-scrollbar-thumb {
-// //           background: #2563eb;
-// //           border-radius: 8px;
-// //           border: 2px solid #f1f5f9;
-// //         }
-// //         ::-webkit-scrollbar-thumb:hover {
-// //           background: #1d4ed8;
-// //         }
-// //         .product-scroll-panel::-webkit-scrollbar {
-// //           width: 6px;
-// //         }
-// //         .product-scroll-panel::-webkit-scrollbar-track {
-// //           background: #f8fafc;
-// //           border-radius: 4px;
-// //         }
-// //         .product-scroll-panel::-webkit-scrollbar-thumb {
-// //           background: #3b82f6;
-// //           border-radius: 4px;
-// //         }
-// //         .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-// //           background: #2563eb;
-// //         }
-// //       `}</style>
-
-      
-
-// //       {/* BOTTOM SECTION - DUAL SIDE-BY-SIDE PANEL */}
-// //       <div style={styles.bottomGrid}>
-// //           {/* LEFT SIDE: AVAILABLE PRODUCTS */}
-// //           <div style={styles.card}>
-// //             <div
-// //   style={{
-// //     display: "flex",
-// //     justifyContent: "space-between",
-// //     alignItems: "center",
-// //     marginBottom: 20,
-// //   }}
-// // >
-// //   <div
-// //   style={{
-// //     display: "flex",
-// //     justifyContent: "space-between",
-// //     alignItems: "center",
-// //     marginBottom: "16px",
-// //   }}
-// // >
-// //   <h3 style={{ ...styles.panelTitle, marginBottom: 0 }}>
-// //     HUNGER HUNT
-// //   </h3>
-
-  
-// // </div>
-
-// //   <button
-// //     onClick={() => setShowCart(true)}
-// //     style={{
-// //       border: "none",
-// //       background: "transparent",
-// //       cursor: "pointer",
-// //       position: "relative",
-// //     }}
-// //   >
-// //     <ShoppingCart size={34} />
-
-// //     {cart.length > 0 && (
-// //       <span
-// //         style={{
-// //           position: "absolute",
-// //           top: -6,
-// //           right: -8,
-// //           background: "#ef4444",
-// //           color: "#fff",
-// //           width: 20,
-// //           height: 20,
-// //           borderRadius: "50%",
-// //           display: "flex",
-// //           justifyContent: "center",
-// //           alignItems: "center",
-// //           fontSize: 12,
-// //           fontWeight: "bold",
-// //         }}
-// //       >
-// //         {cart.length}
-// //       </span>
-// //     )}
-// //   </button>
-// // </div>
-// //             <div
-// //   style={{
-// //     display: "flex",
-// //     gap: 12,
-// //     overflowX: "auto",
-// //     marginBottom: 20,
-// //     paddingBottom: 6,
-// //   }}
-// // >
-// //   {categories.map(category => (
-// //     <button
-// //       key={category}
-// //       onClick={() => setSelectedCategory(category)}
-// //       style={{
-// //         padding: "12px 22px",
-// //         borderRadius: 30,
-// //         border: "none",
-// //         cursor: "pointer",
-// //         whiteSpace: "nowrap",
-// //         fontWeight: 700,
-// //         fontSize: 15,
-
-// //         background:
-// //           selectedCategory === category
-// //             ? "#2563EB"
-// //             : "#E5E7EB",
-
-// //         color:
-// //           selectedCategory === category
-// //             ? "#fff"
-// //             : "#111827",
-// //       }}
-// //     >
-// //       {category}
-// //     </button>
-// //   ))}
-// // </div>
-// //             <input
-// //               style={styles.productSearchInput}
-// //               placeholder="🔍 Quick filter products by name..."
-// //               value={productSearchQuery}
-// //               onChange={(e) => setProductSearchQuery(e.target.value)}
-// //               onFocus={(e) => {
-// //                 e.currentTarget.style.borderColor = "#2563eb";
-// //                 e.currentTarget.style.backgroundColor = "#ffffff";
-// //               }}
-// //               onBlur={(e) => {
-// //                 e.currentTarget.style.borderColor = "#e2e8f0";
-// //                 e.currentTarget.style.backgroundColor = "#f8fafc";
-// //               }}
-// //             />
-
-// //             <div className="product-scroll-panel" style={styles.scrollContainer}>
-// //               {loadingProducts ? (
-// //   <div
-// //     style={{
-// //       display: "flex",
-// //       justifyContent: "center",
-// //       alignItems: "center",
-// //       height: 250,
-// //       fontSize: 18,
-// //       fontWeight: 600,
-// //     }}
-// //   >
-// //     Loading Products...
-// //   </div>
-// // ) : filteredProducts.length === 0 ? (
-// //   <p
-// //     style={{
-// //       ...styles.emptyState,
-// //       textAlign: "center",
-// //       padding: "20px 0",
-// //     }}
-// //   >
-// //     No active items match your product filters.
-// //   </p>
-// // ) : (
-// //                 <div style={styles.productGrid}>
-// //   {filteredProducts.map((p) => {
-
-// //     const cartItem = cart.find(item => item._id === p._id);
-
-// //     const currentQty =
-// //       cartItem
-// //         ? cartItem.quantity
-// //         : (stagedQuantities[p._id] ?? 1);
-
-// //     return (
-
-// //       <div key={p._id} style={styles.productCard}>
-
-// //         <img
-// //           src={p.image || "https://placehold.co/400x300?text=No+Image"}
-// //           alt={p.name}
-// //           style={styles.productImage}
-// //         />
-
-// //         <div style={styles.productBody}>
-
-// //           <div style={styles.productTitle}>
-// //             {p.name}
-// //           </div>
-
-// //           <div style={styles.priceText}>
-// //             ₹{p.price}
-// //           </div>
-
-// //           <div style={styles.stockBadge}>
-// //             Stock : {p.stock}
-// //           </div>
-
-// //           <div style={styles.cardFooter}>
-
-// //             <div style={styles.qtySelector}>
-
-// //               <button
-// //                 style={styles.qtyBtn}
-// //                 onClick={() => {
-// //                   if (cartItem)
-// //                     updateCartItemQuantity(p._id, -1);
-// //                   else
-// //                     updateStagedQuantity(p._id, -1, p.stock);
-// //                 }}
-// //               >
-// //                 -
-// //               </button>
-
-// //               <input
-// //                 value={currentQty}
-// //                 style={styles.qtyInput}
-// //                 onChange={(e) => {
-// //                   if (cartItem)
-// //                     handleCartManualQuantityChange(
-// //                       p._id,
-// //                       e.target.value
-// //                     );
-// //                   else
-// //                     handleManualQuantityChange(
-// //                       p._id,
-// //                       e.target.value,
-// //                       p.stock
-// //                     );
-// //                 }}
-// //               />
-
-// //               <button
-// //                 style={styles.qtyBtn}
-// //                 onClick={() => {
-// //                   if (cartItem)
-// //                     updateCartItemQuantity(p._id, 1);
-// //                   else
-// //                     updateStagedQuantity(p._id, 1, p.stock);
-// //                 }}
-// //               >
-// //                 +
-// //               </button>
-
-// //             </div>
-
-// //             <button
-// //               style={styles.addBtn}
-// //               onClick={() => addToCart(p)}
-// //             >
-// //               Add
-// //             </button>
-
-// //           </div>
-
-// //         </div>
-
-// //       </div>
-
-// //     );
-
-// //   })}
-// // </div>
-// //               )}
-// //             </div>
-// //           </div>
-
-// //         </div>
-// //       {showCart && (
-// //   <>
-// //     <div
-// //       onClick={() => setShowCart(false)}
-// //       style={{
-// //         position: "fixed",
-// //         inset: 0,
-// //         background: "rgba(0,0,0,0.45)",
-// //         backdropFilter: "blur(5px)",
-// //         zIndex: 998,
-// //       }}
-// //     />
-
-// //     <div
-// //       style={{
-// //         position: "fixed",
-// //         top: "50%",
-// //         left: "50%",
-// //         transform: "translate(-50%, -50%)",
-// //         width: "90%",
-// //         maxWidth: "900px",
-// //         height: "85vh",
-// //         background: "#fff",
-// //         borderRadius: "18px",
-// //         boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-// //         zIndex: 999,
-// //         padding: 25,
-// //         overflowY: "auto",
-// //       }}
-// //     >
-// //       <div
-// //         style={{
-// //           display: "flex",
-// //           justifyContent: "space-between",
-// //           alignItems: "center",
-// //           marginBottom: 20,
-// //         }}
-// //       >
-// //         <h2>My Cart</h2>
-
-// //         <button
-// //           onClick={() => setShowCart(false)}
-// //           style={{
-// //             border: "none",
-// //             background: "transparent",
-// //             cursor: "pointer",
-// //           }}
-// //         >
-// //           <X size={28} />
-// //         </button>
-// //       </div>
-
-// //       <div style={styles.lookupFlex}>
-// //   <input
-// //     style={styles.input}
-// //     placeholder="Search Student Name / Hostel Number"
-// //     value={searchQuery}
-// //     onChange={(e) => setSearchQuery(e.target.value)}
-// //   />
-
-// //   <button
-// //     style={styles.primaryBtn}
-// //     onClick={handleStudentSearch}
-// //   >
-// //     Search
-// //   </button>
-// // </div>
-// // {searchResults.length > 0 && (
-// //   <div style={styles.resultsSection}>
-// //     <table style={styles.table}>
-// //       <thead>
-// //         <tr>
-// //           <th style={styles.th}>Student</th>
-// //           <th style={styles.th}>Hostel</th>
-// //           <th style={styles.th}></th>
-// //         </tr>
-// //       </thead>
-
-// //       <tbody>
-// //         {searchResults.map((student) => (
-// //           <tr key={student._id}>
-// //             <td style={styles.td}>{student.name}</td>
-
-// //             <td style={styles.td}>
-// //               {student.hostelNumber}
-// //             </td>
-
-// //             <td style={styles.td}>
-// //               <button
-// //                 style={styles.selectBtn}
-// //                 onClick={() => {
-// //                   setSelectedStudent(student);
-// //                   setSearchResults([]);
-// //                 }}
-// //               >
-// //                 Select
-// //               </button>
-// //             </td>
-// //           </tr>
-// //         ))}
-// //       </tbody>
-// //     </table>
-// //   </div>
-// // )}
-
-// //     {selectedStudent && (
-// //   <div
-// //     style={{
-// //       display: "flex",
-// //       justifyContent: "space-between",
-// //       alignItems: "center",
-// //       flexWrap: "wrap",
-// //       gap: 18,
-// //       padding: "16px 20px",
-// //       margin: "18px 0",
-// //       border: "1px solid #E5E7EB",
-// //       borderRadius: 12,
-// //       background: "#F8FAFC",
-// //     }}
-// //   >
-// //     <div>
-// //       <div style={{ fontSize: 12, color: "#64748B" }}>
-// //         Student
-// //       </div>
-// //       <div style={{ fontWeight: 700, fontSize: 17 }}>
-// //         {selectedStudent.name}
-// //       </div>
-// //     </div>
-
-// //     <div>
-// //       <div style={{ fontSize: 12, color: "#64748B" }}>
-// //         Father
-// //       </div>
-// //       <div style={{ fontWeight: 700, fontSize: 17 }}>
-// //         {selectedStudent.fatherName}
-// //       </div>
-// //     </div>
-
-// //     <div>
-// //       <div style={{ fontSize: 12, color: "#64748B" }}>
-// //         Hostel No
-// //       </div>
-// //       <div style={{ fontWeight: 700, fontSize: 17 }}>
-// //         {selectedStudent.hostelNumber}
-// //       </div>
-// //     </div>
-
-// //     <div>
-// //       <div style={{ fontSize: 12, color: "#64748B" }}>
-// //         Phone
-// //       </div>
-// //       <div style={{ fontWeight: 700, fontSize: 17 }}>
-// //         {selectedStudent.parentPhoneNumber}
-// //       </div>
-// //     </div>
-
-// //     <div
-// //       style={{
-// //         marginLeft: "auto",
-// //         background: "#FEF3C7",
-// //         color: "#92400E",
-// //         padding: "12px 18px",
-// //         borderRadius: 10,
-// //         textAlign: "center",
-// //         minWidth: 180,
-// //       }}
-// //     >
-// //       <div style={{ fontSize: 12 }}>
-// //         Wallet Balance
-// //       </div>
-
-// //       <div
-// //         style={{
-// //           fontSize: 26,
-// //           fontWeight: 700,
-// //         }}
-// //       >
-// //         ₹{selectedStudent.pocketMoney}
-// //       </div>
-// //     </div>
-// //   </div>
-// // )}
-
-// //       {cart.length === 0 ? (
-// //   <p style={styles.emptyState}>Cart is empty.</p>
-// // ) : (
-// //   <table style={styles.table}>
-// //     <thead>
-// //   <tr>
-// //     <th style={styles.th}>Image</th>
-// //     <th style={styles.th}>Product Name</th>
-// //     <th style={styles.th}>Unit Price</th>
-// //     <th style={styles.th}>Quantity</th>
-// //     <th style={styles.th}>Total Price</th>
-// //     <th style={styles.th}></th>
-// //   </tr>
-// // </thead>
-
-// //     <tbody>
-// //   {cart.map((item) => (
-// //     <tr key={item._id}>
-
-// //       {/* Product Image */}
-// //       <td style={styles.td}>
-// //         <img
-// //           src={item.image || "https://placehold.co/80x80?text=No+Image"}
-// //           alt={item.name}
-// //           style={{
-// //             width: 70,
-// //             height: 70,
-// //             objectFit: "cover",
-// //             borderRadius: 8,
-// //             border: "1px solid #ddd",
-// //           }}
-// //         />
-// //       </td>
-
-// //       {/* Product Name */}
-// //       <td style={styles.td}>
-// //         <strong>{item.name}</strong>
-// //       </td>
-
-// //       {/* Unit Price */}
-// //       <td style={styles.td}>
-// //         ₹{item.price}
-// //       </td>
-
-// //       {/* Quantity */}
-// //       <td style={styles.td}>
-// //         <div
-// //           style={{
-// //             display: "flex",
-// //             alignItems: "center",
-// //             gap: 8,
-// //           }}
-// //         >
-// //           <button
-// //             style={styles.cartQtyBtn}
-// //             onClick={() =>
-// //               updateCartItemQuantity(item._id, -1)
-// //             }
-// //           >
-// //             -
-// //           </button>
-
-// //           <input
-// //             value={item.quantity}
-// //             style={styles.cartQtyText}
-// //             onChange={(e) =>
-// //               handleCartManualQuantityChange(
-// //                 item._id,
-// //                 e.target.value
-// //               )
-// //             }
-// //           />
-
-// //           <button
-// //             style={styles.cartQtyBtn}
-// //             onClick={() =>
-// //               updateCartItemQuantity(item._id, 1)
-// //             }
-// //           >
-// //             +
-// //           </button>
-// //         </div>
-// //       </td>
-
-// //       {/* Total */}
-// //       <td style={styles.td}>
-// //         ₹{item.price * item.quantity}
-// //       </td>
-
-// //       {/* Remove */}
-// //       <td style={styles.td}>
-// //         <button
-// //           style={styles.removeBtn}
-// //           onClick={() => removeFromCart(item._id)}
-// //         >
-// //           ×
-// //         </button>
-// //       </td>
-
-// //     </tr>
-// //   ))}
-// // </tbody>
-// //   </table>
-// // )}
-// //        {/* <div style={styles.checkoutSection}>
-// //                 <div style={styles.totalRow}>
-// //                   <span style={styles.totalLabel}>Total Bill</span>
-// //                   <span style={styles.totalAmount}>₹{invoiceTotal}</span>
-// //            </div> */}
-// // <div style={styles.checkoutSection}>
-// //   <div style={styles.totalRow}>
-// //     <span style={styles.totalLabel}>
-// //       Total Bill
-// //     </span>
-
-// //     <span style={styles.totalAmount}>
-// //       ₹{invoiceTotal}
-// //     </span>
-// //   </div>
-// //                 {selectedStudent && (
-// //   <div style={styles.remainingBalance(selectedStudent.pocketMoney - invoiceTotal < 0)}>
-// //                    {selectedStudent.pocketMoney - invoiceTotal < 0
-// //                     ? `Overdraft Limit Exceeded by ₹${Math.abs(selectedStudent.pocketMoney - invoiceTotal)}`
-// //                      : `Remaining Balance: ₹${selectedStudent.pocketMoney - invoiceTotal}`}
-// //                  </div>)}
-
-// //                  <div style={styles.btnActionGroup}>
-// //                   <button
-// //                      style={styles.cancelBtn}
-// //                     onClick={handleCancelPayment}
-// //                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
-// //                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#dc2626")}
-// //                   >
-// //                      Cancel Payment
-// //                   </button>
-// //                   <button
-// //                     style={styles.successBtn}
-// //                     onClick={() => {
-// //   if (!selectedStudent) {
-// //     alert("Please select a student.");
-// //     return;
-// //   }
-
-// //   setShowVerifyModal(true);
-// // }}
-// //                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#15803d")}
-// //                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#16a34a")}
-// //                      disabled={
-// //    !selectedStudent ||
-// //   cart.length === 0 ||
-// //   selectedStudent.pocketMoney - invoiceTotal < 0
-// //  }
-// //                   >
-// //                      Complete Payment
-// //                   </button>
-// //              </div>
-// //              </div>
-// //          </div>
-// //     </>
-// // )}
-
-// // {/* ===== Parent Verification Popup ===== */}
-
-// // {/* ===== Parent Verification Popup ===== */}
-
-// // {showVerifyModal && (
-// //   <>
-// //     <div
-// //       onClick={() => {
-// //         setShowVerifyModal(false);
-// //         setPurchasePassword("");
-// //       }}
-// //       style={{
-// //         position: "fixed",
-// //         inset: 0,
-// //         background: "rgba(0,0,0,.45)",
-// //         zIndex: 1000
-// //       }}
-// //     />
-
-// //     <div
-// //       style={{
-// //         position: "fixed",
-// //         top: "50%",
-// //         left: "50%",
-// //         transform: "translate(-50%,-50%)",
-// //         width: 430,
-// //         background: "#fff",
-// //         borderRadius: 18,
-// //         padding: 30,
-// //         zIndex: 1001,
-// //         boxShadow: "0 20px 50px rgba(0,0,0,.3)"
-// //       }}
-// //     >
-// //       <h2 style={{ marginBottom: 25 }}>
-// //         Parent Verification
-// //       </h2>
-
-// //       <label
-// //         style={{
-// //           display: "block",
-// //           marginBottom: 8,
-// //           fontWeight: 600
-// //         }}
-// //       >
-// //         Father's Mobile Number
-// //       </label>
-
-// //       <input
-// //         readOnly
-// //         value={selectedStudent?.parentPhoneNumber || ""}
-// //         style={{
-// //           width: "100%",
-// //           padding: 14,
-// //           border: "1px solid #ddd",
-// //           borderRadius: 8,
-// //           marginBottom: 20
-// //         }}
-// //       />
-
-// //       <label
-// //         style={{
-// //           display: "block",
-// //           marginBottom: 8,
-// //           fontWeight: 600
-// //         }}
-// //       >
-// //         Purchase Password
-// //       </label>
-
-// //       <input
-// //         type="password"
-// //         placeholder="Enter Purchase Password"
-// //         value={purchasePassword}
-// //         onChange={(e) =>
-// //           setPurchasePassword(e.target.value)
-// //         }
-// //         style={{
-// //           width: "100%",
-// //           padding: 14,
-// //           border: "1px solid #ddd",
-// //           borderRadius: 8
-// //         }}
-// //       />
-
-// //       <div
-// //         style={{
-// //           display: "flex",
-// //           gap: 15,
-// //           marginTop: 30
-// //         }}
-// //       >
-// //         <button
-// //           style={{
-// //             flex: 1,
-// //             padding: 14,
-// //             borderRadius: 10,
-// //             border: "1px solid #ccc",
-// //             cursor: "pointer"
-// //           }}
-// //           onClick={() => {
-// //             setShowVerifyModal(false);
-// //             setPurchasePassword("");
-// //           }}
-// //         >
-// //           Cancel
-// //         </button>
-
-// //         <button
-// //           style={{
-// //             flex: 1,
-// //             padding: 14,
-// //             borderRadius: 10,
-// //             border: "none",
-// //             background: "#16A34A",
-// //             color: "#fff",
-// //             cursor: "pointer"
-// //           }}
-// //           onClick={async () => {
-// //             try {
-
-// //               await api.post(
-// //                 "/transactions/verify-payment",
-// //                 {
-// //                   studentId: selectedStudent._id,
-// //                   phone: selectedStudent.parentPhoneNumber,
-// //                   password: purchasePassword
-// //                 }
-// //               );
-
-// //               setShowVerifyModal(false);
-// //               setPurchasePassword("");
-
-// //               await handleCheckout();
-
-// //             } catch (err) {
-
-// //               alert(
-// //                 err.response?.data?.message ||
-// //                 "Verification Failed"
-// //               );
-
-// //             }
-// //           }}
-// //         >
-// //           Verify & Pay
-// //         </button>
-// //       </div>
-// //     </div>
-// //   </>
-// // )}
-
-// // <RefreshButton
-// //   onRefresh={refreshPage}
-// //   loading={loadingProducts}
-// // />
-// //     </div>
-// //   );
-// // };
-
-// // export default KioskBilling;
-
-
-
-
-
-// // 24-07-2026-for wallet control
-
-
-
-
-
-
-
-
-
-
-// import React, { useState, useEffect } from "react";
-// import { ShoppingCart, X } from "lucide-react";
-// import api from "../utils/api";
-// import RefreshButton from "../components/RefreshButton";
-// import hungerLogo from "../assets/Logo.png";
-
-// const KioskBilling = () => {
-//   const [searchQuery, setSearchQuery] = useState("");
-//   const [productSearchQuery, setProductSearchQuery] = useState("");
-//   const [selectedStudent, setSelectedStudent] = useState(null);
-//   const [searchResults, setSearchResults] = useState([]);
-//   const [products, setProducts] = useState([]);
-//   const [selectedCategory, setSelectedCategory] = useState("All");
-//   const [cart, setCart] = useState([]);
-//   const [invoiceTotal, setInvoiceTotal] = useState(0);
-//   const [isSearched, setIsSearched] = useState(false); // Tracks if a search has been executed
- 
-//   // Track configurations for staging quantities before appending to cart
-//   // Format: { [productId]: quantity }
-//   const [stagedQuantities, setStagedQuantities] = useState({});
-
-// const [loadingProducts, setLoadingProducts] = useState(false);
-// const [showWelcome, setShowWelcome] = useState(true);
-// const [showCart, setShowCart] = useState(false);
-//  const [showVerifyModal, setShowVerifyModal] = useState(false);
-
-// const [purchasePassword, setPurchasePassword] = useState("");
-// const refreshPage = async () => {
-//   try {
-//     setLoadingProducts(true);
-
-//    const res = await api.get("/inventory/public");
-
-// console.log("Response:", res);
-// console.log("Response Data:", res.data);
-// console.log("Is Array:", Array.isArray(res.data));
-// const data = Array.isArray(res.data) ? res.data : [];
-
-// const inventoryProducts = data
-//   .filter(item => item.stock > 0)
-//   .map(item => ({
-//     _id: item.productId._id,
-//     name: item.productId.name,
-//     price: item.productId.price,
-//     image: item.productId.image,
-//     stock: item.stock,
-//     stockGroup: item.productId.stockGroup,
-//   }));
-
-//     // Refresh product list
-//     setProducts(inventoryProducts);
-
-//     // Reset staged quantities
-//     const initialQuantities = {};
-//     inventoryProducts.forEach(product => {
-//       initialQuantities[product._id] = 1;
-//     });
-//     setStagedQuantities(initialQuantities);
-
-//     // ✅ Refresh cart items too
-//     setCart(prevCart =>
-//       prevCart
-//         .map(cartItem => {
-//           const latest = inventoryProducts.find(
-//             p => p._id === cartItem._id
-//           );
-
-//           // Product removed from stock
-//           if (!latest) return null;
-
-//           return {
-//             ...cartItem,
-//             price: latest.price,
-//             stock: latest.stock,
-//             quantity: Math.min(cartItem.quantity, latest.stock),
-//           };
-//         })
-//         .filter(item => item && item.stock > 0)
-//     );
-// // Refresh selected student details
-// // Clear student details
-// setSelectedStudent(null);
-// setSearchResults([]);
-// setSearchQuery("");
-// setIsSearched(false);
-// setCart([]);
-//   } catch (err) {
-//     console.error(err);
-//     alert("Failed to refresh products.");
-//   } finally {
-//     setLoadingProducts(false);
-//   }
-// };
-
-//   useEffect(() => {
-//     const total = cart.reduce(
-//       (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 0),
-//       0
-//     );
-//     setInvoiceTotal(total);
-//   }, [cart]);
-
-// useEffect(() => {
-//   fetchCatalog();
-// }, []);
-
-
-// const fetchCatalog = async () => {
-//   try {
-//     setLoadingProducts(true);
-
-//     const res = await api.get("/inventory/public");
-
-//     console.log("STATUS:", res.status);
-//     console.log("DATA:", res.data);
-//     console.log("IS ARRAY:", Array.isArray(res.data));
-
-//     if (!Array.isArray(res.data)) {
-//       alert("Inventory API did not return an array. Check console.");
-//       return;
-//     }
-
-//     const inventoryProducts = res.data
-//       .filter(item => item.stock > 0)
-//       .map(item => ({
-//         _id: item.productId._id,
-//         name: item.productId.name,
-//         price: item.productId.price,
-//         image: item.productId.image,
-//         stock: item.stock,
-//         stockGroup: item.productId.stockGroup,
-//       }));
-
-//     setProducts(inventoryProducts);
-
-//   } catch (err) {
-//     console.error(err);
-//   } finally {
-//     setLoadingProducts(false);
-//   }
-// };
-
-
-
-//   const handleStudentSearch = async () => {
-//     if (!searchQuery.trim()) {
-//       alert("Please enter student name or hostel number");
-//       return;
-//     }
-
-//     try {
-//      const res = await api.get(
-//   `/students/public-search?q=${encodeURIComponent(searchQuery)}`
-// );
-
-//       setIsSearched(true);
-
-//       if (res.data.length === 0) {
-//         setSelectedStudent(null);
-//         setSearchResults([]);
-//         // setProducts([]);
-//         setCart([]);
-//         alert("No student found matching that name or hostel number");
-//         return;
-//       }
-
-//       if (res.data.length === 1) {
-//   setSelectedStudent(res.data[0]);
-//   setSearchResults([]);
-//   return;
-// }
-
-//       // Multiple students found
-//       setSelectedStudent(null);
-//       setSearchResults(res.data);
-//       // setProducts([]);
-//       setCart([]);
-//     } catch (error) {
-//       console.error(error);
-//       alert("Student search failed");
-//     }
-//   };
-
-//   const updateStagedQuantity = (productId, amount, maxStock) => {
-//     setStagedQuantities(prev => {
-//       const current = parseInt(prev[productId], 10) || 0;
-//       const updated = current + amount;
-//       if (updated < 1) return prev;
-//       if (updated > maxStock) {
-//         alert(`Only ${maxStock} items available in stock!`);
-//         return prev;
-//       }
-//       return { ...prev, [productId]: updated };
-//     });
-//   };
-
-//   const handleManualQuantityChange = (productId, value, maxStock) => {
-//     if (value === "") {
-//       setStagedQuantities(prev => ({ ...prev, [productId]: "" }));
-//       return;
-//     }
-
-//     const parsed = parseInt(value, 10);
-//     if (isNaN(parsed)) return;
-
-//     if (parsed < 1) {
-//       setStagedQuantities(prev => ({ ...prev, [productId]: 1 }));
-//       return;
-//     }
-//     if (parsed > maxStock) {
-//       alert(`Only ${maxStock} items available in stock!`);
-//       setStagedQuantities(prev => ({ ...prev, [productId]: maxStock }));
-//       return;
-//     }
-//     setStagedQuantities(prev => ({ ...prev, [productId]: parsed }));
-//   };
-
-//   const addToCart = (product) => {
-//     const qtyToAdd = parseInt(stagedQuantities[product._id], 10) || 1;
-//     const exists = cart.find((item) => item._id === product._id);
-//     const currentCartQty = exists ? parseInt(exists.quantity, 10) || 0 : 0;
-
-//     if (currentCartQty + qtyToAdd > product.stock) {
-//       return alert(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
-//     }
-
-//     if (exists) {
-//       setCart(
-//         cart.map((item) =>
-//           item._id === product._id
-//             ? { ...item, quantity: (parseInt(item.quantity, 10) || 0) + qtyToAdd }
-//             : item
-//         )
-//       );
-//     } else {
-//       setCart([...cart, { ...product, quantity: qtyToAdd }]);
-//     }
-    
-//    if (!cart.find(item => item._id === product._id)) {
-//   setStagedQuantities(prev => ({
-//     ...prev,
-//     [product._id]: 1,
-//   }));
-// }
-//   };
-
-//   const updateCartItemQuantity = (productId, amount) => {
-//     const targetProduct = products.find(p => p._id === productId);
-//     const maxStock = targetProduct ? targetProduct.stock : 999;
-
-//     setCart(prevCart => {
-//       return prevCart.map(item => {
-//         if (item._id === productId) {
-//           const currentQty = parseInt(item.quantity, 10) || 0;
-//           const updatedQty = currentQty + amount;
-          
-//           if (updatedQty > maxStock) {
-//             alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-//             return item;
-//           }
-          
-//           if (updatedQty < 1) {
-//             return null;
-//           }
-          
-//           return { ...item, quantity: updatedQty };
-//         }
-//         return item;
-//       }).filter(Boolean);
-//     });
-//   };
-
-//   const handleCartManualQuantityChange = (productId, value) => {
-//     if (value === "") {
-//       setCart(prevCart => prevCart.map(item => 
-//         item._id === productId ? { ...item, quantity: "" } : item
-//       ));
-//       return;
-//     }
-
-//     const targetProduct = products.find(p => p._id === productId);
-//     const maxStock = targetProduct ? targetProduct.stock : 999;
-//     const parsed = parseInt(value, 10);
-
-//     if (isNaN(parsed)) return;
-
-//     setCart(prevCart => {
-//       return prevCart.map(item => {
-//         if (item._id === productId) {
-//           if (parsed < 1) {
-//             return { ...item, quantity: 1 };
-//           }
-//           if (parsed > maxStock) {
-//             alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-//             return { ...item, quantity: maxStock };
-//           }
-//           return { ...item, quantity: parsed };
-//         }
-//         return item;
-//       });
-//     });
-//   };
-
-//   const removeFromCart = (productId) => {
-//     setCart(prevCart => prevCart.filter(item => item._id !== productId));
-//   };
-
-//   const handleCancelPayment = () => {
-//     if (window.confirm("Are you sure you want to cancel payment? This will reset the terminal.")) {
-//       setCart([]);
-//       setSelectedStudent(null);
-//       setSearchResults([]);
-//       setSearchQuery("");
-//       setProductSearchQuery("");
-//       setIsSearched(false);
-//     }
-//   };
-
-//   const handleCheckout = async () => {
-//    if (!selectedStudent) {
-//   alert("Please search and select a student first.");
-//   return;
-// }
-
-//     const calibratedCart = cart.map(item => ({
-//       ...item,
-//       quantity: parseInt(item.quantity, 10) || 1
-//     }));
-
-//     if (invoiceTotal > selectedStudent.pocketMoney) {
-//       return alert("Insufficient wallet balance!");
-//     }
-
-//     try {
-//       await api.post("/transactions/bill", {
-//         studentId: selectedStudent._id,
-//         items: calibratedCart.map((item) => ({
-//           productId: item._id,
-//           quantity: item.quantity,
-//         })),
-//         totalAmount: invoiceTotal,
-//       });
-
-//       alert("Payment successful!");
-
-// await fetchCatalog();
-
-// setCart([]);
-// setSelectedStudent(null);
-// setSearchQuery("");
-// setProductSearchQuery("");
-// setIsSearched(false);
-// setShowCart(false);
-// setShowWelcome(true);
-//     } catch (err) {
-
-//   console.log("Checkout Error:", err);
-
-//   console.log(
-//     "Server Response:",
-//     err.response?.data
-//   );
-
-//   alert(
-//     err.response?.data?.message ||
-//     err.response?.data?.error ||
-//     "Checkout failed"
-//   );
-// }
-//   };
-// const getCartQuantity = (productId) => {
-//   const item = cart.find((c) => c._id === productId);
-//   return item ? item.quantity : 0;
-// };
-//   const filteredProducts = products.filter((p) => {
-
-//   const matchesCategory =
-//     selectedCategory === "All" ||
-//     p.stockGroup?.name === selectedCategory;
-
-//   const matchesSearch =
-//     p.name
-//       .toLowerCase()
-//       .includes(productSearchQuery.toLowerCase());
-
-//   return matchesCategory && matchesSearch;
-// });
-// const categories = [
-//   "All",
-//   ...new Set(
-//     products.map(p => p.stockGroup?.name).filter(Boolean)
-//   ),
-// ];
-//   const styles = {
-//     page: {
-//       minHeight: "100vh",
-//       backgroundColor: "#f8fafc",
-//       padding: "32px",
-//       fontFamily: "system-ui, -apple-system, sans-serif",
-//       boxSizing: "border-box",
-//     },
-//     topSection: {
-//       marginBottom: "24px",
-//     },
-//    bottomGrid: {
-//     display: "grid",
-//     gridTemplateColumns: "1fr",
-// },
-//     card: {
-//       width: "100%",
-//       background: "#ffffff",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "14px",
-//       padding: "20px",
-//       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-//       boxSizing: "border-box",
-//     },
-//     lookupFlex: {
-//       display: "flex",
-//       gap: "16px",
-//       alignItems: "center",
-//     },
-//    panelTitle: {
-//   fontSize: "42px",
-//   fontWeight: "900",
-//   fontFamily: "'Poppins', sans-serif",
-//   color: "#033d6c",
-//   letterSpacing: "2px",
-//   // textTransform: "uppercase",
-//   textShadow: "2px 2px 6px rgba(66, 55, 10, 0.25)",
-//   marginTop: 0,
-//   marginBottom: "16px",
-// },
-//     input: {
-//       flex: 1,
-//       padding: "12px 14px",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "10px",
-//       fontSize: "14px",
-//       color: "#0f172a",
-//       backgroundColor: "#ffffff",
-//       outline: "none",
-//       transition: "border-color 0.2s",
-//       boxSizing: "border-box",
-//     },
-//     productSearchInput: {
-//       width: "100%",
-//       padding: "10px 12px",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "8px",
-//       fontSize: "13px",
-//       color: "#0f172a",
-//       backgroundColor: "#f8fafc",
-//       outline: "none",
-//       transition: "border-color 0.2s, background-color 0.2s",
-//       boxSizing: "border-box",
-//       marginBottom: "16px",
-//     },
-//     primaryBtn: {
-//       padding: "12px 24px",
-//       background: "orange",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "10px",
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       cursor: "pointer",
-//       transition: "background-color 0.2s",
-//       whiteSpace: "nowrap",
-//     },
-//     resultsSection: {
-//       marginTop: "20px",
-//     },
-//     resultsTitle: {
-//       fontSize: "15px",
-//       fontWeight: "600",
-//       color: "#1e293b",
-//       marginBottom: "12px",
-//     },
-//     table: {
-//       width: "100%",
-//       borderCollapse: "collapse",
-//       marginTop: "8px",
-//       textAlign: "left",
-//     },
-//     th: {
-//       backgroundColor: "#f1f5f9",
-//       color: "#334155",
-//       fontWeight: "600",
-//       padding: "12px",
-//       fontSize: "13px",
-//       borderBottom: "2px solid #e2e8f0",
-//     },
-//     tr: {
-//       cursor: "pointer",
-//       transition: "background-color 0.2s",
-//     },
-//     td: {
-//       padding: "12px",
-//       fontSize: "14px",
-//       color: "#0f172a",
-//       borderBottom: "1px solid #e2e8f0",
-//     },
-//     selectBtn: {
-//       padding: "6px 12px",
-//       background: "#0284c7",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "6px",
-//       fontWeight: "600",
-//       fontSize: "12px",
-//       cursor: "pointer",
-//     },
-//     studentRowDetails: {
-//       display: "flex",
-//       gap: "24px",
-//       alignItems: "center",
-//       marginTop: "16px",
-//       paddingTop: "16px",
-//       borderTop: "1px solid #f1f5f9",
-//     },
-//     studentInlineBanner: {
-//       display: "flex",
-//       gap: "16px",
-//       fontSize: "14px",
-//       color: "#475569",
-//       fontWeight: "500",
-//       backgroundColor: "#f1f5f9",
-//       padding: "10px 14px",
-//       borderRadius: "8px",
-//       marginBottom: "16px",
-//     },
-//     studentName: {
-//       fontSize: "15px",
-//       fontWeight: "600",
-//       color: "#0f172a",
-//     },
-//     studentMeta: {
-//       fontSize: "13px",
-//       color: "#334155",
-//       fontWeight: "500",
-//     },
-//     walletBadge: {
-//       padding: "8px 14px",
-//       background: "#fef3c7",
-//       color: "#92400e",
-//       borderRadius: "8px",
-//       fontSize: "14px",
-//       fontWeight: "600",
-//       marginLeft: "auto",
-//     },
-//     scrollContainer: {
-//   maxHeight: "750px",
-//       overflowY: "auto",
-//       paddingRight: "6px",
-//     },
-//     productItem: {
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       padding: "12px 14px",
-//       background: "#ffffff",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "10px",
-//       marginBottom: "10px",
-//     },
-//     productName: {
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       color: "#0f172a",
-//     },
-//     productStock: {
-//       fontSize: "12px",
-//       color: "#64748b",
-//       marginTop: "2px",
-//     },
-//     actionControlWrap: {
-//       display: "flex",
-//       alignItems: "center",
-//       gap: "12px",
-//     },
-//     qtySelector: {
-//       display: "flex",
-//       alignItems: "center",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "8px",
-//       overflow: "hidden",
-//       backgroundColor: "#f8fafc",
-//     },
-//     qtyBtn: {
-//       width: "32px",
-//       height: "32px",
-//       border: "none",
-//       background: "transparent",
-//       color: "#334155",
-//       fontSize: "16px",
-//       fontWeight: "600",
-//       cursor: "pointer",
-//       display: "flex",
-//       alignItems: "center",
-//       justifyContent: "center",
-//       transition: "background-color 0.15s",
-//     },
-//     qtyInput: {
-//       width: "40px",
-//       height: "32px",
-//       borderTop: "none",
-//       borderBottom: "none",
-//       borderLeft: "1px solid #e2e8f0",
-//       borderRight: "1px solid #e2e8f0",
-//       background: "#ffffff",
-//       textAlign: "center",
-//       fontSize: "13px",
-//       fontWeight: "600",
-//       color: "#0f172a",
-//       outline: "none",
-//     },
-//     addBtn: {
-//       padding: "8px 14px",
-//       background: "#0d4d82",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "8px",
-//       fontWeight: "600",
-//       fontSize: "13px",
-//       cursor: "pointer",
-//       transition: "background-color 0.2s",
-//     },
-    
-//     checkoutSection: {
-//       marginTop: "24px",
-//       paddingTop: "16px",
-//       borderTop: "1px solid #e2e8f0",
-//     },
-//     totalRow: {
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//     },
-//     totalLabel: {
-//       fontSize: "16px",
-//       fontWeight: "600",
-//       color: "#64748b",
-//     },
-//     totalAmount: {
-//       fontSize: "22px",
-//       fontWeight: "700",
-//       color: "#0f172a",
-//     },
-//     remainingBalance: (isNegative) => ({
-//       fontSize: "13px",
-//       color: isNegative ? "#dc2626" : "#16a34a",
-//       fontWeight: "500",
-//       marginTop: "4px",
-//       textAlign: "right",
-//     }),
-//     btnActionGroup: {
-//       display: "flex",
-//       gap: "12px",
-//       marginTop: "16px",
-//     },
-//     successBtn: {
-//       flex: 1,
-//       padding: "12px",
-//       background: "#16a34a",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "10px",
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       cursor: "pointer",
-//       transition: "background-color 0.2s",
-//     },
-//     cancelBtn: {
-//       padding: "12px 20px",
-//       background: "#dc2626",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "10px",
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       cursor: "pointer",
-//       transition: "background-color 0.2s",
-//     },
-//     highlightPrice: {
-//       color: "#0f172a",
-//       fontWeight: "700",
-//       fontSize: "14px",
-//       marginRight: "8px",
-//     },
-//     emptyState: {
-//       color: "#64748b",
-//       fontSize: "14px",
-//       margin: 0,
-//     },
-//     cartQtyText: {
-//       width: "35px",
-//       height: "24px",
-//       textAlign: "center",
-//       fontSize: "13px",
-//       fontWeight: "600",
-//       color: "#0f172a",
-//       border: "1px solid #cbd5e1",
-//       borderRadius: "4px",
-//       outline: "none",
-//       backgroundColor: "#ffffff",
-//     },
-//     cartQtyBtn: {
-//       width: "24px",
-//       height: "24px",
-//       borderRadius: "4px",
-//       border: "1px solid #cbd5e1",
-//       background: "#f8fafc",
-//       cursor: "pointer",
-//       display: "inline-flex",
-//       alignItems: "center",
-//       justifyContent: "center",
-//       fontWeight: "700",
-//       fontSize: "12px",
-//       color: "#475569",
-//     },
-//     removeBtn: {
-//   width: "26px",
-//   height: "26px",
-//   display: "inline-flex",
-//   alignItems: "center",
-//   justifyContent: "center",
-//   background: "#fee2e2",
-//   color: "#ef4444",
-//   border: "none",
-//   borderRadius: "6px",
-//   fontSize: "16px",
-//   fontWeight: "600",
-//   cursor: "pointer",
-//   transition: "all 0.2s ease",
-//   lineHeight: "1",
-//   padding: 0,
-// },
-
-// welcomeScreen: {
-//   minHeight: "100vh",
-//   display: "flex",
-//   flexDirection: "column",
-//   justifyContent: "center",
-//   alignItems: "center",
-//   textAlign: "center",
-
-//   background:
-//     "linear-gradient(135deg,#FF6B35 0%, #F59E0B 50%, #FACC15 100%)",
-
-//   color: "#ffffff",
-//   overflow: "hidden",
-// },
-
-// welcomeTitle: {
-//   fontSize: "72px",
-//   fontWeight: "900",
-//   letterSpacing: "2px",
-//   color: "#ffffff",
-//   textShadow: "3px 3px 10px rgba(0,0,0,.25)",
-//   marginTop: 25,
-//   marginBottom: 15,
-// },
-
-// welcomeSubTitle: {
-//   fontSize: "28px",
-//   fontWeight: "500",
-//   color: "#FFF7ED",
-//   // marginBottom: "45px",
-// },
-
-// startButton: {
-//   padding: "22px 85px",
-//   fontSize: "28px",
-//   fontWeight: "700",
-//   border: "none",
-//   borderRadius: "60px",
-//   background: "#ffffff",
-//   color: "#EA580C",
-//   cursor: "pointer",
-//   boxShadow: "0 15px 30px rgba(0,0,0,.25)",
-//   transition: ".3s",
-//   marginTop: 0,       // remove top margin
-// },
-
-
-
-// productGrid: {
-//   display: "grid",
-//   gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-//   gap: 22,
-// },
-
-// productCard: {
-//   background: "#fff",
-//   borderRadius: 18,
-//   overflow: "hidden",
-//   boxShadow: "0 8px 25px rgba(0,0,0,.08)",
-//   border: "1px solid #eee",
-//   transition: ".25s",
-// },
-
-// productImage: {
-//   width: "100%",
-//   height: 180,
-//   objectFit: "cover",
-// },
-
-// productBody: {
-//   padding: 15,
-// },
-
-// productTitle: {
-//   fontWeight: 700,
-//   fontSize: 18,
-//   marginBottom: 8,
-// },
-
-// priceText: {
-//   color: "#2563EB",
-//   fontWeight: 700,
-//   fontSize: 20,
-// },
-
-// stockBadge: {
-//   display: "inline-block",
-//   background: "#DCFCE7",
-//   color: "#166534",
-//   padding: "4px 10px",
-//   borderRadius: 20,
-//   fontSize: 12,
-//   marginTop: 6,
-// },
-
-// cardFooter: {
-//   display: "flex",
-//   justifyContent: "space-between",
-//   alignItems: "center",
-//   marginTop: 14,
-// },
-
-    
-//   };
-// if (showWelcome) {
-//   return (
-//     <div style={styles.welcomeScreen}>
-      
-//      <img
-//   src={hungerLogo}
-//   alt="Hunger Hunt"
-//   style={{
-//     width: "420px",
-//     maxWidth: "85%",
-//     height: "auto",
-//     marginBottom: "20px",
-//   }}
-// />
-
-// {/* <h1 style={styles.welcomeTitle}>
-//   HUNGER HUNT
-// </h1> */}
-
-// <div
-//   style={{
-//     display: "flex",
-//     flexDirection: "column",
-//     alignItems: "center",
-//     gap: "0px", // No gap between text and button
-//   }}
-// >
-//   {/* <p
-//     style={{
-//       fontSize: "28px",
-//       fontWeight: "500",
-//       color: "#FFF7ED",
-//       margin: 0,
-//       lineHeight: 1.4,
-//       textAlign: "center",
-//     }}
-//   >
-//    • Fresh • Fast • Delicious
-  
-//   </p> */}
-
-//   <button
-//     style={{
-//       ...styles.startButton,
-//       marginTop: 0,
-//     }}
-//     onClick={() => setShowWelcome(false)}
-//   >
-//     START ORDER
-//   </button>
-// </div>
-//     </div>
-//   );
-// }
-//   return (
-//     <div style={styles.page}>
-//       <style>{`
-//         ::-webkit-scrollbar {
-//           width: 10px;
-//           height: 10px;
-//         }
-//         ::-webkit-scrollbar-track {
-//           background: #f1f5f9;
-//           border-radius: 8px;
-//         }
-//         ::-webkit-scrollbar-thumb {
-//           background: #2563eb;
-//           border-radius: 8px;
-//           border: 2px solid #f1f5f9;
-//         }
-//         ::-webkit-scrollbar-thumb:hover {
-//           background: #1d4ed8;
-//         }
-//         .product-scroll-panel::-webkit-scrollbar {
-//           width: 6px;
-//         }
-//         .product-scroll-panel::-webkit-scrollbar-track {
-//           background: #f8fafc;
-//           border-radius: 4px;
-//         }
-//         .product-scroll-panel::-webkit-scrollbar-thumb {
-//           background: #3b82f6;
-//           border-radius: 4px;
-//         }
-//         .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-//           background: #2563eb;
-//         }
-//       `}</style>
-
-      
-
-//       {/* BOTTOM SECTION - DUAL SIDE-BY-SIDE PANEL */}
-//       <div style={styles.bottomGrid}>
-//           {/* LEFT SIDE: AVAILABLE PRODUCTS */}
-//           <div style={styles.card}>
-//             <div
-//   style={{
-//     display: "flex",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     marginBottom: 20,
-//   }}
-// >
-//   <div
-//   style={{
-//     display: "flex",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     marginBottom: "16px",
-//   }}
-// >
-//   <h3 style={{ ...styles.panelTitle, marginBottom: 0 }}>
-//     Hunger Hunt
-//   </h3>
-
-  
-// </div>
-
-//   <button
-//     onClick={() => setShowCart(true)}
-//     style={{
-//       border: "none",
-//       background: "transparent",
-//       cursor: "pointer",
-//       position: "relative",
-//     }}
-//   >
-//     <ShoppingCart size={34} />
-
-//     {cart.length > 0 && (
-//       <span
-//         style={{
-//           position: "absolute",
-//           top: -6,
-//           right: -8,
-//           background: "#ef4444",
-//           color: "#fff",
-//           width: 20,
-//           height: 20,
-//           borderRadius: "50%",
-//           display: "flex",
-//           justifyContent: "center",
-//           alignItems: "center",
-//           fontSize: 12,
-//           fontWeight: "bold",
-//         }}
-//       >
-//         {cart.length}
-//       </span>
-//     )}
-//   </button>
-// </div>
-//             <div
-//   style={{
-//     display: "flex",
-//     gap: 12,
-//     overflowX: "auto",
-//     marginBottom: 20,
-//     paddingBottom: 6,
-//   }}
-// >
-//   {categories.map(category => (
-//     <button
-//       key={category}
-//       onClick={() => setSelectedCategory(category)}
-//       style={{
-//         padding: "12px 22px",
-//         borderRadius: 30,
-//         border: "none",
-//         cursor: "pointer",
-//         whiteSpace: "nowrap",
-//         fontWeight: 700,
-//         fontSize: 15,
-
-//         background:
-//           selectedCategory === category
-//             ? "#0d4d82"
-//             : "#E5E7EB",
-
-//         color:
-//           selectedCategory === category
-//             ? "#fff"
-//             : "#111827",
-//       }}
-//     >
-//       {category}
-//     </button>
-//   ))}
-// </div>
-//             <input
-//               style={styles.productSearchInput}
-//               placeholder="🔍 Quick filter products by name..."
-//               value={productSearchQuery}
-//               onChange={(e) => setProductSearchQuery(e.target.value)}
-//               onFocus={(e) => {
-//                 e.currentTarget.style.borderColor = "#2563eb";
-//                 e.currentTarget.style.backgroundColor = "#ffffff";
-//               }}
-//               onBlur={(e) => {
-//                 e.currentTarget.style.borderColor = "#e2e8f0";
-//                 e.currentTarget.style.backgroundColor = "#f8fafc";
-//               }}
-//             />
-
-//             <div className="product-scroll-panel" style={styles.scrollContainer}>
-//               {loadingProducts ? (
-//   <div
-//     style={{
-//       display: "flex",
-//       justifyContent: "center",
-//       alignItems: "center",
-//       height: 250,
-//       fontSize: 18,
-//       fontWeight: 600,
-//     }}
-//   >
-//     Loading Products...
-//   </div>
-// ) : filteredProducts.length === 0 ? (
-//   <p
-//     style={{
-//       ...styles.emptyState,
-//       textAlign: "center",
-//       padding: "20px 0",
-//     }}
-//   >
-//     No active items match your product filters.
-//   </p>
-// ) : (
-//                 <div style={styles.productGrid}>
-//   {filteredProducts.map((p) => {
-
-//     const cartItem = cart.find(item => item._id === p._id);
-
-//     const currentQty =
-//       cartItem
-//         ? cartItem.quantity
-//         : (stagedQuantities[p._id] ?? 1);
-
-//     return (
-
-//       <div key={p._id} style={styles.productCard}>
-
-//         <img
-//           src={p.image || "https://placehold.co/400x300?text=No+Image"}
-//           alt={p.name}
-//           style={styles.productImage}
-//         />
-
-//         <div style={styles.productBody}>
-// <div
-//   style={{
-//     fontSize: "18px",
-//     fontWeight: "700",
-//     color: "#374151",
-//     marginBottom: "8px",
-//     textAlign: "left",
-//   }}
-// >
-//   {p.name}
-// </div>
-
-// <div
-//   style={{
-//     display: "flex",
-//     justifyContent: "space-between",
-//     alignItems: "center",
-//     marginBottom: "12px",
-//   }}
-// >
-//   <div>
-//     <div
-//       style={{
-//         fontSize: "18px",
-//         fontWeight: "700",
-//         color: "#111827",
-//       }}
-//     >
-//       ₹{p.price}
-//     </div>
-//   </div>
-
-//   <div
-//     style={{
-//       fontSize: "15px",
-//       fontWeight: "500",
-//       color: "#374151",
-//     }}
-//   >
-//     {p.stock} Stock
-//   </div>
-// </div>
-
-//           <div style={styles.cardFooter}>
-
-//             <div style={styles.qtySelector}>
-
-//               <button
-//                 style={styles.qtyBtn}
-//                 onClick={() => {
-//                   if (cartItem)
-//                     updateCartItemQuantity(p._id, -1);
-//                   else
-//                     updateStagedQuantity(p._id, -1, p.stock);
-//                 }}
-//               >
-//                 -
-//               </button>
-
-//               <input
-//                 value={currentQty}
-//                 style={styles.qtyInput}
-//                 onChange={(e) => {
-//                   if (cartItem)
-//                     handleCartManualQuantityChange(
-//                       p._id,
-//                       e.target.value
-//                     );
-//                   else
-//                     handleManualQuantityChange(
-//                       p._id,
-//                       e.target.value,
-//                       p.stock
-//                     );
-//                 }}
-//               />
-
-//               <button
-//                 style={styles.qtyBtn}
-//                 onClick={() => {
-//                   if (cartItem)
-//                     updateCartItemQuantity(p._id, 1);
-//                   else
-//                     updateStagedQuantity(p._id, 1, p.stock);
-//                 }}
-//               >
-//                 +
-//               </button>
-
-//             </div>
-
-//             <button
-//               style={styles.addBtn}
-//               onClick={() => addToCart(p)}
-//             >
-//               Add
-//             </button>
-
-//           </div>
-
-//         </div>
-
-//       </div>
-
-//     );
-
-//   })}
-// </div>
-//               )}
-//             </div>
-//           </div>
-
-//         </div>
-//       {showCart && (
-//   <>
-//     <div
-//       onClick={() => setShowCart(false)}
-//       style={{
-//         position: "fixed",
-//         inset: 0,
-//         background: "rgba(0,0,0,0.45)",
-//         backdropFilter: "blur(5px)",
-//         zIndex: 998,
-//       }}
-//     />
-
-//     <div
-//       style={{
-//         position: "fixed",
-//         top: "50%",
-//         left: "50%",
-//         transform: "translate(-50%, -50%)",
-//         width: "90%",
-//         maxWidth: "900px",
-//         height: "85vh",
-//         background: "#fff",
-//         borderRadius: "18px",
-//         boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-//         zIndex: 999,
-//         padding: 25,
-//         overflowY: "auto",
-//       }}
-//     >
-//       <div
-//         style={{
-//           display: "flex",
-//           justifyContent: "space-between",
-//           alignItems: "center",
-//           marginBottom: 20,
-//         }}
-//       >
-//         <h2>My Cart</h2>
-
-//         <button
-//           onClick={() => setShowCart(false)}
-//           style={{
-//             border: "none",
-//             background: "transparent",
-//             cursor: "pointer",
-//           }}
-//         >
-//           <X size={28} />
-//         </button>
-//       </div>
-
-//       <div style={styles.lookupFlex}>
-//   <input
-//     style={styles.input}
-//     placeholder="Search Student Name / Hostel Number"
-//     value={searchQuery}
-//     onChange={(e) => setSearchQuery(e.target.value)}
-//   />
-
-//   <button
-//     style={styles.primaryBtn}
-//     onClick={handleStudentSearch}
-//   >
-//     Search
-//   </button>
-// </div>
-// {searchResults.length > 0 && (
-//   <div style={styles.resultsSection}>
-//     <table style={styles.table}>
-//       <thead>
-//         <tr>
-//           <th style={styles.th}>Student</th>
-//           <th style={styles.th}>Hostel</th>
-//           <th style={styles.th}></th>
-//         </tr>
-//       </thead>
-
-//       <tbody>
-//         {searchResults.map((student) => (
-//           <tr key={student._id}>
-//             <td style={styles.td}>{student.name}</td>
-
-//             <td style={styles.td}>
-//               {student.hostelNumber}
-//             </td>
-
-//             <td style={styles.td}>
-//               <button
-//                 style={styles.selectBtn}
-//                 onClick={() => {
-//                   setSelectedStudent(student);
-//                   setSearchResults([]);
-//                 }}
-//               >
-//                 Select
-//               </button>
-//             </td>
-//           </tr>
-//         ))}
-//       </tbody>
-//     </table>
-//   </div>
-// )}
-
-//     {selectedStudent && (
-//   <div
-//     style={{
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       flexWrap: "wrap",
-//       gap: 18,
-//       padding: "16px 20px",
-//       margin: "18px 0",
-//       border: "1px solid #E5E7EB",
-//       borderRadius: 12,
-//       background: "#F8FAFC",
-//     }}
-//   >
-//     <div>
-//       <div style={{ fontSize: 12, color: "#64748B" }}>
-//         Student
-//       </div>
-//       <div style={{ fontWeight: 700, fontSize: 17 }}>
-//         {selectedStudent.name}
-//       </div>
-//     </div>
-
-//     <div>
-//       <div style={{ fontSize: 12, color: "#64748B" }}>
-//         Father
-//       </div>
-//       <div style={{ fontWeight: 700, fontSize: 17 }}>
-//         {selectedStudent.fatherName}
-//       </div>
-//     </div>
-
-//     <div>
-//       <div style={{ fontSize: 12, color: "#64748B" }}>
-//         Hostel No
-//       </div>
-//       <div style={{ fontWeight: 700, fontSize: 17 }}>
-//         {selectedStudent.hostelNumber}
-//       </div>
-//     </div>
-
-//     <div>
-//       <div style={{ fontSize: 12, color: "#64748B" }}>
-//         Phone
-//       </div>
-//       <div style={{ fontWeight: 700, fontSize: 17 }}>
-//         {selectedStudent.parentPhoneNumber}
-//       </div>
-//     </div>
-
-//     <div
-//       style={{
-//         marginLeft: "auto",
-//         background: "#FEF3C7",
-//         color: "#92400E",
-//         padding: "12px 18px",
-//         borderRadius: 10,
-//         textAlign: "center",
-//         minWidth: 180,
-//       }}
-//     >
-//       <div style={{ fontSize: 12 }}>
-//         Wallet Balance
-//       </div>
-
-//       <div
-//         style={{
-//           fontSize: 26,
-//           fontWeight: 700,
-//         }}
-//       >
-//         ₹{selectedStudent.pocketMoney}
-//       </div>
-//     </div>
-//   </div>
-// )}
-
-//       {cart.length === 0 ? (
-//   <p style={styles.emptyState}>Cart is empty.</p>
-// ) : (
-//   <table style={styles.table}>
-//     <thead>
-//   <tr>
-//     <th style={styles.th}>Image</th>
-//     <th style={styles.th}>Product Name</th>
-//     <th style={styles.th}>Unit Price</th>
-//     <th style={styles.th}>Quantity</th>
-//     <th style={styles.th}>Total Price</th>
-//     <th style={styles.th}></th>
-//   </tr>
-// </thead>
-
-//     <tbody>
-//   {cart.map((item) => (
-//     <tr key={item._id}>
-
-//       {/* Product Image */}
-//       <td style={styles.td}>
-//         <img
-//           src={item.image || "https://placehold.co/80x80?text=No+Image"}
-//           alt={item.name}
-//           style={{
-//             width: 70,
-//             height: 70,
-//             objectFit: "cover",
-//             borderRadius: 8,
-//             border: "1px solid #ddd",
-//           }}
-//         />
-//       </td>
-
-//       {/* Product Name */}
-//       <td style={styles.td}>
-//         <strong>{item.name}</strong>
-//       </td>
-
-//       {/* Unit Price */}
-//       <td style={styles.td}>
-//         ₹{item.price}
-//       </td>
-
-//       {/* Quantity */}
-//       <td style={styles.td}>
-//         <div
-//           style={{
-//             display: "flex",
-//             alignItems: "center",
-//             gap: 8,
-//           }}
-//         >
-//           <button
-//             style={styles.cartQtyBtn}
-//             onClick={() =>
-//               updateCartItemQuantity(item._id, -1)
-//             }
-//           >
-//             -
-//           </button>
-
-//           <input
-//             value={item.quantity}
-//             style={styles.cartQtyText}
-//             onChange={(e) =>
-//               handleCartManualQuantityChange(
-//                 item._id,
-//                 e.target.value
-//               )
-//             }
-//           />
-
-//           <button
-//             style={styles.cartQtyBtn}
-//             onClick={() =>
-//               updateCartItemQuantity(item._id, 1)
-//             }
-//           >
-//             +
-//           </button>
-//         </div>
-//       </td>
-
-//       {/* Total */}
-//       <td style={styles.td}>
-//         ₹{item.price * item.quantity}
-//       </td>
-
-//       {/* Remove */}
-//       <td style={styles.td}>
-//         <button
-//           style={styles.removeBtn}
-//           onClick={() => removeFromCart(item._id)}
-//         >
-//           ×
-//         </button>
-//       </td>
-
-//     </tr>
-//   ))}
-// </tbody>
-//   </table>
-// )}
-//        {/* <div style={styles.checkoutSection}>
-//                 <div style={styles.totalRow}>
-//                   <span style={styles.totalLabel}>Total Bill</span>
-//                   <span style={styles.totalAmount}>₹{invoiceTotal}</span>
-//            </div> */}
-// <div style={styles.checkoutSection}>
-//   <div style={styles.totalRow}>
-//     <span style={styles.totalLabel}>
-//       Total Bill
-//     </span>
-
-//     <span style={styles.totalAmount}>
-//       ₹{invoiceTotal}
-//     </span>
-//   </div>
-//                 {selectedStudent && (
-//   <div style={styles.remainingBalance(selectedStudent.pocketMoney - invoiceTotal < 0)}>
-//                    {selectedStudent.pocketMoney - invoiceTotal < 0
-//                     ? `Overdraft Limit Exceeded by ₹${Math.abs(selectedStudent.pocketMoney - invoiceTotal)}`
-//                      : `Remaining Balance: ₹${selectedStudent.pocketMoney - invoiceTotal}`}
-//                  </div>)}
-
-//                  <div style={styles.btnActionGroup}>
-//                   <button
-//                      style={styles.cancelBtn}
-//                     onClick={handleCancelPayment}
-//                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
-//                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#dc2626")}
-//                   >
-//                      Cancel Payment
-//                   </button>
-//                   <button
-//                     style={styles.successBtn}
-//                     onClick={() => {
-//   if (!selectedStudent) {
-//     alert("Please select a student.");
-//     return;
-//   }
-
-//   setShowVerifyModal(true);
-// }}
-//                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#15803d")}
-//                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#16a34a")}
-//                      disabled={
-//    !selectedStudent ||
-//   cart.length === 0 ||
-//   selectedStudent.pocketMoney - invoiceTotal < 0
-//  }
-//                   >
-//                      Complete Payment
-//                   </button>
-//              </div>
-//              </div>
-//          </div>
-//     </>
-// )}
-
-// {/* ===== Parent Verification Popup ===== */}
-
-// {/* ===== Parent Verification Popup ===== */}
-
-// {showVerifyModal && (
-//   <>
-//     <div
-//       onClick={() => {
-//         setShowVerifyModal(false);
-//         setPurchasePassword("");
-//       }}
-//       style={{
-//         position: "fixed",
-//         inset: 0,
-//         background: "rgba(0,0,0,.45)",
-//         zIndex: 1000
-//       }}
-//     />
-
-//     <div
-//       style={{
-//         position: "fixed",
-//         top: "50%",
-//         left: "50%",
-//         transform: "translate(-50%,-50%)",
-//         width: 430,
-//         background: "#fff",
-//         borderRadius: 18,
-//         padding: 30,
-//         zIndex: 1001,
-//         boxShadow: "0 20px 50px rgba(0,0,0,.3)"
-//       }}
-//     >
-//       <h2 style={{ marginBottom: 25 }}>
-//         Parent Verification
-//       </h2>
-
-//       <label
-//         style={{
-//           display: "block",
-//           marginBottom: 8,
-//           fontWeight: 600
-//         }}
-//       >
-//         Father's Mobile Number
-//       </label>
-
-//       <input
-//         readOnly
-//         value={selectedStudent?.parentPhoneNumber || ""}
-//         style={{
-//           width: "100%",
-//           padding: 14,
-//           border: "1px solid #ddd",
-//           borderRadius: 8,
-//           marginBottom: 20
-//         }}
-//       />
-
-//       <label
-//         style={{
-//           display: "block",
-//           marginBottom: 8,
-//           fontWeight: 600
-//         }}
-//       >
-//         Purchase Password
-//       </label>
-
-//       <input
-//         type="password"
-//         placeholder="Enter Purchase Password"
-//         value={purchasePassword}
-//         onChange={(e) =>
-//           setPurchasePassword(e.target.value)
-//         }
-//         style={{
-//           width: "100%",
-//           padding: 14,
-//           border: "1px solid #ddd",
-//           borderRadius: 8
-//         }}
-//       />
-
-//       <div
-//         style={{
-//           display: "flex",
-//           gap: 15,
-//           marginTop: 30
-//         }}
-//       >
-//         <button
-//           style={{
-//             flex: 1,
-//             padding: 14,
-//             borderRadius: 10,
-//             border: "1px solid #ccc",
-//             cursor: "pointer"
-//           }}
-//           onClick={() => {
-//             setShowVerifyModal(false);
-//             setPurchasePassword("");
-//           }}
-//         >
-//           Cancel
-//         </button>
-
-//         <button
-//           style={{
-//             flex: 1,
-//             padding: 14,
-//             borderRadius: 10,
-//             border: "none",
-//             background: "#16A34A",
-//             color: "#fff",
-//             cursor: "pointer"
-//           }}
-//           onClick={async () => {
-//             try {
-
-//               await api.post(
-//                 "/transactions/verify-payment",
-//                 {
-//                   studentId: selectedStudent._id,
-//                   phone: selectedStudent.parentPhoneNumber,
-//                   password: purchasePassword
-//                 }
-//               );
-
-//               setShowVerifyModal(false);
-//               setPurchasePassword("");
-
-//               await handleCheckout();
-
-//             } catch (err) {
-
-//               alert(
-//                 err.response?.data?.message ||
-//                 "Verification Failed"
-//               );
-
-//             }
-//           }}
-//         >
-//           Verify & Pay
-//         </button>
-//       </div>
-//     </div>
-//   </>
-// )}
-
-// <RefreshButton
-//   onRefresh={refreshPage}
-//   loading={loadingProducts}
-// />
-//     </div>
-//   );
-// };
-
-// export default KioskBilling;
-
-
-
-// 08-08-2026
-
-
-
-
-
-
-import React, { useState, useEffect } from "react";
-import { ShoppingCart, X } from "lucide-react";
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
+import { formatINR } from "../utils/format";
+import { Button } from "../components/ui";
+import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
+import KioskResultScreen from "../components/KioskResultScreen";
+import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
+import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
+import { presentError } from "../utils/errorPresentation";
 
-const KioskBilling = () => {
-  const [searchQuery, setSearchQuery] = useState("");
+const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
+
+const formatSessionTime = (seconds) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
+};
+
+// Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
+// actually enforces it. Here it only shapes the field.
+const PURCHASE_CODE_LENGTH = 4;
+
+// Category names arrive however they were typed into the admin console
+// ("CHIPS", "biscuits"), so they are title-cased for display only. Filtering
+// still compares against the stored value.
+const titleCase = (s) =>
+  String(s)
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+const productNameCollator = new Intl.Collator('en', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+const sortProductsByName = (items) => [...items].sort((a, b) =>
+  productNameCollator.compare(a.name || '', b.name || '') ||
+  String(a._id).localeCompare(String(b._id))
+);
+
+const stockGroupNames = (products) => {
+  const groups = new Map();
+
+  products.forEach((product) => {
+    const group = product.stockGroup;
+    if (group?.name && !groups.has(group.name)) groups.set(group.name, group);
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
+    .map((group) => group.name);
+};
+
+// Nutrition is transcribed off a packet by hand, so it is routinely partial.
+// Whatever the office entered is shown and the rest reads as a dash; only a
+// product with nothing at all goes without the strip entirely.
+//
+// Nothing here is derived — no macro energy share, no totals checked against
+// the calorie figure. The till repeats what the wrapper says and stops, so
+// every number on this screen traces back to one a person read off a packet.
+const readNutrition = (product) => {
+  const n = product?.nutrition;
+  if (!n) return null;
+
+  // null and "" mean never entered; 0 is a fact and survives. Plain Number()
+  // flattens the first two to 0 and would print a claim nobody made.
+  const num = (v) =>
+    v === null || v === undefined || v === "" || !Number.isFinite(Number(v))
+      ? null
+      : Number(v);
+
+  const macros = {
+    calories: num(n.calories),
+    protein: num(n.protein),
+    carbs: num(n.carbs),
+    fat: num(n.fat),
+  };
+
+  const serving = n.serving || "";
+
+  if (Object.values(macros).every((v) => v === null) && !serving) return null;
+
+  return { ...macros, serving };
+};
+
+// What a figure nobody entered looks like. An em dash, never a 0.
+const BLANK = "\u2014";
+
+const grams = (v) => (v === null ? BLANK : `${v} g`);
+
+const toProduct = (item) => ({
+  _id: item.productId?._id,
+  name: item.productId?.name,
+  price: item.productId?.price,
+  image: item.productId?.image,
+  stock: item.stock,
+  stockGroup: item.productId?.stockGroup,
+  subCategory: item.productId?.subCategory || "Others",
+  nutrition: readNutrition(item.productId),
+  purchaseAllowance: item.purchaseAllowance || null,
+});
+
+const allowanceCeiling = (product) => {
+  const allowance = product?.purchaseAllowance;
+  if (!allowance?.enabled) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Number(allowance.remaining) || 0);
+};
+
+const allowancePeriod = (period) => ({
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+  TOTAL: "total",
+}[period] || "purchase");
+
+const limitMessage = (product) => {
+  const allowance = product.purchaseAllowance;
+  if (!allowance?.enabled) return "This item cannot be added.";
+  if (allowance.pending > 0) {
+    return `${product.name}'s ${allowancePeriod(allowance.period)} limit includes ${allowance.pending} awaiting parent approval.`;
+  }
+  return `${product.name}'s ${allowancePeriod(allowance.period)} limit has been reached.`;
+};
+
+const KioskBilling = ({ student, onLogout }) => {
+  const [walletBalance, setWalletBalance] = useState(
+    Number(student.wallet?.balance ?? student.pocketMoney ?? 0)
+  );
   const [productSearchQuery, setProductSearchQuery] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [productWallScrolled, setProductWallScrolled] = useState(false);
   const [products, setProducts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [showCategoryWelcome, setShowCategoryWelcome] = useState(true);
+  const [openingCategory, setOpeningCategory] = useState("");
   const [cart, setCart] = useState([]);
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const [invoiceTotal, setInvoiceTotal] = useState(0);
-  const [isSearched, setIsSearched] = useState(false); // Tracks if a search has been executed
- 
-  // Track configurations for staging quantities before appending to cart
-  // Format: { [productId]: quantity }
-  const [stagedQuantities, setStagedQuantities] = useState({});
+  const [recentlyAdded, setRecentlyAdded] = useState(null);
+  const [removingIds, setRemovingIds] = useState([]);
+  const feedbackTimerRef = useRef(null);
+  const categoryTimerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const removeTimersRef = useRef(new Map());
 
-const [loadingProducts, setLoadingProducts] = useState(false);
-const [showWelcome, setShowWelcome] = useState(true);
-const [showCart, setShowCart] = useState(false);
- const [showVerifyModal, setShowVerifyModal] = useState(false);
+  /* How the sale ended: null while it is still going, then 'paid' or
+     'pending'. Once set the session is over — the wall is gone, the timers
+     stop, and the only thing left running is the few seconds this screen is
+     held for. */
+  const [result, setResult] = useState(null);
 
-const [purchasePassword, setPurchasePassword] = useState("");
-const [waitingApproval, setWaitingApproval] = useState(false);
-const refreshPage = async () => {
-  try {
+  // Starts true: the catalogue is fetched on mount, and seeding the flag here
+  // keeps that effect free of a synchronous setState.
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [inventoryError, setInventoryError] = useState("");
+
+  const [ticketFolded, setTicketFolded] = useState(false);
+  const [nutritionFor, setNutritionFor] = useState(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
+
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [purchasePassword, setPurchasePassword] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [pinIssue, setPinIssue] = useState(null);
+  const [lockoutIssue, setLockoutIssue] = useState(null);
+
+  const showFeedback = (error, details = {}) => {
+    setFeedback((current) => ({ ...presentError(error, details), ...details, key: (current?.key || 0) + 1 }));
+  };
+
+  const refreshWallet = useCallback(async () => {
+    const { data } = await api.get('/students/me/wallet');
+    setWalletBalance(Number(data.wallet.balance));
+    return Number(data.wallet.balance);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const { data } = await api.get('/students/me/wallet');
+        if (active) setWalletBalance(Number(data.wallet.balance));
+      } catch (error) {
+        console.error('Could not refresh wallet balance', error);
+      }
+    };
+
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
+
+  // `paying` drives the disabled state and the label, but it cannot be the
+  // lock: setPaying does not apply until the next render, so taps landing in
+  // the same tick all read false and every one of them posts. A ref flips
+  // synchronously, so the second tap bails no matter how fast it arrives.
+  const payingRef = useRef(false);
+
+  // Fetching and applying are kept apart so the mount effect can await before
+  // it touches state — no synchronous setState, no cascading render.
+  const loadInventory = useCallback(async () => {
+    try {
+      const res = await api.get("/inventory");
+
+      if (!Array.isArray(res.data)) {
+        return {
+          products: [],
+          error: "Inventory data could not be loaded. Please try refreshing.",
+        };
+      }
+
+      return {
+        products: res.data
+          .filter(
+            (item) =>
+              item.stock > 0 &&
+              item.productId &&
+              // Archived is off sale; absent means the row predates the flag.
+              item.productId.active !== false
+          )
+          .map(toProduct)
+          .filter((item) => item._id),
+        error: "",
+      };
+    } catch (err) {
+      console.error(err);
+      return {
+        products: [],
+        error: "Failed to load inventory. Please try refreshing.",
+      };
+    }
+  }, []);
+
+  const applyInventory = useCallback(({ products: next, error }) => {
+    // Preserve the last good catalogue until a successful refresh replaces it;
+    // the availability guard below keeps stale products off screen meanwhile.
+    if (!error) {
+      setProducts(next);
+      const nextCategories = stockGroupNames(next);
+      setSelectedCategory((current) =>
+        nextCategories.includes(current) ? current : (nextCategories[0] || "")
+      );
+    }
+    setInventoryError(error);
+    setLoadingProducts(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const result = await loadInventory();
+      if (!cancelled) applyInventory(result);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyInventory, loadInventory]);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(feedbackTimerRef.current);
+      window.clearTimeout(categoryTimerRef.current);
+      removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      removeTimersRef.current.clear();
+    },
+    []
+  );
+
+  // A cleared quantity box prices as 1, which is what checkout posts and what
+  // the steppers clamp to. Treating it as 0 here understated the bill.
+  const invoiceTotal = cart.reduce(
+    (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 1),
+    0
+  );
+
+  const refreshPage = useCallback(async () => {
     setLoadingProducts(true);
+    // Named for what it is rather than `result`, which now means how the sale
+    // ended and is in scope here.
+    const refreshed = await loadInventory();
+    applyInventory(refreshed);
 
-   const res = await api.get("/inventory/public");
+    // A failed refresh must leave the ticket alone. Reconciling against the
+    // empty list an error returns would silently clear every line the moment
+    // the network hiccuped, mid-sale.
+    if (refreshed.error) return;
 
-console.log("Response:", res);
-console.log("Response Data:", res.data);
-console.log("Is Array:", Array.isArray(res.data));
-const data = Array.isArray(res.data) ? res.data : [];
-
-const inventoryProducts = data
-  .filter(item => item.stock > 0)
-  .map(item => ({
-    _id: item.productId._id,
-    name: item.productId.name,
-    price: item.productId.price,
-    image: item.productId.image,
-    stock: item.stock,
-    stockGroup: item.productId.stockGroup,
-  }));
-
-    // Refresh product list
-    setProducts(inventoryProducts);
-
-    // Reset staged quantities
-    const initialQuantities = {};
-    inventoryProducts.forEach(product => {
-      initialQuantities[product._id] = 1;
-    });
-    setStagedQuantities(initialQuantities);
-
-    // ✅ Refresh cart items too
-    setCart(prevCart =>
+    // Reconcile the ticket against fresh stock rather than dropping it.
+    setCart((prevCart) =>
       prevCart
-        .map(cartItem => {
-          const latest = inventoryProducts.find(
-            p => p._id === cartItem._id
-          );
-
-          // Product removed from stock
+        .map((cartItem) => {
+          const latest = refreshed.products.find((p) => p._id === cartItem._id);
           if (!latest) return null;
 
           return {
             ...cartItem,
             price: latest.price,
             stock: latest.stock,
-            quantity: Math.min(cartItem.quantity, latest.stock),
+            quantity: Math.min(
+              parseInt(cartItem.quantity, 10) || 1,
+              latest.stock,
+              allowanceCeiling(latest)
+            ),
+            purchaseAllowance: latest.purchaseAllowance,
           };
         })
-        .filter(item => item && item.stock > 0)
+        .filter((item) => item && item.stock > 0 && item.quantity > 0)
     );
-// Refresh selected student details
-// Clear student details
-setSelectedStudent(null);
-setSearchResults([]);
-setSearchQuery("");
-setIsSearched(false);
-setCart([]);
-  } catch (err) {
-    console.error(err);
-    alert("Failed to refresh products.");
-  } finally {
-    setLoadingProducts(false);
-  }
-};
-
-  useEffect(() => {
-    const total = cart.reduce(
-      (sum, item) => sum + item.price * (parseInt(item.quantity, 10) || 0),
-      0
-    );
-    setInvoiceTotal(total);
-  }, [cart]);
-
-useEffect(() => {
-  fetchCatalog();
-}, []);
-
-
-const fetchCatalog = async () => {
-  try {
-    setLoadingProducts(true);
-
-    const res = await api.get("/inventory/public");
-
-    console.log("STATUS:", res.status);
-    console.log("DATA:", res.data);
-    console.log("IS ARRAY:", Array.isArray(res.data));
-
-    if (!Array.isArray(res.data)) {
-      alert("Inventory API did not return an array. Check console.");
-      return;
-    }
-
-    const inventoryProducts = res.data
-      .filter(item => item.stock > 0)
-      .map(item => ({
-        _id: item.productId._id,
-        name: item.productId.name,
-        price: item.productId.price,
-        image: item.productId.image,
-        stock: item.stock,
-        stockGroup: item.productId.stockGroup,
-      }));
-
-    setProducts(inventoryProducts);
-
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoadingProducts(false);
-  }
-};
-
-
-
-  const handleStudentSearch = async () => {
-    if (!searchQuery.trim()) {
-      alert("Please enter student name or hostel number");
-      return;
-    }
-
-    try {
-     const res = await api.get(
-  `/students/public-search?q=${encodeURIComponent(searchQuery)}`
-);
-
-      setIsSearched(true);
-
-      if (res.data.length === 0) {
-        setSelectedStudent(null);
-        setSearchResults([]);
-        // setProducts([]);
-        setCart([]);
-        alert("No student found matching that name or hostel number");
-        return;
-      }
-
-      if (res.data.length === 1) {
-  setSelectedStudent(res.data[0]);
-  setSearchResults([]);
-  return;
-}
-
-      // Multiple students found
-      setSelectedStudent(null);
-      setSearchResults(res.data);
-      // setProducts([]);
-      setCart([]);
-    } catch (error) {
-      console.error(error);
-      alert("Student search failed");
-    }
-  };
-
-  const updateStagedQuantity = (productId, amount, maxStock) => {
-    setStagedQuantities(prev => {
-      const current = parseInt(prev[productId], 10) || 0;
-      const updated = current + amount;
-      if (updated < 1) return prev;
-      if (updated > maxStock) {
-        alert(`Only ${maxStock} items available in stock!`);
-        return prev;
-      }
-      return { ...prev, [productId]: updated };
-    });
-  };
-
-  const handleManualQuantityChange = (productId, value, maxStock) => {
-    if (value === "") {
-      setStagedQuantities(prev => ({ ...prev, [productId]: "" }));
-      return;
-    }
-
-    const parsed = parseInt(value, 10);
-    if (isNaN(parsed)) return;
-
-    if (parsed < 1) {
-      setStagedQuantities(prev => ({ ...prev, [productId]: 1 }));
-      return;
-    }
-    if (parsed > maxStock) {
-      alert(`Only ${maxStock} items available in stock!`);
-      setStagedQuantities(prev => ({ ...prev, [productId]: maxStock }));
-      return;
-    }
-    setStagedQuantities(prev => ({ ...prev, [productId]: parsed }));
-  };
+  }, [applyInventory, loadInventory]);
 
   const addToCart = (product) => {
-    const qtyToAdd = parseInt(stagedQuantities[product._id], 10) || 1;
-    const exists = cart.find((item) => item._id === product._id);
-    const currentCartQty = exists ? parseInt(exists.quantity, 10) || 0 : 0;
-
-    if (currentCartQty + qtyToAdd > product.stock) {
-      return alert(`Insufficient stock! Total in cart cannot exceed available stock (${product.stock}).`);
-    }
-
-    if (exists) {
-      setCart(
-        cart.map((item) =>
-          item._id === product._id
-            ? { ...item, quantity: (parseInt(item.quantity, 10) || 0) + qtyToAdd }
-            : item
-        )
-      );
-    } else {
-      setCart([...cart, { ...product, quantity: qtyToAdd }]);
-    }
-    
-   if (!cart.find(item => item._id === product._id)) {
-  setStagedQuantities(prev => ({
-    ...prev,
-    [product._id]: 1,
-  }));
-}
-  };
-
-  const updateCartItemQuantity = (productId, amount) => {
-    const targetProduct = products.find(p => p._id === productId);
-    const maxStock = targetProduct ? targetProduct.stock : 999;
-
-    setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item._id === productId) {
-          const currentQty = parseInt(item.quantity, 10) || 0;
-          const updatedQty = currentQty + amount;
-          
-          if (updatedQty > maxStock) {
-            alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-            return item;
-          }
-          
-          if (updatedQty < 1) {
-            return null;
-          }
-          
-          return { ...item, quantity: updatedQty };
-        }
-        return item;
-      }).filter(Boolean);
-    });
-  };
-
-  const handleCartManualQuantityChange = (productId, value) => {
-    if (value === "") {
-      setCart(prevCart => prevCart.map(item => 
-        item._id === productId ? { ...item, quantity: "" } : item
-      ));
+    if (product.stock < 1) return;
+    if (allowanceCeiling(product) < 1) {
+      showFeedback({ message: limitMessage(product), code: 'PRODUCT_LIMIT' }, {
+        product,
+      });
       return;
     }
 
-    const targetProduct = products.find(p => p._id === productId);
-    const maxStock = targetProduct ? targetProduct.stock : 999;
-    const parsed = parseInt(value, 10);
+    setCart((prev) =>
+      prev.some((item) => item._id === product._id)
+        ? prev
+        : [...prev, { ...product, quantity: 1 }]
+    );
 
+    // A counter display has room to reveal the receipt immediately. On a
+    // phone/tablet it would cover the catalogue after every tap, so the new
+    // item lands in the animated bottom cart bar instead and the student opens
+    // the sheet when they are ready to review it.
+    setTicketFolded(
+      window.matchMedia?.("(max-width: 900px)").matches ?? false
+    );
+    setRecentlyAdded(product._id);
+    window.clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = window.setTimeout(
+      () => setRecentlyAdded(null),
+      1050
+    );
+  };
+
+  const stepQuantity = (productId, amount) => {
+    const currentLine = cart.find((item) => item._id === productId);
+    const currentQuantity = parseInt(currentLine?.quantity, 10) || 1;
+
+    if (amount < 0 && currentLine && currentQuantity <= 1) {
+      removeFromCart(productId);
+      return;
+    }
+
+    setCart((prevCart) =>
+      prevCart
+        .map((item) => {
+          if (item._id !== productId) return item;
+
+          const latest = products.find((p) => p._id === productId) || item;
+          const maxStock = latest.stock ?? item.stock;
+          const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
+          const next = (parseInt(item.quantity, 10) || 0) + amount;
+
+          if (next > maxAllowed) {
+            if (maxAllowed < maxStock) {
+              showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+              return item;
+            }
+            showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: next });
+            return item;
+          }
+
+          return { ...item, quantity: next };
+        })
+    );
+  };
+
+  const setQuantity = (productId, value) => {
+    if (value === "") {
+      setCart((prev) =>
+        prev.map((item) =>
+          item._id === productId ? { ...item, quantity: "" } : item
+        )
+      );
+      return;
+    }
+
+    const parsed = parseInt(value, 10);
     if (isNaN(parsed)) return;
 
-    setCart(prevCart => {
-      return prevCart.map(item => {
-        if (item._id === productId) {
-          if (parsed < 1) {
-            return { ...item, quantity: 1 };
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        if (item._id !== productId) return item;
+
+        const latest = products.find((p) => p._id === productId) || item;
+        const maxStock = latest.stock ?? item.stock;
+        const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
+
+        if (parsed < 1) return { ...item, quantity: 1 };
+        if (parsed > maxAllowed) {
+          if (maxAllowed < maxStock) {
+            showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+            return { ...item, quantity: maxAllowed };
           }
-          if (parsed > maxStock) {
-            alert(`Cannot exceed available warehouse stock of ${maxStock}!`);
-            return { ...item, quantity: maxStock };
-          }
-          return { ...item, quantity: parsed };
+          showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: parsed });
+          return { ...item, quantity: maxStock };
         }
-        return item;
-      });
-    });
+
+        return { ...item, quantity: parsed };
+      })
+    );
   };
 
   const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item._id !== productId));
+    // The map is the synchronous lock. State does not update until the next
+    // render, so relying on removingIds alone would let rapid taps schedule
+    // several removals for the same receipt line.
+    if (removeTimersRef.current.has(productId)) return;
+
+    setRemovingIds((prev) => [...prev, productId]);
+    const reducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const timer = window.setTimeout(
+      () => {
+        setCart((prev) => prev.filter((item) => item._id !== productId));
+        setRemovingIds((prev) => prev.filter((id) => id !== productId));
+        removeTimersRef.current.delete(productId);
+      },
+      reducedMotion ? 0 : 640
+    );
+    removeTimersRef.current.set(productId, timer);
   };
 
-  const handleCancelPayment = () => {
-    if (window.confirm("Are you sure you want to cancel payment? This will reset the terminal.")) {
-      setCart([]);
-      setSelectedStudent(null);
-      setSearchResults([]);
-      setSearchQuery("");
-      setProductSearchQuery("");
-      setIsSearched(false);
+  // Empties the order without ending the session. Starting the basket again
+  // is not the same as being finished — that is what Done is for.
+  const cancelOrder = () => {
+    removeTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    removeTimersRef.current.clear();
+    setRemovingIds([]);
+    setCart([]);
+    setProductSearchQuery("");
+    setConfirmCancel(false);
+  };
+
+  // The ticket priced as lines the server can charge. A cleared quantity box
+  // bills as 1, the same way it prices.
+  const billedItems = () =>
+    cart.map((item) => ({
+      productId: item._id,
+      quantity: parseInt(item.quantity, 10) || 1,
+    }));
+
+  // The token comes from verify-payment and is bound to exactly the lines that
+  // were sent with it, so those same lines are passed in here rather than read
+  // off the cart again — anything re-derived in between would not match, and
+  // the server would refuse the charge.
+  const handleCheckout = async (items, purchaseToken) => {
+    try {
+      // No studentId: the session's token says whose wallet this is, and the
+      // server reads it from there rather than from anything sent here.
+      await api.post("/transactions/bill", {
+        items,
+        totalAmount: invoiceTotal,
+        purchaseToken,
+      });
+
+      setResult("paid");
+    } catch (err) {
+      console.error("Checkout Error:", err);
+      const issue = presentError(err, { message: err.response?.data?.message || err.response?.data?.error || "Checkout failed" });
+      showFeedback(err, issue);
+      if (['staleData', 'insufficientStock'].includes(issue.presentation)) refreshPage();
     }
   };
 
-const handleCheckout = async () => {
+  /* The other ending. When a parent has asked to approve their child's
+     purchases, the same code buys a request rather than the food: nothing is
+     charged and no stock moves until they say yes in the app. So the screen
+     that follows has to be unambiguous that nothing has been paid for yet. */
+  const requestApproval = async (items, purchaseToken) => {
+    try {
+      await api.post("/pending-orders", { items, purchaseToken });
 
-  if (!selectedStudent) {
-    alert("Please search and select a student.");
-    return;
-  }
+      setResult("pending");
+    } catch (err) {
+      console.error("Approval request error:", err);
+      showFeedback(err, { message: err.response?.data?.message || "Could not send the order for approval" });
+    }
+  };
 
-  const calibratedCart = cart.map(item => ({
-    productId: item._id,
-    quantity: Number(item.quantity)
-  }));
+  const handleVerifyAndPay = async () => {
+    // Without this guard a second tap during the verify round-trip re-enters
+    // from the same closure and bills the student twice.
+    if (payingRef.current) return;
+    payingRef.current = true;
+    setPaying(true);
+    setPinIssue(null);
 
-  try {
+    try {
+      const items = billedItems();
 
-    const res = await api.post("/pending-orders", {
-      studentId: selectedStudent._id,
-      items: calibratedCart
-    });
+      // Only the code and the lines. Who is paying comes from the session's
+      // token, and the parent's mobile number is no longer a second factor —
+      // there is nobody at the counter to ask for it.
+      const { data } = await api.post("/transactions/verify-payment", {
+        password: purchasePassword,
+        items,
+      });
 
+      setShowVerifyModal(false);
+      setPurchasePassword("");
+
+      // The code was right either way. Which of the two endings follows is the
+      // parent's standing choice, reported by verify-payment so the till does
+      // not have to look the student up a second time to find out.
+      if (data?.requiresApproval) {
+        await requestApproval(items, data?.purchaseToken);
+      } else {
+        const liveBalance = await refreshWallet();
+        if (invoiceTotal > liveBalance) {
+          showFeedback({ message: "Not enough in your wallet for this." }, { available: liveBalance, required: invoiceTotal });
+          return;
+        }
+        await handleCheckout(items, data?.purchaseToken);
+      }
+    } catch (err) {
+      /* Locked out. Five wrong codes closes checkout for fifteen minutes, and
+         there is nothing to be done at this terminal in the meantime — so the
+         session ends rather than leaving a child tapping at a cart they cannot
+         pay for, with a queue behind them. */
+      if (err.response?.status === 423) {
+        setShowVerifyModal(false);
+        setLockoutIssue(presentError(err));
+        return;
+      }
+      const issue = presentError(err);
+      setPinIssue((current) => ({ ...issue, key: (current?.key || 0) + 1 }));
+      setPurchasePassword("");
+    } finally {
+      payingRef.current = false;
+      setPaying(false);
+    }
+  };
+
+  // Inert while the charge is in flight — including the backdrop, which used to
+  // stay clickable and could dismiss the modal mid-request.
+  const closeVerify = () => {
+    if (payingRef.current) return;
     setShowVerifyModal(false);
     setPurchasePassword("");
+    setPinIssue(null);
+  };
 
-    setWaitingApproval(true);
+  const categories = stockGroupNames(products);
+  const categoryCards = categories.map((category) => {
+    const items = sortProductsByName(products.filter(
+      (product) => product.stockGroup?.name === category
+    ));
+    return {
+      name: category,
+      count: items.length,
+      image: items.find((item) => item.image)?.image || "",
+    };
+  });
 
-    // Show waiting screen for 3 seconds
-  setTimeout(async () => {
+  const openCategory = (category) => {
+    if (openingCategory) return;
+    setOpeningCategory(category);
+    setSelectedCategory(category);
+    setSearchOpen(false);
+    setProductSearchQuery("");
+    window.clearTimeout(categoryTimerRef.current);
+    categoryTimerRef.current = window.setTimeout(() => {
+      setShowCategoryWelcome(false);
+      setOpeningCategory("");
+    }, 440);
+  };
 
-  setWaitingApproval(false);
+  const categoryProducts = sortProductsByName(products.filter(
+    (product) => product.stockGroup?.name === selectedCategory
+  ));
+  const categorySubCategoryOrder = categoryProducts[0]?.stockGroup?.subCategories || [];
+  const normalizedSearch = productSearchQuery.trim().toLocaleLowerCase();
+  const filteredProducts = categoryProducts.filter((product) =>
+    product.name?.toLocaleLowerCase().includes(normalizedSearch)
+  );
+  const subCategoryNames = [...new Set(filteredProducts.map((product) => product.subCategory || "Others"))]
+    .sort((a, b) => {
+      const aIndex = categorySubCategoryOrder.indexOf(a);
+      const bIndex = categorySubCategoryOrder.indexOf(b);
+      if (aIndex >= 0 || bIndex >= 0) {
+        if (aIndex < 0) return 1;
+        if (bIndex < 0) return -1;
+        return aIndex - bIndex;
+      }
+      return (a === "Others") - (b === "Others") || a.localeCompare(b);
+    });
+  const subCategorySections = subCategoryNames.map((name) => ({
+    name,
+    products: filteredProducts.filter((product) => (product.subCategory || "Others") === name),
+  }));
 
-  await fetchCatalog();
+  // The segmented lens is measured from the live segment rather than hardcoded,
+  // so it stays correct whatever the categories turn out to be called.
+  const segRef = useRef(null);
+  const [lens, setLens] = useState({ x: 0, w: 0 });
+  const categoryKey = categories.join("|");
 
-  setCart([]);
-  setSelectedStudent(null);
-  setSearchResults([]);
-  setSearchQuery("");
-  setProductSearchQuery("");
-  setIsSearched(false);
+  useLayoutEffect(() => {
+    const seat = () => {
+      const active = segRef.current?.querySelector('[data-on="true"]');
+      if (!active) return;
+      setLens({ x: active.offsetLeft, w: active.offsetWidth });
+    };
 
-  setShowCart(false);
+    seat();
+    const observer = new ResizeObserver(seat);
+    if (segRef.current) observer.observe(segRef.current);
+    window.addEventListener("resize", seat);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", seat);
+    };
+  }, [selectedCategory, categoryKey, showCategoryWelcome]);
 
-  setShowWelcome(true);
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    const focus = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(focus);
+  }, [searchOpen]);
 
-},3000);
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setProductSearchQuery("");
+  };
 
-  } catch(err){
+  /* The session's clocks. They stop once the sale has ended — the result
+     screen is not part of the session, and asking "still there?" over
+     somebody's receipt would be asking about something already finished.
 
-    alert(
-      err.response?.data?.message ||
-      "Unable to create pending order."
+     isBusy is read through the ref rather than the state so the cap sees the
+     charge that is in flight right now, not the one the last render knew
+     about. */
+  const { capRemaining, capWarning, idlePrompt, idleRemaining, dismissIdle } =
+    useSessionTimers({
+      active: !result,
+      onExpire: onLogout,
+      isBusy: () => payingRef.current,
+    });
+
+  // A session always has its student, so none of this is conditional any more.
+  const itemCount = cart.length;
+  const remaining = walletBalance - invoiceTotal;
+  const short = remaining < 0;
+  const canPay = cart.length > 0 && !short;
+
+  /* How the session ends. Held long enough to be read over a shoulder in a
+     queue, and skippable by touching it — the next student should not have to
+     wait out somebody else's receipt. The timers do not run here; the session
+     is already over, and this is only the telling. */
+  if (result) {
+    return (
+      <KioskResultScreen
+        variant={result}
+        mark={result === "paid" ? "✓" : "⏳"}
+        kicker={result === "paid" ? "All done" : "Request sent"}
+        title={result === "paid" ? "Order confirmed" : "Sent to your parent"}
+        body={result === "paid"
+          ? "Collect your items at the counter. Enjoy!"
+          : "Nothing has been charged yet — your parent has been asked to approve it."}
+        onDone={onLogout}
+        tapLabel="Tap anywhere for next order"
+      />
     );
-
   }
 
-};
-
-  const filteredProducts = products.filter((p) => {
-
-  const matchesCategory =
-    selectedCategory === "All" ||
-    p.stockGroup?.name === selectedCategory;
-
-  const matchesSearch =
-    p.name
-      .toLowerCase()
-      .includes(productSearchQuery.toLowerCase());
-
-  return matchesCategory && matchesSearch;
-});
-const categories = [
-  "All",
-  ...new Set(
-    products.map(p => p.stockGroup?.name).filter(Boolean)
-  ),
-];
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "#f8fafc",
-      padding: "32px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box",
-    },
-    topSection: {
-      marginBottom: "24px",
-    },
-   bottomGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr",
-},
-    card: {
-      width: "100%",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "14px",
-      padding: "20px",
-      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      boxSizing: "border-box",
-    },
-    lookupFlex: {
-      display: "flex",
-      gap: "16px",
-      alignItems: "center",
-    },
-   panelTitle: {
-  fontSize: "42px",
-  fontWeight: "900",
-  fontFamily: "'Poppins', sans-serif",
-  color: "#033d6c",
-  letterSpacing: "2px",
-  // textTransform: "uppercase",
-  textShadow: "2px 2px 6px rgba(66, 55, 10, 0.25)",
-  marginTop: 0,
-  marginBottom: "16px",
-},
-    input: {
-      flex: 1,
-      padding: "12px 14px",
-      border: "1px solid #e2e8f0",
-      borderRadius: "10px",
-      fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
-      outline: "none",
-      transition: "border-color 0.2s",
-      boxSizing: "border-box",
-    },
-    productSearchInput: {
-      width: "100%",
-      padding: "10px 12px",
-      border: "1px solid #e2e8f0",
-      borderRadius: "8px",
-      fontSize: "13px",
-      color: "#0f172a",
-      backgroundColor: "#f8fafc",
-      outline: "none",
-      transition: "border-color 0.2s, background-color 0.2s",
-      boxSizing: "border-box",
-      marginBottom: "16px",
-    },
-    primaryBtn: {
-      padding: "12px 24px",
-      background: "orange",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-      whiteSpace: "nowrap",
-    },
-    resultsSection: {
-      marginTop: "20px",
-    },
-    resultsTitle: {
-      fontSize: "15px",
-      fontWeight: "600",
-      color: "#1e293b",
-      marginBottom: "12px",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      marginTop: "8px",
-      textAlign: "left",
-    },
-    th: {
-      backgroundColor: "#f1f5f9",
-      color: "#334155",
-      fontWeight: "600",
-      padding: "12px",
-      fontSize: "13px",
-      borderBottom: "2px solid #e2e8f0",
-    },
-    tr: {
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    td: {
-      padding: "12px",
-      fontSize: "14px",
-      color: "#0f172a",
-      borderBottom: "1px solid #e2e8f0",
-    },
-    selectBtn: {
-      padding: "6px 12px",
-      background: "#0284c7",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "6px",
-      fontWeight: "600",
-      fontSize: "12px",
-      cursor: "pointer",
-    },
-    studentRowDetails: {
-      display: "flex",
-      gap: "24px",
-      alignItems: "center",
-      marginTop: "16px",
-      paddingTop: "16px",
-      borderTop: "1px solid #f1f5f9",
-    },
-    studentInlineBanner: {
-      display: "flex",
-      gap: "16px",
-      fontSize: "14px",
-      color: "#475569",
-      fontWeight: "500",
-      backgroundColor: "#f1f5f9",
-      padding: "10px 14px",
-      borderRadius: "8px",
-      marginBottom: "16px",
-    },
-    studentName: {
-      fontSize: "15px",
-      fontWeight: "600",
-      color: "#0f172a",
-    },
-    studentMeta: {
-      fontSize: "13px",
-      color: "#334155",
-      fontWeight: "500",
-    },
-    walletBadge: {
-      padding: "8px 14px",
-      background: "#fef3c7",
-      color: "#92400e",
-      borderRadius: "8px",
-      fontSize: "14px",
-      fontWeight: "600",
-      marginLeft: "auto",
-    },
-    scrollContainer: {
-  maxHeight: "750px",
-      overflowY: "auto",
-      paddingRight: "6px",
-    },
-    productItem: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "10px",
-      marginBottom: "10px",
-    },
-    productName: {
-      fontWeight: "600",
-      fontSize: "14px",
-      color: "#0f172a",
-    },
-    productStock: {
-      fontSize: "12px",
-      color: "#64748b",
-      marginTop: "2px",
-    },
-    actionControlWrap: {
-      display: "flex",
-      alignItems: "center",
-      gap: "12px",
-    },
-    qtySelector: {
-      display: "flex",
-      alignItems: "center",
-      border: "1px solid #e2e8f0",
-      borderRadius: "8px",
-      overflow: "hidden",
-      backgroundColor: "#f8fafc",
-    },
-    qtyBtn: {
-      width: "32px",
-      height: "32px",
-      border: "none",
-      background: "transparent",
-      color: "#334155",
-      fontSize: "16px",
-      fontWeight: "600",
-      cursor: "pointer",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "background-color 0.15s",
-    },
-    qtyInput: {
-      width: "40px",
-      height: "32px",
-      borderTop: "none",
-      borderBottom: "none",
-      borderLeft: "1px solid #e2e8f0",
-      borderRight: "1px solid #e2e8f0",
-      background: "#ffffff",
-      textAlign: "center",
-      fontSize: "13px",
-      fontWeight: "600",
-      color: "#0f172a",
-      outline: "none",
-    },
-    addBtn: {
-      padding: "8px 14px",
-      background: "#0d4d82",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "8px",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    
-    checkoutSection: {
-      marginTop: "24px",
-      paddingTop: "16px",
-      borderTop: "1px solid #e2e8f0",
-    },
-    totalRow: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
-    totalLabel: {
-      fontSize: "16px",
-      fontWeight: "600",
-      color: "#64748b",
-    },
-    totalAmount: {
-      fontSize: "22px",
-      fontWeight: "700",
-      color: "#0f172a",
-    },
-    remainingBalance: (isNegative) => ({
-      fontSize: "13px",
-      color: isNegative ? "#dc2626" : "#16a34a",
-      fontWeight: "500",
-      marginTop: "4px",
-      textAlign: "right",
-    }),
-    btnActionGroup: {
-      display: "flex",
-      gap: "12px",
-      marginTop: "16px",
-    },
-    successBtn: {
-      flex: 1,
-      padding: "12px",
-      background: "#16a34a",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    cancelBtn: {
-      padding: "12px 20px",
-      background: "#dc2626",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "10px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    highlightPrice: {
-      color: "#0f172a",
-      fontWeight: "700",
-      fontSize: "14px",
-      marginRight: "8px",
-    },
-    emptyState: {
-      color: "#64748b",
-      fontSize: "14px",
-      margin: 0,
-    },
-    cartQtyText: {
-      width: "35px",
-      height: "24px",
-      textAlign: "center",
-      fontSize: "13px",
-      fontWeight: "600",
-      color: "#0f172a",
-      border: "1px solid #cbd5e1",
-      borderRadius: "4px",
-      outline: "none",
-      backgroundColor: "#ffffff",
-    },
-    cartQtyBtn: {
-      width: "24px",
-      height: "24px",
-      borderRadius: "4px",
-      border: "1px solid #cbd5e1",
-      background: "#f8fafc",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: "700",
-      fontSize: "12px",
-      color: "#475569",
-    },
-    removeBtn: {
-  width: "26px",
-  height: "26px",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "#fee2e2",
-  color: "#ef4444",
-  border: "none",
-  borderRadius: "6px",
-  fontSize: "16px",
-  fontWeight: "600",
-  cursor: "pointer",
-  transition: "all 0.2s ease",
-  lineHeight: "1",
-  padding: 0,
-},
-
-welcomeScreen: {
-  minHeight: "100vh",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-  alignItems: "center",
-  textAlign: "center",
-
-  background:
-    "linear-gradient(135deg,#FF6B35 0%, #F59E0B 50%, #FACC15 100%)",
-
-  color: "#ffffff",
-  overflow: "hidden",
-},
-
-welcomeTitle: {
-  fontSize: "72px",
-  fontWeight: "900",
-  letterSpacing: "2px",
-  color: "#ffffff",
-  textShadow: "3px 3px 10px rgba(0,0,0,.25)",
-  marginTop: 25,
-  marginBottom: 15,
-},
-
-welcomeSubTitle: {
-  fontSize: "28px",
-  fontWeight: "500",
-  color: "#FFF7ED",
-  // marginBottom: "45px",
-},
-
-startButton: {
-  padding: "22px 85px",
-  fontSize: "28px",
-  fontWeight: "700",
-  border: "none",
-  borderRadius: "60px",
-  background: "#ffffff",
-  color: "#EA580C",
-  cursor: "pointer",
-  boxShadow: "0 15px 30px rgba(0,0,0,.25)",
-  transition: ".3s",
-  marginTop: 0,       // remove top margin
-},
-
-
-
-productGrid: {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-  gap: 22,
-},
-
-productCard: {
-  background: "#fff",
-  borderRadius: 18,
-  overflow: "hidden",
-  boxShadow: "0 8px 25px rgba(0,0,0,.08)",
-  border: "1px solid #eee",
-  transition: ".25s",
-},
-
-productImage: {
-  width: "100%",
-  height: 180,
-  objectFit: "cover",
-},
-
-productBody: {
-  padding: 15,
-},
-
-productTitle: {
-  fontWeight: 700,
-  fontSize: 18,
-  marginBottom: 8,
-},
-
-priceText: {
-  color: "#2563EB",
-  fontWeight: 700,
-  fontSize: 20,
-},
-
-stockBadge: {
-  display: "inline-block",
-  background: "#DCFCE7",
-  color: "#166534",
-  padding: "4px 10px",
-  borderRadius: 20,
-  fontSize: 12,
-  marginTop: 6,
-},
-
-cardFooter: {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 14,
-},
-
-    
-  };
-if (showWelcome) {
-  const cartCount = cart.reduce(
-  (sum, item) => sum + item.quantity,
-  0
-);
-  return (
-    <div style={styles.welcomeScreen}>
-      
-     <img
-  src={hungerLogo}
-  alt="Hunger Hunt"
-  style={{
-    width: "420px",
-    maxWidth: "85%",
-    height: "auto",
-    marginBottom: "20px",
-  }}
-/>
-
-
-
-<div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0px", // No gap between text and button
-  }}
->
- 
-
-  <button
-    style={{
-      ...styles.startButton,
-      marginTop: 0,
-    }}
-    onClick={() => setShowWelcome(false)}
-  >
-    START ORDER
-  </button>
-</div>
-    </div>
-  );
-}
-  return (
-    <div style={styles.page}>
-      <style>{`
-        ::-webkit-scrollbar {
-          width: 10px;
-          height: 10px;
-        }
-        ::-webkit-scrollbar-track {
-          background: #f1f5f9;
-          border-radius: 8px;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #2563eb;
-          border-radius: 8px;
-          border: 2px solid #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background: #1d4ed8;
-        }
-        .product-scroll-panel::-webkit-scrollbar {
-          width: 6px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-track {
-          background: #f8fafc;
-          border-radius: 4px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-thumb {
-          background: #3b82f6;
-          border-radius: 4px;
-        }
-        .product-scroll-panel::-webkit-scrollbar-thumb:hover {
-          background: #2563eb;
-        }
-      `}</style>
-
-      
-
-      {/* BOTTOM SECTION - DUAL SIDE-BY-SIDE PANEL */}
-      <div style={styles.bottomGrid}>
-          {/* LEFT SIDE: AVAILABLE PRODUCTS */}
-          <div style={styles.card}>
-            <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  }}
->
-  <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  }}
->
-  <h3 style={{ ...styles.panelTitle, marginBottom: 0 }}>
-    Hunger Hunt
-  </h3>
-
-  
-</div>
-
-  <button
-    onClick={() => setShowCart(true)}
-    style={{
-      border: "none",
-      background: "transparent",
-      cursor: "pointer",
-      position: "relative",
-    }}
-  >
-    <ShoppingCart size={34} />
-
-    {cart.length > 0 && (
-      <span
-        style={{
-          position: "absolute",
-          top: -6,
-          right: -8,
-          background: "#ef4444",
-          color: "#fff",
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          fontSize: 12,
-          fontWeight: "bold",
-        }}
-      >
-        {cartCount}
-      </span>
-    )}
-  </button>
-</div>
-            <div
-  style={{
-    display: "flex",
-    gap: 12,
-    overflowX: "auto",
-    marginBottom: 20,
-    paddingBottom: 6,
-  }}
->
-  {categories.map(category => (
-    <button
-      key={category}
-      onClick={() => setSelectedCategory(category)}
-      style={{
-        padding: "12px 22px",
-        borderRadius: 30,
-        border: "none",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        fontWeight: 700,
-        fontSize: 15,
-
-        background:
-          selectedCategory === category
-            ? "#0d4d82"
-            : "#E5E7EB",
-
-        color:
-          selectedCategory === category
-            ? "#fff"
-            : "#111827",
-      }}
-    >
-      {category}
-    </button>
-  ))}
-</div>
-            <input
-              style={styles.productSearchInput}
-              placeholder="🔍 Quick filter products by name..."
-              value={productSearchQuery}
-              onChange={(e) => setProductSearchQuery(e.target.value)}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "#2563eb";
-                e.currentTarget.style.backgroundColor = "#ffffff";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "#e2e8f0";
-                e.currentTarget.style.backgroundColor = "#f8fafc";
-              }}
-            />
-
-            <div className="product-scroll-panel" style={styles.scrollContainer}>
-              {loadingProducts ? (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      height: 250,
-      fontSize: 18,
-      fontWeight: 600,
-    }}
-  >
-    Loading Products...
-  </div>
-) : filteredProducts.length === 0 ? (
-  <p
-    style={{
-      ...styles.emptyState,
-      textAlign: "center",
-      padding: "20px 0",
-    }}
-  >
-    No active items match your product filters.
-  </p>
-) : (
-                <div style={styles.productGrid}>
-  {filteredProducts.map((p) => {
-
-    const cartItem = cart.find(item => item._id === p._id);
-
-    const currentQty =
-      cartItem
-        ? cartItem.quantity
-        : (stagedQuantities[p._id] ?? 1);
-
+  if (lockoutIssue) {
     return (
+      <KioskResultScreen
+        variant="locked"
+        mark="🔒"
+        kicker="Purchase code paused"
+        title={lockoutIssue.title}
+        body="Try again when the lock ends, or ask your parent to set a new purchase code in the app."
+        onDone={onLogout}
+        seconds={12}
+      />
+    );
+  }
 
-      <div key={p._id} style={styles.productCard}>
+  // The catalogue is the store's front door. A failed inventory request means
+  // the backend/store cannot safely take an order, while a successful empty
+  // response means there is nothing available to sell. In either case, stop
+  // here instead of opening an empty or stale product wall.
+  if (inventoryError || (!loadingProducts && categoryCards.length === 0)) {
+    return (
+      <KioskResultScreen
+        {...TECHNICAL_DIFFICULTIES_SCREEN}
+        onDone={onLogout}
+      />
+    );
+  }
 
-        <img
-          src={p.image || "https://placehold.co/400x300?text=No+Image"}
-          alt={p.name}
-          style={styles.productImage}
-        />
+  if (showCategoryWelcome) {
+    return (
+      <>
+        <main
+          className={`kiosk-category-welcome${openingCategory ? " kiosk-category-welcome--opening" : ""}`}
+          aria-busy={loadingProducts}
+        >
+          <div className="kiosk-category-ambient kiosk-category-ambient--one" aria-hidden="true" />
+          <div className="kiosk-category-ambient kiosk-category-ambient--two" aria-hidden="true" />
 
-        <div style={styles.productBody}>
-<div
-  style={{
-    fontSize: "18px",
-    fontWeight: "700",
-    color: "#374151",
-    marginBottom: "8px",
-    textAlign: "left",
-  }}
->
-  {p.name}
-</div>
+          <header className="kiosk-category-topbar">
+            <div className="kiosk-wordmark kiosk-wordmark--category">Hunger Hunt</div>
+            <div className="kiosk-category-student">
+              <span aria-hidden="true">{student.name?.charAt(0).toUpperCase()}</span>
+              <div><small>Ordering for</small><strong>{student.name}</strong></div>
+            </div>
+            <div className="kiosk-category-wallet">
+              <small>Wallet balance</small>
+              <strong className="money">{formatINR(walletBalance)}</strong>
+            </div>
+            <button type="button" className="kiosk-category-exit" onClick={onLogout}>
+              End session
+            </button>
+            <div
+              className="kiosk-session-clock kiosk-session-clock--category"
+              role="timer"
+              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
+            >
+              <small>Session</small>
+              <strong>{formatSessionTime(capRemaining)}</strong>
+            </div>
+          </header>
 
-<div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "12px",
-  }}
->
-  <div>
-    <div
-      style={{
-        fontSize: "18px",
-        fontWeight: "700",
-        color: "#111827",
-      }}
-    >
-      ₹{p.price}
-    </div>
-  </div>
+          <section className="kiosk-category-hero">
+            <p>Welcome, {student.name?.split(" ")[0]}</p>
+            <h1>What would you like to buy?</h1>
+            <span>Choose a category to start your order.</span>
+          </section>
 
-  <div
-    style={{
-      fontSize: "15px",
-      fontWeight: "500",
-      color: "#374151",
-    }}
-  >
-    {p.stock} Stock
-  </div>
-</div>
+          {loadingProducts ? (
+            <div className="kiosk-category-grid kiosk-category-grid--loading" aria-label="Loading categories">
+              {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
+            </div>
+          ) : (
+            <div className="kiosk-category-grid" role="tablist" aria-label="Product categories">
+              {categoryCards.map((category, index) => (
+                <button
+                  type="button"
+                  role="tab"
+                  className={`kiosk-category-card${openingCategory === category.name ? " kiosk-category-card--opening" : ""}`}
+                  key={category.name}
+                  style={{ "--category-index": index }}
+                  aria-selected={openingCategory === category.name}
+                  onClick={() => openCategory(category.name)}
+                >
+                  <span className="kiosk-category-card__image">
+                    {category.image ? (
+                      <img src={category.image} alt="" />
+                    ) : (
+                      <b aria-hidden="true">{titleCase(category.name).charAt(0)}</b>
+                    )}
+                  </span>
+                  <span className="kiosk-category-card__copy">
+                    <strong>{titleCase(category.name)}</strong>
+                    <small>{category.count} {category.count === 1 ? "item" : "items"}</small>
+                  </span>
+                  <span className="kiosk-category-card__arrow" aria-hidden="true">→</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div style={styles.cardFooter}>
+          {cart.length > 0 && (
+            <button
+              type="button"
+              className="kiosk-category-resume"
+              onClick={() => setShowCategoryWelcome(false)}
+            >
+              Resume order · {itemCount} {itemCount === 1 ? "item" : "items"} · {formatINR(invoiceTotal)}
+            </button>
+          )}
+        </main>
 
-            <div style={styles.qtySelector}>
+        {capWarning && !idlePrompt && (
+          <div className="kiosk-cap-banner" role="status">
+            Session ending in {capRemaining}s
+          </div>
+        )}
+        {idlePrompt && (
+          <div className="kiosk-idle-veil" role="alertdialog" aria-label="Are you still there?">
+            <div className="kiosk-idle-card">
+              <h2>Still there?</h2>
+              <p>Your session ends in {idleRemaining}s.</p>
+              <button type="button" className="kiosk-start" onClick={dismissIdle}>I&rsquo;m here</button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
-              <button
-                style={styles.qtyBtn}
-                onClick={() => {
-                  if (cartItem)
-                    updateCartItemQuantity(p._id, -1);
-                  else
-                    updateStagedQuantity(p._id, -1, p.stock);
-                }}
-              >
-                -
-              </button>
+  const ticketVisible = cart.length > 0 && !ticketFolded;
+  const stubVisible = cart.length > 0 && ticketFolded;
 
-              <input
-                value={currentQty}
-                style={styles.qtyInput}
-                onChange={(e) => {
-                  if (cartItem)
-                    handleCartManualQuantityChange(
-                      p._id,
-                      e.target.value
-                    );
-                  else
-                    handleManualQuantityChange(
-                      p._id,
-                      e.target.value,
-                      p.stock
-                    );
-                }}
-              />
+  return (
+    <>
+      <div
+        className={`till till--category-enter${cart.length === 0 ? " till--bare" : ""}${
+          stubVisible ? " till--folded" : ""
+        }${ticketVisible ? " till--cart-open" : ""}`}
+      >
+        {ticketVisible && (
+          <button
+            type="button"
+            className="mobile-ticket-backdrop"
+            onClick={() => setTicketFolded(true)}
+            aria-label="Close order ticket"
+          />
+        )}
 
-              <button
-                style={styles.qtyBtn}
-                onClick={() => {
-                  if (cartItem)
-                    updateCartItemQuantity(p._id, 1);
-                  else
-                    updateStagedQuantity(p._id, 1, p.stock);
-                }}
-              >
-                +
-              </button>
+        {ticketVisible && (
+          <aside className="ticket-col">
+            <div className="ticket-brand">
+              <img src={hungerLogo} alt="" />
+              <span>Counter 1</span>
+            </div>
+
+            <div className="ticket">
+              <div className="ticket-slip">
+                <h2>Order Ticket</h2>
+                <p>
+                  {itemCount} {itemCount === 1 ? "item" : "items"}
+                </p>
+              </div>
+
+              {/* The hostel and the father's name were here for a cashier
+                  making sure they had the right child. The child is holding
+                  the terminal now, so what is left is what they came to check:
+                  that this is them, and what they have to spend. */}
+              <div className="ticket-who">
+                <div className="ticket-who-row">
+                  <span>Student</span>
+                  <b>{student.name}</b>
+                </div>
+                <div className="ticket-who-row">
+                  <span>Admission</span>
+                  <b>{student.admissionNumber}</b>
+                </div>
+                <div className="ticket-wallet">
+                  <span>Wallet</span>
+                  <b className="money">{formatINR(walletBalance)}</b>
+                </div>
+              </div>
+
+              <div className="ticket-lines">
+                <div className="ticket-lhead">
+                  <span />
+                  <span>Item</span>
+                  <span>Qty</span>
+                  <span>Amount</span>
+                  <span />
+                </div>
+
+                {cart.map((item) => (
+                  <div
+                    className={`ticket-line${
+                      recentlyAdded === item._id
+                        ? " ticket-line--paint-born"
+                        : ""
+                    }${
+                      removingIds.includes(item._id)
+                        ? " ticket-line--paint-delete"
+                        : ""
+                    }`}
+                    key={item._id}
+                  >
+                    {(recentlyAdded === item._id ||
+                      removingIds.includes(item._id)) && (
+                      <span
+                        className={`ticket-paint${
+                          removingIds.includes(item._id)
+                            ? " ticket-paint--erase"
+                            : ""
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <i /><i /><i /><i /><i /><i /><i /><i />
+                      </span>
+                    )}
+                    <img src={item.image || PLACEHOLDER} alt="" />
+
+                    <div className="ticket-line-name">
+                      {item.name}
+                      <em className="money">{formatINR(item.price)} each</em>
+                    </div>
+
+                    <div className="ticket-line-qty money">{item.quantity}</div>
+
+                    <div className="ticket-line-amt money">
+                      {formatINR(
+                        item.price * (parseInt(item.quantity, 10) || 1)
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="ticket-line-drop"
+                      onClick={() => removeFromCart(item._id)}
+                      disabled={removingIds.includes(item._id)}
+                      aria-label={`Remove ${item.name} from the order`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="ticket-tot">
+                <div className="ticket-tot-row">
+                  <span>Items</span>
+                  <b className="money">{itemCount}</b>
+                </div>
+
+                <div
+                  className={`ticket-tot-row${
+                    short ? " ticket-tot-row--short" : ""
+                  }`}
+                >
+                  <span>{short ? "Short by" : "Balance after"}</span>
+                  <b className="money">{formatINR(Math.abs(remaining))}</b>
+                </div>
+
+                {short && (
+                  <BalanceMeter available={walletBalance} required={invoiceTotal} />
+                )}
+
+                <div className="ticket-grand">
+                  <span>Total</span>
+                  <b className="money" key={invoiceTotal}>
+                    {formatINR(invoiceTotal)}
+                  </b>
+                </div>
+
+                <Button
+                  className="btn--place"
+                  disabled={!canPay}
+                  onClick={() => setShowVerifyModal(true)}
+                >
+                  Place Order
+                </Button>
+
+                <Button
+                  className="btn--cancel"
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  Cancel order
+                </Button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="ticket-handle"
+              onClick={() => setTicketFolded(true)}
+              aria-label="Hide the order ticket"
+            >
+              &lsaquo;
+            </button>
+          </aside>
+        )}
+
+        {stubVisible && (
+          <aside
+            className={`ticket-stub${recentlyAdded ? " ticket-stub--just-added" : ""}`}
+          >
+            <div
+              className="ticket-stub-paper"
+              role="button"
+              tabIndex={0}
+              onClick={() => setTicketFolded(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setTicketFolded(false);
+              }}
+              aria-label="Show the order ticket"
+            >
+              <span className="ticket-stub-n money">{itemCount}</span>
+              <span className="ticket-stub-rot">Order ticket</span>
+              <span className="ticket-stub-tot">
+                <span>Total</span>
+                <b className="money">{formatINR(invoiceTotal)}</b>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="ticket-handle"
+              onClick={() => setTicketFolded(false)}
+              aria-label="Show the order ticket"
+            >
+              &rsaquo;
+            </button>
+          </aside>
+        )}
+
+        <section className={`wall${productWallScrolled ? " wall--scrolled" : ""}`}>
+          <div
+            className="wall-scroll"
+            onScroll={(event) => setProductWallScrolled(event.currentTarget.scrollTop > 1)}
+          >
+            <div className="wall-fixed">
+              <div className="wall-top">
+            <div className="kiosk-wordmark kiosk-wordmark--wall">Hunger Hunt</div>
+
+            {/* Where the student search used to be. Nobody is looked up here
+                any more — the session already knows who this is, so the bar
+                reports it instead of asking. */}
+            <div className="serving glass">
+              <span className="serving-avatar" aria-hidden="true">
+                {student.name?.charAt(0).toUpperCase()}
+              </span>
+
+              <div className="serving-who">
+                <div className="serving-label">Ordering for</div>
+                <div className="serving-name">{student.name}</div>
+                <div className="serving-meta">Admission no. {student.admissionNumber}</div>
+              </div>
 
             </div>
 
             <button
-              style={styles.addBtn}
-              onClick={() => addToCart(p)}
+              type="button"
+              className="kiosk-exit"
+              onClick={() => setConfirmExit(true)}
+              aria-label="Cancel order and end session"
             >
-              Add
+              <span aria-hidden="true">×</span>
             </button>
+            <div
+              className="kiosk-session-clock"
+              role="timer"
+              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
+            >
+              <small>Session</small>
+              <strong>{formatSessionTime(capRemaining)}</strong>
+            </div>
+              </div>
 
+              {inventoryError && (
+                <ErrorFeedback
+                  issue={presentError({ request: true, message: inventoryError })}
+                  level="inline"
+                  action={{ label: 'Try again', onClick: refreshPage }}
+                />
+              )}
+
+            <div className={`filterbar${searchOpen ? " filterbar--searching" : ""}`}>
+              <div className="filterbar-groups">
+                <div
+                  className="seg"
+                  ref={segRef}
+                  role="tablist"
+                  aria-hidden={searchOpen}
+                >
+                  <span
+                    className="seg-lens"
+                    aria-hidden="true"
+                    style={{ "--x": `${lens.x}px`, "--w": `${lens.w}px` }}
+                  />
+
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category}
+                      role="tab"
+                      className="seg-item"
+                      data-on={selectedCategory === category}
+                      aria-selected={selectedCategory === category}
+                      tabIndex={searchOpen ? -1 : 0}
+                      onClick={() => setSelectedCategory(category)}
+                    >
+                      {titleCase(category)}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="filterbar-group-logo"
+                  aria-label="Close search and show categories"
+                  tabIndex={searchOpen ? 0 : -1}
+                  onClick={closeSearch}
+                >
+                  <img src={hungerLogo} alt="" />
+                </button>
+              </div>
+
+              <div className="wall-search glass">
+                <input
+                  ref={searchInputRef}
+                  className="wall-filter-input"
+                  placeholder="Find an item…"
+                  aria-label="Find an item by name"
+                  tabIndex={searchOpen ? 0 : -1}
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") closeSearch();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="wall-search-toggle"
+                  aria-label={searchOpen ? "Close product search" : "Search products"}
+                  aria-expanded={searchOpen}
+                  onClick={() => searchOpen ? closeSearch() : setSearchOpen(true)}
+                >
+                  <span aria-hidden="true">{searchOpen ? "×" : "⌕"}</span>
+                </button>
+              </div>
+            </div>
+            </div>
+
+            {!loadingProducts && selectedCategory && (
+              <header className="wall-group-heading">
+                <div>
+                  <span>Category</span>
+                  <h2>{titleCase(selectedCategory)}</h2>
+                </div>
+                <p>
+                  {productSearchQuery.trim()
+                    ? `${filteredProducts.length} matching ${filteredProducts.length === 1 ? 'item' : 'items'}`
+                    : `${categoryProducts.length} ${categoryProducts.length === 1 ? 'item' : 'items'} · A–Z`}
+                </p>
+              </header>
+            )}
+
+            {loadingProducts ? (
+              <div className="wall-state">
+                <b>Loading products…</b>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="wall-state wall-state--empty">
+                <span className="wall-state__icon" aria-hidden="true">{productSearchQuery.trim() ? '⌕' : '↻'}</span>
+                <b>{productSearchQuery.trim() ? 'No items found' : 'This category is being restocked'}</b>
+                <span>
+                  {productSearchQuery.trim()
+                    ? 'Try another product name or choose a different category.'
+                    : 'Choose another category or ask a staff member for help.'}
+                </span>
+              </div>
+            ) : (
+              <div className="kiosk-subcategory-shelves">
+                {subCategorySections.map((subCategory, sectionIndex) => (
+                  <section className="kiosk-subcategory" key={subCategory.name} aria-labelledby={`subcategory-${sectionIndex}`}>
+                    <header className="kiosk-subcategory__heading">
+                      <div>
+                        <h3 id={`subcategory-${sectionIndex}`}>{subCategory.name}</h3>
+                      </div>
+                      <p>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'} <b aria-hidden="true">→</b></p>
+                    </header>
+                    <div className="wall-grid wall-grid--rail" role="list">
+                {subCategory.products.map((p, i) => {
+                  const line = cart.find((item) => item._id === p._id);
+                  const maxAllowed = Math.min(p.stock, allowanceCeiling(p));
+                  const limitReached = maxAllowed < 1;
+                  const atCeiling =
+                    (parseInt(line?.quantity, 10) || 0) >= maxAllowed;
+
+                  return (
+                    <article
+                      className={`tile${
+                        recentlyAdded === p._id ? " tile--just-added" : ""
+                      }`}
+                      key={p._id}
+                      style={{ "--i": i + sectionIndex }}
+                      role="listitem"
+                    >
+                      <figure>
+                        <img src={p.image || PLACEHOLDER} alt="" />
+                      </figure>
+
+                      {p.nutrition && (
+                        <Button
+                          className="tile-info"
+                          onClick={() => setNutritionFor(p)}
+                          aria-label={`Nutrition information for ${p.name}`}
+                        >
+                          i
+                        </Button>
+                      )}
+
+                      <span className="tile-price money">
+                        {formatINR(p.price)}
+                      </span>
+
+                      <div className="tile-body">
+                        <h3 className="tile-name">{p.name}</h3>
+
+                        {p.stockGroup?.name && (
+                          <p className="tile-meta">
+                            {titleCase(p.stockGroup.name)}
+                          </p>
+                        )}
+
+                        {p.purchaseAllowance?.enabled && (
+                          <p className={`tile-limit${limitReached ? " tile-limit--reached" : ""}`}>
+                            {limitReached
+                              ? `${allowancePeriod(p.purchaseAllowance.period)} limit reached`
+                              : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`}
+                          </p>
+                        )}
+
+                        {p.nutrition && (
+                          <div className="tile-macros">
+                            <div className="tile-macro">
+                              <b className="money">
+                                {p.nutrition.calories === null
+                                  ? BLANK
+                                  : p.nutrition.calories}
+                              </b>
+                              <span>kcal</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">
+                                {p.nutrition.protein === null
+                                  ? BLANK
+                                  : `${p.nutrition.protein}g`}
+                              </b>
+                              <span>Prot</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">
+                                {p.nutrition.carbs === null
+                                  ? BLANK
+                                  : `${p.nutrition.carbs}g`}
+                              </b>
+                              <span>Carb</span>
+                            </div>
+                            <div className="tile-macro">
+                              <b className="money">
+                                {p.nutrition.fat === null
+                                  ? BLANK
+                                  : `${p.nutrition.fat}g`}
+                              </b>
+                              <span>Fat</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {line ? (
+                          <div className="tile-step">
+                            <button
+                              type="button"
+                              className="tile-step-btn"
+                              onClick={() => stepQuantity(p._id, -1)}
+                              aria-label={`One fewer ${p.name}`}
+                            >
+                              &minus;
+                            </button>
+
+                            <input
+                              className="tile-step-input money"
+                              inputMode="numeric"
+                              value={line.quantity}
+                              aria-label={`Quantity of ${p.name}`}
+                              onChange={(e) => setQuantity(p._id, e.target.value)}
+                            />
+
+                            <button
+                              type="button"
+                              className="tile-step-btn"
+                              aria-disabled={atCeiling}
+                              onClick={() => stepQuantity(p._id, 1)}
+                              aria-label={`One more ${p.name}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <Button
+                            className="btn--add"
+                            aria-disabled={limitReached}
+                            onClick={() => addToCart(p)}
+                          >
+                            {limitReached ? "Limit reached" : "Add"}
+                          </Button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
-
-        </div>
-
+        </section>
       </div>
 
-    );
+      <div className="kiosk-cart-announcer" aria-live="polite">
+        {recentlyAdded
+          ? `${products.find((p) => p._id === recentlyAdded)?.name || "Item"} added to order`
+          : ""}
+      </div>
 
-  })}
-</div>
-              )}
+      {nutritionFor && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setNutritionFor(null)}
+        >
+          <div
+            className="modal till-modal nutrition"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Nutrition information for ${nutritionFor.name}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="nutrition-head">
+              <img src={nutritionFor.image || PLACEHOLDER} alt="" />
+
+              <div className="nutrition-head-t">
+                <div className="nutrition-kicker">Nutrition</div>
+                <h3>{nutritionFor.name}</h3>
+                <p className="nutrition-serving">
+                  {nutritionFor.nutrition.serving || "Per unit as sold"}
+                  {nutritionFor.stockGroup?.name
+                    ? ` · ${titleCase(nutritionFor.stockGroup.name)}`
+                    : ""}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="btn nutrition-close"
+                onClick={() => setNutritionFor(null)}
+                aria-label="Close nutrition information"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="nutrition-energy">
+              <span>Energy</span>
+              <b className="money">
+                {nutritionFor.nutrition.calories === null
+                  ? BLANK
+                  : nutritionFor.nutrition.calories}
+                <i>kcal</i>
+              </b>
+            </div>
+
+            <div className="nutrition-body">
+              {[
+                { key: "protein", label: "Protein" },
+                { key: "carbs", label: "Carbohydrate" },
+                { key: "fat", label: "Fat" },
+              ].map((row) => (
+                <div className="nutrition-row" key={row.key}>
+                  <div className="nutrition-row-t">
+                    <span>{row.label}</span>
+                    <b className="money">
+                      {grams(nutritionFor.nutrition[row.key])}
+                    </b>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="nutrition-foot">
+              As printed on the pack. A dash means the figure was not supplied.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {confirmCancel && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setConfirmCancel(false)}
+        >
+          <div
+            className="modal till-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cancel-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title" id="cancel-title">
+              Cancel this order?
+            </h2>
+
+            <p className="verify-line">
+              The {itemCount} {itemCount === 1 ? "item" : "items"} in your cart
+              will be removed. Nothing will be charged, and you can keep shopping.
+            </p>
+
+            <div className="modal-actions">
+              <Button
+                className="btn--quiet"
+                onClick={() => setConfirmCancel(false)}
+              >
+                Keep order
+              </Button>
+              <Button className="btn--confirm btn--destroy" onClick={cancelOrder}>
+                Cancel order
+              </Button>
             </div>
           </div>
-
         </div>
-      {showCart && (
-  <>
-    <div
-      onClick={() => setShowCart(false)}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        backdropFilter: "blur(5px)",
-        zIndex: 998,
-      }}
-    />
+      )}
 
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "90%",
-        maxWidth: "900px",
-        height: "85vh",
-        background: "#fff",
-        borderRadius: "18px",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-        zIndex: 999,
-        padding: 25,
-        overflowY: "auto",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <h2>My Cart</h2>
-
-        <button
-          onClick={() => setShowCart(false)}
-          style={{
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-          }}
-        >
-          <X size={28} />
-        </button>
-      </div>
-
-      <div style={styles.lookupFlex}>
-  <input
-    style={styles.input}
-    placeholder="Search Student Name / Hostel Number"
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
-  />
-
-  <button
-    style={styles.primaryBtn}
-    onClick={handleStudentSearch}
-  >
-    Search
-  </button>
-</div>
-{searchResults.length > 0 && (
-  <div style={styles.resultsSection}>
-    <table style={styles.table}>
-      <thead>
-        <tr>
-          <th style={styles.th}>Student</th>
-          <th style={styles.th}>Hostel</th>
-          <th style={styles.th}></th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {searchResults.map((student) => (
-          <tr key={student._id}>
-            <td style={styles.td}>{student.name}</td>
-
-            <td style={styles.td}>
-              {student.hostelNumber}
-            </td>
-
-            <td style={styles.td}>
-              <button
-                style={styles.selectBtn}
-                onClick={() => {
-                  setSelectedStudent(student);
-                  setSearchResults([]);
-                }}
-              >
-                Select
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-    {selectedStudent && (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 18,
-      padding: "16px 20px",
-      margin: "18px 0",
-      border: "1px solid #E5E7EB",
-      borderRadius: 12,
-      background: "#F8FAFC",
-    }}
-  >
-    <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
-        Student
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.name}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
-        Father
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.fatherName}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
-        Hostel No
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.hostelNumber}
-      </div>
-    </div>
-
-    <div>
-      <div style={{ fontSize: 12, color: "#64748B" }}>
-        Phone
-      </div>
-      <div style={{ fontWeight: 700, fontSize: 17 }}>
-        {selectedStudent.parentPhoneNumber}
-      </div>
-    </div>
-
-    <div
-      style={{
-        marginLeft: "auto",
-        background: "#FEF3C7",
-        color: "#92400E",
-        padding: "12px 18px",
-        borderRadius: 10,
-        textAlign: "center",
-        minWidth: 180,
-      }}
-    >
-      <div style={{ fontSize: 12 }}>
-        Wallet Balance
-      </div>
-
-      <div
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-        }}
-      >
-        ₹{selectedStudent.pocketMoney}
-      </div>
-    </div>
-  </div>
-)}
-
-      {cart.length === 0 ? (
-  <p style={styles.emptyState}>Cart is empty.</p>
-) : (
-  <table style={styles.table}>
-    <thead>
-  <tr>
-    <th style={styles.th}>Image</th>
-    <th style={styles.th}>Product Name</th>
-    <th style={styles.th}>Unit Price</th>
-    <th style={styles.th}>Quantity</th>
-    <th style={styles.th}>Total Price</th>
-    <th style={styles.th}></th>
-  </tr>
-</thead>
-
-    <tbody>
-  {cart.map((item) => (
-    <tr key={item._id}>
-
-      {/* Product Image */}
-      <td style={styles.td}>
-        <img
-          src={item.image || "https://placehold.co/80x80?text=No+Image"}
-          alt={item.name}
-          style={{
-            width: 70,
-            height: 70,
-            objectFit: "cover",
-            borderRadius: 8,
-            border: "1px solid #ddd",
-          }}
-        />
-      </td>
-
-      {/* Product Name */}
-      <td style={styles.td}>
-        <strong>{item.name}</strong>
-      </td>
-
-      {/* Unit Price */}
-      <td style={styles.td}>
-        ₹{item.price}
-      </td>
-
-      {/* Quantity */}
-      <td style={styles.td}>
+      {confirmExit && (
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
+          className="modal-backdrop till-modal-backdrop"
+          onClick={() => setConfirmExit(false)}
         >
-          <button
-            style={styles.cartQtyBtn}
-            onClick={() =>
-              updateCartItemQuantity(item._id, -1)
-            }
+          <div
+            className="modal till-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="exit-title"
+            onClick={(e) => e.stopPropagation()}
           >
-            -
-          </button>
+            <div className="exit-warning-mark" aria-hidden="true">×</div>
 
-          <input
-            value={item.quantity}
-            style={styles.cartQtyText}
-            onChange={(e) =>
-              handleCartManualQuantityChange(
-                item._id,
-                e.target.value
-              )
-            }
-          />
+            <h2 className="modal-title" id="exit-title">
+              Cancel and exit?
+            </h2>
 
-          <button
-            style={styles.cartQtyBtn}
-            onClick={() =>
-              updateCartItemQuantity(item._id, 1)
-            }
-          >
-            +
-          </button>
+            <p className="verify-line">
+              {itemCount > 0
+                ? `Your ${itemCount} ${
+                    itemCount === 1 ? "item" : "items"
+                  } will be removed and your session will end. Nothing will be charged.`
+                : "Your session will end and return to the sign-in screen. Nothing will be charged."}
+            </p>
+
+            <div className="modal-actions">
+              <Button
+                className="btn--quiet"
+                onClick={() => setConfirmExit(false)}
+              >
+                Keep ordering
+              </Button>
+              <Button
+                className="btn--confirm btn--destroy"
+                onClick={onLogout}
+              >
+                Cancel &amp; exit
+              </Button>
+            </div>
+          </div>
         </div>
-      </td>
+      )}
 
-      {/* Total */}
-      <td style={styles.td}>
-        ₹{item.price * item.quantity}
-      </td>
+      {/* The last thirty seconds. Not a prompt — there is nothing to answer,
+          the session is ending either way — so it states it and stays out of
+          the way of a student trying to finish. Hidden while the idle prompt
+          is up, which is the more urgent of the two. */}
+      {capWarning && !idlePrompt && (
+        <div className="kiosk-cap-banner" role="status">
+          Session ending in {capRemaining}s
+        </div>
+      )}
 
-      {/* Remove */}
-      <td style={styles.td}>
-        <button
-          style={styles.removeBtn}
-          onClick={() => removeFromCart(item._id)}
+      {/* One quiet minute. Almost always a terminal somebody walked away
+          from; occasionally a child deciding. Ten seconds and a visible count
+          is enough for the second case and quick enough for the first. Any
+          touch anywhere dismisses it, including on this backdrop. */}
+      {idlePrompt && (
+        <div
+          className="kiosk-idle-veil"
+          role="alertdialog"
+          aria-label="Are you still there?"
         >
-          ×
-        </button>
-      </td>
+          <div className="kiosk-idle-card">
+            <h2>Still there?</h2>
+            <p>Your session ends in {idleRemaining}s.</p>
+            <button type="button" className="kiosk-start" onClick={dismissIdle}>
+              I&rsquo;m here
+            </button>
+          </div>
+        </div>
+      )}
 
-    </tr>
-  ))}
-</tbody>
-  </table>
-)}
-       {/* <div style={styles.checkoutSection}>
-                <div style={styles.totalRow}>
-                  <span style={styles.totalLabel}>Total Bill</span>
-                  <span style={styles.totalAmount}>₹{invoiceTotal}</span>
-           </div> */}
-<div style={styles.checkoutSection}>
-  <div style={styles.totalRow}>
-    <span style={styles.totalLabel}>
-      Total Bill
-    </span>
+      {showVerifyModal && (
+        <div
+          className="modal-backdrop till-modal-backdrop"
+          onClick={closeVerify}
+        >
+          <div
+            className="modal till-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-title"
+            aria-busy={paying}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* It was "Parent verification" when a cashier read a phone
+                number off the screen and rang the parent. The student is
+                standing here now, and what they are being asked for is their
+                own code. */}
+            <h2 className="modal-title" id="verify-title">
+              Enter your purchase code
+            </h2>
 
-    <span style={styles.totalAmount}>
-      ₹{invoiceTotal}
-    </span>
-  </div>
-                {selectedStudent && (
-  <div style={styles.remainingBalance(selectedStudent.pocketMoney - invoiceTotal < 0)}>
-                   {selectedStudent.pocketMoney - invoiceTotal < 0
-                    ? `Overdraft Limit Exceeded by ₹${Math.abs(selectedStudent.pocketMoney - invoiceTotal)}`
-                     : `Remaining Balance: ₹${selectedStudent.pocketMoney - invoiceTotal}`}
-                 </div>)}
+            <p className="verify-line">
+              Your 4-digit code confirms this order and pays from your wallet.
+            </p>
 
-                 <div style={styles.btnActionGroup}>
-                  <button
-                     style={styles.cancelBtn}
-                    onClick={handleCancelPayment}
-                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#b91c1c")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#dc2626")}
-                  >
-                     Cancel Payment
-                  </button>
-                  <button
-                    style={styles.successBtn}
-                    onClick={() => {
-  if (!selectedStudent) {
-    alert("Please select a student.");
-    return;
-  }
+            <div className="verify-amount">
+              <span>To charge</span>
+              <b>{formatINR(invoiceTotal)}</b>
+            </div>
 
-  setShowVerifyModal(true);
-}}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#15803d")}
-                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#16a34a")}
-                     disabled={
-   !selectedStudent ||
-  cart.length === 0 ||
-  selectedStudent.pocketMoney - invoiceTotal < 0
- }
-                  >
-                     Complete Payment
-                  </button>
-             </div>
-             </div>
-         </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleVerifyAndPay();
+              }}
+            >
+              <label className="field-label" htmlFor="purchase-password">
+                Purchase code
+              </label>
+
+              {/* A student has one secret and it is four digits, so this is a
+                  number pad and nothing else: non-digits are dropped as typed
+                  and a fifth character is refused. A code from before that rule
+                  cannot be entered here on purpose — the parent sets a new one
+                  in the app, which needs only their own account password. */}
+              <input
+                id="purchase-password"
+                className={`input${pinIssue ? " field-has-error" : ""}`}
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                autoFocus
+                maxLength={PURCHASE_CODE_LENGTH}
+                placeholder="4-digit code"
+                value={purchasePassword}
+                aria-invalid={Boolean(pinIssue)}
+                aria-describedby={pinIssue ? 'purchase-code-error' : undefined}
+                onChange={(e) => {
+                  setPinIssue(null);
+                  setPurchasePassword(e.target.value.replace(/\D/g, "").slice(0, PURCHASE_CODE_LENGTH));
+                }}
+                disabled={paying}
+              />
+
+              <div className={`kiosk-pin-dots${pinIssue ? ' pin-error-shake' : ''}`} aria-hidden="true">
+                {Array.from({ length: PURCHASE_CODE_LENGTH }, (_, index) => (
+                  <i key={index} className={index < purchasePassword.length ? 'is-filled' : ''} />
+                ))}
+              </div>
+
+              {pinIssue && (
+                <ErrorFeedback id="purchase-code-error" key={pinIssue.key} issue={pinIssue} level="inline" className="kiosk-pin-feedback" />
+              )}
+
+              <div className="modal-actions">
+                <Button
+                  type="submit"
+                  className="btn--confirm"
+                  disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
+                >
+                  {paying ? "Processing…" : "Verify & Pay"}
+                </Button>
+                <Button
+                  className="btn--quiet"
+                  disabled={paying}
+                  onClick={closeVerify}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {feedback && (
+        <ErrorFeedback
+          key={feedback.key}
+          issue={feedback}
+          className="error-feedback--kiosk-popover"
+          available={feedback.available}
+          required={feedback.required}
+          action={{ label: 'Got it', onClick: () => setFeedback(null) }}
+        >
+          {feedback.product && (
+            <LimitMeter
+              used={feedback.product.purchaseAllowance?.purchased}
+              pending={feedback.product.purchaseAllowance?.pending}
+              limit={feedback.product.purchaseAllowance?.quantity}
+              period={allowancePeriod(feedback.product.purchaseAllowance?.period)}
+            />
+          )}
+          {feedback.available !== undefined && feedback.required === undefined && (
+            <StockMeter available={feedback.available} requested={feedback.requested} />
+          )}
+        </ErrorFeedback>
+      )}
+
+      <RefreshButton onRefresh={refreshPage} loading={loadingProducts} />
     </>
-)}
-
-{/* ===== Parent Verification Popup ===== */}
-
-{/* ===== Parent Verification Popup ===== */}
-
-{showVerifyModal && (
-  <>
-    <div
-      onClick={() => {
-        setShowVerifyModal(false);
-        setPurchasePassword("");
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.45)",
-        zIndex: 1000
-      }}
-    />
-
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%,-50%)",
-        width: "90%",
-maxWidth: 430,
-        background: "#fff",
-        borderRadius: 18,
-        padding: 30,
-        zIndex: 1001,
-        boxShadow: "0 20px 50px rgba(0,0,0,.3)"
-      }}
-    >
-      <h2 style={{ marginBottom: 25 }}>
-        Parent Verification
-      </h2>
-
-      <label
-        style={{
-          display: "block",
-          marginBottom: 8,
-          fontWeight: 600
-        }}
-      >
-        Father's Mobile Number
-      </label>
-
-      <input
-        readOnly
-        value={selectedStudent?.parentPhoneNumber || ""}
-        style={{
-          width: "100%",
-          padding: 14,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-          marginBottom: 20
-        }}
-      />
-
-      <label
-        style={{
-          display: "block",
-          marginBottom: 8,
-          fontWeight: 600
-        }}
-      >
-        Purchase Password
-      </label>
-
-      <input
-        type="password"
-        placeholder="Enter Purchase Password"
-        value={purchasePassword}
-        onChange={(e) =>
-          setPurchasePassword(e.target.value)
-        }
-        style={{
-          width: "100%",
-          padding: 14,
-          border: "1px solid #ddd",
-          borderRadius: 8
-        }}
-      />
-
-      <div
-        style={{
-          display: "flex",
-          gap: 15,
-          marginTop: 30
-        }}
-      >
-        <button
-          style={{
-            flex: 1,
-            padding: 14,
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            cursor: "pointer"
-          }}
-          onClick={() => {
-            setShowVerifyModal(false);
-            setPurchasePassword("");
-          }}
-        >
-          Cancel
-        </button>
-
-        <button
-          style={{
-            flex: 1,
-            padding: 14,
-            borderRadius: 10,
-            border: "none",
-            background: "#16A34A",
-            color: "#fff",
-            cursor: "pointer"
-          }}
-          onClick={async () => {
-            try {
-
-              await api.post(
-                "/transactions/verify-payment",
-                {
-                  studentId: selectedStudent._id,
-                  phone: selectedStudent.parentPhoneNumber,
-                  password: purchasePassword
-                }
-              );
-
-              setShowVerifyModal(false);
-              setPurchasePassword("");
-
-              await handleCheckout();
-
-            } catch (err) {
-
-              alert(
-                err.response?.data?.message ||
-                "Verification Failed"
-              );
-
-            }
-          }}
-        >
-          Request Approval
-        </button>
-      </div>
-    </div>
-  </>
-)}
-
-{waitingApproval && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "#fff",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      flexDirection: "column",
-      zIndex: 5000,
-    }}
-  >
-    <h1>Waiting for Parent Approval...</h1>
-
-    <p>
-      The order request has been sent to the parent's mobile.
-    </p>
-  </div>
-)}
-
-<RefreshButton
-  onRefresh={refreshPage}
-  loading={loadingProducts}
-/>
-    </div>
   );
 };
 

@@ -1,4312 +1,87 @@
-// // // // // // // // import React, { useState, useEffect } from 'react';
-// // // // // // // // import api from '../utils/api';
-
-// // // // // // // // const Products = () => {
-// // // // // // // //   const [products, setProducts] = useState([]);
-// // // // // // // //   const [form, setForm] = useState({ name: '', price: 0, stock: 0 });
-// // // // // // // //   const [editId, setEditId] = useState(null);
-
-// // // // // // // //   useEffect(() => { fetchProducts(); }, []);
-// // // // // // // //   const fetchProducts = async () => { const res = await api.get('/products'); setProducts(res.data); };
-
-// // // // // // // //   const handleSave = async (e) => {
-// // // // // // // //     e.preventDefault();
-// // // // // // // //     if(editId) await api.put(`/products/${editId}`, form);
-// // // // // // // //     else await api.post('/products', form);
-// // // // // // // //     setForm({ name: '', price: 0, stock: 0 });
-// // // // // // // //     setEditId(null);
-// // // // // // // //     fetchProducts();
-// // // // // // // //   };
-
-// // // // // // // //   return (
-// // // // // // // //     <div className="space-y-6">
-// // // // // // // //       <h1 className="text-3xl font-bold">Store Catalog & Stock Inventory</h1>
-// // // // // // // //       <form onSubmit={handleSave} className="bg-white p-4 rounded shadow flex space-x-4">
-// // // // // // // //         <input type="text" placeholder="Product Item Name" value={form.name} onChange={e=>setForm({...form, name: e.target.value})} className="border p-2 flex-1 rounded" required />
-// // // // // // // //         <input type="number" placeholder="Price" value={form.price} onChange={e=>setForm({...form, price: Number(e.target.value)})} className="border p-2 w-32 rounded" required />
-// // // // // // // //         <input type="number" placeholder="Initial Inventory Units" value={form.stock} onChange={e=>setForm({...form, stock: Number(e.target.value)})} className="border p-2 w-32 rounded" required />
-// // // // // // // //         <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded">{editId ? 'Modify' : 'Add Item'}</button>
-// // // // // // // //       </form>
-
-// // // // // // // //       <div className="bg-white rounded shadow p-4">
-// // // // // // // //         {products.map(p => (
-// // // // // // // //           <div key={p._id} className="flex justify-between p-3 border-b items-center">
-// // // // // // // //             <div>
-// // // // // // // //               <p className="font-semibold text-lg">{p.name}</p>
-// // // // // // // //               <p className="text-sm text-gray-500">Unit Price: ₹{p.price}</p>
-// // // // // // // //             </div>
-// // // // // // // //             <div className="flex items-center space-x-6">
-// // // // // // // //               <span className={`px-3 py-1 rounded text-sm ${p.stock < 5 ? 'bg-red-100 text-red-700 font-bold' : 'bg-gray-100'}`}>Stock: {p.stock} units</span>
-// // // // // // // //               <button onClick={() => { setEditId(p._id); setForm(p); }} className="text-blue-600">Update</button>
-// // // // // // // //             </div>
-// // // // // // // //           </div>
-// // // // // // // //         ))}
-// // // // // // // //       </div>
-// // // // // // // //     </div>
-// // // // // // // //   );
-// // // // // // // // };
-
-// // // // // // // // export default Products;
-
-
-
-
-
-// // // // // // // import React, { useState, useEffect } from 'react';
-// // // // // // // import api from '../utils/api';
-
-// // // // // // // const Products = () => {
-// // // // // // //   const [products, setProducts] = useState([]);
-// // // // // // //   const [searchQuery, setSearchQuery] = useState("");
-// // // // // // //   const [form, setForm] = useState({ 
-// // // // // // //     name: '', 
-// // // // // // //     price: 0, 
-// // // // // // //     stock: 0 
-// // // // // // //   });
-// // // // // // //   const [editId, setEditId] = useState(null);
-
-// // // // // // //   useEffect(() => { 
-// // // // // // //     fetchProducts(); 
-// // // // // // //   }, []);
-
-// // // // // // //   const fetchProducts = async () => {
-// // // // // // //     try {
-// // // // // // //       const res = await api.get('/products');
-// // // // // // //       setProducts(res.data);
-// // // // // // //     } catch (error) {
-// // // // // // //       console.error(error);
-// // // // // // //       alert('Failed to fetch product catalog');
-// // // // // // //     }
-// // // // // // //   };
-
-// // // // // // //   const handleSave = async (e) => {
-// // // // // // //     e.preventDefault();
-// // // // // // //     try {
-// // // // // // //       if (editId) {
-// // // // // // //         await api.put(`/products/${editId}`, form);
-// // // // // // //         alert('Product inventory updated successfully!');
-// // // // // // //       } else {
-// // // // // // //         await api.post('/products', form);
-// // // // // // //         alert('Product item registered successfully!');
-// // // // // // //       }
-// // // // // // //       setForm({ name: '', price: 0, stock: 0 });
-// // // // // // //       setEditId(null);
-// // // // // // //       fetchProducts();
-// // // // // // //     } catch (error) {
-// // // // // // //       console.error(error);
-// // // // // // //       alert('Failed to save product information');
-// // // // // // //     }
-// // // // // // //   };
-
-// // // // // // //   const handleDelete = async (id) => {
-// // // // // // //     if (confirm('Are you sure you want to remove this product permanently?')) {
-// // // // // // //       try {
-// // // // // // //         await api.delete(`/products/${id}`);
-// // // // // // //         fetchProducts();
-// // // // // // //       } catch (error) {
-// // // // // // //         console.error(error);
-// // // // // // //         alert('Failed to delete product item');
-// // // // // // //       }
-// // // // // // //     }
-// // // // // // //   };
-
-// // // // // // //   // Client-side real-time filter logic matching the Student Directory paradigm
-// // // // // // //   const filteredProducts = products.filter(p => {
-// // // // // // //     const query = searchQuery.toLowerCase().trim();
-// // // // // // //     if (!query) return true;
-// // // // // // //     return p.name?.toLowerCase().includes(query);
-// // // // // // //   });
-
-// // // // // // //   const styles = {
-// // // // // // //     page: {
-// // // // // // //       minHeight: "100vh",
-// // // // // // //       backgroundColor: "#f8fafc",
-// // // // // // //       padding: "32px",
-// // // // // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // // // // //       boxSizing: "border-box",
-// // // // // // //     },
-// // // // // // //     headerFlex: {
-// // // // // // //       display: "flex",
-// // // // // // //       justifyContent: "space-between",
-// // // // // // //       alignItems: "center",
-// // // // // // //       marginBottom: "24px",
-// // // // // // //     },
-// // // // // // //     title: {
-// // // // // // //       fontSize: "28px",
-// // // // // // //       fontWeight: "700",
-// // // // // // //       color: "#0f172a",
-// // // // // // //       letterSpacing: "-0.5px",
-// // // // // // //       margin: 0,
-// // // // // // //     },
-// // // // // // //     subtitle: {
-// // // // // // //       fontSize: "14px",
-// // // // // // //       color: "#64748b",
-// // // // // // //       marginTop: "4px",
-// // // // // // //       marginBottom: 0,
-// // // // // // //     },
-// // // // // // //     bottomGrid: {
-// // // // // // //       display: "grid",
-// // // // // // //       gridTemplateColumns: "1fr 2fr",
-// // // // // // //       gap: "24px",
-// // // // // // //       alignItems: "start",
-// // // // // // //     },
-// // // // // // //     card: {
-// // // // // // //       background: "#ffffff",
-// // // // // // //       border: "1px solid #e2e8f0",
-// // // // // // //       borderRadius: "14px",
-// // // // // // //       padding: "20px",
-// // // // // // //       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-// // // // // // //       boxSizing: "border-box",
-// // // // // // //     },
-// // // // // // //     panelTitle: {
-// // // // // // //       fontSize: "16px",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       color: "#0f172a",
-// // // // // // //       marginTop: 0,
-// // // // // // //       marginBottom: "16px",
-// // // // // // //     },
-// // // // // // //     formGroupGrid: {
-// // // // // // //       display: "flex",
-// // // // // // //       flexDirection: "column",
-// // // // // // //       gap: "14px",
-// // // // // // //     },
-// // // // // // //     input: {
-// // // // // // //       width: "100%",
-// // // // // // //       padding: "12px 14px",
-// // // // // // //       border: "1px solid #e2e8f0",
-// // // // // // //       borderRadius: "10px",
-// // // // // // //       fontSize: "14px",
-// // // // // // //       color: "#0f172a",
-// // // // // // //       backgroundColor: "#ffffff",
-// // // // // // //       outline: "none",
-// // // // // // //       transition: "border-color 0.2s",
-// // // // // // //       boxSizing: "border-box",
-// // // // // // //     },
-// // // // // // //     searchBarContainer: {
-// // // // // // //       marginBottom: "16px",
-// // // // // // //     },
-// // // // // // //     tableContainer: {
-// // // // // // //       background: "#ffffff",
-// // // // // // //       border: "1px solid #e2e8f0",
-// // // // // // //       borderRadius: "14px",
-// // // // // // //       boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-// // // // // // //       overflow: "hidden",
-// // // // // // //     },
-// // // // // // //     table: {
-// // // // // // //       width: "100%",
-// // // // // // //       borderCollapse: "collapse",
-// // // // // // //       textAlign: "left",
-// // // // // // //     },
-// // // // // // //     th: {
-// // // // // // //       backgroundColor: "#f1f5f9",
-// // // // // // //       color: "#334155",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       padding: "14px",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       borderBottom: "2px solid #e2e8f0",
-// // // // // // //     },
-// // // // // // //     tr: {
-// // // // // // //       transition: "background-color 0.2s",
-// // // // // // //     },
-// // // // // // //     td: {
-// // // // // // //       padding: "14px",
-// // // // // // //       fontSize: "14px",
-// // // // // // //       color: "#0f172a",
-// // // // // // //       borderBottom: "1px solid #e2e8f0",
-// // // // // // //     },
-// // // // // // //     primaryBtn: {
-// // // // // // //       width: "100%",
-// // // // // // //       padding: "12px",
-// // // // // // //       background: "#2563eb",
-// // // // // // //       color: "#ffffff",
-// // // // // // //       border: "none",
-// // // // // // //       borderRadius: "10px",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       fontSize: "14px",
-// // // // // // //       cursor: "pointer",
-// // // // // // //       transition: "background-color 0.2s",
-// // // // // // //       marginTop: "6px",
-// // // // // // //     },
-// // // // // // //     cancelBtn: {
-// // // // // // //       width: "100%",
-// // // // // // //       padding: "10px",
-// // // // // // //       background: "#f1f5f9",
-// // // // // // //       color: "#334155",
-// // // // // // //       border: "none",
-// // // // // // //       borderRadius: "10px",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       cursor: "pointer",
-// // // // // // //       transition: "background-color 0.2s",
-// // // // // // //       marginTop: "2px",
-// // // // // // //     },
-// // // // // // //     stockTextNormal: {
-// // // // // // //       backgroundColor: "#f1f5f9",
-// // // // // // //       color: "#334155",
-// // // // // // //       padding: "4px 10px",
-// // // // // // //       borderRadius: "8px",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       fontWeight: "600",
-// // // // // // //     },
-// // // // // // //     stockTextAlert: {
-// // // // // // //       backgroundColor: "#fee2e2",
-// // // // // // //       color: "#dc2626",
-// // // // // // //       padding: "4px 10px",
-// // // // // // //       borderRadius: "8px",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       fontWeight: "700",
-// // // // // // //     },
-// // // // // // //     currencyText: {
-// // // // // // //       color: "#0f172a",
-// // // // // // //       fontWeight: "600",
-// // // // // // //     },
-// // // // // // //     actionFlex: {
-// // // // // // //       display: "flex",
-// // // // // // //       gap: "12px",
-// // // // // // //     },
-// // // // // // //     editBtn: {
-// // // // // // //       background: "none",
-// // // // // // //       border: "none",
-// // // // // // //       color: "#2563eb",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       cursor: "pointer",
-// // // // // // //       padding: 0,
-// // // // // // //     },
-// // // // // // //     removeBtn: {
-// // // // // // //       background: "none",
-// // // // // // //       border: "none",
-// // // // // // //       color: "#dc2626",
-// // // // // // //       fontWeight: "600",
-// // // // // // //       fontSize: "13px",
-// // // // // // //       cursor: "pointer",
-// // // // // // //       padding: 0,
-// // // // // // //     },
-// // // // // // //     emptyState: {
-// // // // // // //       color: "#64748b",
-// // // // // // //       fontSize: "14px",
-// // // // // // //       textAlign: "center",
-// // // // // // //       padding: "32px 0",
-// // // // // // //       margin: 0,
-// // // // // // //     },
-// // // // // // //   };
-
-// // // // // // //   return (
-// // // // // // //     <div style={styles.page}>
-// // // // // // //       {/* Page Header */}
-// // // // // // //       <div style={styles.headerFlex}>
-// // // // // // //         <div>
-// // // // // // //           <h1 style={styles.title}>Store Catalog & Stock Inventory</h1>
-// // // // // // //           <p style={styles.subtitle}>
-// // // // // // //             Manage institutional inventory metrics, master pricing schedules, and real-time stock parameters
-// // // // // // //           </p>
-// // // // // // //         </div>
-// // // // // // //       </div>
-
-// // // // // // //       {/* Main Bottom Operational Grid */}
-// // // // // // //       <div style={styles.bottomGrid}>
-        
-// // // // // // //         {/* LEFT SIDE: CONTROL FORM CARD */}
-// // // // // // //         <div style={styles.card}>
-// // // // // // //           <h3 style={styles.panelTitle}>
-// // // // // // //             {editId ? "Modify Product Parameters" : "Register Catalog Item"}
-// // // // // // //           </h3>
-// // // // // // //           <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // // // // //             <input 
-// // // // // // //               type="text" 
-// // // // // // //               placeholder="Product Item Name" 
-// // // // // // //               required 
-// // // // // // //               value={form.name} 
-// // // // // // //               onChange={e => setForm({...form, name: e.target.value})} 
-// // // // // // //               style={styles.input}
-// // // // // // //               onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-// // // // // // //               onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
-// // // // // // //             />
-// // // // // // //             <input 
-// // // // // // //               type="number" 
-// // // // // // //               placeholder="Unit Price (₹)" 
-// // // // // // //               required 
-// // // // // // //               value={form.price || ''} 
-// // // // // // //               onChange={e => setForm({...form, price: Number(e.target.value)})} 
-// // // // // // //               style={styles.input}
-// // // // // // //               onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-// // // // // // //               onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
-// // // // // // //             />
-// // // // // // //             <input 
-// // // // // // //               type="number" 
-// // // // // // //               placeholder="Initial Inventory Units" 
-// // // // // // //               required 
-// // // // // // //               value={form.stock || ''} 
-// // // // // // //               onChange={e => setForm({...form, stock: Number(e.target.value)})} 
-// // // // // // //               style={styles.input}
-// // // // // // //               onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-// // // // // // //               onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
-// // // // // // //             />
-            
-// // // // // // //             <button 
-// // // // // // //               type="submit" 
-// // // // // // //               style={styles.primaryBtn}
-// // // // // // //               onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-// // // // // // //               onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
-// // // // // // //             >
-// // // // // // //               {editId ? 'Update Parameters' : 'Save Item'}
-// // // // // // //             </button>
-
-// // // // // // //             {editId && (
-// // // // // // //               <button
-// // // // // // //                 type="button"
-// // // // // // //                 style={styles.cancelBtn}
-// // // // // // //                 onClick={() => {
-// // // // // // //                   setEditId(null);
-// // // // // // //                   setForm({ name: '', price: 0, stock: 0 });
-// // // // // // //                 }}
-// // // // // // //                 onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#e2e8f0")}
-// // // // // // //                 onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#f1f5f9")}
-// // // // // // //               >
-// // // // // // //                 Cancel Edit
-// // // // // // //               </button>
-// // // // // // //             )}
-// // // // // // //           </form>
-// // // // // // //         </div>
-
-// // // // // // //         {/* RIGHT SIDE: INTERACTIVE INVENTORY LOOKUP & TABLE */}
-// // // // // // //         <div>
-// // // // // // //           {/* Live Dynamic Table Filter Bar */}
-// // // // // // //           <div style={styles.searchBarContainer}>
-// // // // // // //             <input 
-// // // // // // //               type="text"
-// // // // // // //               style={styles.input}
-// // // // // // //               placeholder="Quick search catalog by item name..."
-// // // // // // //               value={searchQuery}
-// // // // // // //               onChange={(e) => setSearchQuery(e.target.value)}
-// // // // // // //               onFocus={(e) => (e.currentTarget.style.borderColor = "#2563eb")}
-// // // // // // //               onBlur={(e) => (e.currentTarget.style.borderColor = "#e2e8f0")}
-// // // // // // //             />
-// // // // // // //           </div>
-
-// // // // // // //           <div style={styles.tableContainer}>
-// // // // // // //             <table style={styles.table}>
-// // // // // // //               <thead>
-// // // // // // //                 <tr>
-// // // // // // //                   <th style={styles.th}>Product Item Profile</th>
-// // // // // // //                   <th style={styles.th}>Master Unit Price</th>
-// // // // // // //                   <th style={styles.th}>Stock Allocation</th>
-// // // // // // //                   <th style={styles.th}>Actions</th>
-// // // // // // //                 </tr>
-// // // // // // //               </thead>
-// // // // // // //               <tbody>
-// // // // // // //                 {filteredProducts.length === 0 ? (
-// // // // // // //                   <tr>
-// // // // // // //                     <td colSpan="4" style={styles.td}>
-// // // // // // //                       <p style={styles.emptyState}>
-// // // // // // //                         {products.length === 0 
-// // // // // // //                           ? "No active product metrics discovered in the system catalog."
-// // // // // // //                           : "No items matched your search filtering criteria."}
-// // // // // // //                       </p>
-// // // // // // //                     </td>
-// // // // // // //                   </tr>
-// // // // // // //                 ) : (
-// // // // // // //                   filteredProducts.map((p) => (
-// // // // // // //                     <tr 
-// // // // // // //                       key={p._id} 
-// // // // // // //                       style={styles.tr}
-// // // // // // //                       onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-// // // // // // //                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-// // // // // // //                     >
-// // // // // // //                       <td style={styles.td}>
-// // // // // // //                         <strong>{p.name}</strong>
-// // // // // // //                       </td>
-// // // // // // //                       <td style={styles.td}>
-// // // // // // //                         <span style={styles.currencyText}>₹{p.price}</span>
-// // // // // // //                       </td>
-// // // // // // //                       <td style={styles.td}>
-// // // // // // //                         <span style={p.stock < 5 ? styles.stockTextAlert : styles.stockTextNormal}>
-// // // // // // //                           {p.stock} units
-// // // // // // //                         </span>
-// // // // // // //                       </td>
-// // // // // // //                       <td style={styles.td}>
-// // // // // // //                         <div style={styles.actionFlex}>
-// // // // // // //                           <button 
-// // // // // // //                             style={styles.editBtn} 
-// // // // // // //                             onClick={() => { setEditId(p._id); setForm(p); }}
-// // // // // // //                           >
-// // // // // // //                             Edit
-// // // // // // //                           </button>
-// // // // // // //                           <button 
-// // // // // // //                             style={styles.removeBtn} 
-// // // // // // //                             onClick={() => handleDelete(p._id)}
-// // // // // // //                           >
-// // // // // // //                             Remove
-// // // // // // //                           </button>
-// // // // // // //                         </div>
-// // // // // // //                       </td>
-// // // // // // //                     </tr>
-// // // // // // //                   ))
-// // // // // // //                 )}
-// // // // // // //               </tbody>
-// // // // // // //             </table>
-// // // // // // //           </div>
-// // // // // // //         </div>
-
-// // // // // // //       </div>
-// // // // // // //     </div>
-// // // // // // //   );
-// // // // // // // };
-
-// // // // // // // export default Products;
-
-
-
-
-// // // // // // import React, { useState } from 'react';
-// // // // // // import api from '../utils/api';
-
-// // // // // // const Products = () => {
-// // // // // //   const [form, setForm] = useState({ 
-// // // // // //     name: '', 
-// // // // // //     price: 0, 
-// // // // // //     stock: 0 
-// // // // // //   });
-// // // // // //   const [loading, setLoading] = useState(false);
-
-// // // // // //   const handleSave = async (e) => {
-// // // // // //     e.preventDefault();
-// // // // // //     setLoading(true);
-// // // // // //     try {
-// // // // // //       await api.post('/products', form);
-// // // // // //       alert('Product item registered successfully!');
-// // // // // //       setForm({ name: '', price: 0, stock: 0 });
-// // // // // //     } catch (error) {
-// // // // // //       console.error(error);
-// // // // // //       alert('Failed to save product information');
-// // // // // //     } finally {
-// // // // // //       setLoading(false);
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   const styles = {
-// // // // // //     page: {
-// // // // // //       minHeight: "100vh",
-// // // // // //       backgroundColor: "#f8fafc",
-// // // // // //       padding: "32px",
-// // // // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // // // //       boxSizing: "border-box",
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       alignItems: "center",
-// // // // // //     },
-// // // // // //     container: {
-// // // // // //       width: "100%",
-// // // // // //       maxWidth: "480px",
-// // // // // //     },
-// // // // // //     headerBlock: {
-// // // // // //       textAlign: "center",
-// // // // // //       marginBottom: "28px",
-// // // // // //     },
-// // // // // //     title: {
-// // // // // //       fontSize: "28px",
-// // // // // //       fontWeight: "700",
-// // // // // //       color: "#0f172a",
-// // // // // //       letterSpacing: "-0.5px",
-// // // // // //       margin: 0,
-// // // // // //     },
-// // // // // //     subtitle: {
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#64748b",
-// // // // // //       marginTop: "6px",
-// // // // // //       marginBottom: 0,
-// // // // // //       lineHeight: "1.5",
-// // // // // //     },
-// // // // // //     card: {
-// // // // // //       background: "#ffffff",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "14px",
-// // // // // //       padding: "24px",
-// // // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     panelTitle: {
-// // // // // //       fontSize: "16px",
-// // // // // //       fontWeight: "600",
-// // // // // //       color: "#0f172a",
-// // // // // //       marginTop: 0,
-// // // // // //       marginBottom: "18px",
-// // // // // //     },
-// // // // // //     formGroupGrid: {
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       gap: "14px",
-// // // // // //     },
-// // // // // //     input: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px 14px",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#0f172a",
-// // // // // //       backgroundColor: "#ffffff",
-// // // // // //       outline: "none",
-// // // // // //       transition: "border-color 0.2s, box-shadow 0.2s",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     primaryBtn: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px",
-// // // // // //       background: "#2563eb",
-// // // // // //       color: "#ffffff",
-// // // // // //       border: "none",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontWeight: "600",
-// // // // // //       fontSize: "14px",
-// // // // // //       cursor: "pointer",
-// // // // // //       transition: "background-color 0.2s",
-// // // // // //       marginTop: "6px",
-// // // // // //     },
-// // // // // //   };
-
-// // // // // //   return (
-// // // // // //     <div style={styles.page}>
-// // // // // //       <div style={styles.container}>
-// // // // // //         {/* Page Header */}
-// // // // // //         <div style={styles.headerBlock}>
-// // // // // //           <h1 style={styles.title}>Store Catalog Entry</h1>
-// // // // // //           <p style={styles.subtitle}>
-// // // // // //             Register internal master pricing schedules, global metrics, and initialize system stock thresholds
-// // // // // //           </p>
-// // // // // //         </div>
-        
-// // // // // //         {/* CONTROL FORM CARD */}
-// // // // // //         <div style={styles.card}>
-// // // // // //           <h3 style={styles.panelTitle}>Register Catalog Item</h3>
-// // // // // //           <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // // // //             <input 
-// // // // // //               type="text" 
-// // // // // //               placeholder="Product Item Name" 
-// // // // // //               required 
-// // // // // //               value={form.name} 
-// // // // // //               onChange={e => setForm({...form, name: e.target.value})} 
-// // // // // //               style={styles.input}
-// // // // // //               onFocus={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //               }}
-// // // // // //               onBlur={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                 e.currentTarget.style.boxShadow = "none";
-// // // // // //               }}
-// // // // // //             />
-// // // // // //             <input 
-// // // // // //               type="number" 
-// // // // // //               placeholder="Unit Price (₹)" 
-// // // // // //               required 
-// // // // // //               value={form.price || ''} 
-// // // // // //               onChange={e => setForm({...form, price: Number(e.target.value)})} 
-// // // // // //               style={styles.input}
-// // // // // //               onFocus={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //               }}
-// // // // // //               onBlur={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                 e.currentTarget.style.boxShadow = "none";
-// // // // // //               }}
-// // // // // //             />
-// // // // // //             <input 
-// // // // // //               type="number" 
-// // // // // //               placeholder="Initial Inventory Units" 
-// // // // // //               required 
-// // // // // //               value={form.stock || ''} 
-// // // // // //               onChange={e => setForm({...form, stock: Number(e.target.value)})} 
-// // // // // //               style={styles.input}
-// // // // // //               onFocus={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //               }}
-// // // // // //               onBlur={(e) => {
-// // // // // //                 e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                 e.currentTarget.style.boxShadow = "none";
-// // // // // //               }}
-// // // // // //             />
-            
-// // // // // //             <button 
-// // // // // //               type="submit" 
-// // // // // //               disabled={loading}
-// // // // // //               style={{
-// // // // // //                 ...styles.primaryBtn,
-// // // // // //                 backgroundColor: loading ? "#93c5fd" : "#2563eb",
-// // // // // //                 cursor: loading ? "not-allowed" : "pointer"
-// // // // // //               }}
-// // // // // //               onMouseOver={(e) => {
-// // // // // //                 if (!loading) e.currentTarget.style.backgroundColor = "#1d4ed8";
-// // // // // //               }}
-// // // // // //               onMouseOut={(e) => {
-// // // // // //                 if (!loading) e.currentTarget.style.backgroundColor = "#2563eb";
-// // // // // //               }}
-// // // // // //             >
-// // // // // //               {loading ? 'Saving Profile...' : 'Save Catalog Item'}
-// // // // // //             </button>
-// // // // // //           </form>
-// // // // // //         </div>
-// // // // // //       </div>
-// // // // // //     </div>
-// // // // // //   );
-// // // // // // };
-
-// // // // // // export default Products;
-
-
-
-
-// // // // // // import React, { useState, useEffect } from 'react';
-// // // // // // import api from '../utils/api';
-
-// // // // // // const Products = () => {
-// // // // // //   const [products, setProducts] = useState([]);
-// // // // // //   const [searchQuery, setSearchQuery] = useState("");
-// // // // // //   const [form, setForm] = useState({ 
-// // // // // //     name: '', 
-// // // // // //     price: 0, 
-// // // // // //     stock: 0 
-// // // // // //   });
-// // // // // //   const [loading, setLoading] = useState(false);
-
-// // // // // //   useEffect(() => { 
-// // // // // //     fetchProducts(); 
-// // // // // //   }, []);
-
-// // // // // //   const fetchProducts = async () => {
-// // // // // //     try {
-// // // // // //       const res = await api.get('/products');
-// // // // // //       setProducts(res.data);
-// // // // // //     } catch (error) {
-// // // // // //       console.error(error);
-// // // // // //       alert('Failed to fetch product catalog');
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   const handleSave = async (e) => {
-// // // // // //     e.preventDefault();
-// // // // // //     setLoading(true);
-// // // // // //     try {
-// // // // // //       await api.post('/products', form);
-// // // // // //       alert('Product item registered successfully!');
-// // // // // //       setForm({ name: '', price: 0, stock: 0 });
-// // // // // //       fetchProducts();
-// // // // // //     } catch (error) {
-// // // // // //       console.error(error);
-// // // // // //       alert('Failed to save product information');
-// // // // // //     } finally {
-// // // // // //       setLoading(false);
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   const handleDelete = async (id) => {
-// // // // // //     if (confirm('Are you sure you want to remove this product permanently?')) {
-// // // // // //       try {
-// // // // // //         await api.delete(`/products/${id}`);
-// // // // // //         fetchProducts();
-// // // // // //       } catch (error) {
-// // // // // //         console.error(error);
-// // // // // //         alert('Failed to delete product item');
-// // // // // //       }
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   // Check matched items matching the search paradigm
-// // // // // //   const filteredProducts = products.filter(p => {
-// // // // // //     const query = searchQuery.toLowerCase().trim();
-// // // // // //     if (!query) return false; // Don't filter/show table if search bar is empty
-// // // // // //     return p.name?.toLowerCase().includes(query);
-// // // // // //   });
-
-// // // // // //   // Toggle flag: show table view only if there is a query AND matches exist
-// // // // // //   const isProductAvailable = searchQuery.trim() !== "" && filteredProducts.length > 0;
-
-// // // // // //   const styles = {
-// // // // // //     page: {
-// // // // // //       minHeight: "100vh",
-// // // // // //       backgroundColor: "#f8fafc",
-// // // // // //       padding: "32px",
-// // // // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // // // //       boxSizing: "border-box",
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       alignItems: "center",
-// // // // // //     },
-// // // // // //     container: {
-// // // // // //       width: "100%",
-// // // // // //       maxWidth: "540px",
-// // // // // //     },
-// // // // // //     headerBlock: {
-// // // // // //       textAlign: "center",
-// // // // // //       marginBottom: "24px",
-// // // // // //     },
-// // // // // //     title: {
-// // // // // //       fontSize: "28px",
-// // // // // //       fontWeight: "700",
-// // // // // //       color: "#0f172a",
-// // // // // //       letterSpacing: "-0.5px",
-// // // // // //       margin: 0,
-// // // // // //     },
-// // // // // //     subtitle: {
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#64748b",
-// // // // // //       marginTop: "6px",
-// // // // // //       marginBottom: 0,
-// // // // // //       lineHeight: "1.5",
-// // // // // //     },
-// // // // // //     searchBarContainer: {
-// // // // // //       width: "100%",
-// // // // // //       marginBottom: "24px",
-// // // // // //     },
-// // // // // //     card: {
-// // // // // //       background: "#ffffff",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "14px",
-// // // // // //       padding: "24px",
-// // // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     panelTitle: {
-// // // // // //       fontSize: "16px",
-// // // // // //       fontWeight: "600",
-// // // // // //       color: "#0f172a",
-// // // // // //       marginTop: 0,
-// // // // // //       marginBottom: "18px",
-// // // // // //     },
-// // // // // //     formGroupGrid: {
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       gap: "14px",
-// // // // // //     },
-// // // // // //     input: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px 14px",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#0f172a",
-// // // // // //       backgroundColor: "#ffffff",
-// // // // // //       outline: "none",
-// // // // // //       transition: "border-color 0.2s, box-shadow 0.2s",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     primaryBtn: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px",
-// // // // // //       background: "#2563eb",
-// // // // // //       color: "#ffffff",
-// // // // // //       border: "none",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontWeight: "600",
-// // // // // //       fontSize: "14px",
-// // // // // //       cursor: "pointer",
-// // // // // //       transition: "background-color 0.2s",
-// // // // // //       marginTop: "6px",
-// // // // // //     },
-// // // // // //     tableContainer: {
-// // // // // //       background: "#ffffff",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "14px",
-// // // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-// // // // // //       overflow: "hidden",
-// // // // // //       width: "100%",
-// // // // // //     },
-// // // // // //     table: {
-// // // // // //       width: "100%",
-// // // // // //       borderCollapse: "collapse",
-// // // // // //       textAlign: "left",
-// // // // // //     },
-// // // // // //     th: {
-// // // // // //       backgroundColor: "#f1f5f9",
-// // // // // //       color: "#334155",
-// // // // // //       fontWeight: "600",
-// // // // // //       padding: "14px",
-// // // // // //       fontSize: "13px",
-// // // // // //       borderBottom: "2px solid #e2e8f0",
-// // // // // //     },
-// // // // // //     tr: {
-// // // // // //       transition: "background-color 0.2s",
-// // // // // //     },
-// // // // // //     td: {
-// // // // // //       padding: "14px",
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#0f172a",
-// // // // // //       borderBottom: "1px solid #e2e8f0",
-// // // // // //     },
-// // // // // //     stockTextNormal: {
-// // // // // //       backgroundColor: "#f1f5f9",
-// // // // // //       color: "#334155",
-// // // // // //       padding: "4px 10px",
-// // // // // //       borderRadius: "8px",
-// // // // // //       fontSize: "13px",
-// // // // // //       fontWeight: "600",
-// // // // // //     },
-// // // // // //     stockTextAlert: {
-// // // // // //       backgroundColor: "#fee2e2",
-// // // // // //       color: "#dc2626",
-// // // // // //       padding: "4px 10px",
-// // // // // //       borderRadius: "8px",
-// // // // // //       fontSize: "13px",
-// // // // // //       fontWeight: "700",
-// // // // // //     },
-// // // // // //     currencyText: {
-// // // // // //       color: "#0f172a",
-// // // // // //       fontWeight: "600",
-// // // // // //     },
-// // // // // //     actionFlex: {
-// // // // // //       display: "flex",
-// // // // // //       gap: "12px",
-// // // // // //     },
-// // // // // //     removeBtn: {
-// // // // // //       background: "none",
-// // // // // //       border: "none",
-// // // // // //       color: "#dc2626",
-// // // // // //       fontWeight: "600",
-// // // // // //       fontSize: "13px",
-// // // // // //       cursor: "pointer",
-// // // // // //       padding: 0,
-// // // // // //     },
-// // // // // //     alertBanner: {
-// // // // // //       backgroundColor: "#f0fdf4",
-// // // // // //       border: "1px solid #bbf7d0",
-// // // // // //       color: "#166534",
-// // // // // //       padding: "12px 14px",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontSize: "14px",
-// // // // // //       fontWeight: "500",
-// // // // // //       marginBottom: "16px",
-// // // // // //       textAlign: "center"
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   return (
-// // // // // //     <div style={styles.page}>
-// // // // // //       <div style={styles.container}>
-        
-// // // // // //         {/* Page Header */}
-// // // // // //         <div style={styles.headerBlock}>
-// // // // // //           <h1 style={styles.title}>Add Products to Catalog </h1>
-// // // // // //           {/* <p style={styles.subtitle}>
-// // // // // //             Verify inventory parameters via real-time tracking bar or initialize brand new system stock records
-// // // // // //           </p> */}
-// // // // // //         </div>
-
-// // // // // //         {/* Global Verification Search Bar */}
-// // // // // //         <div style={styles.searchBarContainer}>
-// // // // // //           <input 
-// // // // // //             type="text"
-// // // // // //             style={styles.input}
-// // // // // //             placeholder="Type item name to verify availability status..."
-// // // // // //             value={searchQuery}
-// // // // // //             onChange={(e) => setSearchQuery(e.target.value)}
-// // // // // //             onFocus={(e) => {
-// // // // // //               e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //               e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //             }}
-// // // // // //             onBlur={(e) => {
-// // // // // //               e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //               e.currentTarget.style.boxShadow = "none";
-// // // // // //             }}
-// // // // // //           />
-// // // // // //         </div>
-
-// // // // // //         {/* CONDITIONAL INTERACTIVE VIEW */}
-// // // // // //         {isProductAvailable ? (
-// // // // // //           /* SHOW PRODUCTS TABLE (Hides Registration Form) */
-// // // // // //           <div>
-// // // // // //             <div style={styles.alertBanner}>
-// // // // // //               ✓ Product records matching "{searchQuery}" are available in the system.
-// // // // // //             </div>
-// // // // // //             <div style={styles.tableContainer}>
-// // // // // //               <table style={styles.table}>
-// // // // // //                 <thead>
-// // // // // //                   <tr>
-// // // // // //                     <th style={styles.th}>Product Item Name</th>
-// // // // // //                     <th style={styles.th}>Unit Price</th>
-// // // // // //                     <th style={styles.th}>Current Stock</th>
-// // // // // //                     <th style={styles.th}>Action</th>
-// // // // // //                   </tr>
-// // // // // //                 </thead>
-// // // // // //                 <tbody>
-// // // // // //                   {filteredProducts.map((p) => (
-// // // // // //                     <tr 
-// // // // // //                       key={p._id} 
-// // // // // //                       style={styles.tr}
-// // // // // //                       onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f8fafc")}
-// // // // // //                       onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-// // // // // //                     >
-// // // // // //                       <td style={styles.td}>
-// // // // // //                         <strong>{p.name}</strong>
-// // // // // //                       </td>
-// // // // // //                       <td style={styles.td}>
-// // // // // //                         <span style={styles.currencyText}>₹{p.price}</span>
-// // // // // //                       </td>
-// // // // // //                       <td style={styles.td}>
-// // // // // //                         <span style={p.stock < 5 ? styles.stockTextAlert : styles.stockTextNormal}>
-// // // // // //                           {p.stock} units
-// // // // // //                         </span>
-// // // // // //                       </td>
-// // // // // //                       <td style={styles.td}>
-// // // // // //                         <div style={styles.actionFlex}>
-// // // // // //                           <button 
-// // // // // //                             style={styles.removeBtn} 
-// // // // // //                             onClick={() => handleDelete(p._id)}
-// // // // // //                           >
-// // // // // //                             Remove
-// // // // // //                           </button>
-// // // // // //                         </div>
-// // // // // //                       </td>
-// // // // // //                     </tr>
-// // // // // //                   ))}
-// // // // // //                 </tbody>
-// // // // // //               </table>
-// // // // // //             </div>
-// // // // // //           </div>
-// // // // // //         ) : (
-// // // // // //           /* REGISTER CATALOG ITEM CARD (Shows when no match or search input is empty) */
-// // // // // //           <div style={styles.card}>
-// // // // // //             <h3 style={styles.panelTitle}>
-// // // // // //               {searchQuery.trim() !== "" 
-// // // // // //                 ? `"${searchQuery}" Not Found — Register As New Item` 
-// // // // // //                 : "Add Product Details"
-// // // // // //               }
-// // // // // //             </h3>
-// // // // // //             <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // // // //               <input 
-// // // // // //                 type="text" 
-// // // // // //                 placeholder="Product Item Name" 
-// // // // // //                 required 
-// // // // // //                 value={form.name} 
-// // // // // //                 onChange={e => setForm({...form, name: e.target.value})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               />
-// // // // // //               <input 
-// // // // // //                 type="number" 
-// // // // // //                 placeholder="Unit Price (₹)" 
-// // // // // //                 required 
-// // // // // //                 value={form.price || ''} 
-// // // // // //                 onChange={e => setForm({...form, price: Number(e.target.value)})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               />
-// // // // // //               <input 
-// // // // // //                 type="number" 
-// // // // // //                 placeholder="Initial Inventory Units" 
-// // // // // //                 required 
-// // // // // //                 value={form.stock || ''} 
-// // // // // //                 onChange={e => setForm({...form, stock: Number(e.target.value)})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               />
-              
-// // // // // //               <button 
-// // // // // //                 type="submit" 
-// // // // // //                 disabled={loading}
-// // // // // //                 style={{
-// // // // // //                   ...styles.primaryBtn,
-// // // // // //                   backgroundColor: loading ? "#93c5fd" : "#2563eb",
-// // // // // //                   cursor: loading ? "not-allowed" : "pointer"
-// // // // // //                 }}
-// // // // // //                 onMouseOver={(e) => {
-// // // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#1d4ed8";
-// // // // // //                 }}
-// // // // // //                 onMouseOut={(e) => {
-// // // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#2563eb";
-// // // // // //                 }}
-// // // // // //               >
-// // // // // //                 {loading ? 'Saving Profile...' : 'Save Catalog Item'}
-// // // // // //               </button>
-// // // // // //             </form>
-// // // // // //           </div>
-// // // // // //         )}
-
-// // // // // //       </div>
-// // // // // //     </div>
-// // // // // //   );
-// // // // // // };
-
-// // // // // // export default Products;
-
-
-
-
-// // // // // // 18-06-2026
-
-
-
-
-
-// // // // // // import React, { useState, useEffect } from 'react';
-// // // // // // import api from '../utils/api';
-
-// // // // // // const Products = () => {
-// // // // // //   const [products, setProducts] = useState([]);
-// // // // // //   const [searchQuery, setSearchQuery] = useState("");
-// // // // // //   const [form, setForm] = useState({ 
-// // // // // //     name: '' 
-   
-// // // // // //   });
-// // // // // //   const [loading, setLoading] = useState(false);
-
-// // // // // //   useEffect(() => { 
-// // // // // //     fetchProducts(); 
-// // // // // //   }, []);
-
-// // // // // //   const fetchProducts = async () => {
-// // // // // //     try {
-// // // // // //       const res = await api.get('/products');
-// // // // // //       setProducts(res.data);
-// // // // // //     } catch (error) {
-// // // // // //       console.error(error);
-// // // // // //       alert('Failed to fetch product catalog');
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   const handleSave = async (e) => {
-// // // // // //     e.preventDefault();
-// // // // // //     setLoading(true);
-// // // // // //     try {
-// // // // // //       await api.post('/products', form);
-// // // // // //       alert('Product item registered successfully!');
-// // // // // //       setForm({ name: '' });
-// // // // // //       fetchProducts();
-// // // // // //     } catch (error) {
-// // // // // //       console.error(error);
-// // // // // //       alert('Failed to save product information');
-// // // // // //     } finally {
-// // // // // //       setLoading(false);
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   const handleDelete = async (id) => {
-// // // // // //     if (confirm('Are you sure you want to remove this product permanently?')) {
-// // // // // //       try {
-// // // // // //         await api.delete(`/products/${id}`);
-// // // // // //         fetchProducts();
-// // // // // //       } catch (error) {
-// // // // // //         console.error(error);
-// // // // // //         alert('Failed to delete product item');
-// // // // // //       }
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   // Check matched items matching the search paradigm
-// // // // // //   const filteredProducts = products.filter(p => {
-// // // // // //     const query = searchQuery.toLowerCase().trim();
-// // // // // //     if (!query) return false; // Don't filter/show table if search bar is empty
-// // // // // //     return p.name?.toLowerCase().includes(query);
-// // // // // //   });
-
-// // // // // //   // Toggle flag: show table view only if there is a query AND matches exist
-// // // // // //   const isProductAvailable = searchQuery.trim() !== "" && filteredProducts.length > 0;
-
-// // // // // //   const styles = {
-// // // // // //     page: {
-// // // // // //       minHeight: "100vh",
-// // // // // //       backgroundColor: "#f8fafc",
-// // // // // //       padding: "32px",
-// // // // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // // // //       boxSizing: "border-box",
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       alignItems: "center",
-// // // // // //     },
-// // // // // //     container: {
-// // // // // //       width: "100%",
-// // // // // //       maxWidth: "540px",
-// // // // // //     },
-// // // // // //     headerBlock: {
-// // // // // //       textAlign: "center",
-// // // // // //       marginBottom: "24px",
-// // // // // //     },
-// // // // // //     title: {
-// // // // // //       fontSize: "28px",
-// // // // // //       fontWeight: "700",
-// // // // // //       color: "#0f172a",
-// // // // // //       letterSpacing: "-0.5px",
-// // // // // //       margin: 0,
-// // // // // //     },
-// // // // // //     subtitle: {
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#64748b",
-// // // // // //       marginTop: "6px",
-// // // // // //       marginBottom: 0,
-// // // // // //       lineHeight: "1.5",
-// // // // // //     },
-// // // // // //     searchBarContainer: {
-// // // // // //       width: "100%",
-// // // // // //       marginBottom: "24px",
-// // // // // //     },
-// // // // // //     card: {
-// // // // // //       background: "#ffffff",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "14px",
-// // // // // //       padding: "24px",
-// // // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     panelTitle: {
-// // // // // //       fontSize: "16px",
-// // // // // //       fontWeight: "600",
-// // // // // //       color: "#0f172a",
-// // // // // //       marginTop: 0,
-// // // // // //       marginBottom: "18px",
-// // // // // //     },
-// // // // // //     formGroupGrid: {
-// // // // // //       display: "flex",
-// // // // // //       flexDirection: "column",
-// // // // // //       gap: "14px",
-// // // // // //     },
-// // // // // //     input: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px 14px",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#0f172a",
-// // // // // //       backgroundColor: "#ffffff",
-// // // // // //       outline: "none",
-// // // // // //       transition: "border-color 0.2s, box-shadow 0.2s",
-// // // // // //       boxSizing: "border-box",
-// // // // // //     },
-// // // // // //     primaryBtn: {
-// // // // // //       width: "100%",
-// // // // // //       padding: "12px",
-// // // // // //       background: "#2563eb",
-// // // // // //       color: "#ffffff",
-// // // // // //       border: "none",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontWeight: "600",
-// // // // // //       fontSize: "14px",
-// // // // // //       cursor: "pointer",
-// // // // // //       transition: "background-color 0.2s",
-// // // // // //       marginTop: "6px",
-// // // // // //     },
-// // // // // //     tableContainer: {
-// // // // // //       background: "#ffffff",
-// // // // // //       border: "1px solid #e2e8f0",
-// // // // // //       borderRadius: "14px",
-// // // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-// // // // // //       overflow: "hidden",
-// // // // // //       width: "100%",
-// // // // // //     },
-// // // // // //     table: {
-// // // // // //       width: "100%",
-// // // // // //       borderCollapse: "collapse",
-// // // // // //       textAlign: "left",
-// // // // // //     },
-// // // // // //     th: {
-// // // // // //       backgroundColor: "#f1f5f9",
-// // // // // //       color: "#334155",
-// // // // // //       fontWeight: "600",
-// // // // // //       padding: "14px",
-// // // // // //       fontSize: "13px",
-// // // // // //       borderBottom: "2px solid #e2e8f0",
-// // // // // //     },
-// // // // // //     tr: {
-// // // // // //       transition: "background-color 0.2s",
-// // // // // //     },
-// // // // // //     td: {
-// // // // // //       padding: "14px",
-// // // // // //       fontSize: "14px",
-// // // // // //       color: "#0f172a",
-// // // // // //       borderBottom: "1px solid #e2e8f0",
-// // // // // //     },
-// // // // // //     stockTextNormal: {
-// // // // // //       backgroundColor: "#f1f5f9",
-// // // // // //       color: "#334155",
-// // // // // //       padding: "4px 10px",
-// // // // // //       borderRadius: "8px",
-// // // // // //       fontSize: "13px",
-// // // // // //       fontWeight: "600",
-// // // // // //     },
-// // // // // //     stockTextAlert: {
-// // // // // //       backgroundColor: "#fee2e2",
-// // // // // //       color: "#dc2626",
-// // // // // //       padding: "4px 10px",
-// // // // // //       borderRadius: "8px",
-// // // // // //       fontSize: "13px",
-// // // // // //       fontWeight: "700",
-// // // // // //     },
-// // // // // //     currencyText: {
-// // // // // //       color: "#0f172a",
-// // // // // //       fontWeight: "600",
-// // // // // //     },
-// // // // // //     actionFlex: {
-// // // // // //       display: "flex",
-// // // // // //       gap: "12px",
-// // // // // //     },
-// // // // // //     removeBtn: {
-// // // // // //       background: "none",
-// // // // // //       border: "none",
-// // // // // //       color: "#dc2626",
-// // // // // //       fontWeight: "600",
-// // // // // //       fontSize: "13px",
-// // // // // //       cursor: "pointer",
-// // // // // //       padding: 0,
-// // // // // //     },
-// // // // // //     alertBanner: {
-// // // // // //       backgroundColor: "#f0fdf4",
-// // // // // //       border: "1px solid #bbf7d0",
-// // // // // //       color: "#166534",
-// // // // // //       padding: "12px 14px",
-// // // // // //       borderRadius: "10px",
-// // // // // //       fontSize: "14px",
-// // // // // //       fontWeight: "500",
-// // // // // //       marginBottom: "16px",
-// // // // // //       textAlign: "center"
-// // // // // //     }
-// // // // // //   };
-
-// // // // // //   return (
-// // // // // //     <div style={styles.page}>
-// // // // // //       <div style={styles.container}>
-        
-// // // // // //         {/* Page Header */}
-// // // // // //         <div style={styles.headerBlock}>
-// // // // // //           <h1 style={styles.title}>Add Products to Catalog </h1>
-// // // // // //           {/* <p style={styles.subtitle}>
-// // // // // //             Verify inventory parameters via real-time tracking bar or initialize brand new system stock records
-// // // // // //           </p> */}
-// // // // // //         </div>
-
-// // // // // //         {/* Global Verification Search Bar */}
-// // // // // //         <div style={styles.searchBarContainer}>
-// // // // // //           <input 
-// // // // // //             type="text"
-// // // // // //             style={styles.input}
-// // // // // //             placeholder="Type item name to verify availability status..."
-// // // // // //             value={searchQuery}
-// // // // // //             onChange={(e) => setSearchQuery(e.target.value)}
-// // // // // //             onFocus={(e) => {
-// // // // // //               e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //               e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //             }}
-// // // // // //             onBlur={(e) => {
-// // // // // //               e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //               e.currentTarget.style.boxShadow = "none";
-// // // // // //             }}
-// // // // // //           />
-// // // // // //         </div>
-
-// // // // // //         {/* CONDITIONAL INTERACTIVE VIEW */}
-// // // // // //         {isProductAvailable ? (
-// // // // // //           /* SHOW PRODUCTS TABLE (Hides Registration Form) */
-// // // // // //           <div>
-// // // // // //             <div style={styles.alertBanner}>
-// // // // // //               ✓ Product records matching "{searchQuery}" are available in the system.
-// // // // // //             </div>
-// // // // // //             <div style={styles.tableContainer}>
-// // // // // //               <table style={styles.table}>
-// // // // // //                 <thead>
-// // // // // //   <tr>
-// // // // // //     <th style={styles.th}>Product Name</th>
-// // // // // //     <th style={styles.th}>Action</th>
-// // // // // //   </tr>
-// // // // // // </thead>
-// // // // // //                 <tbody>
-// // // // // //                   {filteredProducts.map((p) => (
-// // // // // //                     <tr key={p._id}>
-// // // // // //   <td style={styles.td}>
-// // // // // //     <strong>{p.name}</strong>
-// // // // // //   </td>
-
-// // // // // //   <td style={styles.td}>
-// // // // // //     <div style={styles.actionFlex}>
-// // // // // //       <button
-// // // // // //         style={styles.removeBtn}
-// // // // // //         onClick={() => handleDelete(p._id)}
-// // // // // //       >
-// // // // // //         Remove
-// // // // // //       </button>
-// // // // // //     </div>
-// // // // // //   </td>
-// // // // // // </tr>
-// // // // // //                   ))}
-// // // // // //                 </tbody>
-// // // // // //               </table>
-// // // // // //             </div>
-// // // // // //           </div>
-// // // // // //         ) : (
-// // // // // //           /* REGISTER CATALOG ITEM CARD (Shows when no match or search input is empty) */
-// // // // // //           <div style={styles.card}>
-// // // // // //             <h3 style={styles.panelTitle}>
-// // // // // //               {searchQuery.trim() !== "" 
-// // // // // //                 ? `"${searchQuery}" Not Found — Register As New Item` 
-// // // // // //                 : "Add Product Details"
-// // // // // //               }
-// // // // // //             </h3>
-// // // // // //             <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // // // //               <input 
-// // // // // //                 type="text" 
-// // // // // //                 placeholder="Product Item Name" 
-// // // // // //                 required 
-// // // // // //                 value={form.name} 
-// // // // // //                 onChange={e => setForm({...form, name: e.target.value})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               />
-// // // // // //               {/* <input 
-// // // // // //                 type="number" 
-// // // // // //                 placeholder="Unit Price (₹)" 
-// // // // // //                 required 
-// // // // // //                 value={form.price || ''} 
-// // // // // //                 onChange={e => setForm({...form, price: Number(e.target.value)})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               /> */}
-// // // // // //               {/* <input 
-// // // // // //                 type="number" 
-// // // // // //                 placeholder="Initial Inventory Units" 
-// // // // // //                 required 
-// // // // // //                 value={form.stock || ''} 
-// // // // // //                 onChange={e => setForm({...form, stock: Number(e.target.value)})} 
-// // // // // //                 style={styles.input}
-// // // // // //                 onFocus={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // // //                 }}
-// // // // // //                 onBlur={(e) => {
-// // // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // // //                 }}
-// // // // // //               /> */}
-              
-// // // // // //               <button 
-// // // // // //                 type="submit" 
-// // // // // //                 disabled={loading}
-// // // // // //                 style={{
-// // // // // //                   ...styles.primaryBtn,
-// // // // // //                   backgroundColor: loading ? "#93c5fd" : "#2563eb",
-// // // // // //                   cursor: loading ? "not-allowed" : "pointer"
-// // // // // //                 }}
-// // // // // //                 onMouseOver={(e) => {
-// // // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#1d4ed8";
-// // // // // //                 }}
-// // // // // //                 onMouseOut={(e) => {
-// // // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#2563eb";
-// // // // // //                 }}
-// // // // // //               >
-// // // // // //                 {loading ? 'Saving Profile...' : 'Save Catalog Item'}
-// // // // // //               </button>
-// // // // // //             </form>
-// // // // // //           </div>
-// // // // // //         )}
-
-// // // // // //       </div>
-// // // // // //     </div>
-// // // // // //   );
-// // // // // // };
-
-// // // // // // export default Products;
-
-
-
-
-// // // // // // 19-06-2026
-
-
-
-
-
-
-// // // // // import React, { useState, useEffect } from 'react';
-// // // // // import api from '../utils/api';
-
-// // // // // const Products = () => {
-// // // // //   const [products, setProducts] = useState([]);
-// // // // //   const [stockGroups, setStockGroups] = useState([]);
-// // // // //   const [units, setUnits] = useState([]);
-
-
-// // // // // const [groupName, setGroupName] = useState("");
-
-// // // // // const [unitForm, setUnitForm] = useState({
-// // // // //   name: "",
-// // // // //   symbol: ""
-// // // // // });
-
-// // // // //   const [searchQuery, setSearchQuery] = useState("");
-  
-// // // // //   const [form, setForm] = useState({
-// // // // //   name: '',
-// // // // //   stockGroup: '',
-// // // // //   unit: ''
-// // // // // });
-// // // // //   const [loading, setLoading] = useState(false);
-
-// // // // //   useEffect(() => {
-// // // // //   fetchProducts();
-// // // // //   fetchStockGroups();
-// // // // //   fetchUnits();
-// // // // // }, []);
-
-// // // // //   const fetchProducts = async () => {
-// // // // //     try {
-// // // // //       const res = await api.get('/products');
-// // // // //       setProducts(res.data);
-// // // // //     } catch (error) {
-// // // // //       console.error(error);
-// // // // //       alert('Failed to fetch product catalog');
-// // // // //     }
-// // // // //   };
-
-// // // // //   const fetchStockGroups = async () => {
-// // // // //   try {
-// // // // //     const res = await api.get("/stock-groups");
-// // // // //     setStockGroups(res.data);
-// // // // //   } catch (error) {
-// // // // //     console.error(error);
-// // // // //   }
-// // // // // };
-
-// // // // // const fetchUnits = async () => {
-// // // // //   try {
-// // // // //     const res = await api.get("/units");
-// // // // //     setUnits(res.data);
-// // // // //   } catch (error) {
-// // // // //     console.error(error);
-// // // // //   }
-// // // // // };
-
-// // // // //   const handleSave = async (e) => {
-// // // // //     e.preventDefault();
-// // // // //     setLoading(true);
-// // // // //     try {
-// // // // //       await api.post('/products', form);
-// // // // //       alert('Product item registered successfully!');
-// // // // //       setForm({
-// // // // //   name: '',
-// // // // //   stockGroup: '',
-// // // // //   unit: ''
-// // // // // });
-// // // // //       fetchProducts();
-// // // // //     } catch (error) {
-// // // // //       console.error(error);
-// // // // //       alert('Failed to save product information');
-// // // // //     } finally {
-// // // // //       setLoading(false);
-// // // // //     }
-// // // // //   };
-
-// // // // //   const handleDelete = async (id) => {
-// // // // //     if (confirm('Are you sure you want to remove this product permanently?')) {
-// // // // //       try {
-// // // // //         await api.delete(`/products/${id}`);
-// // // // //         fetchProducts();
-// // // // //       } catch (error) {
-// // // // //         console.error(error);
-// // // // //         alert('Failed to delete product item');
-// // // // //       }
-// // // // //     }
-// // // // //   };
-
-
-// // // // // const addStockGroup = async () => {
-// // // // //   try {
-
-// // // // //     await api.post("/stock-groups", {
-// // // // //       name: groupName
-// // // // //     });
-
-// // // // //     setGroupName("");
-
-// // // // //     fetchStockGroups();
-
-// // // // //   } catch (error) {
-
-// // // // //     console.error(error);
-
-// // // // //   }
-// // // // // };
-
-
-
-// // // // // const addUnit = async () => {
-// // // // //   try {
-
-// // // // //     await api.post("/units", unitForm);
-
-// // // // //     setUnitForm({
-// // // // //       name: "",
-// // // // //       symbol: ""
-// // // // //     });
-
-// // // // //     fetchUnits();
-
-// // // // //   } catch (error) {
-
-// // // // //     console.error(error);
-
-// // // // //   }
-// // // // // };
-
-
-
-// // // // //   // Check matched items matching the search paradigm
-// // // // //   const filteredProducts = products.filter(p => {
-// // // // //     const query = searchQuery.toLowerCase().trim();
-// // // // //     if (!query) return false; // Don't filter/show table if search bar is empty
-// // // // //     return p.name?.toLowerCase().includes(query);
-// // // // //   });
-
-// // // // //   // Toggle flag: show table view only if there is a query AND matches exist
-// // // // //   const isProductAvailable = searchQuery.trim() !== "" && filteredProducts.length > 0;
-
-// // // // //   const styles = {
-// // // // //     page: {
-// // // // //       minHeight: "100vh",
-// // // // //       backgroundColor: "#f8fafc",
-// // // // //       padding: "32px",
-// // // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // // //       boxSizing: "border-box",
-// // // // //       display: "flex",
-// // // // //       flexDirection: "column",
-// // // // //       alignItems: "center",
-// // // // //     },
-// // // // //     container: {
-// // // // //       width: "100%",
-// // // // //       maxWidth: "540px",
-// // // // //     },
-// // // // //     headerBlock: {
-// // // // //       textAlign: "center",
-// // // // //       marginBottom: "24px",
-// // // // //     },
-// // // // //     title: {
-// // // // //       fontSize: "28px",
-// // // // //       fontWeight: "700",
-// // // // //       color: "#0f172a",
-// // // // //       letterSpacing: "-0.5px",
-// // // // //       margin: 0,
-// // // // //     },
-// // // // //     subtitle: {
-// // // // //       fontSize: "14px",
-// // // // //       color: "#64748b",
-// // // // //       marginTop: "6px",
-// // // // //       marginBottom: 0,
-// // // // //       lineHeight: "1.5",
-// // // // //     },
-// // // // //     searchBarContainer: {
-// // // // //       width: "100%",
-// // // // //       marginBottom: "24px",
-// // // // //     },
-// // // // //     card: {
-// // // // //       background: "#ffffff",
-// // // // //       border: "1px solid #e2e8f0",
-// // // // //       borderRadius: "14px",
-// // // // //       padding: "24px",
-// // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)",
-// // // // //       boxSizing: "border-box",
-// // // // //     },
-// // // // //     panelTitle: {
-// // // // //       fontSize: "16px",
-// // // // //       fontWeight: "600",
-// // // // //       color: "#0f172a",
-// // // // //       marginTop: 0,
-// // // // //       marginBottom: "18px",
-// // // // //     },
-// // // // //     formGroupGrid: {
-// // // // //       display: "flex",
-// // // // //       flexDirection: "column",
-// // // // //       gap: "14px",
-// // // // //     },
-// // // // //     input: {
-// // // // //       width: "100%",
-// // // // //       padding: "12px 14px",
-// // // // //       border: "1px solid #e2e8f0",
-// // // // //       borderRadius: "10px",
-// // // // //       fontSize: "14px",
-// // // // //       color: "#0f172a",
-// // // // //       backgroundColor: "#ffffff",
-// // // // //       outline: "none",
-// // // // //       transition: "border-color 0.2s, box-shadow 0.2s",
-// // // // //       boxSizing: "border-box",
-// // // // //     },
-// // // // //     primaryBtn: {
-// // // // //       width: "100%",
-// // // // //       padding: "12px",
-// // // // //       background: "#2563eb",
-// // // // //       color: "#ffffff",
-// // // // //       border: "none",
-// // // // //       borderRadius: "10px",
-// // // // //       fontWeight: "600",
-// // // // //       fontSize: "14px",
-// // // // //       cursor: "pointer",
-// // // // //       transition: "background-color 0.2s",
-// // // // //       marginTop: "6px",
-// // // // //     },
-// // // // //     tableContainer: {
-// // // // //       background: "#ffffff",
-// // // // //       border: "1px solid #e2e8f0",
-// // // // //       borderRadius: "14px",
-// // // // //       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-// // // // //       overflow: "hidden",
-// // // // //       width: "100%",
-// // // // //     },
-// // // // //     table: {
-// // // // //       width: "100%",
-// // // // //       borderCollapse: "collapse",
-// // // // //       textAlign: "left",
-// // // // //     },
-// // // // //     th: {
-// // // // //       backgroundColor: "#f1f5f9",
-// // // // //       color: "#334155",
-// // // // //       fontWeight: "600",
-// // // // //       padding: "14px",
-// // // // //       fontSize: "13px",
-// // // // //       borderBottom: "2px solid #e2e8f0",
-// // // // //     },
-// // // // //     tr: {
-// // // // //       transition: "background-color 0.2s",
-// // // // //     },
-// // // // //     td: {
-// // // // //       padding: "14px",
-// // // // //       fontSize: "14px",
-// // // // //       color: "#0f172a",
-// // // // //       borderBottom: "1px solid #e2e8f0",
-// // // // //     },
-// // // // //     stockTextNormal: {
-// // // // //       backgroundColor: "#f1f5f9",
-// // // // //       color: "#334155",
-// // // // //       padding: "4px 10px",
-// // // // //       borderRadius: "8px",
-// // // // //       fontSize: "13px",
-// // // // //       fontWeight: "600",
-// // // // //     },
-// // // // //     stockTextAlert: {
-// // // // //       backgroundColor: "#fee2e2",
-// // // // //       color: "#dc2626",
-// // // // //       padding: "4px 10px",
-// // // // //       borderRadius: "8px",
-// // // // //       fontSize: "13px",
-// // // // //       fontWeight: "700",
-// // // // //     },
-// // // // //     currencyText: {
-// // // // //       color: "#0f172a",
-// // // // //       fontWeight: "600",
-// // // // //     },
-// // // // //     actionFlex: {
-// // // // //       display: "flex",
-// // // // //       gap: "12px",
-// // // // //     },
-// // // // //     removeBtn: {
-// // // // //       background: "none",
-// // // // //       border: "none",
-// // // // //       color: "#dc2626",
-// // // // //       fontWeight: "600",
-// // // // //       fontSize: "13px",
-// // // // //       cursor: "pointer",
-// // // // //       padding: 0,
-// // // // //     },
-// // // // //     alertBanner: {
-// // // // //       backgroundColor: "#f0fdf4",
-// // // // //       border: "1px solid #bbf7d0",
-// // // // //       color: "#166534",
-// // // // //       padding: "12px 14px",
-// // // // //       borderRadius: "10px",
-// // // // //       fontSize: "14px",
-// // // // //       fontWeight: "500",
-// // // // //       marginBottom: "16px",
-// // // // //       textAlign: "center"
-// // // // //     }
-// // // // //   };
-
-// // // // //   return (
-// // // // //     <div style={styles.page}>
-// // // // //       <div style={styles.container}>
-        
-// // // // //         {/* Page Header */}
-// // // // //         <div style={styles.headerBlock}>
-// // // // //           <h1 style={styles.title}>Add Products to Catalog </h1>
-// // // // //           {/* <p style={styles.subtitle}>
-// // // // //             Verify inventory parameters via real-time tracking bar or initialize brand new system stock records
-// // // // //           </p> */}
-// // // // //         </div>
-
-// // // // //         {/* Global Verification Search Bar */}
-// // // // //         <div style={styles.searchBarContainer}>
-// // // // //           <input 
-// // // // //             type="text"
-// // // // //             style={styles.input}
-// // // // //             placeholder="Type item name to verify availability status..."
-// // // // //             value={searchQuery}
-// // // // //             onChange={(e) => setSearchQuery(e.target.value)}
-// // // // //             onFocus={(e) => {
-// // // // //               e.currentTarget.style.borderColor = "#2563eb";
-// // // // //               e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // //             }}
-// // // // //             onBlur={(e) => {
-// // // // //               e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // //               e.currentTarget.style.boxShadow = "none";
-// // // // //             }}
-// // // // //           />
-// // // // //         </div>
-
-// // // // //         {/* CONDITIONAL INTERACTIVE VIEW */}
-// // // // //         {isProductAvailable ? (
-// // // // //           /* SHOW PRODUCTS TABLE (Hides Registration Form) */
-// // // // //           <div>
-// // // // //             <div style={styles.alertBanner}>
-// // // // //               ✓ Product records matching "{searchQuery}" are available in the system.
-// // // // //             </div>
-// // // // //             <div style={styles.tableContainer}>
-// // // // //               <table style={styles.table}>
-// // // // //                 <thead>
-// // // // //   <tr>
-// // // // //     <th>Product Name</th>
-// // // // // <th>Stock Group</th>
-// // // // // <th>Unit</th>
-// // // // // <th>Action</th>
-// // // // //   </tr>
-// // // // // </thead>
-// // // // //                 <tbody>
-// // // // //                   {filteredProducts.map((p) => (
-// // // // //                     <tr key={p._id}>
-// // // // //   <td>{p.name}</td>
-// // // // // <td>{p.stockGroup?.name}</td>
-// // // // // <td>{p.unit?.symbol}</td>
-
-// // // // //   <td style={styles.td}>
-// // // // //     <div style={styles.actionFlex}>
-// // // // //       <button
-// // // // //         style={styles.removeBtn}
-// // // // //         onClick={() => handleDelete(p._id)}
-// // // // //       >
-// // // // //         Remove
-// // // // //       </button>
-// // // // //     </div>
-// // // // //   </td>
-// // // // // </tr>
-// // // // //                   ))}
-// // // // //                 </tbody>
-// // // // //               </table>
-// // // // //             </div>
-// // // // //           </div>
-// // // // //         ) : (
-// // // // //           /* REGISTER CATALOG ITEM CARD (Shows when no match or search input is empty) */
-// // // // //           <div style={styles.card}>
-// // // // //             <h3 style={styles.panelTitle}>
-// // // // //               {searchQuery.trim() !== "" 
-// // // // //                 ? `"${searchQuery}" Not Found — Register As New Item` 
-// // // // //                 : "Add Product Details"
-// // // // //               }
-// // // // //             </h3>
-// // // // //             <div style={styles.card}>
-// // // // //   <h3>Add Stock Group</h3>
-
-// // // // //   <input
-// // // // //     type="text"
-// // // // //     value={groupName}
-// // // // //     onChange={(e) => setGroupName(e.target.value)}
-// // // // //     placeholder="Stock Group Name"
-// // // // //     style={styles.input}
-// // // // //   />
-
-// // // // //   <button
-// // // // //     type="button"
-// // // // //     onClick={addStockGroup}
-// // // // //     style={styles.primaryBtn}
-// // // // //   >
-// // // // //     Add Stock Group
-// // // // //   </button>
-// // // // // </div>
-// // // // // <div style={styles.card}>
-// // // // //   <h3>Add Unit</h3>
-
-// // // // //   <input
-// // // // //     type="text"
-// // // // //     value={unitForm.name}
-// // // // //     onChange={(e) =>
-// // // // //       setUnitForm({
-// // // // //         ...unitForm,
-// // // // //         name: e.target.value
-// // // // //       })
-// // // // //     }
-// // // // //     placeholder="Unit Name"
-// // // // //     style={styles.input}
-// // // // //   />
-
-// // // // //   <input
-// // // // //     type="text"
-// // // // //     value={unitForm.symbol}
-// // // // //     onChange={(e) =>
-// // // // //       setUnitForm({
-// // // // //         ...unitForm,
-// // // // //         symbol: e.target.value
-// // // // //       })
-// // // // //     }
-// // // // //     placeholder="Symbol"
-// // // // //     style={styles.input}
-// // // // //   />
-
-// // // // //   <button
-// // // // //     type="button"
-// // // // //     onClick={addUnit}
-// // // // //     style={styles.primaryBtn}
-// // // // //   >
-// // // // //     Add Unit
-// // // // //   </button>
-// // // // // </div>
-// // // // //             <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // // //               <input 
-// // // // //                 type="text" 
-// // // // //                 placeholder="Product Item Name" 
-// // // // //                 required 
-// // // // //                 value={form.name} 
-// // // // //                 onChange={e => setForm({...form, name: e.target.value})} 
-// // // // //                 style={styles.input}
-// // // // //                 onFocus={(e) => {
-// // // // //                   e.currentTarget.style.borderColor = "#2563eb";
-// // // // //                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
-// // // // //                 }}
-// // // // //                 onBlur={(e) => {
-// // // // //                   e.currentTarget.style.borderColor = "#e2e8f0";
-// // // // //                   e.currentTarget.style.boxShadow = "none";
-// // // // //                 }}
-// // // // //               />
-             
-// // // // //               <select
-// // // // //   value={form.stockGroup}
-// // // // //   onChange={(e) =>
-// // // // //     setForm({
-// // // // //       ...form,
-// // // // //       stockGroup: e.target.value
-// // // // //     })
-// // // // //   }
-// // // // //   style={styles.input}
-// // // // //   required
-// // // // // >
-// // // // //   <option value="">
-// // // // //     Select Stock Group
-// // // // //   </option>
-
-// // // // //   {stockGroups.map(group => (
-// // // // //     <option
-// // // // //       key={group._id}
-// // // // //       value={group._id}
-// // // // //     >
-// // // // //       {group.name}
-// // // // //     </option>
-// // // // //   ))}
-// // // // // </select>
-
-// // // // // <select
-// // // // //   value={form.unit}
-// // // // //   onChange={(e) =>
-// // // // //     setForm({
-// // // // //       ...form,
-// // // // //       unit: e.target.value
-// // // // //     })
-// // // // //   }
-// // // // //   style={styles.input}
-// // // // //   required
-// // // // // >
-// // // // //   <option value="">
-// // // // //     Select Unit
-// // // // //   </option>
-
-// // // // //   {units.map(unit => (
-// // // // //     <option
-// // // // //       key={unit._id}
-// // // // //       value={unit._id}
-// // // // //     >
-// // // // //       {unit.symbol}
-// // // // //     </option>
-// // // // //   ))}
-// // // // // </select>              <button 
-// // // // //                 type="submit" 
-// // // // //                 disabled={loading}
-// // // // //                 style={{
-// // // // //                   ...styles.primaryBtn,
-// // // // //                   backgroundColor: loading ? "#93c5fd" : "#2563eb",
-// // // // //                   cursor: loading ? "not-allowed" : "pointer"
-// // // // //                 }}
-// // // // //                 onMouseOver={(e) => {
-// // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#1d4ed8";
-// // // // //                 }}
-// // // // //                 onMouseOut={(e) => {
-// // // // //                   if (!loading) e.currentTarget.style.backgroundColor = "#2563eb";
-// // // // //                 }}
-// // // // //               >
-// // // // //                 {loading ? 'Saving Profile...' : 'Save Catalog Item'}
-// // // // //               </button>
-// // // // //             </form>
-// // // // //           </div>
-// // // // //         )}
-
-// // // // //       </div>
-// // // // //     </div>
-// // // // //   );
-// // // // // };
-
-// // // // // export default Products;
-
-
-
-
-
-// // // // import React, { useState, useEffect } from 'react';
-// // // // import api from '../utils/api';
-
-// // // // const Products = () => {
-// // // //   const [products, setProducts] = useState([]);
-// // // //   const [stockGroups, setStockGroups] = useState([]);
-// // // //   const [units, setUnits] = useState([]);
-
-// // // //   const [groupName, setGroupName] = useState("");
-// // // //   const [unitForm, setUnitForm] = useState({ name: "", symbol: "" });
-// // // //   const [searchQuery, setSearchQuery] = useState("");
-// // // //   const [form, setForm] = useState({ name: '', stockGroup: '', unit: '' });
-// // // //   const [loading, setLoading] = useState(false);
-
-// // // //   useEffect(() => {
-// // // //     fetchProducts();
-// // // //     fetchStockGroups();
-// // // //     fetchUnits();
-// // // //   }, []);
-
-// // // //   const fetchProducts = async () => {
-// // // //     try {
-// // // //       const res = await api.get('/products');
-// // // //       setProducts(res.data);
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //       alert('Failed to fetch product catalog');
-// // // //     }
-// // // //   };
-
-// // // //   const fetchStockGroups = async () => {
-// // // //     try {
-// // // //       const res = await api.get("/stock-groups");
-// // // //       setStockGroups(res.data);
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //     }
-// // // //   };
-
-// // // //   const fetchUnits = async () => {
-// // // //     try {
-// // // //       const res = await api.get("/units");
-// // // //       setUnits(res.data);
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //     }
-// // // //   };
-
-// // // //   const handleSave = async (e) => {
-// // // //     e.preventDefault();
-// // // //     setLoading(true);
-// // // //     try {
-// // // //       await api.post('/products', form);
-// // // //       alert('Product item registered successfully!');
-// // // //       setForm({ name: '', stockGroup: '', unit: '' });
-// // // //       fetchProducts();
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //       alert('Failed to save product information');
-// // // //     } finally {
-// // // //       setLoading(false);
-// // // //     }
-// // // //   };
-
-// // // //   const handleDelete = async (id) => {
-// // // //     if (window.confirm('Are you sure you want to remove this product permanently?')) {
-// // // //       try {
-// // // //         await api.delete(`/products/${id}`);
-// // // //         fetchProducts();
-// // // //       } catch (error) {
-// // // //         console.error(error);
-// // // //         alert('Failed to delete product item');
-// // // //       }
-// // // //     }
-// // // //   };
-
-// // // //   const addStockGroup = async (e) => {
-// // // //     e.preventDefault();
-// // // //     if (!groupName.trim()) return;
-// // // //     try {
-// // // //       await api.post("/stock-groups", { name: groupName });
-// // // //       setGroupName("");
-// // // //       fetchStockGroups();
-// // // //       alert('Stock group added successfully!');
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //     }
-// // // //   };
-
-// // // //   const addUnit = async (e) => {
-// // // //     e.preventDefault();
-// // // //     if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
-// // // //     try {
-// // // //       await api.post("/units", unitForm);
-// // // //       setUnitForm({ name: "", symbol: "" });
-// // // //       fetchUnits();
-// // // //       alert('Unit added successfully!');
-// // // //     } catch (error) {
-// // // //       console.error(error);
-// // // //     }
-// // // //   };
-
-// // // //   const filteredProducts = products.filter(p => {
-// // // //     const query = searchQuery.toLowerCase().trim();
-// // // //     return p.name?.toLowerCase().includes(query);
-// // // //   });
-
-// // // //   const styles = {
-// // // //     page: {
-// // // //       minHeight: "100vh",
-// // // //       backgroundColor: "#f1f5f9",
-// // // //       padding: "40px 24px",
-// // // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // // //       boxSizing: "border-box",
-// // // //     },
-// // // //     container: {
-// // // //       width: "100%",
-// // // //       maxWidth: "1200px",
-// // // //       margin: "0 auto",
-// // // //     },
-// // // //     headerBlock: {
-// // // //       marginBottom: "32px",
-// // // //     },
-// // // //     title: {
-// // // //       fontSize: "32px",
-// // // //       fontWeight: "800",
-// // // //       color: "#0f172a",
-// // // //       letterSpacing: "-0.5px",
-// // // //       margin: 0,
-// // // //     },
-// // // //     subtitle: {
-// // // //       fontSize: "15px",
-// // // //       color: "#64748b",
-// // // //       marginTop: "6px",
-// // // //       marginBottom: 0,
-// // // //     },
-// // // //     dashboardGrid: {
-// // // //       display: "grid",
-// // // //       gridTemplateColumns: "1fr 1.5fr",
-// // // //       gap: "32px",
-// // // //       alignItems: "start",
-// // // //     },
-// // // //     sidebar: {
-// // // //       display: "flex",
-// // // //       flexDirection: "column",
-// // // //       gap: "24px",
-// // // //     },
-// // // //     card: {
-// // // //       background: "#ffffff",
-// // // //       border: "1px solid #e2e8f0",
-// // // //       borderRadius: "16px",
-// // // //       padding: "24px",
-// // // //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
-// // // //     },
-// // // //     subCardTitle: {
-// // // //       fontSize: "14px",
-// // // //       fontWeight: "700",
-// // // //       color: "#475569",
-// // // //       textTransform: "uppercase",
-// // // //       letterSpacing: "0.5px",
-// // // //       marginTop: 0,
-// // // //       marginBottom: "14px",
-// // // //       borderBottom: "1px solid #f1f5f9",
-// // // //       paddingBottom: "8px"
-// // // //     },
-// // // //     inlineFormGroup: {
-// // // //       display: "flex",
-// // // //       gap: "10px",
-// // // //       marginBottom: "12px"
-// // // //     },
-// // // //     formGroupGrid: {
-// // // //       display: "flex",
-// // // //       flexDirection: "column",
-// // // //       gap: "16px",
-// // // //     },
-// // // //     input: {
-// // // //       width: "100%",
-// // // //       padding: "10px 14px",
-// // // //       border: "1px solid #cbd5e1",
-// // // //       borderRadius: "8px",
-// // // //       fontSize: "14px",
-// // // //       color: "#0f172a",
-// // // //       backgroundColor: "#ffffff",
-// // // //       outline: "none",
-// // // //       transition: "all 0.2s",
-// // // //       boxSizing: "border-box",
-// // // //     },
-// // // //     primaryBtn: {
-// // // //       padding: "10px 16px",
-// // // //       background: "#2563eb",
-// // // //       color: "#ffffff",
-// // // //       border: "none",
-// // // //       borderRadius: "8px",
-// // // //       fontWeight: "600",
-// // // //       fontSize: "14px",
-// // // //       cursor: "pointer",
-// // // //       transition: "background-color 0.2s",
-// // // //       whiteSpace: "nowrap"
-// // // //     },
-// // // //     submitBtn: {
-// // // //       width: "100%",
-// // // //       padding: "12px",
-// // // //       color: "#ffffff",
-// // // //       border: "none",
-// // // //       borderRadius: "8px",
-// // // //       fontWeight: "600",
-// // // //       fontSize: "15px",
-// // // //       marginTop: "8px",
-// // // //       transition: "all 0.2s",
-// // // //     },
-// // // //     tableContainer: {
-// // // //       background: "#ffffff",
-// // // //       border: "1px solid #e2e8f0",
-// // // //       borderRadius: "16px",
-// // // //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-// // // //       overflow: "hidden",
-// // // //     },
-// // // //     table: {
-// // // //       width: "100%",
-// // // //       borderCollapse: "collapse",
-// // // //       textAlign: "left",
-// // // //     },
-// // // //     th: {
-// // // //       backgroundColor: "#f8fafc",
-// // // //       color: "#475569",
-// // // //       fontWeight: "600",
-// // // //       padding: "16px",
-// // // //       fontSize: "13px",
-// // // //       borderBottom: "1px solid #e2e8f0",
-// // // //     },
-// // // //     td: {
-// // // //       padding: "16px",
-// // // //       fontSize: "14px",
-// // // //       color: "#334155",
-// // // //       borderBottom: "1px solid #f1f5f9",
-// // // //     },
-// // // //     removeBtn: {
-// // // //       background: "none",
-// // // //       border: "none",
-// // // //       color: "#ef4444",
-// // // //       fontWeight: "600",
-// // // //       fontSize: "13px",
-// // // //       cursor: "pointer",
-// // // //       padding: 0,
-// // // //       transition: "color 0.2s"
-// // // //     },
-// // // //     alertBanner: {
-// // // //       backgroundColor: "#f0fdf4",
-// // // //       border: "1px solid #bbf7d0",
-// // // //       color: "#166534",
-// // // //       padding: "12px 16px",
-// // // //       borderRadius: "8px",
-// // // //       fontSize: "14px",
-// // // //       fontWeight: "500",
-// // // //       marginBottom: "20px",
-// // // //     },
-// // // //     emptyState: {
-// // // //       padding: "40px",
-// // // //       textAlign: "center",
-// // // //       color: "#64748b",
-// // // //       fontSize: "15px"
-// // // //     }
-// // // //   };
-
-// // // //   const handleFocus = (e) => {
-// // // //     e.currentTarget.style.borderColor = "#2563eb";
-// // // //     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-// // // //   };
-
-// // // //   const handleBlur = (e) => {
-// // // //     e.currentTarget.style.borderColor = "#cbd5e1";
-// // // //     e.currentTarget.style.boxShadow = "none";
-// // // //   };
-
-// // // //   return (
-// // // //     <div style={styles.page}>
-// // // //       <div style={styles.container}>
-        
-// // // //         {/* Page Header */}
-// // // //         <div style={styles.headerBlock}>
-// // // //           <h1 style={styles.title}>Inventory Catalog Manager</h1>
-// // // //           <p style={styles.subtitle}>Register items, customize inventory configurations, and manage your real-time stocks.</p>
-// // // //         </div>
-
-// // // //         <div style={styles.dashboardGrid}>
-          
-// // // //           {/* LEFT COLUMN: Management Panel */}
-// // // //           <div style={styles.sidebar}>
-            
-// // // //             {/* 1. Add Stock Group */}
-// // // //             <div style={styles.card}>
-// // // //               <h3 style={styles.subCardTitle}>Quick Add: Stock Group</h3>
-// // // //               <form onSubmit={addStockGroup} style={styles.inlineFormGroup}>
-// // // //                 <input
-// // // //                   type="text"
-// // // //                   value={groupName}
-// // // //                   onChange={(e) => setGroupName(e.target.value)}
-// // // //                   placeholder="e.g., Electronics"
-// // // //                   style={styles.input}
-// // // //                   onFocus={handleFocus}
-// // // //                   onBlur={handleBlur}
-// // // //                 />
-// // // //                 <button type="submit" style={styles.primaryBtn}>Add</button>
-// // // //               </form>
-// // // //             </div>
-
-// // // //             {/* 2. Add Unit */}
-// // // //             <div style={styles.card}>
-// // // //               <h3 style={styles.subCardTitle}>Quick Add: Measurement Unit</h3>
-// // // //               <form onSubmit={addUnit} style={styles.formGroupGrid}>
-// // // //                 <div style={styles.inlineFormGroup}>
-// // // //                   <input
-// // // //                     type="text"
-// // // //                     value={unitForm.name}
-// // // //                     onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-// // // //                     placeholder="Unit Name (Kilogram)"
-// // // //                     style={styles.input}
-// // // //                     onFocus={handleFocus}
-// // // //                     onBlur={handleBlur}
-// // // //                   />
-// // // //                   <input
-// // // //                     type="text"
-// // // //                     value={unitForm.symbol}
-// // // //                     onChange={(e) => setUnitForm({ ...unitForm, symbol: e.target.value })}
-// // // //                     placeholder="Symbol (kg)"
-// // // //                     style={styles.input}
-// // // //                     onFocus={handleFocus}
-// // // //                     onBlur={handleBlur}
-// // // //                   />
-// // // //                 </div>
-// // // //                 <button type="submit" style={{ ...styles.primaryBtn, width: '100%' }}>Add Unit Setup</button>
-// // // //               </form>
-// // // //             </div>
-
-// // // //             {/* 3. Register Product */}
-// // // //             <div style={styles.card}>
-// // // //               <h3 style={styles.subCardTitle}>Product Details Entry</h3>
-// // // //               <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // // //                 <div>
-// // // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Product Name</label>
-// // // //                   <input 
-// // // //                     type="text" 
-// // // //                     placeholder="Enter unique catalog item name" 
-// // // //                     required 
-// // // //                     value={form.name} 
-// // // //                     onChange={e => setForm({...form, name: e.target.value})} 
-// // // //                     style={styles.input}
-// // // //                     onFocus={handleFocus}
-// // // //                     onBlur={handleBlur}
-// // // //                   />
-// // // //                 </div>
-                 
-// // // //                 <div>
-// // // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Stock Group Assignment</label>
-// // // //                   <select
-// // // //                     value={form.stockGroup}
-// // // //                     onChange={(e) => setForm({ ...form, stockGroup: e.target.value })}
-// // // //                     style={styles.input}
-// // // //                     required
-// // // //                   >
-// // // //                     <option value="">Select Stock Group</option>
-// // // //                     {stockGroups.map(group => (
-// // // //                       <option key={group._id} value={group._id}>{group.name}</option>
-// // // //                     ))}
-// // // //                   </select>
-// // // //                 </div>
-
-// // // //                 <div>
-// // // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Unit Dimension</label>
-// // // //                   <select
-// // // //                     value={form.unit}
-// // // //                     onChange={(e) => setForm({ ...form, unit: e.target.value })}
-// // // //                     style={styles.input}
-// // // //                     required
-// // // //                   >
-// // // //                     <option value="">Select Unit</option>
-// // // //                     {units.map(unit => (
-// // // //                       <option key={unit._id} value={unit._id}>{unit.symbol} ({unit.name})</option>
-// // // //                     ))}
-// // // //                   </select>
-// // // //                 </div>
-
-// // // //                 <button 
-// // // //                   type="submit" 
-// // // //                   disabled={loading}
-// // // //                   style={{
-// // // //                     ...styles.submitBtn,
-// // // //                     backgroundColor: loading ? "#93c5fd" : "#2563eb",
-// // // //                     cursor: loading ? "not-allowed" : "pointer"
-// // // //                   }}
-// // // //                 >
-// // // //                   {loading ? 'Saving Parameters...' : 'Save Catalog Item'}
-// // // //                 </button>
-// // // //               </form>
-// // // //             </div>
-// // // //           </div>
-
-// // // //           {/* RIGHT COLUMN: Search & Live View Table */}
-// // // //           <div>
-// // // //             <div style={{ marginBottom: "20px" }}>
-// // // //               <input 
-// // // //                 type="text"
-// // // //                 style={styles.input}
-// // // //                 placeholder="🔍 Search or verify products inside database..."
-// // // //                 value={searchQuery}
-// // // //                 onChange={(e) => setSearchQuery(e.target.value)}
-// // // //                 onFocus={handleFocus}
-// // // //                 onBlur={handleBlur}
-// // // //               />
-// // // //             </div>
-
-// // // //             {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-// // // //               <div style={styles.alertBanner}>
-// // // //                 ✨ <strong>Matches Found:</strong> Found records aligning with "{searchQuery}".
-// // // //               </div>
-// // // //             )}
-
-// // // //             <div style={styles.tableContainer}>
-// // // //               {filteredProducts.length === 0 ? (
-// // // //                 <div style={styles.emptyState}>
-// // // //                   {searchQuery.trim() !== "" 
-// // // //                     ? `No matching records found for "${searchQuery}". Use the entry panel to create it!` 
-// // // //                     : "No products in system. Complete the entry setup wizard."
-// // // //                   }
-// // // //                 </div>
-// // // //               ) : (
-// // // //                 <table style={styles.table}>
-// // // //                   <thead>
-// // // //                     <tr>
-// // // //                       <th style={styles.th}>Product Name</th>
-// // // //                       <th style={styles.th}>Stock Group</th>
-// // // //                       <th style={styles.th}>Unit Configuration</th>
-// // // //                       <th style={styles.th}>Action</th>
-// // // //                     </tr>
-// // // //                   </thead>
-// // // //                   <tbody>
-// // // //                     {filteredProducts.map((p) => (
-// // // //                       <tr key={p._id}>
-// // // //                         <td style={styles.td}><strong>{p.name}</strong></td>
-// // // //                         <td style={styles.td}>{p.stockGroup?.name || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// // // //                         <td style={styles.td}>{p.unit?.symbol || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// // // //                         <td style={styles.td}>
-// // // //                           <button
-// // // //                             style={styles.removeBtn}
-// // // //                             onClick={() => handleDelete(p._id)}
-// // // //                             onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-// // // //                             onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
-// // // //                           >
-// // // //                             Remove
-// // // //                           </button>
-// // // //                         </td>
-// // // //                       </tr>
-// // // //                     ))}
-// // // //                   </tbody>
-// // // //                 </table>
-// // // //               )}
-// // // //             </div>
-// // // //           </div>
-
-// // // //         </div>
-// // // //       </div>
-// // // //     </div>
-// // // //   );
-// // // // };
-
-// // // // export default Products;
-
-
-
-
-
-
-
-// // // import React, { useState, useEffect } from 'react';
-// // // import api from '../utils/api';
-
-// // // const Products = () => {
-// // //   const [products, setProducts] = useState([]);
-// // //   const [stockGroups, setStockGroups] = useState([]);
-// // //   const [units, setUnits] = useState([]);
-
-// // //   const [groupName, setGroupName] = useState("");
-// // //   const [unitForm, setUnitForm] = useState({ name: "", symbol: "" });
-// // //   const [searchQuery, setSearchQuery] = useState("");
-  
-// // //   // Form state manages both creating and updating
-// // //   const [form, setForm] = useState({ name: '', stockGroup: '', unit: '' });
-// // //   const [editingId, setEditingId] = useState(null); 
-// // //   const [loading, setLoading] = useState(false);
-
-// // //   useEffect(() => {
-// // //     fetchProducts();
-// // //     fetchStockGroups();
-// // //     fetchUnits();
-// // //   }, []);
-
-// // //   const fetchProducts = async () => {
-// // //     try {
-// // //       const res = await api.get('/products');
-// // //       setProducts(res.data);
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //       alert('Failed to fetch product catalog');
-// // //     }
-// // //   };
-
-// // //   const fetchStockGroups = async () => {
-// // //     try {
-// // //       const res = await api.get("/stock-groups");
-// // //       setStockGroups(res.data);
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //     }
-// // //   };
-
-// // //   const fetchUnits = async () => {
-// // //     try {
-// // //       const res = await api.get("/units");
-// // //       setUnits(res.data);
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //     }
-// // //   };
-
-// // //   const handleSave = async (e) => {
-// // //     e.preventDefault();
-// // //     setLoading(true);
-// // //     try {
-// // //       if (editingId) {
-// // //         // Update operational flow
-// // //         await api.put(`/products/${editingId}`, form);
-// // //         alert('Product item updated successfully!');
-// // //       } else {
-// // //         // Create operational flow
-// // //         await api.post('/products', form);
-// // //         alert('Product item registered successfully!');
-// // //       }
-// // //       clearForm();
-// // //       fetchProducts();
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //       alert('Failed to save product information');
-// // //     } finally {
-// // //       setLoading(false);
-// // //     }
-// // //   };
-
-// // //   const handleEditInit = (product) => {
-// // //     setEditingId(product._id);
-// // //     setForm({
-// // //       name: product.name || '',
-// // //       stockGroup: product.stockGroup?._id || product.stockGroup || '',
-// // //       unit: product.unit?._id || product.unit || ''
-// // //     });
-// // //     window.scrollTo({ top: 0, behavior: 'smooth' });
-// // //   };
-
-// // //   const clearForm = () => {
-// // //     setForm({ name: '', stockGroup: '', unit: '' });
-// // //     setEditingId(null);
-// // //   };
-
-// // //   const handleDelete = async (id) => {
-// // //     if (window.confirm('Are you sure you want to delete this product permanently?')) {
-// // //       try {
-// // //         await api.delete(`/products/${id}`);
-// // //         if (editingId === id) clearForm();
-// // //         fetchProducts();
-// // //       } catch (error) {
-// // //         console.error(error);
-// // //         alert('Failed to delete product item');
-// // //       }
-// // //     }
-// // //   };
-
-// // //   const addStockGroup = async (e) => {
-// // //     e.preventDefault();
-// // //     if (!groupName.trim()) return;
-// // //     try {
-// // //       await api.post("/stock-groups", { name: groupName });
-// // //       setGroupName("");
-// // //       fetchStockGroups();
-// // //       alert('Stock group added successfully!');
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //     }
-// // //   };
-
-// // //   const addUnit = async (e) => {
-// // //     e.preventDefault();
-// // //     if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
-// // //     try {
-// // //       await api.post("/units", unitForm);
-// // //       setUnitForm({ name: "", symbol: "" });
-// // //       fetchUnits();
-// // //       alert('Unit added successfully!');
-// // //     } catch (error) {
-// // //       console.error(error);
-// // //     }
-// // //   };
-
-// // //   const filteredProducts = products.filter(p => {
-// // //     const query = searchQuery.toLowerCase().trim();
-// // //     return p.name?.toLowerCase().includes(query);
-// // //   });
-
-// // //   const styles = {
-// // //     page: {
-// // //       minHeight: "100vh",
-// // //       backgroundColor: "#f1f5f9",
-// // //       padding: "40px 24px",
-// // //       fontFamily: "system-ui, -apple-system, sans-serif",
-// // //       boxSizing: "border-box",
-// // //     },
-// // //     container: {
-// // //       width: "100%",
-// // //       maxWidth: "1200px",
-// // //       margin: "0 auto",
-// // //     },
-// // //     headerBlock: {
-// // //       marginBottom: "32px",
-// // //     },
-// // //     title: {
-// // //       fontSize: "32px",
-// // //       fontWeight: "800",
-// // //       color: "#0f172a",
-// // //       letterSpacing: "-0.5px",
-// // //       margin: 0,
-// // //     },
-// // //     subtitle: {
-// // //       fontSize: "15px",
-// // //       color: "#64748b",
-// // //       marginTop: "6px",
-// // //       marginBottom: 0,
-// // //     },
-// // //     dashboardGrid: {
-// // //       display: "grid",
-// // //       gridTemplateColumns: "1fr 1.5fr",
-// // //       gap: "32px",
-// // //       alignItems: "start",
-// // //     },
-// // //     sidebar: {
-// // //       display: "flex",
-// // //       flexDirection: "column",
-// // //       gap: "24px",
-// // //     },
-// // //     card: {
-// // //       background: "#ffffff",
-// // //       border: "1px solid #e2e8f0",
-// // //       borderRadius: "16px",
-// // //       padding: "24px",
-// // //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
-// // //     },
-// // //     subCardTitle: {
-// // //       fontSize: "14px",
-// // //       fontWeight: "700",
-// // //       color: "#475569",
-// // //       textTransform: "uppercase",
-// // //       letterSpacing: "0.5px",
-// // //       marginTop: 0,
-// // //       marginBottom: "14px",
-// // //       borderBottom: "1px solid #f1f5f9",
-// // //       paddingBottom: "8px"
-// // //     },
-// // //     inlineFormGroup: {
-// // //       display: "flex",
-// // //       gap: "10px",
-// // //       marginBottom: "12px"
-// // //     },
-// // //     formGroupGrid: {
-// // //       display: "flex",
-// // //       flexDirection: "column",
-// // //       gap: "16px",
-// // //     },
-// // //     input: {
-// // //       width: "100%",
-// // //       padding: "10px 14px",
-// // //       border: "1px solid #cbd5e1",
-// // //       borderRadius: "8px",
-// // //       fontSize: "14px",
-// // //       color: "#0f172a",
-// // //       backgroundColor: "#ffffff",
-// // //       outline: "none",
-// // //       transition: "all 0.2s",
-// // //       boxSizing: "border-box",
-// // //     },
-// // //     primaryBtn: {
-// // //       padding: "10px 16px",
-// // //       background: "#2563eb",
-// // //       color: "#ffffff",
-// // //       border: "none",
-// // //       borderRadius: "8px",
-// // //       fontWeight: "600",
-// // //       fontSize: "14px",
-// // //       cursor: "pointer",
-// // //       transition: "background-color 0.2s",
-// // //       whiteSpace: "nowrap"
-// // //     },
-// // //     submitBtn: {
-// // //       width: "100%",
-// // //       padding: "12px",
-// // //       color: "#ffffff",
-// // //       border: "none",
-// // //       borderRadius: "8px",
-// // //       fontWeight: "600",
-// // //       fontSize: "15px",
-// // //       marginTop: "8px",
-// // //       transition: "all 0.2s",
-// // //     },
-// // //     cancelBtn: {
-// // //       width: "100%",
-// // //       padding: "10px",
-// // //       background: "#f1f5f9",
-// // //       color: "#475569",
-// // //       border: "1px solid #cbd5e1",
-// // //       borderRadius: "8px",
-// // //       fontWeight: "600",
-// // //       fontSize: "14px",
-// // //       cursor: "pointer",
-// // //       marginTop: "4px",
-// // //       transition: "all 0.2s"
-// // //     },
-// // //     tableContainer: {
-// // //       background: "#ffffff",
-// // //       border: "1px solid #e2e8f0",
-// // //       borderRadius: "16px",
-// // //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-// // //       overflow: "hidden",
-// // //     },
-// // //     table: {
-// // //       width: "100%",
-// // //       borderCollapse: "collapse",
-// // //       textAlign: "left",
-// // //     },
-// // //     th: {
-// // //       backgroundColor: "#f8fafc",
-// // //       color: "#475569",
-// // //       fontWeight: "600",
-// // //       padding: "16px",
-// // //       fontSize: "13px",
-// // //       borderBottom: "1px solid #e2e8f0",
-// // //     },
-// // //     td: {
-// // //       padding: "16px",
-// // //       fontSize: "14px",
-// // //       color: "#334155",
-// // //       borderBottom: "1px solid #f1f5f9",
-// // //     },
-// // //     actionFlex: {
-// // //       display: "flex",
-// // //       gap: "14px",
-// // //     },
-// // //     editBtn: {
-// // //       background: "none",
-// // //       border: "none",
-// // //       color: "#2563eb",
-// // //       fontWeight: "600",
-// // //       fontSize: "13px",
-// // //       cursor: "pointer",
-// // //       padding: 0,
-// // //     },
-// // //     deleteBtn: {
-// // //       background: "none",
-// // //       border: "none",
-// // //       color: "#ef4444",
-// // //       fontWeight: "600",
-// // //       fontSize: "13px",
-// // //       cursor: "pointer",
-// // //       padding: 0,
-// // //     },
-// // //     alertBanner: {
-// // //       backgroundColor: "#f0fdf4",
-// // //       border: "1px solid #bbf7d0",
-// // //       color: "#166534",
-// // //       padding: "12px 16px",
-// // //       borderRadius: "8px",
-// // //       fontSize: "14px",
-// // //       fontWeight: "500",
-// // //       marginBottom: "20px",
-// // //     },
-// // //     emptyState: {
-// // //       padding: "40px",
-// // //       textAlign: "center",
-// // //       color: "#64748b",
-// // //       fontSize: "15px"
-// // //     }
-// // //   };
-
-// // //   const handleFocus = (e) => {
-// // //     e.currentTarget.style.borderColor = "#2563eb";
-// // //     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-// // //   };
-
-// // //   const handleBlur = (e) => {
-// // //     e.currentTarget.style.borderColor = "#cbd5e1";
-// // //     e.currentTarget.style.boxShadow = "none";
-// // //   };
-
-// // //   return (
-// // //     <div style={styles.page}>
-// // //       <div style={styles.container}>
-        
-// // //         {/* Page Header */}
-// // //         <div style={styles.headerBlock}>
-// // //           <h1 style={styles.title}>Inventory Catalog Manager</h1>
-// // //           <p style={styles.subtitle}>Register items, customize inventory configurations, and manage your real-time stocks.</p>
-// // //         </div>
-
-// // //         <div style={styles.dashboardGrid}>
-          
-// // //           {/* LEFT COLUMN: Management Panel */}
-// // //           <div style={styles.sidebar}>
-            
-// // //             {/* 1. Add Stock Group */}
-// // //             <div style={styles.card}>
-// // //               <h3 style={styles.subCardTitle}>Quick Add: Stock Group</h3>
-// // //               <form onSubmit={addStockGroup} style={styles.inlineFormGroup}>
-// // //                 <input
-// // //                   type="text"
-// // //                   value={groupName}
-// // //                   onChange={(e) => setGroupName(e.target.value)}
-// // //                   placeholder="e.g., Electronics"
-// // //                   style={styles.input}
-// // //                   onFocus={handleFocus}
-// // //                   onBlur={handleBlur}
-// // //                 />
-// // //                 <button type="submit" style={styles.primaryBtn}>Add</button>
-// // //               </form>
-// // //             </div>
-
-// // //             {/* 2. Add Unit */}
-// // //             <div style={styles.card}>
-// // //               <h3 style={styles.subCardTitle}>Quick Add: Measurement Unit</h3>
-// // //               <form onSubmit={addUnit} style={styles.formGroupGrid}>
-// // //                 <div style={styles.inlineFormGroup}>
-// // //                   <input
-// // //                     type="text"
-// // //                     value={unitForm.name}
-// // //                     onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-// // //                     placeholder="Unit Name (Kilogram)"
-// // //                     style={styles.input}
-// // //                     onFocus={handleFocus}
-// // //                     onBlur={handleBlur}
-// // //                   />
-// // //                   <input
-// // //                     type="text"
-// // //                     value={unitForm.symbol}
-// // //                     onChange={(e) => setUnitForm({ ...unitForm, symbol: e.target.value })}
-// // //                     placeholder="Symbol (kg)"
-// // //                     style={styles.input}
-// // //                     onFocus={handleFocus}
-// // //                     onBlur={handleBlur}
-// // //                   />
-// // //                 </div>
-// // //                 <button type="submit" style={{ ...styles.primaryBtn, width: '100%' }}>Add Unit Setup</button>
-// // //               </form>
-// // //             </div>
-
-// // //             {/* 3. Register/Edit Product */}
-// // //             <div style={{ ...styles.card, border: editingId ? '1px solid #2563eb' : '1px solid #e2e8f0' }}>
-// // //               <h3 style={{ ...styles.subCardTitle, color: editingId ? '#2563eb' : '#475569' }}>
-// // //                 {editingId ? '📝 Edit Product Parameters' : 'Product Details Entry'}
-// // //               </h3>
-// // //               <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// // //                 <div>
-// // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Product Name</label>
-// // //                   <input 
-// // //                     type="text" 
-// // //                     placeholder="Enter unique catalog item name" 
-// // //                     required 
-// // //                     value={form.name} 
-// // //                     onChange={e => setForm({...form, name: e.target.value})} 
-// // //                     style={styles.input}
-// // //                     onFocus={handleFocus}
-// // //                     onBlur={handleBlur}
-// // //                   />
-// // //                 </div>
-                 
-// // //                 <div>
-// // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Stock Group Assignment</label>
-// // //                   <select
-// // //                     value={form.stockGroup}
-// // //                     onChange={(e) => setForm({ ...form, stockGroup: e.target.value })}
-// // //                     style={styles.input}
-// // //                     required
-// // //                   >
-// // //                     <option value="">Select Stock Group</option>
-// // //                     {stockGroups.map(group => (
-// // //                       <option key={group._id} value={group._id}>{group.name}</option>
-// // //                     ))}
-// // //                   </select>
-// // //                 </div>
-
-// // //                 <div>
-// // //                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' }}>Unit Dimension</label>
-// // //                   <select
-// // //                     value={form.unit}
-// // //                     onChange={(e) => setForm({ ...form, unit: e.target.value })}
-// // //                     style={styles.input}
-// // //                     required
-// // //                   >
-// // //                     <option value="">Select Unit</option>
-// // //                     {units.map(unit => (
-// // //                       <option key={unit._id} value={unit._id}>{unit.symbol} ({unit.name})</option>
-// // //                     ))}
-// // //                   </select>
-// // //                 </div>
-
-// // //                 <div>
-// // //                   <button 
-// // //                     type="submit" 
-// // //                     disabled={loading}
-// // //                     style={{
-// // //                       ...styles.submitBtn,
-// // //                       backgroundColor: loading ? "#93c5fd" : (editingId ? "#16a34a" : "#2563eb"),
-// // //                       cursor: loading ? "not-allowed" : "pointer"
-// // //                     }}
-// // //                   >
-// // //                     {loading ? 'Saving Data...' : (editingId ? 'Update Catalog Item' : 'Save Catalog Item')}
-// // //                   </button>
-
-// // //                   {editingId && (
-// // //                     <button type="button" onClick={clearForm} style={styles.cancelBtn}>
-// // //                       Cancel Editing
-// // //                     </button>
-// // //                   )}
-// // //                 </div>
-// // //               </form>
-// // //             </div>
-// // //           </div>
-
-// // //           {/* RIGHT COLUMN: Search & Live View Table */}
-// // //           <div>
-// // //             <div style={{ marginBottom: "20px" }}>
-// // //               <input 
-// // //                 type="text"
-// // //                 style={styles.input}
-// // //                 placeholder="🔍 Search or verify products inside database..."
-// // //                 value={searchQuery}
-// // //                 onChange={(e) => setSearchQuery(e.target.value)}
-// // //                 onFocus={handleFocus}
-// // //                 onBlur={handleBlur}
-// // //               />
-// // //             </div>
-
-// // //             {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-// // //               <div style={styles.alertBanner}>
-// // //                 ✨ <strong>Matches Found:</strong> Found records aligning with "{searchQuery}".
-// // //               </div>
-// // //             )}
-
-// // //             <div style={styles.tableContainer}>
-// // //               {filteredProducts.length === 0 ? (
-// // //                 <div style={styles.emptyState}>
-// // //                   {searchQuery.trim() !== "" 
-// // //                     ? `No matching records found for "${searchQuery}". Use the entry panel to create it!` 
-// // //                     : "No products in system. Complete the entry setup wizard."
-// // //                   }
-// // //                 </div>
-// // //               ) : (
-// // //                 <table style={styles.table}>
-// // //                   <thead>
-// // //                     <tr>
-// // //                       <th style={styles.th}>Product Name</th>
-// // //                       <th style={styles.th}>Stock Group</th>
-// // //                       <th style={styles.th}>Unit Configuration</th>
-// // //                       <th style={styles.th}>Actions</th>
-// // //                     </tr>
-// // //                   </thead>
-// // //                   <tbody>
-// // //                     {filteredProducts.map((p) => (
-// // //                       <tr key={p._id} style={{ backgroundColor: editingId === p._id ? '#eff6ff' : 'transparent' }}>
-// // //                         <td style={styles.td}><strong>{p.name}</strong></td>
-// // //                         <td style={styles.td}>{p.stockGroup?.name || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// // //                         <td style={styles.td}>{p.unit?.symbol || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// // //                         <td style={styles.td}>
-// // //                           <div style={styles.actionFlex}>
-// // //                             <button
-// // //                               style={styles.editBtn}
-// // //                               onClick={() => handleEditInit(p)}
-// // //                               onMouseOver={(e) => e.currentTarget.style.textDecoration = "underline"}
-// // //                               onMouseOut={(e) => e.currentTarget.style.textDecoration = "none"}
-// // //                             >
-// // //                               Edit
-// // //                             </button>
-// // //                             <button
-// // //                               style={styles.deleteBtn}
-// // //                               onClick={() => handleDelete(p._id)}
-// // //                               onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-// // //                               onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
-// // //                             >
-// // //                               Delete
-// // //                             </button>
-// // //                           </div>
-// // //                         </td>
-// // //                       </tr>
-// // //                     ))}
-// // //                   </tbody>
-// // //                 </table>
-// // //               )}
-// // //             </div>
-// // //           </div>
-
-// // //         </div>
-// // //       </div>
-// // //     </div>
-// // //   );
-// // // };
-
-// // // export default Products;
-
-
-
-
-
-// // import React, { useState, useEffect } from 'react';
-// // import api from '../utils/api';
-
-// // const Products = () => {
-// //   const [products, setProducts] = useState([]);
-// //   const [stockGroups, setStockGroups] = useState([]);
-// //   const [units, setUnits] = useState([]);
-
-// //   const [groupName, setGroupName] = useState("");
-// //   const [unitForm, setUnitForm] = useState({ name: "", symbol: "" });
-// //   const [searchQuery, setSearchQuery] = useState("");
-  
-// //   // Form state manages both creating and updating
-// //   const [form, setForm] = useState({ name: '', stockGroup: '', unit: '' });
-// //   const [editingId, setEditingId] = useState(null); 
-// //   const [loading, setLoading] = useState(false);
-
-// //   useEffect(() => {
-// //     fetchProducts();
-// //     fetchStockGroups();
-// //     fetchUnits();
-// //   }, []);
-
-// //   const fetchProducts = async () => {
-// //     try {
-// //       const res = await api.get('/products');
-// //       setProducts(res.data);
-// //     } catch (error) {
-// //       console.error(error);
-// //       alert('Failed to fetch product catalog');
-// //     }
-// //   };
-
-// //   const fetchStockGroups = async () => {
-// //     try {
-// //       const res = await api.get("/stock-groups");
-// //       setStockGroups(res.data);
-// //     } catch (error) {
-// //       console.error(error);
-// //     }
-// //   };
-
-// //   const fetchUnits = async () => {
-// //     try {
-// //       const res = await api.get("/units");
-// //       setUnits(res.data);
-// //     } catch (error) {
-// //       console.error(error);
-// //     }
-// //   };
-
-// //   const handleSave = async (e) => {
-// //     e.preventDefault();
-// //     setLoading(true);
-// //     try {
-// //       if (editingId) {
-// //         await api.put(`/products/${editingId}`, form);
-// //         alert('Product item updated successfully!');
-// //       } else {
-// //         await api.post('/products', form);
-// //         alert('Product item registered successfully!');
-// //       }
-// //       clearForm();
-// //       fetchProducts();
-// //     } catch (error) {
-// //       console.error(error);
-// //       alert('Failed to save product information');
-// //     } finally {
-// //       setLoading(false);
-// //     }
-// //   };
-
-// //   const handleEditInit = (product) => {
-// //     setEditingId(product._id);
-// //     setForm({
-// //       name: product.name || '',
-// //       stockGroup: product.stockGroup?._id || product.stockGroup || '',
-// //       unit: product.unit?._id || product.unit || ''
-// //     });
-// //     window.scrollTo({ top: 0, behavior: 'smooth' });
-// //   };
-
-// //   const clearForm = () => {
-// //     setForm({ name: '', stockGroup: '', unit: '' });
-// //     setEditingId(null);
-// //   };
-
-// //   const handleDelete = async (id) => {
-// //     if (window.confirm('Are you sure you want to delete this product permanently?')) {
-// //       try {
-// //         await api.delete(`/products/${id}`);
-// //         if (editingId === id) clearForm();
-// //         fetchProducts();
-// //       } catch (error) {
-// //         console.error(error);
-// //         alert('Failed to delete product item');
-// //       }
-// //     }
-// //   };
-
-// //   const addStockGroup = async (e) => {
-// //     e.preventDefault();
-// //     if (!groupName.trim()) return;
-// //     try {
-// //       await api.post("/stock-groups", { name: groupName });
-// //       setGroupName("");
-// //       fetchStockGroups();
-// //       alert('Stock group added successfully!');
-// //     } catch (error) {
-// //       console.error(error);
-// //     }
-// //   };
-
-// //   const addUnit = async (e) => {
-// //     e.preventDefault();
-// //     if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
-// //     try {
-// //       await api.post("/units", unitForm);
-// //       setUnitForm({ name: "", symbol: "" });
-// //       fetchUnits();
-// //       alert('Unit added successfully!');
-// //     } catch (error) {
-// //       console.error(error);
-// //     }
-// //   };
-
-// //   const filteredProducts = products.filter(p => {
-// //     const query = searchQuery.toLowerCase().trim();
-// //     return p.name?.toLowerCase().includes(query);
-// //   });
-
-// //   const styles = {
-// //     page: {
-// //       minHeight: "100vh",
-// //       backgroundColor: "#f1f5f9",
-// //       padding: "40px 24px",
-// //       fontFamily: "system-ui, -apple-system, sans-serif",
-// //       boxSizing: "border-box",
-// //     },
-// //     container: {
-// //       width: "100%",
-// //       maxWidth: "1400px",
-// //       margin: "0 auto",
-// //     },
-// //     headerBlock: {
-// //       marginBottom: "32px",
-// //     },
-// //     title: {
-// //       fontSize: "32px",
-// //       fontWeight: "800",
-// //       color: "#0f172a",
-// //       letterSpacing: "-0.5px",
-// //       margin: 0,
-// //     },
-// //     subtitle: {
-// //       fontSize: "15px",
-// //       color: "#64748b",
-// //       marginTop: "6px",
-// //       marginBottom: 0,
-// //     },
-// //     topInlineGrid: {
-// //       display: "grid",
-// //       gridTemplateColumns: "1fr 1.25fr 2fr",
-// //       gap: "20px",
-// //       alignItems: "stretch",
-// //       marginBottom: "32px",
-// //     },
-// //     card: {
-// //       background: "#ffffff",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "16px",
-// //       padding: "20px",
-// //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
-// //       display: "flex",
-// //       flexDirection: "column",
-// //       justifyContent: "space-between"
-// //     },
-// //     subCardTitle: {
-// //       fontSize: "13px",
-// //       fontWeight: "700",
-// //       color: "#475569",
-// //       textTransform: "uppercase",
-// //       letterSpacing: "0.5px",
-// //       marginTop: 0,
-// //       marginBottom: "12px",
-// //       borderBottom: "1px solid #f1f5f9",
-// //       paddingBottom: "6px"
-// //     },
-// //     inlineFormGroup: {
-// //       display: "flex",
-// //       gap: "10px",
-// //     },
-// //     formGroupGrid: {
-// //       display: "flex",
-// //       flexDirection: "column",
-// //       gap: "12px",
-// //     },
-// //     productFormFields: {
-// //       display: "grid",
-// //       gridTemplateColumns: "1.2fr 1fr 1fr",
-// //       gap: "12px"
-// //     },
-// //     label: {
-// //       display: 'block', 
-// //       fontSize: '12px', 
-// //       fontWeight: '600', 
-// //       color: '#475569', 
-// //       marginBottom: '4px'
-// //     },
-// //     input: {
-// //       width: "100%",
-// //       padding: "10px 14px",
-// //       border: "1px solid #cbd5e1",
-// //       borderRadius: "8px",
-// //       fontSize: "14px",
-// //       color: "#0f172a",
-// //       backgroundColor: "#ffffff",
-// //       outline: "none",
-// //       transition: "all 0.2s",
-// //       boxSizing: "border-box",
-// //     },
-// //     primaryBtn: {
-// //       padding: "10px 16px",
-// //       background: "#2563eb",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "8px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       cursor: "pointer",
-// //       transition: "background-color 0.2s",
-// //       whiteSpace: "nowrap"
-// //     },
-// //     submitBtn: {
-// //       width: "100%",
-// //       padding: "10px",
-// //       color: "#ffffff",
-// //       border: "none",
-// //       borderRadius: "8px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       transition: "all 0.2s",
-// //     },
-// //     productActionsContainer: {
-// //       display: "flex",
-// //       gap: "10px",
-// //       marginTop: "4px"
-// //     },
-// //     cancelBtn: {
-// //       flex: "1",
-// //       padding: "10px",
-// //       background: "#f1f5f9",
-// //       color: "#475569",
-// //       border: "1px solid #cbd5e1",
-// //       borderRadius: "8px",
-// //       fontWeight: "600",
-// //       fontSize: "14px",
-// //       cursor: "pointer",
-// //       transition: "all 0.2s"
-// //     },
-// //     tableContainer: {
-// //       background: "#ffffff",
-// //       border: "1px solid #e2e8f0",
-// //       borderRadius: "16px",
-// //       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-// //       overflow: "hidden",
-// //     },
-// //     table: {
-// //       width: "100%",
-// //       borderCollapse: "collapse",
-// //       textAlign: "left",
-// //     },
-// //     th: {
-// //       backgroundColor: "#f8fafc",
-// //       color: "#475569",
-// //       fontWeight: "600",
-// //       padding: "16px",
-// //       fontSize: "13px",
-// //       borderBottom: "1px solid #e2e8f0",
-// //     },
-// //     td: {
-// //       padding: "16px",
-// //       fontSize: "14px",
-// //       color: "#334155",
-// //       borderBottom: "1px solid #f1f5f9",
-// //     },
-// //     actionFlex: {
-// //       display: "flex",
-// //       gap: "14px",
-// //     },
-// //     editBtn: {
-// //       background: "none",
-// //       border: "none",
-// //       color: "#2563eb",
-// //       fontWeight: "600",
-// //       fontSize: "13px",
-// //       cursor: "pointer",
-// //       padding: 0,
-// //     },
-// //     deleteBtn: {
-// //       background: "none",
-// //       border: "none",
-// //       color: "#ef4444",
-// //       fontWeight: "600",
-// //       fontSize: "13px",
-// //       cursor: "pointer",
-// //       padding: 0,
-// //     },
-// //     alertBanner: {
-// //       backgroundColor: "#f0fdf4",
-// //       border: "1px solid #bbf7d0",
-// //       color: "#166534",
-// //       padding: "12px 16px",
-// //       borderRadius: "8px",
-// //       fontSize: "14px",
-// //       fontWeight: "500",
-// //       marginBottom: "20px",
-// //     },
-// //     emptyState: {
-// //       padding: "40px",
-// //       textAlign: "center",
-// //       color: "#64748b",
-// //       fontSize: "15px"
-// //     }
-// //   };
-
-// //   const handleFocus = (e) => {
-// //     e.currentTarget.style.borderColor = "#2563eb";
-// //     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-// //   };
-
-// //   const handleBlur = (e) => {
-// //     e.currentTarget.style.borderColor = "#cbd5e1";
-// //     e.currentTarget.style.boxShadow = "none";
-// //   };
-
-// //   return (
-// //     <div style={styles.page}>
-// //       <div style={styles.container}>
-        
-// //         {/* Page Header */}
-// //         <div style={styles.headerBlock}>
-// //           <h1 style={styles.title}>Inventory Catalog Manager</h1>
-// //           <p style={styles.subtitle}>Register items, customize inventory configurations, and manage your real-time stocks.</p>
-// //         </div>
-
-// //         {/* TOP ROW: INLINE MANAGEMENT PANEL */}
-// //         <div style={styles.topInlineGrid}>
-          
-// //           {/* 1. Add Stock Group */}
-// //           <div style={styles.card}>
-// //             <div>
-// //               <h3 style={styles.subCardTitle}>Quick Add: Stock Group</h3>
-// //               <form onSubmit={addStockGroup} style={styles.inlineFormGroup}>
-// //                 <input
-// //                   type="text"
-// //                   value={groupName}
-// //                   onChange={(e) => setGroupName(e.target.value)}
-// //                   placeholder="e.g., Electronics"
-// //                   style={styles.input}
-// //                   onFocus={handleFocus}
-// //                   onBlur={handleBlur}
-// //                 />
-// //                 <button type="submit" style={styles.primaryBtn}>Add</button>
-// //               </form>
-// //             </div>
-// //           </div>
-
-// //           {/* 2. Add Unit */}
-// //           <div style={styles.card}>
-// //             <div>
-// //               <h3 style={styles.subCardTitle}>Quick Add: Unit</h3>
-// //               <form onSubmit={addUnit} style={styles.formGroupGrid}>
-// //                 <div style={styles.inlineFormGroup}>
-// //                   <input
-// //                     type="text"
-// //                     value={unitForm.name}
-// //                     onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-// //                     placeholder="Name (Kilogram)"
-// //                     style={styles.input}
-// //                     onFocus={handleFocus}
-// //                     onBlur={handleBlur}
-// //                   />
-// //                   <input
-// //                     type="text"
-// //                     value={unitForm.symbol}
-// //                     onChange={(e) => setUnitForm({ ...unitForm, symbol: e.target.value })}
-// //                     placeholder="Symbol (kg)"
-// //                     style={{ ...styles.input, width: "100px" }}
-// //                     onFocus={handleFocus}
-// //                     onBlur={handleBlur}
-// //                   />
-// //                   <button type="submit" style={styles.primaryBtn}>Add</button>
-// //                 </div>
-// //               </form>
-// //             </div>
-// //           </div>
-
-// //           {/* 3. Register/Edit Product */}
-// //           <div style={{ ...styles.card, border: editingId ? '1px solid #2563eb' : '1px solid #e2e8f0' }}>
-// //             <div>
-// //               <h3 style={{ ...styles.subCardTitle, color: editingId ? '#2563eb' : '#475569' }}>
-// //                 {editingId ? '📝 Edit Product Parameters' : 'Product Details Entry'}
-// //               </h3>
-// //               <form onSubmit={handleSave} style={styles.formGroupGrid}>
-// //                 <div style={styles.productFormFields}>
-// //                   <div>
-// //                     <label style={styles.label}>Product Name</label>
-// //                     <input 
-// //                       type="text" 
-// //                       placeholder="Enter item name" 
-// //                       required 
-// //                       value={form.name} 
-// //                       onChange={e => setForm({...form, name: e.target.value})} 
-// //                       style={styles.input}
-// //                       onFocus={handleFocus}
-// //                       onBlur={handleBlur}
-// //                     />
-// //                   </div>
-                   
-// //                   <div>
-// //                     <label style={styles.label}>Stock Group</label>
-// //                     <select
-// //                       value={form.stockGroup}
-// //                       onChange={(e) => setForm({ ...form, stockGroup: e.target.value })}
-// //                       style={styles.input}
-// //                       required
-// //                     >
-// //                       <option value="">Select Group</option>
-// //                       {stockGroups.map(group => (
-// //                         <option key={group._id} value={group._id}>{group.name}</option>
-// //                       ))}
-// //                     </select>
-// //                   </div>
-
-// //                   <div>
-// //                     <label style={styles.label}>Unit Dimension</label>
-// //                     <select
-// //                       value={form.unit}
-// //                       onChange={(e) => setForm({ ...form, unit: e.target.value })}
-// //                       style={styles.input}
-// //                       required
-// //                     >
-// //                       <option value="">Select Unit</option>
-// //                       {units.map(unit => (
-// //                         <option key={unit._id} value={unit._id}>{unit.symbol} ({unit.name})</option>
-// //                       ))}
-// //                     </select>
-// //                   </div>
-// //                 </div>
-
-// //                 <div style={styles.productActionsContainer}>
-// //                   <button 
-// //                     type="submit" 
-// //                     disabled={loading}
-// //                     style={{
-// //                       ...styles.submitBtn,
-// //                       flex: "2",
-// //                       backgroundColor: loading ? "#93c5fd" : (editingId ? "#16a34a" : "#2563eb"),
-// //                       cursor: loading ? "not-allowed" : "pointer"
-// //                     }}
-// //                   >
-// //                     {loading ? 'Saving...' : (editingId ? 'Update Catalog Item' : 'Save Catalog Item')}
-// //                   </button>
-
-// //                   {editingId && (
-// //                     <button type="button" onClick={clearForm} style={styles.cancelBtn}>
-// //                       Cancel
-// //                     </button>
-// //                   )}
-// //                 </div>
-// //               </form>
-// //             </div>
-// //           </div>
-// //         </div>
-
-// //         {/* BOTTOM ROW: FULL-WIDTH SEARCH & DATA LIVE VIEW */}
-// //         <div>
-// //           <div style={{ marginBottom: "20px" }}>
-// //             <input 
-// //               type="text"
-// //               style={styles.input}
-// //               placeholder="🔍 Search or verify products inside database..."
-// //               value={searchQuery}
-// //               onChange={(e) => setSearchQuery(e.target.value)}
-// //               onFocus={handleFocus}
-// //               onBlur={handleBlur}
-// //             />
-// //           </div>
-
-// //           {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-// //             <div style={styles.alertBanner}>
-// //               ✨ <strong>Matches Found:</strong> Found records aligning with "{searchQuery}".
-// //             </div>
-// //           )}
-
-// //           <div style={styles.tableContainer}>
-// //             {filteredProducts.length === 0 ? (
-// //               <div style={styles.emptyState}>
-// //                 {searchQuery.trim() !== "" 
-// //                   ? `No matching records found for "${searchQuery}". Use the entry panel to create it!` 
-// //                   : "No products in system. Complete the entry setup wizard."
-// //                 }
-// //               </div>
-// //             ) : (
-// //               <table style={styles.table}>
-// //                 <thead>
-// //                   <tr>
-// //                     <th style={styles.th}>Product Name</th>
-// //                     <th style={styles.th}>Stock Group</th>
-// //                     <th style={styles.th}>Unit Configuration</th>
-// //                     <th style={styles.th}>Actions</th>
-// //                   </tr>
-// //                 </thead>
-// //                 <tbody>
-// //                   {filteredProducts.map((p) => (
-// //                     <tr key={p._id} style={{ backgroundColor: editingId === p._id ? '#eff6ff' : 'transparent' }}>
-// //                       <td style={styles.td}><strong>{p.name}</strong></td>
-// //                       <td style={styles.td}>{p.stockGroup?.name || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// //                       <td style={styles.td}>{p.unit?.symbol || <span style={{ color: '#94a3b8' }}>None</span>}</td>
-// //                       <td style={styles.td}>
-// //                         <div style={styles.actionFlex}>
-// //                           <button
-// //                             style={styles.editBtn}
-// //                             onClick={() => handleEditInit(p)}
-// //                             onMouseOver={(e) => e.currentTarget.style.textDecoration = "underline"}
-// //                             onMouseOut={(e) => e.currentTarget.style.textDecoration = "none"}
-// //                           >
-// //                             Edit
-// //                           </button>
-// //                           <button
-// //                             style={styles.deleteBtn}
-// //                             onClick={() => handleDelete(p._id)}
-// //                             onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-// //                             onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
-// //                           >
-// //                             Delete
-// //                           </button>
-// //                         </div>
-// //                       </td>
-// //                     </tr>
-// //                   ))}
-// //                 </tbody>
-// //               </table>
-// //             )}
-// //           </div>
-// //         </div>
-
-// //       </div>
-// //     </div>
-// //   );
-// // };
-
-// // export default Products;
-
-
-
-
-
-// import React, { useState, useEffect } from 'react';
-// import api from '../utils/api';
-
-// const Products = () => {
-//   const [products, setProducts] = useState([]);
-//   const [stockGroups, setStockGroups] = useState([]);
-//   const [units, setUnits] = useState([]);
-
-//   // Modal Visibility States
-//   const [isGroupOpen, setIsGroupOpen] = useState(false);
-//   const [isUnitOpen, setIsUnitOpen] = useState(false);
-//   const [isProductOpen, setIsProductOpen] = useState(false);
-
-//   const [groupName, setGroupName] = useState("");
-//   const [unitForm, setUnitForm] = useState({ name: "", symbol: "" });
-//   const [searchQuery, setSearchQuery] = useState("");
-  
-//   // Form state manages both creating and updating
-//   const [form, setForm] = useState({
-//   name: '',
-//   stockGroup: '',
-//   unit: '',
-//   price: '',
-//   image: null
-// });
-//   const [editingId, setEditingId] = useState(null); 
-//   const [loading, setLoading] = useState(false);
-
-//   useEffect(() => {
-//     fetchProducts();
-//     fetchStockGroups();
-//     fetchUnits();
-//   }, []);
-
-//   const fetchProducts = async () => {
-//     try {
-//       const res = await api.get('/products');
-//       setProducts(res.data);
-//     } catch (error) {
-//       console.error(error);
-//       alert('Failed to fetch product catalog');
-//     }
-//   };
-
-//   const fetchStockGroups = async () => {
-//     try {
-//       const res = await api.get("/stock-groups");
-//       setStockGroups(res.data);
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const fetchUnits = async () => {
-//     try {
-//       const res = await api.get("/units");
-//       setUnits(res.data);
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const handleSave = async (e) => {
-
-//   e.preventDefault();
-
-//   setLoading(true);
-
-//   try {
-
-//     const data = new FormData();
-
-//     data.append("name", form.name);
-
-//     data.append("stockGroup", form.stockGroup);
-
-//     data.append("unit", form.unit);
-
-//     data.append("price", form.price);
-
-//     if (form.image) {
-
-//       data.append("image", form.image);
-
-//     }console.log(form);
-
-// for (let pair of data.entries()) {
-//   console.log(pair[0], pair[1]);
-// }
-
-//     if (editingId) {
-
-//       await api.put(`/products/${editingId}`, data);
-
-//       alert("Product updated");
-
-//     } else {
-
-//       await api.post("/products", data);
-
-//       alert("Product added");
-
-//     }
-
-//     clearForm();
-
-//     setIsProductOpen(false);
-
-//     fetchProducts();
-
-//   } catch (err) {
-
-//     console.log(err);
-
-//   }
-
-//   setLoading(false);
-
-// };
-
-//   const handleEditInit = (product) => {
-//     setEditingId(product._id);
-//     setForm({
-//   name: product.name || "",
-//   stockGroup: product.stockGroup?._id || "",
-//   unit: product.unit?._id || "",
-//   price: product.price || "",
-//   image: null,
-// });
-//     setIsProductOpen(true);
-//   };
-
-//   const clearForm = () => {
-//   setForm({
-//     name: "",
-//     stockGroup: "",
-//     unit: "",
-//     price: "",
-//     image: null,
-//   });
-
-//   setEditingId(null);
-// };
-//   const handleDelete = async (id) => {
-//     if (window.confirm('Are you sure you want to delete this product permanently?')) {
-//       try {
-//         await api.delete(`/products/${id}`);
-//         if (editingId === id) clearForm();
-//         fetchProducts();
-//       } catch (error) {
-//         console.error(error);
-//         alert('Failed to delete product item');
-//       }
-//     }
-//   };
-
-//   const addStockGroup = async (e) => {
-//     e.preventDefault();
-//     if (!groupName.trim()) return;
-//     try {
-//       await api.post("/stock-groups", { name: groupName });
-//       setGroupName("");
-//       fetchStockGroups();
-//       setIsGroupOpen(false);
-//       alert('Stock group added successfully!');
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const addUnit = async (e) => {
-//     e.preventDefault();
-//     if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
-//     try {
-//       await api.post("/units", unitForm);
-//       setUnitForm({ name: "", symbol: "" });
-//       fetchUnits();
-//       setIsUnitOpen(false);
-//       alert('Unit added successfully!');
-//     } catch (error) {
-//       console.error(error);
-//     }
-//   };
-
-//   const filteredProducts = products.filter(p => {
-//     const query = searchQuery.toLowerCase().trim();
-//     return p.name?.toLowerCase().includes(query);
-//   });
-
-//   const styles = {
-//     page: {
-//       minHeight: "100vh",
-//       backgroundColor: "#f1f5f9",
-//       padding: "40px 24px",
-//       fontFamily: "system-ui, -apple-system, sans-serif",
-//       boxSizing: "border-box",
-//     },
-//     container: {
-//       width: "100%",
-//       maxWidth: "1400px",
-//       margin: "0 auto",
-//     },
-//     headerWrapper: {
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       flexWrap: "wrap",
-//       gap: "20px",
-//       marginBottom: "32px",
-//     },
-//     title: {
-//       fontSize: "32px",
-//       fontWeight: "800",
-//       color: "#0f172a",
-//       letterSpacing: "-0.5px",
-//       margin: 0,
-//     },
-//     subtitle: {
-//       fontSize: "15px",
-//       color: "#64748b",
-//       marginTop: "6px",
-//       marginBottom: 0,
-//     },
-//     actionButtonGroup: {
-//       display: "flex",
-//       gap: "12px",
-//     },
-//     actionBtn: {
-//       padding: "10px 18px",
-//       backgroundColor: "#ffffff",
-//       border: "1px solid #cbd5e1",
-//       borderRadius: "10px",
-//       color: "#334155",
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       cursor: "pointer",
-//       boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-//       transition: "all 0.2s",
-//     },
-//     activeBtn: {
-//       backgroundColor: "#2563eb",
-//       color: "#ffffff",
-//       border: "1px solid #2563eb",
-//     },
-//     tableContainer: {
-//       background: "#ffffff",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "16px",
-//       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-//       overflow: "hidden",
-//     },
-//     table: {
-//       width: "100%",
-//       borderCollapse: "collapse",
-//       textAlign: "left",
-//     },
-//     th: {
-//       backgroundColor: "#f8fafc",
-//       color: "#475569",
-//       fontWeight: "600",
-//       padding: "16px",
-//       fontSize: "13px",
-//       borderBottom: "1px solid #e2e8f0",
-//     },
-//     td: {
-//       padding: "16px",
-//       fontSize: "14px",
-//       color: "#334155",
-//       borderBottom: "1px solid #f1f5f9",
-//     },
-//     actionFlex: {
-//       display: "flex",
-//       gap: "14px",
-//     },
-//     editBtn: {
-//       background: "none",
-//       border: "none",
-//       color: "#2563eb",
-//       fontWeight: "600",
-//       fontSize: "13px",
-//       cursor: "pointer",
-//       padding: 0,
-//     },
-//     deleteBtn: {
-//       background: "none",
-//       border: "none",
-//       color: "#ef4444",
-//       fontWeight: "600",
-//       fontSize: "13px",
-//       cursor: "pointer",
-//       padding: 0,
-//     },
-//     alertBanner: {
-//       backgroundColor: "#f0fdf4",
-//       border: "1px solid #bbf7d0",
-//       color: "#166534",
-//       padding: "12px 16px",
-//       borderRadius: "8px",
-//       fontSize: "14px",
-//       fontWeight: "500",
-//       marginBottom: "20px",
-//     },
-//     emptyState: {
-//       padding: "40px",
-//       textAlign: "center",
-//       color: "#64748b",
-//       fontSize: "15px"
-//     },
-//     // Modal Overlay Styling Component Styles
-//     modalOverlay: {
-//       position: "fixed",
-//       top: 0,
-//       left: 0,
-//       right: 0,
-//       bottom: 0,
-//       backgroundColor: "rgba(15, 23, 42, 0.4)",
-//       backdropFilter: "blur(4px)",
-//       display: "flex",
-//       alignItems: "center",
-//       justifyContent: "center",
-//       zIndex: 1000,
-//     },
-//     modalCard: {
-//       background: "#ffffff",
-//       border: "1px solid #e2e8f0",
-//       borderRadius: "16px",
-//       padding: "28px",
-//       width: "100%",
-//       maxWidth: "520px",
-//       boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-//       boxSizing: "border-box",
-//     },
-//     modalCardLarge: {
-//       maxWidth: "680px",
-//     },
-//     modalHeader: {
-//       display: "flex",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       marginBottom: "20px",
-//       borderBottom: "1px solid #f1f5f9",
-//       paddingBottom: "12px",
-//     },
-//     modalTitle: {
-//       fontSize: "18px",
-//       fontWeight: "700",
-//       color: "#0f172a",
-//       margin: 0,
-//     },
-//     closeXBtn: {
-//       background: "none",
-//       border: "none",
-//       fontSize: "20px",
-//       color: "#94a3b8",
-//       cursor: "pointer",
-//     },
-//     formGrid: {
-//       display: "flex",
-//       flexDirection: "column",
-//       gap: "16px",
-//     },
-//     input: {
-//       width: "100%",
-//       padding: "10px 14px",
-//       border: "1px solid #cbd5e1",
-//       borderRadius: "8px",
-//       fontSize: "14px",
-//       color: "#0f172a",
-//       backgroundColor: "#ffffff",
-//       outline: "none",
-//       transition: "all 0.2s",
-//       boxSizing: "border-box",
-//     },
-//     label: {
-//       display: 'block', 
-//       fontSize: '13px', 
-//       fontWeight: '600', 
-//       color: '#475569', 
-//       marginBottom: '6px'
-//     },
-//     modalFooter: {
-//       display: "flex",
-//       justifyContent: "flex-end",
-//       gap: "12px",
-//       marginTop: "24px",
-//       borderTop: "1px solid #f1f5f9",
-//       paddingTop: "16px",
-//     },
-//     saveBtn: {
-//       padding: "10px 20px",
-//       color: "#ffffff",
-//       border: "none",
-//       borderRadius: "8px",
-//       fontWeight: "600",
-//       fontSize: "14px",
-//       cursor: "pointer",
-//     }
-//   };
-
-//   const handleFocus = (e) => {
-//     e.currentTarget.style.borderColor = "#2563eb";
-//     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-//   };
-
-//   const handleBlur = (e) => {
-//     e.currentTarget.style.borderColor = "#cbd5e1";
-//     e.currentTarget.style.boxShadow = "none";
-//   };
-
-//   return (
-//     <div style={styles.page}>
-//       <div style={styles.container}>
-        
-//         {/* Main Application Page Control Header */}
-//         <div style={styles.headerWrapper}>
-//           <div>
-//             <h1 style={styles.title}>Inventory Catalog Manager</h1>
-//             <p style={styles.subtitle}>Configure inventory structural parameters and manage products cleanly inside models.</p>
-//           </div>
-          
-//           <div style={styles.actionButtonGroup}>
-//             <button style={styles.actionBtn} onClick={() => setIsGroupOpen(true)}>+ Stock Group</button>
-//             <button style={styles.actionBtn} onClick={() => setIsUnitOpen(true)}>+ Measurement Unit</button>
-//             <button style={{ ...styles.actionBtn, ...styles.activeBtn }} onClick={() => { clearForm(); setIsProductOpen(true); }}>
-//               + Add Product Entry
-//             </button>
-//           </div>
-//         </div>
-
-//         {/* DATA SEARCH VIEW ENTRY CONTAINER */}
-//         <div>
-//           <div style={{ marginBottom: "20px" }}>
-//             <input 
-//               type="text"
-//               style={styles.input}
-//               placeholder="🔍 Search or verify products inside database..."
-//               value={searchQuery}
-//               onChange={(e) => setSearchQuery(e.target.value)}
-//               onFocus={handleFocus}
-//               onBlur={handleBlur}
-//             />
-//           </div>
-
-//           {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-//             <div style={styles.alertBanner}>
-//               ✨ <strong>Matches Found:</strong> Found records aligning with "{searchQuery}".
-//             </div>
-//           )}
-
-//           <div style={styles.tableContainer}>
-//             {filteredProducts.length === 0 ? (
-//               <div style={styles.emptyState}>
-//                 {searchQuery.trim() !== "" 
-//                   ? `No matching records found for "${searchQuery}". Use the entry forms to register it!` 
-//                   : "No products in system. Add parameters to begin catalog management."
-//                 }
-//               </div>
-//             ) : (
-//               <table style={styles.table}>
-//                 <thead>
-// <tr>
-//   <th style={styles.th}>Image</th>
-//   <th style={styles.th}>Product Name</th>
-//   <th style={styles.th}>Stock Group</th>
-//   <th style={styles.th}>Unit Configuration</th>
-//   <th style={styles.th}>Actions</th>
-// </tr>
-// </thead>
-//                 <tbody>
-//   {filteredProducts.map((p) => (
-//     <tr key={p._id}>
-
-//       <td style={styles.td}>
-//         {p.image ? (
-//           <img
-//             src={p.image}
-//             alt={p.name}
-//             style={{
-//               width: 60,
-//               height: 60,
-//               objectFit: "cover",
-//               borderRadius: 8,
-//             }}
-//           />
-//         ) : (
-//           "No Image"
-//         )}
-//       </td>
-
-//       <td style={styles.td}>
-//         <strong>{p.name}</strong>
-//       </td>
-
-//       <td style={styles.td}>
-//         {p.stockGroup?.name}
-//       </td>
-
-//       <td style={styles.td}>
-//         {p.unit?.symbol}
-//       </td>
-//                       <td style={styles.td}>
-//                         <div style={styles.actionFlex}>
-//                           <button
-//                             style={styles.editBtn}
-//                             onClick={() => handleEditInit(p)}
-//                             onMouseOver={(e) => e.currentTarget.style.textDecoration = "underline"}
-//                             onMouseOut={(e) => e.currentTarget.style.textDecoration = "none"}
-//                           >
-//                             Edit
-//                           </button>
-//                           <button
-//                             style={styles.deleteBtn}
-//                             onClick={() => handleDelete(p._id)}
-//                             onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-//                             onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
-//                           >
-//                             Delete
-//                           </button>
-//                         </div>
-//                       </td>
-//                     </tr>
-//                   ))}
-//                 </tbody>
-//               </table>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* ========================================= MODAL OVERLAYS ========================================= */}
-
-//         {/* 1. STOCK GROUP MODAL */}
-//         {isGroupOpen && (
-//           <div style={styles.modalOverlay}>
-//             <div style={styles.modalCard}>
-//               <div style={styles.modalHeader}>
-//                 <h3 style={styles.modalTitle}>Quick Add: Stock Group</h3>
-//                 <button style={styles.closeXBtn} onClick={() => setIsGroupOpen(false)}>&times;</button>
-//               </div>
-//               <form onSubmit={addStockGroup} style={styles.formGrid}>
-//                 <div>
-//                   <label style={styles.label}>Stock Group Name</label>
-//                   <input
-//                     type="text"
-//                     required
-//                     value={groupName}
-//                     onChange={(e) => setGroupName(e.target.value)}
-//                     placeholder="e.g., Electronics, Raw Materials"
-//                     style={styles.input}
-//                     onFocus={handleFocus}
-//                     onBlur={handleBlur}
-//                   />
-//                 </div>
-//                 <div style={styles.modalFooter}>
-//                   <button type="button" style={styles.actionBtn} onClick={() => setIsGroupOpen(false)}>Cancel</button>
-//                   <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Group</button>
-//                 </div>
-//               </form>
-//             </div>
-//           </div>
-//         )}
-
-//         {/* 2. MEASUREMENT UNIT MODAL */}
-//         {isUnitOpen && (
-//           <div style={styles.modalOverlay}>
-//             <div style={styles.modalCard}>
-//               <div style={styles.modalHeader}>
-//                 <h3 style={styles.modalTitle}>Quick Add: Measurement Unit</h3>
-//                 <button style={styles.closeXBtn} onClick={() => setIsUnitOpen(false)}>&times;</button>
-//               </div>
-//               <form onSubmit={addUnit} style={styles.formGrid}>
-//                 <div>
-//                   <label style={styles.label}>Unit Configuration Name</label>
-//                   <input
-//                     type="text"
-//                     required
-//                     value={unitForm.name}
-//                     onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-//                     placeholder="e.g., Kilogram, Litre"
-//                     style={styles.input}
-//                     onFocus={handleFocus}
-//                     onBlur={handleBlur}
-//                   />
-//                 </div>
-//                 <div>
-//                   <label style={styles.label}>Standard Unit Symbol</label>
-//                   <input
-//                     type="text"
-//                     required
-//                     value={unitForm.symbol}
-//                     onChange={(e) => setUnitForm({ ...unitForm, symbol: e.target.value })}
-//                     placeholder="e.g., kg, L, pcs"
-//                     style={styles.input}
-//                     onFocus={handleFocus}
-//                     onBlur={handleBlur}
-//                   />
-//                 </div>
-//                 <div style={styles.modalFooter}>
-//                   <button type="button" style={styles.actionBtn} onClick={() => setIsUnitOpen(false)}>Cancel</button>
-//                   <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Unit Setup</button>
-//                 </div>
-//               </form>
-//             </div>
-//           </div>
-//         )}
-
-//         {/* 3. REGISTER/EDIT PRODUCT MODAL */}
-//         {isProductOpen && (
-//           <div style={styles.modalOverlay}>
-//             <div style={{ ...styles.modalCard, ...styles.modalCardLarge }}>
-//               <div style={styles.modalHeader}>
-//                 <h3 style={{ ...styles.modalTitle, color: editingId ? '#2563eb' : '#0f172a' }}>
-//                   {editingId ? '📝 Edit Product Parameters' : 'Product Details Entry'}
-//                 </h3>
-//                 <button style={styles.closeXBtn} onClick={() => { setIsProductOpen(false); clearForm(); }}>&times;</button>
-//               </div>
-//               <form onSubmit={handleSave} style={styles.formGrid}>
-//                 <div>
-//                   <label style={styles.label}>Product Name</label>
-//                   <input 
-//                     type="text" 
-//                     placeholder="Enter unique catalog item name" 
-//                     required 
-//                     value={form.name} 
-//                     onChange={e => setForm({...form, name: e.target.value})} 
-//                     style={styles.input}
-//                     onFocus={handleFocus}
-//                     onBlur={handleBlur}
-//                   />
-//                 </div>
-                 
-//                 <div>
-//                   <label style={styles.label}>Stock Group Assignment</label>
-//                   <select
-//                     value={form.stockGroup}
-//                     onChange={(e) => setForm({ ...form, stockGroup: e.target.value })}
-//                     style={styles.input}
-//                     required
-//                   >
-//                     <option value="">Select Stock Group</option>
-//                     {stockGroups.map(group => (
-//                       <option key={group._id} value={group._id}>{group.name}</option>
-//                     ))}
-//                   </select>
-//                 </div>
-
-//                 <div>
-//                   <label style={styles.label}>Unit Dimension</label>
-//                   <select
-//                     value={form.unit}
-//                     onChange={(e) => setForm({ ...form, unit: e.target.value })}
-//                     style={styles.input}
-//                     required
-//                   >
-//                     <option value="">Select Unit Option</option>
-//                     {units.map(unit => (
-//                       <option key={unit._id} value={unit._id}>{unit.symbol} ({unit.name})</option>
-//                     ))}
-//                   </select>
-//                 </div>
-// <div>
-//   <label style={styles.label}>Product Image</label>
-
-//   <input
-//     type="file"
-//     accept="image/*"
-//     onChange={(e) =>
-//       setForm({
-//         ...form,
-//         image: e.target.files[0],
-//       })
-//     }
-//     style={styles.input}
-//   />
-// </div>
-//                 <div style={styles.modalFooter}>
-//                   <button 
-//                     type="button" 
-//                     style={styles.actionBtn} 
-//                     onClick={() => { setIsProductOpen(false); clearForm(); }}
-//                   >
-//                     Cancel
-//                   </button>
-//                   <button 
-//                     type="submit" 
-//                     disabled={loading}
-//                     style={{
-//                       ...styles.saveBtn,
-//                       backgroundColor: loading ? "#93c5fd" : (editingId ? "#16a34a" : "#2563eb"),
-//                       cursor: loading ? "not-allowed" : "pointer"
-//                     }}
-//                   >
-//                     {loading ? 'Saving Parameters...' : (editingId ? 'Update Item' : 'Save Catalog Product')}
-//                   </button>
-//                 </div>
-//               </form>
-//             </div>
-//           </div>
-//         )}
-
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Products;
-
-
-
-
-
-
-
-
-// 14-8-2026
-
-
-
-
-
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import api from '../utils/api';
+import {
+  Badge,
+  Banner,
+  Button,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+} from '../components/ui';
+import { formatINR } from '../utils/format';
+
+const EMPTY_FORM = {
+  name: '',
+  stockGroup: '',
+  subCategory: 'Others',
+  unit: '',
+  price: '',
+  reorderLevel: '5',
+  safetyStock: '0',
+  purchaseLimitEnabled: false,
+  purchaseLimitQuantity: '',
+  purchaseLimitPeriod: 'DAILY',
+  nutritionCalories: '',
+  nutritionProtein: '',
+  nutritionCarbs: '',
+  nutritionFat: '',
+  nutritionServing: '',
+  image: null,
+};
+
+// Transcribed off the packet, one box each. All optional and independent —
+// the till shows what is filled and dashes the rest — so none is `required`
+// and a half-read wrapper still saves.
+const NUTRITION_FIELDS = [
+  ['nutritionCalories', 'Energy (kcal)', 'e.g., 280'],
+  ['nutritionProtein', 'Protein (g)', 'e.g., 3.2'],
+  ['nutritionCarbs', 'Carbohydrate (g)', 'e.g., 30.1'],
+  ['nutritionFat', 'Fat (g)', 'e.g., 16.4'],
+];
+
+const LIMIT_PERIODS = [
+  ['DAILY', 'per day'],
+  ['WEEKLY', 'per week'],
+  ['MONTHLY', 'per month'],
+  ['TOTAL', 'ever'],
+];
+
+const limitLabel = (product) => {
+  if (!product.purchaseLimit?.enabled) return '—';
+
+  const period = LIMIT_PERIODS.find(([value]) => value === product.purchaseLimit.period);
+
+  return `${product.purchaseLimit.quantity} ${period ? period[1] : 'per day'}`;
+};
 
 const Products = () => {
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [stockGroups, setStockGroups] = useState([]);
   const [units, setUnits] = useState([]);
 
-  // Modal Visibility States
   const [isGroupOpen, setIsGroupOpen] = useState(false);
   const [isUnitOpen, setIsUnitOpen] = useState(false);
   const [isProductOpen, setIsProductOpen] = useState(false);
 
-  const [groupName, setGroupName] = useState("");
-  const [unitForm, setUnitForm] = useState({ name: "", symbol: "" });
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // Form state manages both creating and updating
-  const [form, setForm] = useState({
-  name: '',
-  stockGroup: '',
-  unit: '',
-  price: '',
-  image: null,
+  const [groupName, setGroupName] = useState('');
+  const [unitForm, setUnitForm] = useState({ name: '', symbol: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('kiosk');
+  const [selectedGroup, setSelectedGroup] = useState('All');
+  const [savingGroups, setSavingGroups] = useState(false);
+  const [draggedGroupId, setDraggedGroupId] = useState(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState(null);
+  const [editorCategoryId, setEditorCategoryId] = useState('');
+  const [subCategoryName, setSubCategoryName] = useState('');
+  const [draggedSubCategory, setDraggedSubCategory] = useState('');
+  const [dragOverSubCategory, setDragOverSubCategory] = useState('');
 
-  purchaseLimitEnabled: false,
-  purchaseLimitQuantity: '',
-  purchaseLimitPeriod: 'DAILY'
-});
-  const [editingId, setEditingId] = useState(null); 
-  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -4314,818 +89,1227 @@ const Products = () => {
     fetchUnits();
   }, []);
 
-  const fetchProducts = async () => {
+  async function fetchProducts() {
+    setLoading(true);
+    setLoadError(false);
+
     try {
-      const res = await api.get('/products');
+      const res = await api.get('/products?all=1');
       setProducts(res.data);
     } catch (error) {
       console.error(error);
-      alert('Failed to fetch product catalog');
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const fetchStockGroups = async () => {
+  async function fetchStockGroups() {
     try {
-      const res = await api.get("/stock-groups");
+      const res = await api.get('/stock-groups');
       setStockGroups(res.data);
     } catch (error) {
       console.error(error);
     }
-  };
+  }
 
-  const fetchUnits = async () => {
+  async function fetchUnits() {
     try {
-      const res = await api.get("/units");
+      const res = await api.get('/units');
       setUnits(res.data);
     } catch (error) {
       console.error(error);
     }
+  }
+
+  const openProductModal = () => {
+    clearForm();
+    setIsProductOpen(true);
+    // The selects come from their own endpoints; refetch if either list
+    // failed to load at mount so the form isn't silently unusable.
+    if (stockGroups.length === 0) fetchStockGroups();
+    if (units.length === 0) fetchUnits();
+  };
+
+  const openCategoryEditor = () => {
+    setEditorCategoryId((current) =>
+      stockGroups.some((group) => group._id === current)
+        ? current
+        : (stockGroups[0]?._id || '')
+    );
+    setIsGroupOpen(true);
   };
 
   const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
 
-  e.preventDefault();
+    try {
+      const data = new FormData();
+      data.append('name', form.name);
+      data.append('stockGroup', form.stockGroup);
+      data.append('subCategory', form.subCategory.trim() || 'Others');
+      data.append('unit', form.unit);
+      data.append('price', form.price);
+      data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
+      data.append('safetyStock', form.safetyStock === '' ? '0' : form.safetyStock);
+      // Always sent, both fields included, so switching the limit off is a
+      // change the server sees rather than an omission it ignores.
+      data.append('purchaseLimitEnabled', form.purchaseLimitEnabled ? 'true' : 'false');
+      if (form.purchaseLimitQuantity !== '') {
+        data.append('purchaseLimitQuantity', form.purchaseLimitQuantity);
+      }
+      data.append('purchaseLimitPeriod', form.purchaseLimitPeriod);
+      // Blanks are sent too: an emptied box is the office taking a figure
+      // back, and the server reads "" as clear-this-one.
+      NUTRITION_FIELDS.forEach(([key]) => data.append(key, form[key]));
+      data.append('nutritionServing', form.nutritionServing);
+      if (form.image) {
+        data.append('image', form.image);
+      }
 
-  setLoading(true);
+      if (editingId) {
+        await api.put(`/products/${editingId}`, data);
+        toast.success('Product updated');
+      } else {
+        await api.post('/products', data);
+        toast.success('Product added');
+      }
 
-  try {
-
-    const data = new FormData();
-
-    data.append("name", form.name);
-data.append("stockGroup", form.stockGroup);
-data.append("unit", form.unit);
-data.append("price", form.price);
-
-data.append(
-  "purchaseLimitEnabled",
-  form.purchaseLimitEnabled ? "true" : "false"
-);
-
-data.append(
-  "purchaseLimitQuantity",
-  form.purchaseLimitQuantity || "0"
-);
-
-data.append(
-  "purchaseLimitPeriod",
-  form.purchaseLimitPeriod || "DAILY"
-);
-
-if (form.image) {
-  data.append("image", form.image);
-}console.log(form);
-
-for (let pair of data.entries()) {
-  console.log(pair[0], pair[1]);
-}
-
-    if (editingId) {
-
-      await api.put(`/products/${editingId}`, data);
-
-      alert("Product updated");
-
-    } else {
-
-      await api.post("/products", data);
-
-      alert("Product added");
-
+      clearForm();
+      setIsProductOpen(false);
+      fetchProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save product');
+    } finally {
+      setSaving(false);
     }
-
-    clearForm();
-
-    setIsProductOpen(false);
-
-    fetchProducts();
-
-  } catch (err) {
-
-    console.log(err);
-
-  }
-
-  setLoading(false);
-
-};
+  };
 
   const handleEditInit = (product) => {
-  setEditingId(product._id);
-
-  setForm({
-    name: product.name || "",
-    stockGroup: product.stockGroup?._id || "",
-    unit: product.unit?._id || "",
-    price: product.price || "",
-    image: null,
-
-    purchaseLimitEnabled:
-      product.purchaseLimit?.enabled || false,
-
-    purchaseLimitQuantity:
-      product.purchaseLimit?.quantity || "",
-
-    purchaseLimitPeriod:
-      product.purchaseLimit?.period || "DAILY"
-  });
-
-  setIsProductOpen(true);
-};
+    setEditingId(product._id);
+    setForm({
+      name: product.name || '',
+      stockGroup: product.stockGroup?._id || '',
+      subCategory: product.subCategory || 'Others',
+      unit: product.unit?._id || '',
+      price: product.price ?? '',
+      reorderLevel: String(product.reorderLevel ?? 5),
+      safetyStock: String(product.safetyStock ?? 0),
+      purchaseLimitEnabled: Boolean(product.purchaseLimit?.enabled),
+      purchaseLimitQuantity: product.purchaseLimit?.quantity
+        ? String(product.purchaseLimit.quantity)
+        : '',
+      purchaseLimitPeriod: product.purchaseLimit?.period || 'DAILY',
+      // ?? not ||: a stored 0 must fill the box with "0", not read as blank
+      // and get cleared by the next save.
+      nutritionCalories: String(product.nutrition?.calories ?? ''),
+      nutritionProtein: String(product.nutrition?.protein ?? ''),
+      nutritionCarbs: String(product.nutrition?.carbs ?? ''),
+      nutritionFat: String(product.nutrition?.fat ?? ''),
+      nutritionServing: product.nutrition?.serving || '',
+      image: null,
+    });
+    setIsProductOpen(true);
+  };
 
   const clearForm = () => {
-  setForm({
-  name: "",
-  stockGroup: "",
-  unit: "",
-  price: "",
-  image: null,
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+  };
 
-  purchaseLimitEnabled: false,
-  purchaseLimitQuantity: "",
-  purchaseLimitPeriod: "DAILY"
-});
+  const setArchived = async (product, archived) => {
+    if (
+      archived &&
+      !window.confirm(
+        `Archive ${product.name}? It disappears from sale everywhere; its stock and history stay, and you can restore it any time.`
+      )
+    )
+      return;
 
-  setEditingId(null);
-};
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product permanently?')) {
-      try {
-        await api.delete(`/products/${id}`);
-        if (editingId === id) clearForm();
-        fetchProducts();
-      } catch (error) {
-        console.error(error);
-        alert('Failed to delete product item');
-      }
+    try {
+      await api.put(`/products/${product._id}`, { active: !archived });
+      if (editingId === product._id) clearForm();
+      toast.success(archived ? 'Product archived' : 'Product restored');
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to update product');
     }
   };
 
   const addStockGroup = async (e) => {
     e.preventDefault();
     if (!groupName.trim()) return;
+
+    setSavingGroups(true);
     try {
-      await api.post("/stock-groups", { name: groupName });
-      setGroupName("");
-      fetchStockGroups();
-      setIsGroupOpen(false);
-      alert('Stock group added successfully!');
+      await api.post('/stock-groups', { name: groupName });
+      setGroupName('');
+      await fetchStockGroups();
+      toast.success('Category added');
     } catch (error) {
       console.error(error);
+      toast.error('Failed to add category');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const removeStockGroup = async (group) => {
+    const productCount = products.filter(
+      (product) => product.stockGroup?._id === group._id
+    ).length;
+
+    if (productCount > 0) {
+      toast.error('Move all products to another category before removing this category');
+      return;
+    }
+    if (!window.confirm(`Remove the empty category “${group.name}”?`)) return;
+
+    setSavingGroups(true);
+    try {
+      await api.delete(`/stock-groups/${group._id}`);
+      if (selectedGroup === group.name) setSelectedGroup('All');
+      await fetchStockGroups();
+      toast.success('Category removed');
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error.response?.data?.message || 'Failed to remove category'
+      );
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const reorderStockGroup = async (sourceId, targetId, position) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+
+    const reordered = [...stockGroups];
+    const sourceIndex = reordered.findIndex((group) => group._id === sourceId);
+    if (sourceIndex < 0) return;
+
+    const [movedGroup] = reordered.splice(sourceIndex, 1);
+    let targetIndex = reordered.findIndex((group) => group._id === targetId);
+    if (targetIndex < 0) return;
+    if (position === 'after') targetIndex += 1;
+    reordered.splice(targetIndex, 0, movedGroup);
+
+    setStockGroups(reordered);
+    setSavingGroups(true);
+
+    try {
+      await Promise.all(
+        reordered.map((group, order) =>
+          api.put(`/stock-groups/${group._id}`, { order })
+        )
+      );
+      toast.success('Category order updated');
+    } catch (error) {
+      console.error(error);
+      await fetchStockGroups();
+      toast.error('Failed to reorder categories');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const renameCategory = async (category) => {
+    const name = window.prompt('Rename category', category.name)?.trim();
+    if (!name || name === category.name) return;
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}`, { name });
+      await Promise.all([fetchStockGroups(), fetchProducts()]);
+      toast.success('Category renamed');
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to rename category');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const categorySubCategories = (category) => [
+    ...new Set([
+      ...(category?.subCategories || []),
+      ...products
+        .filter((product) => product.stockGroup?._id === category?._id)
+        .map((product) => product.subCategory || 'Others'),
+      'Others',
+    ]),
+  ];
+
+  const saveSubCategories = async (category, names, rename = {}) => {
+    const previous = stockGroups;
+    setStockGroups((current) => current.map((item) =>
+      item._id === category._id ? { ...item, subCategories: names } : item
+    ));
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}/subcategories`, {
+        subCategories: names,
+        ...rename,
+      });
+      await Promise.all([fetchStockGroups(), fetchProducts()]);
+    } catch (error) {
+      setStockGroups(previous);
+      toast.error(error.response?.data?.message || 'Failed to update sub-categories');
+      throw error;
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  const addSubCategory = async (event) => {
+    event.preventDefault();
+    const category = stockGroups.find((group) => group._id === editorCategoryId);
+    const name = subCategoryName.trim();
+    if (!category || !name) return;
+    const current = categorySubCategories(category);
+    if (current.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      toast.error('That sub-category already exists in this category');
+      return;
+    }
+    try {
+      await saveSubCategories(category, [...current.filter((item) => item !== 'Others'), name, 'Others']);
+      setSubCategoryName('');
+      toast.success('Sub-category added');
+    } catch {
+      // saveSubCategories already restored state and explained the failure.
+    }
+  };
+
+  const renameSubCategory = async (category, currentName) => {
+    const name = window.prompt('Rename sub-category', currentName)?.trim();
+    if (!name || name === currentName) return;
+    const current = categorySubCategories(category);
+    if (current.some((item) => item !== currentName && item.toLowerCase() === name.toLowerCase())) {
+      toast.error('That sub-category name is already used in this category');
+      return;
+    }
+    try {
+      await saveSubCategories(
+        category,
+        current.map((item) => item === currentName ? name : item),
+        { renameFrom: currentName, renameTo: name }
+      );
+      toast.success('Sub-category renamed');
+    } catch {
+      // saveSubCategories handles the error.
+    }
+  };
+
+  const removeSubCategory = async (category, name) => {
+    if (name === 'Others') return;
+    const count = products.filter((product) =>
+      product.stockGroup?._id === category._id && (product.subCategory || 'Others') === name
+    ).length;
+    if (count) {
+      toast.error('Move these products to another sub-category before removing it');
+      return;
+    }
+    if (!window.confirm(`Remove the empty sub-category “${name}”?`)) return;
+    try {
+      await saveSubCategories(category, categorySubCategories(category).filter((item) => item !== name));
+      toast.success('Sub-category removed');
+    } catch {
+      // saveSubCategories handles the error.
+    }
+  };
+
+  const reorderSubCategory = async (category, source, target) => {
+    if (!source || !target || source === target) return;
+    const names = categorySubCategories(category);
+    const sourceIndex = names.indexOf(source);
+    const targetIndex = names.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const reordered = [...names];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    try {
+      await saveSubCategories(category, reordered);
+      toast.success('Sub-category order updated');
+    } catch {
+      // saveSubCategories handles the error.
     }
   };
 
   const addUnit = async (e) => {
     e.preventDefault();
     if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
+
     try {
-      await api.post("/units", unitForm);
-      setUnitForm({ name: "", symbol: "" });
+      await api.post('/units', unitForm);
+      setUnitForm({ name: '', symbol: '' });
       fetchUnits();
       setIsUnitOpen(false);
-      alert('Unit added successfully!');
+      toast.success('Unit added');
     } catch (error) {
       console.error(error);
+      toast.error('Failed to add unit');
     }
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
-    return p.name?.toLowerCase().includes(query);
+    return (
+      p.name?.toLowerCase().includes(query) ||
+      p.subCategory?.toLowerCase().includes(query)
+    );
   });
 
-  const styles = {
-    page: {
-      minHeight: "100vh",
-      backgroundColor: "#f1f5f9",
-      padding: "40px 24px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      boxSizing: "border-box",
-    },
-    container: {
-      width: "100%",
-      maxWidth: "1400px",
-      margin: "0 auto",
-    },
-    headerWrapper: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "20px",
-      marginBottom: "32px",
-    },
-    title: {
-      fontSize: "32px",
-      fontWeight: "800",
-      color: "#0f172a",
-      letterSpacing: "-0.5px",
-      margin: 0,
-    },
-    subtitle: {
-      fontSize: "15px",
-      color: "#64748b",
-      marginTop: "6px",
-      marginBottom: 0,
-    },
-    actionButtonGroup: {
-      display: "flex",
-      gap: "12px",
-    },
-    actionBtn: {
-      padding: "10px 18px",
-      backgroundColor: "#ffffff",
-      border: "1px solid #cbd5e1",
-      borderRadius: "10px",
-      color: "#334155",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-      boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-      transition: "all 0.2s",
-    },
-    activeBtn: {
-      backgroundColor: "#2563eb",
-      color: "#ffffff",
-      border: "1px solid #2563eb",
-    },
-    tableContainer: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "16px",
-      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-      overflow: "hidden",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      textAlign: "left",
-    },
-    th: {
-      backgroundColor: "#f8fafc",
-      color: "#475569",
-      fontWeight: "600",
-      padding: "16px",
-      fontSize: "13px",
-      borderBottom: "1px solid #e2e8f0",
-    },
-    td: {
-      padding: "16px",
-      fontSize: "14px",
-      color: "#334155",
-      borderBottom: "1px solid #f1f5f9",
-    },
-    actionFlex: {
-      display: "flex",
-      gap: "14px",
-    },
-    editBtn: {
-      background: "none",
-      border: "none",
-      color: "#2563eb",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      padding: 0,
-    },
-    deleteBtn: {
-      background: "none",
-      border: "none",
-      color: "#ef4444",
-      fontWeight: "600",
-      fontSize: "13px",
-      cursor: "pointer",
-      padding: 0,
-    },
-    alertBanner: {
-      backgroundColor: "#f0fdf4",
-      border: "1px solid #bbf7d0",
-      color: "#166534",
-      padding: "12px 16px",
-      borderRadius: "8px",
-      fontSize: "14px",
-      fontWeight: "500",
-      marginBottom: "20px",
-    },
-    emptyState: {
-      padding: "40px",
-      textAlign: "center",
-      color: "#64748b",
-      fontSize: "15px"
-    },
-    // Modal Overlay Styling Component Styles
-    modalOverlay: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.4)",
-      backdropFilter: "blur(4px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-    },
-    modalCard: {
-      background: "#ffffff",
-      border: "1px solid #e2e8f0",
-      borderRadius: "16px",
-      padding: "28px",
-      width: "100%",
-      maxWidth: "520px",
-      boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
-      boxSizing: "border-box",
-    },
-    modalCardLarge: {
-      maxWidth: "680px",
-    },
-    modalHeader: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: "20px",
-      borderBottom: "1px solid #f1f5f9",
-      paddingBottom: "12px",
-    },
-    modalTitle: {
-      fontSize: "18px",
-      fontWeight: "700",
-      color: "#0f172a",
-      margin: 0,
-    },
-    closeXBtn: {
-      background: "none",
-      border: "none",
-      fontSize: "20px",
-      color: "#94a3b8",
-      cursor: "pointer",
-    },
-    formGrid: {
-      display: "flex",
-      flexDirection: "column",
-      gap: "16px",
-    },
-    input: {
-      width: "100%",
-      padding: "10px 14px",
-      border: "1px solid #cbd5e1",
-      borderRadius: "8px",
-      fontSize: "14px",
-      color: "#0f172a",
-      backgroundColor: "#ffffff",
-      outline: "none",
-      transition: "all 0.2s",
-      boxSizing: "border-box",
-    },
-    label: {
-      display: 'block', 
-      fontSize: '13px', 
-      fontWeight: '600', 
-      color: '#475569', 
-      marginBottom: '6px'
-    },
-    modalFooter: {
-      display: "flex",
-      justifyContent: "flex-end",
-      gap: "12px",
-      marginTop: "24px",
-      borderTop: "1px solid #f1f5f9",
-      paddingTop: "16px",
-    },
-    saveBtn: {
-      padding: "10px 20px",
-      color: "#ffffff",
-      border: "none",
-      borderRadius: "8px",
-      fontWeight: "600",
-      fontSize: "14px",
-      cursor: "pointer",
-    }
-  };
+  const subCategorySuggestions = [
+    ...new Set(
+      (stockGroups.find((group) => group._id === form.stockGroup)?.subCategories || [])
+        .concat(products
+        .filter((product) => !form.stockGroup || product.stockGroup?._id === form.stockGroup)
+        .map((product) => product.subCategory || 'Others')
+        )
+        .concat(['Others'])
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
-  const handleFocus = (e) => {
-    e.currentTarget.style.borderColor = "#2563eb";
-    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.15)";
-  };
+  const groupNames = [
+    ...new Set([
+      ...stockGroups.map((group) => group.name),
+      ...products.map((product) => product.stockGroup?.name).filter(Boolean),
+    ]),
+  ];
+  const catalogueGroups = ['All', ...groupNames];
+  const kioskProducts = filteredProducts.filter(
+    (product) =>
+      selectedGroup === 'All' || product.stockGroup?.name === selectedGroup
+  );
+  const visibleSections = (selectedGroup === 'All' ? groupNames : [selectedGroup])
+    .map((name) => ({
+      name,
+      products: kioskProducts.filter((product) => product.stockGroup?.name === name),
+    }))
+    .filter((section) => section.products.length > 0);
 
-  const handleBlur = (e) => {
-    e.currentTarget.style.borderColor = "#cbd5e1";
-    e.currentTarget.style.boxShadow = "none";
-  };
+  visibleSections.forEach((section) => {
+    const names = [...new Set(section.products.map((product) => product.subCategory || 'Others'))]
+      .sort((a, b) => (a === 'Others') - (b === 'Others') || a.localeCompare(b));
+    section.subCategories = names.map((name) => ({
+      name,
+      products: section.products.filter((product) => (product.subCategory || 'Others') === name),
+    }));
+  });
+  const ungroupedProducts =
+    selectedGroup === 'All'
+      ? kioskProducts.filter((product) => !product.stockGroup?.name)
+      : [];
 
-  return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        
-        {/* Main Application Page Control Header */}
-        <div style={styles.headerWrapper}>
-          <div>
-            <h1 style={styles.title}>Inventory Catalog Manager</h1>
-            <p style={styles.subtitle}>Configure inventory structural parameters and manage products cleanly inside models.</p>
-          </div>
-          
-          <div style={styles.actionButtonGroup}>
-            <button style={styles.actionBtn} onClick={() => setIsGroupOpen(true)}>+ Stock Group</button>
-            <button style={styles.actionBtn} onClick={() => setIsUnitOpen(true)}>+ Measurement Unit</button>
-            <button style={{ ...styles.actionBtn, ...styles.activeBtn }} onClick={() => { clearForm(); setIsProductOpen(true); }}>
-              + Add Product Entry
-            </button>
-          </div>
-        </div>
+  if (ungroupedProducts.length > 0) {
+    const names = [...new Set(ungroupedProducts.map((product) => product.subCategory || 'Others'))]
+      .sort((a, b) => (a === 'Others') - (b === 'Others') || a.localeCompare(b));
+    visibleSections.push({
+      name: 'Unassigned',
+      products: ungroupedProducts,
+      subCategories: names.map((name) => ({
+        name,
+        products: ungroupedProducts.filter((product) => (product.subCategory || 'Others') === name),
+      })),
+    });
+  }
 
-        {/* DATA SEARCH VIEW ENTRY CONTAINER */}
-        <div>
-          <div style={{ marginBottom: "20px" }}>
-            <input 
-              type="text"
-              style={styles.input}
-              placeholder="🔍 Search or verify products inside database..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-          </div>
-
-          {searchQuery.trim() !== "" && filteredProducts.length > 0 && (
-            <div style={styles.alertBanner}>
-              ✨ <strong>Matches Found:</strong> Found records aligning with "{searchQuery}".
-            </div>
-          )}
-
-          <div style={styles.tableContainer}>
-            {filteredProducts.length === 0 ? (
-              <div style={styles.emptyState}>
-                {searchQuery.trim() !== "" 
-                  ? `No matching records found for "${searchQuery}". Use the entry forms to register it!` 
-                  : "No products in system. Add parameters to begin catalog management."
-                }
-              </div>
-            ) : (
-              <table style={styles.table}>
-                <thead>
-<tr>
-  <th style={styles.th}>Image</th>
-  <th style={styles.th}>Product Name</th>
-  <th style={styles.th}>Stock Group</th>
-  <th style={styles.th}>Unit Configuration</th>
-  <th style={styles.th}>Actions</th>
-</tr>
-</thead>
-                <tbody>
-  {filteredProducts.map((p) => (
-    <tr key={p._id}>
-
-      <td style={styles.td}>
-        {p.image ? (
-          <img
-            src={p.image}
-            alt={p.name}
-            style={{
-              width: 60,
-              height: 60,
-              objectFit: "cover",
-              borderRadius: 8,
-            }}
-          />
-        ) : (
-          "No Image"
-        )}
-      </td>
-
-      <td style={styles.td}>
-        <strong>{p.name}</strong>
-      </td>
-
-      <td style={styles.td}>
-        {p.stockGroup?.name}
-      </td>
-
-      <td style={styles.td}>
-        {p.unit?.symbol}
-      </td>
-                      <td style={styles.td}>
-                        <div style={styles.actionFlex}>
-                          <button
-                            style={styles.editBtn}
-                            onClick={() => handleEditInit(p)}
-                            onMouseOver={(e) => e.currentTarget.style.textDecoration = "underline"}
-                            onMouseOut={(e) => e.currentTarget.style.textDecoration = "none"}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            style={styles.deleteBtn}
-                            onClick={() => handleDelete(p._id)}
-                            onMouseOver={(e) => e.currentTarget.style.color = "#b91c1c"}
-                            onMouseOut={(e) => e.currentTarget.style.color = "#ef4444"}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* ========================================= MODAL OVERLAYS ========================================= */}
-
-        {/* 1. STOCK GROUP MODAL */}
-        {isGroupOpen && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalCard}>
-              <div style={styles.modalHeader}>
-                <h3 style={styles.modalTitle}>Quick Add: Stock Group</h3>
-                <button style={styles.closeXBtn} onClick={() => setIsGroupOpen(false)}>&times;</button>
-              </div>
-              <form onSubmit={addStockGroup} style={styles.formGrid}>
-                <div>
-                  <label style={styles.label}>Stock Group Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
-                    placeholder="e.g., Electronics, Raw Materials"
-                    style={styles.input}
-                    onFocus={handleFocus}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                <div style={styles.modalFooter}>
-                  <button type="button" style={styles.actionBtn} onClick={() => setIsGroupOpen(false)}>Cancel</button>
-                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Group</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* 2. MEASUREMENT UNIT MODAL */}
-        {isUnitOpen && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalCard}>
-              <div style={styles.modalHeader}>
-                <h3 style={styles.modalTitle}>Quick Add: Measurement Unit</h3>
-                <button style={styles.closeXBtn} onClick={() => setIsUnitOpen(false)}>&times;</button>
-              </div>
-              <form onSubmit={addUnit} style={styles.formGrid}>
-                <div>
-                  <label style={styles.label}>Unit Configuration Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={unitForm.name}
-                    onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-                    placeholder="e.g., Kilogram, Litre"
-                    style={styles.input}
-                    onFocus={handleFocus}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                <div>
-                  <label style={styles.label}>Standard Unit Symbol</label>
-                  <input
-                    type="text"
-                    required
-                    value={unitForm.symbol}
-                    onChange={(e) => setUnitForm({ ...unitForm, symbol: e.target.value })}
-                    placeholder="e.g., kg, L, pcs"
-                    style={styles.input}
-                    onFocus={handleFocus}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                <div style={styles.modalFooter}>
-                  <button type="button" style={styles.actionBtn} onClick={() => setIsUnitOpen(false)}>Cancel</button>
-                  <button type="submit" style={{ ...styles.saveBtn, backgroundColor: "#2563eb" }}>Add Unit Setup</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* 3. REGISTER/EDIT PRODUCT MODAL */}
-        {isProductOpen && (
-          <div style={styles.modalOverlay}>
-            <div style={{ ...styles.modalCard, ...styles.modalCardLarge }}>
-              <div style={styles.modalHeader}>
-                <h3 style={{ ...styles.modalTitle, color: editingId ? '#2563eb' : '#0f172a' }}>
-                  {editingId ? '📝 Edit Product Parameters' : 'Product Details Entry'}
-                </h3>
-                <button style={styles.closeXBtn} onClick={() => { setIsProductOpen(false); clearForm(); }}>&times;</button>
-              </div>
-              <form onSubmit={handleSave} style={styles.formGrid}>
-                <div>
-                  <label style={styles.label}>Product Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter unique catalog item name" 
-                    required 
-                    value={form.name} 
-                    onChange={e => setForm({...form, name: e.target.value})} 
-                    style={styles.input}
-                    onFocus={handleFocus}
-                    onBlur={handleBlur}
-                  />
-                </div>
-                 
-                <div>
-                  <label style={styles.label}>Stock Group Assignment</label>
-                  <select
-                    value={form.stockGroup}
-                    onChange={(e) => setForm({ ...form, stockGroup: e.target.value })}
-                    style={styles.input}
-                    required
-                  >
-                    <option value="">Select Stock Group</option>
-                    {stockGroups.map(group => (
-                      <option key={group._id} value={group._id}>{group.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={styles.label}>Unit Dimension</label>
-                  <select
-                    value={form.unit}
-                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                    style={styles.input}
-                    required
-                  >
-                    <option value="">Select Unit Option</option>
-                    {units.map(unit => (
-                      <option key={unit._id} value={unit._id}>{unit.symbol} ({unit.name})</option>
-                    ))}
-                  </select>
-                </div>
-                {/* STUDENT PURCHASE LIMIT */}
-<div
-  style={{
-    marginTop: "4px",
-    padding: "16px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "10px",
-    backgroundColor: "#f8fafc",
-  }}
->
-  <div
-    style={{
-      fontSize: "15px",
-      fontWeight: "700",
-      color: "#0f172a",
-      marginBottom: "12px",
-    }}
-  >
-    🎓 Student Purchase Limit
-  </div>
-
-  <label
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "10px",
-      cursor: "pointer",
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "#334155",
-    }}
-  >
-    <input
-      type="checkbox"
-      checked={form.purchaseLimitEnabled}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          purchaseLimitEnabled: e.target.checked,
-        })
-      }
-      style={{
-        width: "18px",
-        height: "18px",
-        cursor: "pointer",
-      }}
-    />
-
-    Enable purchase limit for students
-  </label>
-
-  {form.purchaseLimitEnabled && (
+  const modalHeader = (title, onClose) => (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: "14px",
-        marginTop: "16px",
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 20,
+        paddingBottom: 12,
+        borderBottom: '1px solid var(--bg-subtle)',
       }}
     >
-      {/* MAXIMUM QUANTITY */}
-      <div>
-        <label style={styles.label}>
-          Maximum Quantity
-        </label>
+      <h3 className="modal-title" style={{ margin: 0 }}>
+        {title}
+      </h3>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close dialog"
+        style={{
+          background: 'none',
+          border: 'none',
+          fontSize: 20,
+          color: 'var(--muted-soft)',
+          cursor: 'pointer',
+        }}
+      >
+        &times;
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="page warehouse-page">
+      <PageHeader
+        title="Product Catalog"
+        subtitle="Manage products, categories, sub-categories and measurement units."
+        actions={
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Button variant="ghost" onClick={() => setIsUnitOpen(true)}>
+              + Measurement Unit
+            </Button>
+            <Button onClick={openProductModal}>+ Add Product</Button>
+          </div>
+        }
+      />
+
+      <div className="catalogue-controls">
+        <div className="catalogue-view-toggle" role="group" aria-label="Catalogue view">
+          <Button
+            variant={viewMode === 'kiosk' ? 'primary' : 'ghost'}
+            aria-pressed={viewMode === 'kiosk'}
+            onClick={() => setViewMode('kiosk')}
+          >
+            Kiosk View
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'primary' : 'ghost'}
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+          >
+            List View
+          </Button>
+        </div>
 
         <input
-          type="number"
-          min="1"
-          step="1"
-          required={form.purchaseLimitEnabled}
-          value={form.purchaseLimitQuantity}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              purchaseLimitQuantity: e.target.value,
-            })
-          }
-          placeholder="Example: 2"
-          style={styles.input}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
+          type="search"
+          className="input catalogue-search"
+          aria-label="Search products"
+          placeholder="🔍 Search products…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
 
-      {/* LIMIT PERIOD */}
-      <div>
-        <label style={styles.label}>
-          Limit Period
-        </label>
-
-        <select
-          value={form.purchaseLimitPeriod}
-          onChange={(e) =>
-            setForm({
-              ...form,
-              purchaseLimitPeriod: e.target.value,
-            })
+      {loading ? (
+        <div className="card">
+          <Skeleton height={22} width="40%" />
+          <Skeleton height={16} style={{ marginTop: 16 }} />
+          <Skeleton height={16} style={{ marginTop: 10 }} />
+          <Skeleton height={16} style={{ marginTop: 10 }} />
+        </div>
+      ) : loadError ? (
+        <Banner variant="alert" icon="⚠️">
+          Couldn't load the product catalog. Check your connection and{' '}
+          <button type="button" className="link-button" onClick={fetchProducts}>
+            try again
+          </button>
+          .
+        </Banner>
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState
+          icon="📦"
+          title={searchQuery.trim() ? 'No matching products' : 'No products yet'}
+          action={
+            !searchQuery.trim() && (
+              <Button onClick={openProductModal}>+ Add Product</Button>
+            )
           }
-          style={styles.input}
         >
-          <option value="DAILY">
-            Daily
-          </option>
+          {searchQuery.trim()
+            ? `Nothing matches "${searchQuery}".`
+            : 'Add your first product to start selling.'}
+        </EmptyState>
+      ) : viewMode === 'list' ? (
+        <div className="table-wrap">
+          <table className="table table--stack table--hover">
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>Image</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Sub-category</th>
+                <th>Unit</th>
+                <th style={{ width: 120 }}>Price</th>
+                <th style={{ width: 130 }}>Reorder point</th>
+                <th style={{ width: 120 }}>Safety stock</th>
+                <th style={{ width: 150 }}>Per-student limit</th>
+                <th style={{ width: 180 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((p) => (
+                <tr key={p._id}>
+                  <td data-label="Image">
+                    {p.image ? (
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          objectFit: 'cover',
+                          borderRadius: 8,
+                        }}
+                      />
+                    ) : (
+                      <span style={{ color: 'var(--muted-soft)' }}>No image</span>
+                    )}
+                  </td>
+                  <td data-label="Product">
+                    <strong>{p.name}</strong>
+                    {p.active === false && (
+                      <Badge variant="neutral" style={{ marginLeft: 8 }}>
+                        Archived
+                      </Badge>
+                    )}
+                  </td>
+                  <td data-label="Category">{p.stockGroup?.name}</td>
+                  <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
+                  <td data-label="Unit">{p.unit?.symbol}</td>
+                  <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                    {formatINR(p.price || 0)}
+                  </td>
+                  <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
+                  <td data-label="Safety stock">{p.safetyStock ?? 0}</td>
+                  <td data-label="Per-student limit">{limitLabel(p)}</td>
+                  <td data-label="Actions">
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button
+                        className="btn--sm"
+                        onClick={() => handleEditInit(p)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant={p.active === false ? 'success' : 'danger'}
+                        className="btn--sm"
+                        onClick={() => setArchived(p, p.active !== false)}
+                      >
+                        {p.active === false ? 'Restore' : 'Archive'}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="catalogue-kiosk-view">
+          <div className="catalogue-group-toolbar">
+            <div className="catalogue-group-tabs" role="tablist" aria-label="Categories">
+              {catalogueGroups.map((group) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={group}
+                  className="catalogue-group-tab"
+                  aria-selected={selectedGroup === group}
+                  onClick={() => setSelectedGroup(group)}
+                >
+                  {group}
+                  <span>
+                    {group === 'All'
+                      ? products.length
+                      : products.filter((product) => product.stockGroup?.name === group).length}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-          <option value="WEEKLY">
-            Weekly
-          </option>
+            <Button
+              variant="ghost"
+              className="catalogue-edit-list"
+              onClick={openCategoryEditor}
+            >
+              Edit
+            </Button>
+          </div>
 
-          <option value="MONTHLY">
-            Monthly
-          </option>
+          {kioskProducts.length === 0 ? (
+            <EmptyState icon="📦" title="No products in this group">
+              {searchQuery.trim()
+                ? `Nothing in ${selectedGroup} matches "${searchQuery}".`
+                : 'Choose another category or add a product.'}
+            </EmptyState>
+          ) : (
+            <div className="catalogue-group-sections">
+              {visibleSections.map((section) => (
+                <section className="catalogue-group-section" key={section.name}>
+                  <header className="catalogue-group-heading">
+                    <div>
+                      <p>Category</p>
+                      <h2>{section.name}</h2>
+                    </div>
+                    <span>{section.products.length} {section.products.length === 1 ? 'item' : 'items'}</span>
+                  </header>
 
-          <option value="TOTAL">
-            Total
-          </option>
-        </select>
-      </div>
-    </div>
-  )}
-</div>
-<div>
-  <label style={styles.label}>Product Image</label>
+                  <div className="catalogue-subcategory-sections">
+                    {section.subCategories.map((subCategory) => (
+                      <section className="catalogue-subcategory" key={subCategory.name}>
+                        <div className="catalogue-subcategory__heading">
+                          <h3>{subCategory.name}</h3>
+                          <span>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'}</span>
+                        </div>
+                        <div className="catalogue-product-grid catalogue-product-rail">
+                    {subCategory.products.map((product) => (
+                      <article
+                        className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
+                        key={product._id}
+                      >
+                        <div className="catalogue-product-image">
+                          {product.image ? (
+                            <img src={product.image} alt="" />
+                          ) : (
+                            <span aria-hidden="true">📦</span>
+                          )}
+                          {product.active === false && <Badge variant="neutral">Archived</Badge>}
+                          <div className="catalogue-product-hover-actions">
+                            <Button
+                              className="btn--sm"
+                              onClick={() => handleEditInit(product)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant={product.active === false ? 'success' : 'danger'}
+                              className="btn--sm"
+                              onClick={() => setArchived(product, product.active !== false)}
+                            >
+                              {product.active === false ? 'Restore' : 'Archive'}
+                            </Button>
+                          </div>
+                        </div>
 
-  <input
-    type="file"
-    accept="image/*"
-    onChange={(e) =>
-      setForm({
-        ...form,
-        image: e.target.files[0],
-      })
-    }
-    style={styles.input}
-  />
-</div>
-                <div style={styles.modalFooter}>
-                  <button 
-                    type="button" 
-                    style={styles.actionBtn} 
-                    onClick={() => { setIsProductOpen(false); clearForm(); }}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={loading}
-                    style={{
-                      ...styles.saveBtn,
-                      backgroundColor: loading ? "#93c5fd" : (editingId ? "#16a34a" : "#2563eb"),
-                      cursor: loading ? "not-allowed" : "pointer"
+                        <div className="catalogue-product-body">
+                          <div className="catalogue-product-title">
+                            <h3>{product.name}</h3>
+                            <strong>{formatINR(product.price || 0)}</strong>
+                          </div>
+                          <p>
+                            {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
+                          </p>
+                          <dl>
+                            <div><dt>Safety stock</dt><dd>{product.safetyStock ?? 0}</dd></div>
+                            <div><dt>Student limit</dt><dd>{limitLabel(product)}</dd></div>
+                          </dl>
+
+                        </div>
+                      </article>
+                    ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isGroupOpen && (() => {
+        const selectedCategory = stockGroups.find((group) => group._id === editorCategoryId) || stockGroups[0];
+        const subCategories = categorySubCategories(selectedCategory);
+        return (
+          <div className="modal-backdrop" onClick={() => setIsGroupOpen(false)}>
+            <div className="modal category-editor-modal" onClick={(e) => e.stopPropagation()}>
+              {modalHeader('Edit Categories', () => setIsGroupOpen(false))}
+
+              <p className="stock-group-editor__help">
+                Drag tabs and tiles to set the Kiosk order. Tap any category or sub-category name to rename it.
+              </p>
+
+              <div className="category-editor-tabs" role="tablist" aria-label="Category order">
+                {stockGroups.map((category) => (
+                  <div
+                    className={`category-editor-tab${editorCategoryId === category._id ? ' category-editor-tab--active' : ''}${draggedGroupId === category._id ? ' category-editor-tab--dragging' : ''}${dragOverGroupId === category._id ? ' category-editor-tab--target' : ''}`}
+                    key={category._id}
+                    draggable={!savingGroups}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', category._id);
+                      setDraggedGroupId(category._id);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragOverGroupId(category._id);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      reorderStockGroup(event.dataTransfer.getData('text/plain') || draggedGroupId, category._id, 'before');
+                      setDraggedGroupId(null);
+                      setDragOverGroupId(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedGroupId(null);
+                      setDragOverGroupId(null);
                     }}
                   >
-                    {loading ? 'Saving Parameters...' : (editingId ? 'Update Item' : 'Save Catalog Product')}
-                  </button>
+                    <span aria-hidden="true">⠿</span>
+                    <button type="button" role="tab" aria-selected={editorCategoryId === category._id} onClick={() => setEditorCategoryId(category._id)}>
+                      {category.name}
+                    </button>
+                    <button type="button" className="category-editor-rename" onClick={() => renameCategory(category)} aria-label={`Rename ${category.name}`}>✎</button>
+                  </div>
+                ))}
+              </div>
+
+              {selectedCategory && (
+                <section className="subcategory-editor" aria-labelledby="subcategory-editor-title">
+                  <header>
+                    <div>
+                      <p>Sub-categories in</p>
+                      <button type="button" id="subcategory-editor-title" onClick={() => renameCategory(selectedCategory)}>
+                        {selectedCategory.name} <span aria-hidden="true">✎</span>
+                      </button>
+                    </div>
+                    <Button
+                      variant="danger"
+                      className="btn--sm"
+                      disabled={savingGroups || products.some((product) => product.stockGroup?._id === selectedCategory._id)}
+                      onClick={() => removeStockGroup(selectedCategory)}
+                    >
+                      Remove category
+                    </Button>
+                  </header>
+
+                  <div className="subcategory-tile-grid">
+                    {subCategories.map((name) => {
+                      const count = products.filter((product) =>
+                        product.stockGroup?._id === selectedCategory._id && (product.subCategory || 'Others') === name
+                      ).length;
+                      return (
+                        <div
+                          className={`subcategory-editor-tile${draggedSubCategory === name ? ' subcategory-editor-tile--dragging' : ''}${dragOverSubCategory === name ? ' subcategory-editor-tile--target' : ''}`}
+                          key={name}
+                          draggable={!savingGroups}
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', name);
+                            setDraggedSubCategory(name);
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            setDragOverSubCategory(name);
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            reorderSubCategory(selectedCategory, event.dataTransfer.getData('text/plain') || draggedSubCategory, name);
+                            setDraggedSubCategory('');
+                            setDragOverSubCategory('');
+                          }}
+                          onDragEnd={() => {
+                            setDraggedSubCategory('');
+                            setDragOverSubCategory('');
+                          }}
+                        >
+                          <span className="subcategory-editor-tile__handle" aria-hidden="true">⠿</span>
+                          <button type="button" className="subcategory-editor-tile__name" onClick={() => renameSubCategory(selectedCategory, name)}>
+                            {name} <span aria-hidden="true">✎</span>
+                          </button>
+                          <small>{count} {count === 1 ? 'product' : 'products'}</small>
+                          {name !== 'Others' && (
+                            <button type="button" className="subcategory-editor-tile__remove" disabled={savingGroups || count > 0} onClick={() => removeSubCategory(selectedCategory, name)} aria-label={`Remove ${name}`}>×</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <form className="category-editor-add" onSubmit={addSubCategory}>
+                    <label className="field-label" htmlFor="subcategory-name">Add sub-category</label>
+                    <div>
+                      <input id="subcategory-name" className="input" value={subCategoryName} onChange={(event) => setSubCategoryName(event.target.value)} placeholder="e.g., Biscuits" maxLength="60" required />
+                      <Button type="submit" disabled={savingGroups}>Add</Button>
+                    </div>
+                  </form>
+                </section>
+              )}
+
+              <form className="category-editor-add category-editor-add--category" onSubmit={addStockGroup}>
+                <label className="field-label" htmlFor="group-name">Add category</label>
+                <div>
+                  <input id="group-name" className="input" required value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="e.g., Food & Snacks" />
+                  <Button type="submit" disabled={savingGroups}>Add</Button>
                 </div>
               </form>
+
+              <div className="modal-actions"><Button variant="ghost" onClick={() => setIsGroupOpen(false)}>Done</Button></div>
             </div>
           </div>
-        )}
+        );
+      })()}
 
-      </div>
+      {isUnitOpen && (
+        <div className="modal-backdrop" onClick={() => setIsUnitOpen(false)}>
+          <form
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={addUnit}
+          >
+            {modalHeader('Quick Add: Measurement Unit', () =>
+              setIsUnitOpen(false)
+            )}
+
+            <label className="field-label" htmlFor="unit-name">
+              Unit Name
+            </label>
+            <input
+              id="unit-name"
+              type="text"
+              className="input"
+              style={{ marginBottom: 14 }}
+              required
+              value={unitForm.name}
+              onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
+              placeholder="e.g., Kilogram, Litre"
+            />
+
+            <label className="field-label" htmlFor="unit-symbol">
+              Unit Symbol
+            </label>
+            <input
+              id="unit-symbol"
+              type="text"
+              className="input"
+              required
+              value={unitForm.symbol}
+              onChange={(e) =>
+                setUnitForm({ ...unitForm, symbol: e.target.value })
+              }
+              placeholder="e.g., kg, L, pcs"
+            />
+
+            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+              <Button variant="ghost" onClick={() => setIsUnitOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Add Unit</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isProductOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={() => {
+            if (saving) return;
+            setIsProductOpen(false);
+            clearForm();
+          }}
+        >
+          <form
+            className="modal"
+            style={{ maxWidth: 680 }}
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleSave}
+          >
+            {modalHeader(
+              editingId ? '📝 Edit Product' : 'Add Product',
+              () => {
+                setIsProductOpen(false);
+                clearForm();
+              }
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label className="field-label" htmlFor="product-name">
+                  Product Name
+                </label>
+                <input
+                  id="product-name"
+                  type="text"
+                  className="input"
+                  placeholder="e.g., Banana Cake"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-safety-stock">
+                  Safety Stock Buffer
+                </label>
+                <input
+                  id="product-safety-stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input"
+                  required
+                  value={form.safetyStock}
+                  onChange={(e) => setForm({ ...form, safetyStock: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-group">
+                  Category
+                </label>
+                <select
+                  id="product-group"
+                  className="select"
+                  value={form.stockGroup}
+                  onChange={(e) =>
+                    setForm({ ...form, stockGroup: e.target.value, subCategory: 'Others' })
+                  }
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {stockGroups.map((group) => (
+                    <option key={group._id} value={group._id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-subcategory">
+                  Sub-category
+                </label>
+                <select
+                  id="product-subcategory"
+                  className="select"
+                  required
+                  value={form.subCategory}
+                  onChange={(e) => setForm({ ...form, subCategory: e.target.value })}
+                  disabled={!form.stockGroup}
+                >
+                  {subCategorySuggestions.map((name) => <option key={name} value={name}>{name}</option>)}
+                </select>
+                <p className="field-help">Manage and reorder these options from Edit Categories.</p>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-unit">
+                  Unit
+                </label>
+                <select
+                  id="product-unit"
+                  className="select"
+                  value={form.unit}
+                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  required
+                >
+                  <option value="">Select Unit</option>
+                  {units.map((unit) => (
+                    <option key={unit._id} value={unit._id}>
+                      {unit.symbol} ({unit.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-price">
+                  Selling Price (₹)
+                </label>
+                {/* Required like its siblings: the backend falls back to
+                    price: 0 on a blank, which the till would then sell free. */}
+                {/* min 0.01, not 0: the server refuses an unpriced product
+                    outright, because the till reads zero as free and hands the
+                    goods over. Caught here so the office is told at the box
+                    rather than by a rejected save. */}
+                <input
+                  id="product-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="input"
+                  placeholder="0.00"
+                  required
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-reorder">
+                  Reorder Level (flag when stock falls below this; 0 never flags)
+                </label>
+                <input
+                  id="product-reorder"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input"
+                  required
+                  value={form.reorderLevel}
+                  onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="field-label"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                  htmlFor="product-limit-enabled"
+                >
+                  <input
+                    id="product-limit-enabled"
+                    type="checkbox"
+                    checked={form.purchaseLimitEnabled}
+                    onChange={(e) =>
+                      setForm({ ...form, purchaseLimitEnabled: e.target.checked })
+                    }
+                  />
+                  Cap how many one student may buy
+                </label>
+
+                {form.purchaseLimitEnabled && (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 12,
+                      marginTop: 12,
+                    }}
+                  >
+                    <div>
+                      <label className="field-label" htmlFor="product-limit-quantity">
+                        Maximum quantity
+                      </label>
+                      {/* min 1: the server refuses an enabled limit of zero,
+                          because a product nobody may buy is one to archive. */}
+                      <input
+                        id="product-limit-quantity"
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="input"
+                        placeholder="e.g., 2"
+                        required
+                        value={form.purchaseLimitQuantity}
+                        onChange={(e) =>
+                          setForm({ ...form, purchaseLimitQuantity: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="field-label" htmlFor="product-limit-period">
+                        Counted
+                      </label>
+                      <select
+                        id="product-limit-period"
+                        className="select"
+                        value={form.purchaseLimitPeriod}
+                        onChange={(e) =>
+                          setForm({ ...form, purchaseLimitPeriod: e.target.value })
+                        }
+                      >
+                        {LIMIT_PERIODS.map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="field-label">Nutrition</label>
+
+                {/* Every box optional. The till prints a dash wherever one is
+                    left empty rather than a zero, so a packet read halfway is
+                    worth saving. Nothing is calculated from these figures. */}
+                <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>
+                  As printed on the pack. Leave blank what the pack does not say
+                  &mdash; the till shows a dash, not a zero.
+                </p>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                  }}
+                >
+                  {NUTRITION_FIELDS.map(([key, label, placeholder]) => (
+                    <div key={key}>
+                      <label className="field-label" htmlFor={`product-${key}`}>
+                        {label}
+                      </label>
+                      <input
+                        id={`product-${key}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        className="input"
+                        placeholder={placeholder}
+                        value={form[key]}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <label className="field-label" htmlFor="product-nutritionServing">
+                    Serving these figures are per
+                  </label>
+                  <input
+                    id="product-nutritionServing"
+                    type="text"
+                    maxLength={120}
+                    className="input"
+                    placeholder="e.g., Per 52g pack"
+                    value={form.nutritionServing}
+                    onChange={(e) =>
+                      setForm({ ...form, nutritionServing: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="product-image">
+                  Product Image
+                </label>
+                <input
+                  id="product-image"
+                  type="file"
+                  accept="image/*"
+                  className="input"
+                  onChange={(e) =>
+                    setForm({ ...form, image: e.target.files[0] })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+              <Button
+                variant="ghost"
+                disabled={saving}
+                onClick={() => {
+                  setIsProductOpen(false);
+                  clearForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant={editingId ? 'success' : 'primary'}
+                disabled={saving}
+              >
+                {saving
+                  ? 'Saving…'
+                  : editingId
+                    ? 'Update Product'
+                    : 'Save Product'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

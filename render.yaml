@@ -1,0 +1,67 @@
+# Service definition for the HungerHunt backend on Render.
+#
+# The live service was created by hand, so this file is the reviewable source
+# of truth to MIRROR into the dashboard (Task 11 of the cutover plan) — applying
+# it as a Blueprint would create a *second* service; don't, unless intentionally
+# recreating from scratch. Values marked sync:false are secrets: set in the
+# dashboard from backend/.env.production.local, never committed.
+#
+# autoDeploy is off on purpose: a push to Ashok-work must not become a silent
+# production deploy. Deploys are triggered manually until the team decides otherwise.
+services:
+  - type: web
+    name: hungerhunt-dbat
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    branch: Ashok-work
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BUSINESS_TIME_ZONE
+        value: Asia/Kolkata
+      - key: TRUST_PROXY
+        value: "1"
+      - key: MAX_ADMIN_ACCOUNTS
+        value: "3"
+      # Purchase authorization is required from the first request. The default
+      # in utils/purchaseAuthorization.js grants a grace window to tills running
+      # a pre-token bundle; this deployment has no such clients (every frontend
+      # is built fresh from this branch), so the window is closed by backdating.
+      - key: PURCHASE_AUTH_GRACE_UNTIL
+        value: "2020-01-01T00:00:00Z"
+      - key: PARENT_CLIENT_URL
+        value: https://hunger-hunt-parent.vercel.app
+      - key: ADMIN_CLIENT_URL
+        value: https://hunger-hunt-beta.vercel.app
+      - key: KIOSK_CLIENT_URL
+        value: https://hunger-hunt-kiosk.vercel.app
+      - key: WAREHOUSE_CLIENT_URL
+        value: https://hunger-hunt-warehouse.vercel.app
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PARENT_JWT_SECRET
+        sync: false
+      - key: STUDENT_JWT_SECRET
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false

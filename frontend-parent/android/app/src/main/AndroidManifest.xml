@@ -1,14 +1,24 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      allowBackup is off, against the platform default.
 
+      The session lives in the WebView's data directory, and Android's automatic
+      backup copies that directory to the account holder's Google Drive. For most
+      apps that is a convenience. Here it puts a live token against a named
+      child's wallet into cloud storage the school does not control and cannot
+      revoke, and restores it onto whatever device the account is next set up on.
+
+      The cost is that restoring to a new phone asks the parent to sign in again,
+      which is the correct thing for it to ask.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -16,26 +26,44 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true">
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
+
+        <!--
+          Without these, FCM falls back to the launcher icon for the status bar,
+          and the platform keeps only its alpha channel — so the Hunger Hunt mark
+          arrives as a solid white square with no shape in it at all. The
+          replacement is drawn for that treatment; see ic_stat_notify.xml.
+
+          These are read by the Firebase messaging service for notifications the
+          server sends while the app is backgrounded, which is the path a parent
+          actually sees a recharge on.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 13 and later ask the user before any notification can be shown.
+         The push plugin merges this in as well; naming it here keeps the app's
+         own manifest honest about what it requests. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

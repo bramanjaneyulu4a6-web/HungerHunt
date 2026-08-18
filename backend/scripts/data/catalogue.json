@@ -1,0 +1,766 @@
+{
+  "stockGroups": [
+    {
+      "name": "Snacks",
+      "order": 0,
+      "subCategories": [
+        "Biscuits & Cookies",
+        "Chips & Crisps",
+        "Savoury Snacks",
+        "Nutrition Bars",
+        "Bakery",
+        "Noodles & Instant Food"
+      ]
+    },
+    {
+      "name": "Beverages",
+      "order": 1,
+      "subCategories": [
+        "Drinks"
+      ]
+    },
+    {
+      "name": "Ice Cream",
+      "order": 2,
+      "subCategories": [
+        "Ice Cream"
+      ]
+    },
+    {
+      "name": "Personal Care",
+      "order": 3,
+      "subCategories": [
+        "Personal Care"
+      ]
+    },
+    {
+      "name": "Stationery",
+      "order": 4,
+      "subCategories": [
+        "Stationery"
+      ]
+    },
+    {
+      "name": "Hostel Essentials",
+      "order": 5,
+      "subCategories": [
+        "Hostel Essentials"
+      ]
+    }
+  ],
+  "units": [
+    {
+      "name": "Piece",
+      "symbol": "pc"
+    }
+  ],
+  "products": [
+    {
+      "name": "Marie Gold",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 445,
+        "protein": 7.9,
+        "carbs": 79.5,
+        "fat": 10.6
+      }
+    },
+    {
+      "name": "Oreo",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 480,
+        "protein": 5.3,
+        "carbs": 70.7,
+        "fat": 19.5
+      }
+    },
+    {
+      "name": "Jim Jam",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 483,
+        "protein": 5,
+        "carbs": 73,
+        "fat": 19
+      }
+    },
+    {
+      "name": "Bourbon Biscuit",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 492,
+        "protein": 4.7,
+        "carbs": 73.4,
+        "fat": 19.9
+      }
+    },
+    {
+      "name": "Dark Fantasy Choco Fills",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 507,
+        "protein": 7,
+        "carbs": 61,
+        "fat": 27.3
+      }
+    },
+    {
+      "name": "Hide & Seek",
+      "stockGroup": "Snacks",
+      "subCategory": "Biscuits & Cookies",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 479,
+        "protein": 5.9,
+        "carbs": 73.4,
+        "fat": 18
+      }
+    },
+    {
+      "name": "Blue Lay's",
+      "stockGroup": "Snacks",
+      "subCategory": "Chips & Crisps",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 539,
+        "protein": 6.9,
+        "carbs": 53.4,
+        "fat": 33.1
+      }
+    },
+    {
+      "name": "Green Lay's",
+      "stockGroup": "Snacks",
+      "subCategory": "Chips & Crisps",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 537,
+        "protein": 6.7,
+        "carbs": 53,
+        "fat": 33.1
+      }
+    },
+    {
+      "name": "Pringles South African Style Peri Peri Chips",
+      "stockGroup": "Snacks",
+      "subCategory": "Chips & Crisps",
+      "unit": "Piece",
+      "price": 55,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 522,
+        "protein": 5.2,
+        "carbs": 61.5,
+        "fat": 28.5
+      }
+    },
+    {
+      "name": "Pringles Sour Cream & Onion Chips",
+      "stockGroup": "Snacks",
+      "subCategory": "Chips & Crisps",
+      "unit": "Piece",
+      "price": 55,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 25g",
+        "calories": 136,
+        "protein": 1.3,
+        "carbs": 14.4,
+        "fat": 7.81
+      }
+    },
+    {
+      "name": "Kurkure – Green Chutney",
+      "stockGroup": "Snacks",
+      "subCategory": "Savoury Snacks",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 561,
+        "protein": 5.9,
+        "carbs": 56.3,
+        "fat": 34.7
+      }
+    },
+    {
+      "name": "Kurkure – Masala Munch",
+      "stockGroup": "Snacks",
+      "subCategory": "Savoury Snacks",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 555,
+        "protein": 6,
+        "carbs": 57.3,
+        "fat": 33.6
+      }
+    },
+    {
+      "name": "Energy/protein bar",
+      "stockGroup": "Snacks",
+      "subCategory": "Nutrition Bars",
+      "unit": "Piece",
+      "price": 40,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 40g bar",
+        "calories": 190,
+        "protein": 10,
+        "carbs": 20,
+        "fat": 10.36
+      }
+    },
+    {
+      "name": "Popcorn (premade)",
+      "stockGroup": "Snacks",
+      "subCategory": "Savoury Snacks",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 449,
+        "protein": 9,
+        "carbs": 66,
+        "fat": 19
+      }
+    },
+    {
+      "name": "Choco Pie",
+      "stockGroup": "Snacks",
+      "subCategory": "Bakery",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 25g pack",
+        "calories": 108,
+        "protein": 1,
+        "carbs": 17,
+        "fat": 4
+      }
+    },
+    {
+      "name": "Maggi Cup Noodles Blue",
+      "stockGroup": "Snacks",
+      "subCategory": "Noodles & Instant Food",
+      "unit": "Piece",
+      "price": 55,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 70g pack",
+        "calories": 310,
+        "protein": 5.8,
+        "carbs": 41.4,
+        "fat": 13.4
+      }
+    },
+    {
+      "name": "Badam Milk",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 30,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 200ml pack",
+        "calories": 210,
+        "protein": 6,
+        "carbs": 26,
+        "fat": 9.1
+      }
+    },
+    {
+      "name": "Chocolate milkshake",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 35,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 180ml pack",
+        "calories": 164,
+        "protein": 3.2,
+        "carbs": 30,
+        "fat": 3.4
+      }
+    },
+    {
+      "name": "Strawberry milkshake",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 35,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 180ml pack",
+        "calories": 162,
+        "protein": 3,
+        "carbs": 30,
+        "fat": 3.2
+      }
+    },
+    {
+      "name": "Thums Up",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 25,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 42,
+        "protein": 0,
+        "carbs": 10.6,
+        "fat": 0
+      }
+    },
+    {
+      "name": "Fanta",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 25,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 52,
+        "protein": 0,
+        "carbs": 13,
+        "fat": 0
+      }
+    },
+    {
+      "name": "Sprite",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 25,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 49,
+        "protein": 0,
+        "carbs": 12.2,
+        "fat": 0
+      }
+    },
+    {
+      "name": "Frooti",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 125ml pack",
+        "calories": 79,
+        "protein": 0,
+        "carbs": 20,
+        "fat": 0
+      }
+    },
+    {
+      "name": "Mogu Mogu",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 65,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 320ml bottle",
+        "calories": 138,
+        "protein": 0,
+        "carbs": 34,
+        "fat": 0
+      }
+    },
+    {
+      "name": "Amul Lassi",
+      "stockGroup": "Beverages",
+      "subCategory": "Drinks",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 79,
+        "protein": 2.31,
+        "carbs": 12.8,
+        "fat": 2.1
+      }
+    },
+    {
+      "name": "Strawberry/Butterscotch/Chocolate/C&C",
+      "stockGroup": "Ice Cream",
+      "subCategory": "Ice Cream",
+      "unit": "Piece",
+      "price": 35,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per Dodla cone serving",
+        "calories": 108,
+        "protein": 2.1,
+        "carbs": 11.75,
+        "fat": 5.85
+      }
+    },
+    {
+      "name": "Strawberry/Butterscotch/Chocolate/Raspberry/Kulfi - Bar/Stick",
+      "stockGroup": "Ice Cream",
+      "subCategory": "Ice Cream",
+      "unit": "Piece",
+      "price": 30,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per Dodla chocobar serving",
+        "calories": 108,
+        "protein": 1,
+        "carbs": 10.4,
+        "fat": 6.9
+      }
+    },
+    {
+      "name": "Strawberry/Butterscotch/Chocolate/Raspberry/Kulfi - Bowl",
+      "stockGroup": "Ice Cream",
+      "subCategory": "Ice Cream",
+      "unit": "Piece",
+      "price": 30,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true,
+      "nutrition": {
+        "serving": "Per Dodla cup serving",
+        "calories": 81,
+        "protein": 1.6,
+        "carbs": 8.8,
+        "fat": 4.4
+      }
+    },
+    {
+      "name": "Dove Dryness Care / Clinic Plus / H&S",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 150,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Colgate Toothpaste (original)",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 30,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Toothbrush",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 60,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Hand sanitiser",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 25,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Sanitary pads",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 100,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Lip balm",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 100,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Body Cream",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 50,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Hair oil",
+      "stockGroup": "Personal Care",
+      "subCategory": "Personal Care",
+      "unit": "Piece",
+      "price": 120,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Ball pen - blue",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Ball pen - black",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 10,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Gel pen",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Pencil Pack",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 30,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Mechanical pencil",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 80,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Eraser",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Sharpener",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 15,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Ruler",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 20,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Notebook",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 100,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Fevistick Glue Stick",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 25,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Geometry box",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 100,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "File/folder",
+      "stockGroup": "Stationery",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "price": 60,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Combination lock",
+      "stockGroup": "Hostel Essentials",
+      "subCategory": "Hostel Essentials",
+      "unit": "Piece",
+      "price": 250,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Padlock",
+      "stockGroup": "Hostel Essentials",
+      "subCategory": "Hostel Essentials",
+      "unit": "Piece",
+      "price": 250,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Batteries",
+      "stockGroup": "Hostel Essentials",
+      "subCategory": "Hostel Essentials",
+      "unit": "Piece",
+      "price": 100,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    }
+  ],
+  "_provenance": "Prices and product identity come from the school workbook. The nutrition figures were sourced from online product-label, manufacturer, retailer and nutrition-database records on 2026-08-18 — NOT transcribed from physical packs, and not present in the workbook. Several rest on inferred SKU identity: Blue/Green Lay’s were matched by pack colour, Jim Jam uses Britannia figures though the workbook names Bonn, Energy/protein bar uses a Yoga Bar 40g record with no SKU given, Mogu Mogu uses a flavour-agnostic record, and the three ice-cream rows use Dodla category-level figures for rows that each combine several flavours. Serving bases are mixed (per 100g, per 100ml, per pack) and the till shows the basis only in the nutrition modal. Verify against the physical package label before treating any of this as authoritative."
+}

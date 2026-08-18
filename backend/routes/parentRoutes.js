@@ -1,221 +1,49 @@
-// import express from 'express';
-// import {
-//   registerParent,
-//   loginParent,
-//   getParentDashboardDetails,
-//   getChildDetails,
-//   setPurchasePassword,
-//   changePurchasePassword,
-//   resetPurchasePassword
-// } from "../controllers/parentController.js";
-
-
-// // import {
-// //   registerParent,
-// //   loginParent,
-// //   getParentDashboardDetails,
-// //   getChildDetails
-// // } from '../controllers/parentController.js';
-// // import { registerParent, loginParent, getParentDashboardDetails } from '../controllers/parentController.js';
-// import { protectParent } from '../middleware/authMiddleware.js';
-// import {
-//   forgotPassword,
-//   resetPassword
-// } from "../controllers/parentController.js";
-// import Parent from "../models/Parent.js";
-// // import { setPurchasePassword } from "../controllers/parentController.js";
-
-
-
-// console.log("✅ Parent routes loaded");
-// const router = express.Router();
-
-// // @route   POST /api/parent/register
-// // @desc    Register parent portal (Matches fatherName & phone pre-configured by admin)
-// router.post('/register', registerParent);
-
-// // @route   POST /api/parent/login
-// // @desc    Authenticate parent phone and password
-// router.post('/login', loginParent);
-
-// // @route   GET /api/parent/dashboard
-// // @desc    Fetch balance and live purchase histories for all linked children
-// router.get('/dashboard', protectParent, getParentDashboardDetails);
-// router.get('/child/:id', protectParent, getChildDetails);
-// router.post("/forgot-password", forgotPassword);
-// router.post("/reset-password/:token", resetPassword);
-// router.post("/save-fcm-token", protectParent, async (req, res) => {
-//   try {
-//     const { token } = req.body;
-
-//     console.log("Logged Parent:", req.parent);
-//     console.log("Received Token:", token);
-
-//     await Parent.findByIdAndUpdate(
-//       req.parent.id,
-//       {
-//         fcmToken: token,
-//       }
-//     );
-
-//     console.log("✅ Token saved");
-
-//     res.json({
-//       message: "FCM token saved successfully",
-//     });
-
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({
-//       error: err.message,
-//     });
-//   }
-// });
-// router.get('/test', (req, res) => {
-//   res.send("Parent route working");
-// });
-
-
-// // Create purchase password
-// router.post(
-//   "/set-purchase-password",
-//   protectParent,
-//   setPurchasePassword
-// );
-
-// // Change purchase password
-// router.post(
-//   "/change-purchase-password",
-//   protectParent,
-//   changePurchasePassword
-// );
-
-// // Reset purchase password
-// router.post(
-//   "/reset-purchase-password",
-//   protectParent,
-//   resetPurchasePassword
-// );
-
-// router.post(
-//   "/change-purchase-password",
-//   protectParent,
-//   changePurchasePassword
-// );
-
-// router.post(
-//   "/reset-purchase-password",
-//   protectParent,
-//   resetPurchasePassword
-// );
-// export default router;
-
-
-
-
-// 24-07-2026-for wallet control
-
-
-
-
-
-
-
-
 import express from 'express';
 import {
   registerParent,
   loginParent,
   getParentDashboardDetails,
   getChildDetails,
+  getChildBills,
+  getChildPackages,
+  getChildRecharges,
   setPurchasePassword,
   changePurchasePassword,
   resetPurchasePassword,
-  updateWalletControl
+  updateWalletControl,
+  updatePurchaseApproval,
+  forgotPassword,
+  resetPassword,
+  savePushToken,
+  removePushToken
 } from "../controllers/parentController.js";
-
+import { getWalletBalance } from '../controllers/walletController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
-import {
-  forgotPassword,
-  resetPassword
-} from "../controllers/parentController.js";
-import Parent from "../models/Parent.js";
-// import { setPurchasePassword } from "../controllers/parentController.js";
+import { authLimiter } from '../middleware/rateLimit.js';
 
-
-
-console.log("✅ Parent routes loaded");
 const router = express.Router();
 
-
-router.post('/register', registerParent);
-
-
-router.post('/login', loginParent);
-
+router.post('/register', authLimiter, registerParent);
+router.post('/login', authLimiter, loginParent);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password/:token', authLimiter, resetPassword);
 
 router.get('/dashboard', protectParent, getParentDashboardDetails);
 router.get('/child/:id', protectParent, getChildDetails);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password/:token", resetPassword);
-router.post("/save-fcm-token", protectParent, async (req, res) => {
-  try {
-    const { token } = req.body;
+router.get('/child/:id/wallet', protectParent, getWalletBalance);
+router.get('/child/:id/bills', protectParent, getChildBills);
+router.get('/child/:id/recharges', protectParent, getChildRecharges);
+router.get('/child/:id/packages', protectParent, getChildPackages);
 
-    console.log("Logged Parent:", req.parent);
-    console.log("Received Token:", token);
+router.post('/save-fcm-token', protectParent, savePushToken);
+router.post('/remove-fcm-token', protectParent, removePushToken);
 
-    await Parent.findByIdAndUpdate(
-      req.parent.id,
-      {
-        fcmToken: token,
-      }
-    );
+router.post('/set-purchase-password', protectParent, setPurchasePassword);
+router.post('/change-purchase-password', protectParent, changePurchasePassword);
+router.post('/reset-purchase-password', protectParent, resetPurchasePassword);
 
-    console.log("✅ Token saved");
-
-    res.json({
-      message: "FCM token saved successfully",
-    });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({
-      error: err.message,
-    });
-  }
-});
-router.get('/test', (req, res) => {
-  res.send("Parent route working");
-});
-
-
-// Create purchase password
-router.post(
-  "/set-purchase-password",
-  protectParent,
-  setPurchasePassword
-);
-
-// Change purchase password
-router.post(
-  "/change-purchase-password",
-  protectParent,
-  changePurchasePassword
-);
-
-// Reset purchase password
-router.post(
-  "/reset-purchase-password",
-  protectParent,
-  resetPurchasePassword
-);
-
-router.put(
-  "/wallet-control/:studentId",
-  protectParent,
-  updateWalletControl
-);
+router.put('/wallet-control/:studentId', protectParent, updateWalletControl);
+router.put('/purchase-approval/:studentId', protectParent, updatePurchaseApproval);
 
 export default router;

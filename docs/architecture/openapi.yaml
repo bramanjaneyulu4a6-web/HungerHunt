@@ -1,0 +1,670 @@
+openapi: 3.1.0
+info:
+  title: HungerHunt Warehouse–Accounts API
+  version: 1.0.0
+  description: Versioned contract for procurement review and deterministic inventory analytics.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /purchase-orders:
+    post:
+      summary: Submit an inventory purchase order for Accounts review
+      description: Allowed roles are admin and warehouse.
+      operationId: createPurchaseOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePurchaseOrderRequest' }
+      responses:
+        '201':
+          description: Created in PENDING_REVIEW
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderEnvelope' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      summary: List versioned purchase orders
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+      responses:
+        '200':
+          description: Purchase orders, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PurchaseOrder' }
+                  meta: { $ref: '#/components/schemas/ListMeta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /purchase-orders/{id}/decision:
+    post:
+      summary: Approve or reject a pending purchase order
+      description: Accounts admin only. A rejected decision requires a reason.
+      operationId: reviewPurchaseOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderDecisionRequest' }
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderEnvelope' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Order is no longer pending review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /analytics/inventory:
+    get:
+      summary: Get dashboard- and LLM-ready deterministic analytics
+      description: Read-only. It never mutates reorder settings or submits an order.
+      operationId: getInventoryAnalytics
+      parameters:
+        - name: asOf
+          in: query
+          description: Optional ISO-8601 effective time, useful for reproducible reports.
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Versioned analytics report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsEnvelope' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /fulfillment-orders:
+    get:
+      summary: List dorm packages awaiting fulfilment
+      description: Admin and warehouse roles. Defaults to active package states, ordered by delivery deadline.
+      operationId: listFulfillmentOrders
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/FulfillmentOrderStatus' }
+      responses:
+        '200':
+          description: At most 500 packages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/FulfillmentOrder' } }
+                  meta: { $ref: '#/components/schemas/ListMeta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /fulfillment-orders/alerts:
+    get:
+      summary: List overdue dorm packages that have not been acknowledged
+      description: >-
+        Admin and warehouse roles. Derived on read from the deadline stored on each order; there is
+        no background job. A package acknowledged within the snooze window is withheld from data and
+        counted in meta.acknowledgedCount instead, so one late package cannot head the board
+        indefinitely.
+      operationId: listOverdueFulfillmentAlerts
+      responses:
+        '200':
+          description: At most 200 unacknowledged overdue packages, earliest deadline first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/FulfillmentOrder' }
+                        - type: object
+                          required: [overdueByMinutes, acknowledgements]
+                          properties:
+                            overdueByMinutes: { type: integer, minimum: 0 }
+                            acknowledgements: { type: integer, minimum: 0 }
+                  meta:
+                    allOf:
+                      - { $ref: '#/components/schemas/ListMeta' }
+                      - type: object
+                        required: [acknowledgedCount, snoozeHours, truncated]
+                        properties:
+                          acknowledgedCount: { type: integer, minimum: 0 }
+                          snoozeHours: { type: number }
+                          truncated: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /fulfillment-orders/{id}/alerts/acknowledge:
+    post:
+      summary: Acknowledge an overdue package
+      description: >-
+        Records the authenticated staff account, the time, and an optional follow-up note, and
+        withholds the package from the alert list for the snooze window. Append-only: it never
+        edits the transition history and never changes the package state.
+      operationId: acknowledgeFulfillmentAlert
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Acknowledgement recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/FulfillmentOrder' }
+                  meta:
+                    allOf:
+                      - { $ref: '#/components/schemas/Meta' }
+                      - type: object
+                        properties: { snoozeHours: { type: number } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The package is delivered, cancelled, or not yet past its deadline
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /fulfillment-orders/history:
+    get:
+      summary: Page through dorm packages ordered within a bounded period
+      description: >-
+        Admin and warehouse roles. Date-only bounds use BUSINESS_TIME_ZONE and the through-date is
+        inclusive. Keyed on order time, not delivery time, so packages that were never delivered
+        still appear. Page size is clamped to 100.
+      operationId: listFulfillmentHistory
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/FulfillmentOrderStatus' } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        '200':
+          description: One page of packages, newest order first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/FulfillmentOrder' } }
+                  meta:
+                    allOf:
+                      - { $ref: '#/components/schemas/ListMeta' }
+                      - type: object
+                        required: [total, page, pages, hasMore]
+                        properties:
+                          total: { type: integer, minimum: 0 }
+                          page: { type: integer, minimum: 1 }
+                          pages: { type: integer, minimum: 1 }
+                          hasMore: { type: boolean }
+                          range: { type: object }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /fulfillment-orders/report:
+    get:
+      summary: Deterministic operational delivery report for a bounded period
+      description: >-
+        Admin and warehouse roles. Counts and durations only — no student, staff, item, or money
+        detail leaves this endpoint. Bounds behave exactly as on /fulfillment-orders/history.
+      operationId: getFulfillmentDeliveryReport
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Aggregate delivery report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryReportEnvelope' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: More than 20,000 packages in the period; select a shorter one
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /child/{id}/packages:
+    servers:
+      - url: /api/parent
+    get:
+      summary: List the dorm packages of a child the signed-in parent owns
+      description: >-
+        Parent session only, and only for a student linked to that account. Privacy-minimized: it
+        carries package states, times, the stored delivery deadline, the items paid for, and the
+        short receiver note — never staff accounts, the transition trail, internal delivery notes,
+        or the wallet transaction reference.
+      operationId: listChildFulfillmentPackages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: One page of packages, newest order first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packages, total, page, pages, hasMore]
+                properties:
+                  packages: { type: array, items: { $ref: '#/components/schemas/ParentPackage' } }
+                  total: { type: integer, minimum: 0 }
+                  page: { type: integer, minimum: 1 }
+                  pages: { type: integer, minimum: 1 }
+                  hasMore: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The student is not linked to this parent account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /accounting-exports/tally.xml:
+    get:
+      summary: Download balanced TallyPrime XML vouchers
+      description: Admin only. Date-only bounds use BUSINESS_TIME_ZONE and the through-date is inclusive.
+      operationId: exportTallyPrimeXml
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Native TallyPrime Vouchers import XML
+          headers:
+            X-HungerHunt-Voucher-Count:
+              schema: { type: integer, minimum: 0 }
+          content:
+            application/xml:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: More than 50,000 vouchers; select a shorter period
+  /replenishment-drafts:
+    post:
+      summary: Generate or return today's active analytics-assisted replenishment draft
+      description: Warehouse/admin only. Open purchase-order quantities are subtracted and the draft expires after seven days.
+      operationId: generateReplenishmentDraft
+      responses:
+        '200': { description: Existing active draft returned }
+        '201': { description: Draft created }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /replenishment-drafts/{id}/submit:
+    post:
+      summary: Submit edited draft lines to Accounts review
+      description: Products may be removed or their quantities edited; products outside the generated draft cannot be added.
+      operationId: submitReplenishmentDraft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      responses:
+        '201': { description: Purchase order created in PENDING_REVIEW }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Draft expired or was already submitted }
+  /fulfillment-orders/{id}/transition:
+    post:
+      summary: Advance a dorm package through packing, dispatch, or delivery
+      description: Uses an expected-state update. Cancellation is allowed only before dispatch and atomically restores wallet and stock.
+      operationId: transitionFulfillmentOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Required when status is CANCELLED.
+          schema: { type: string, maxLength: 100 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { type: string, enum: [PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED] }
+                note: { type: string, maxLength: 200 }
+                reason: { type: string, maxLength: 200, description: Required for CANCELLED. }
+                receivedBy:
+                  type: string
+                  minLength: 2
+                  maxLength: 60
+                  description: >-
+                    Required for DELIVERED. The whole of the delivery proof, alongside the
+                    authenticated staff account and server timestamp, which are taken from the
+                    session and the clock rather than this body. A name or dorm role only:
+                    values containing six or more consecutive digits, an "@", or a URL are
+                    rejected so identity numbers and contact details cannot be stored here.
+      responses:
+        '200':
+          description: Transition recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/FulfillmentOrder' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Invalid or concurrent state transition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    PurchaseOrderStatus:
+      type: string
+      enum: [PENDING_REVIEW, APPROVED, REJECTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED]
+    FulfillmentOrderStatus:
+      type: string
+      enum: [PENDING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED]
+    FulfillmentOrder:
+      type: object
+      required: [id, transactionId, studentId, student, items, totalAmount, status, businessWeekStart, orderedAt, deliverBy]
+      properties:
+        id: { type: string }
+        transactionId: { type: string }
+        studentId: { type: string }
+        student:
+          type: object
+          required: [name, hostelNumber]
+          properties:
+            name: { type: string }
+            admissionNumber: { type: string }
+            hostelNumber: { type: string }
+        items: { type: array, items: { type: object } }
+        totalAmount: { type: number }
+        status: { $ref: '#/components/schemas/FulfillmentOrderStatus' }
+        businessWeekStart: { type: string, format: date-time }
+        orderedAt: { type: string, format: date-time }
+        deliverBy: { type: string, format: date-time }
+        packedAt: { type: [string, 'null'], format: date-time }
+        dispatchedAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        deliveryNote: { type: string }
+        proofOfDelivery:
+          type: [object, 'null']
+          required: [receivedBy, recordedBy, recordedAt]
+          properties:
+            receivedBy: { type: string, maxLength: 60 }
+            recordedBy: { type: string, description: The staff account that recorded the handover. }
+            recordedAt: { type: string, format: date-time }
+    ParentPackage:
+      type: object
+      description: The privacy-minimized view of a package for the owning parent.
+      required: [id, status, items, totalAmount, orderedAt, deliverBy, overdue]
+      properties:
+        id: { type: string }
+        status: { $ref: '#/components/schemas/FulfillmentOrderStatus' }
+        items:
+          type: array
+          items:
+            type: object
+            required: [name, quantity, price]
+            properties:
+              name: { type: string }
+              quantity: { type: integer, minimum: 1 }
+              price: { type: number, minimum: 0 }
+        totalAmount: { type: number }
+        hostelNumber: { type: string, description: The dorm recorded on the order, not the current profile. }
+        orderedAt: { type: string, format: date-time }
+        deliverBy:
+          type: string
+          format: date-time
+          description: Read from the order, never recalculated by the client.
+        packedAt: { type: [string, 'null'], format: date-time }
+        dispatchedAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        receivedBy: { type: string, description: Empty until the package is delivered. }
+        overdue: { type: boolean }
+    DeliveryReportEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [schemaVersion, generatedAt, range, summary, delivery, proofOfDelivery, durations]
+          properties:
+            schemaVersion: { type: string, const: '1.0' }
+            generatedAt: { type: string, format: date-time }
+            range:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+                timeZone: { type: string }
+            summary:
+              type: object
+              required: [packages, byStatus, openOverdue]
+              properties:
+                packages: { type: integer, minimum: 0 }
+                byStatus:
+                  type: object
+                  additionalProperties: { type: integer, minimum: 0 }
+                openOverdue: { type: integer, minimum: 0 }
+            delivery:
+              type: object
+              required: [delivered, onTime, late, onTimeRate]
+              properties:
+                delivered: { type: integer, minimum: 0 }
+                onTime: { type: integer, minimum: 0 }
+                late: { type: integer, minimum: 0 }
+                onTimeRate:
+                  type: [number, 'null']
+                  minimum: 0
+                  maximum: 1
+                  description: Null when nothing was delivered, so "no data" never renders as 0% or 100%.
+            proofOfDelivery:
+              type: object
+              required: [recorded, missing]
+              properties:
+                recorded: { type: integer, minimum: 0 }
+                missing: { type: integer, minimum: 0 }
+            durations:
+              type: object
+              description: Hours per step, as both an average and a median.
+              additionalProperties: { $ref: '#/components/schemas/DurationSummary' }
+        meta:
+          allOf:
+            - { $ref: '#/components/schemas/Meta' }
+            - type: object
+              properties: { deterministic: { type: boolean, const: true } }
+    DurationSummary:
+      type: object
+      required: [samples, averageHours, medianHours]
+      properties:
+        samples: { type: integer, minimum: 0 }
+        averageHours: { type: [number, 'null'] }
+        medianHours: { type: [number, 'null'] }
+    CreatePurchaseOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        supplierId: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        reason: { type: string, maxLength: 500 }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [productId, quantity]
+            properties:
+              productId: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+              quantity: { type: integer, minimum: 1 }
+              estimatedUnitCost: { type: number, minimum: 0 }
+    PurchaseOrderDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        reason: { type: string, maxLength: 500 }
+    PurchaseOrder:
+      type: object
+      required: [id, status, items, submittedAt]
+      properties:
+        id: { type: string }
+        status: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+        supplierId: { type: [string, 'null'] }
+        reason: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productId: { type: string }
+              quantity: { type: integer }
+              receivedQuantity: { type: number }
+              estimatedUnitCost: { type: number }
+        requestedBy: { type: [string, 'null'] }
+        reviewedBy: { type: [string, 'null'] }
+        reviewReason: { type: string }
+        submittedAt: { type: string, format: date-time }
+        reviewedAt: { type: [string, 'null'], format: date-time }
+    Meta:
+      type: object
+      required: [requestId]
+      properties:
+        requestId: { type: string }
+    ListMeta:
+      allOf:
+        - { $ref: '#/components/schemas/Meta' }
+        - type: object
+          required: [count]
+          properties: { count: { type: integer, minimum: 0 } }
+    PurchaseOrderEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/PurchaseOrder' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AnalyticsEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [schemaVersion, generatedAt, methodology, summary, procurement, items]
+          properties:
+            schemaVersion: { type: string, const: '1.0' }
+            generatedAt: { type: string, format: date-time }
+            methodology: { type: object }
+            summary: { type: object }
+            procurement: { type: object }
+            items: { type: array, items: { type: object } }
+        meta:
+          allOf:
+            - { $ref: '#/components/schemas/Meta' }
+            - type: object
+              properties:
+                deterministic: { type: boolean, const: true }
+                llmReady: { type: boolean, const: true }
+    ErrorEnvelope:
+      type: object
+      required: [message, error, meta]
+      properties:
+        message: { type: string, description: Legacy-client compatibility alias. }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: array, items: { type: object } }
+        meta: { $ref: '#/components/schemas/Meta' }
+  responses:
+    ValidationError:
+      description: Invalid request data
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Authenticated role lacks permission
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

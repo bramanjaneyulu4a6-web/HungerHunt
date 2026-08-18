@@ -4,11 +4,23 @@ let transporter;
 
 function getTransporter() {
   if (!transporter) {
+    // Spelled out rather than `service: "gmail"` so the two settings that
+    // matter here can be stated. `family: 4` pins the lookup to IPv4: a host
+    // whose IPv6 route to smtp.gmail.com blackholes does not fail fast, it
+    // hangs until the send times out, and the resulting error names nothing
+    // useful. Forcing IPv4 costs nothing where IPv6 works. `minVersion` keeps
+    // a downgrade from being negotiated on our behalf.
     transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      family: 4,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
+      },
+      tls: {
+        minVersion: "TLSv1.2",
       },
     });
   }

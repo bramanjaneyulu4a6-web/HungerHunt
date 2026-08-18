@@ -103,3 +103,44 @@ describe('availability on the list endpoints', () => {
     assert.equal(orphan.availability, 'OUT_OF_STOCK');
   });
 });
+
+describe('the stock alerts feed', () => {
+  const shelf = [
+    invRow('p1', 'frooti', 0),
+    invRow('p2', 'Dairy Milk', 0),
+    invRow('p3', 'Good Day', 3),
+    invRow('p4', 'Lays', 20),
+    invRow('p5', 'Old Bar', 0, { active: false }),   // archived: never an alert
+    { _id: 'row-x', productId: null, stock: 0, toObject() { return this; } }, // unlinked: never an alert
+  ];
+
+  test('splits the shelf into out-of-stock and low, name-sorted, archived excluded', async () => {
+    accountIs('admin');
+    mockInventoryList(shelf);
+
+    const res = await get('/api/inventory/alerts');
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    assert.deepEqual(body.outOfStock.map((e) => e.name), ['Dairy Milk', 'frooti']);
+    assert.deepEqual(body.low.map((e) => e.name), ['Good Day']);
+    assert.deepEqual(body.outOfStock[1], {
+      productId: 'p1', name: 'frooti', stock: 0, reorderLevel: 5,
+    });
+  });
+
+  test('a healthy shelf answers with two empty lists', async () => {
+    accountIs('warehouse');
+    mockInventoryList([invRow('p4', 'Lays', 20)]);
+
+    const res = await get('/api/inventory/alerts', warehouseToken);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { outOfStock: [], low: [] });
+  });
+
+  test('a caretaker cannot read the feed', async () => {
+    accountIs('caretaker');
+    const res = await get('/api/inventory/alerts', caretakerToken);
+    assert.equal(res.status, 403);
+  });
+});

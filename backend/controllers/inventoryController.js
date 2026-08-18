@@ -155,6 +155,46 @@ export const adjustStock = async (req, res) => {
   }
 };
 
+/* The feed behind the warehouse workspace's persistent banner: what is off
+ * sale for want of stock, and what is heading there. Derived from live
+ * Inventory on every read — no alert rows to open, close, or drift out of
+ * sync — so it clears itself the moment a receipt or adjustment lands, and
+ * there is deliberately nothing here to dismiss. Archived products are
+ * excluded: they are off sale because somebody said so, not for want of
+ * stock, and an alert nobody can act on trains people to ignore the banner.
+ */
+export const getStockAlerts = async (req, res) => {
+  try {
+    const rows = await Inventory.find().populate("productId");
+
+    const entry = (row) => ({
+      productId: row.productId._id,
+      name: row.productId.name,
+      stock: row.stock,
+      reorderLevel: row.productId.reorderLevel ?? 5,
+    });
+
+    const byName = (a, b) =>
+      a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+
+    const outOfStock = [];
+    const low = [];
+
+    for (const row of rows) {
+      const availability = availabilityOf(row.productId, row.stock);
+      if (availability === "OUT_OF_STOCK") outOfStock.push(entry(row));
+      else if (availability === "LOW") low.push(entry(row));
+    }
+
+    res.json({
+      outOfStock: outOfStock.sort(byName),
+      low: low.sort(byName),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getAdjustments = async (req, res) => {
   const { productId } = req.params;
 

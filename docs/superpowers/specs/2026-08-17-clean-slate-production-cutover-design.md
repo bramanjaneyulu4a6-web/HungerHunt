@@ -119,6 +119,18 @@ Phase 2, not Phase 1 — the old deployment still uses it until then.
 | `CLOUDINARY_*` (3) | carried from current `.env` — rotation deferred (no dashboard access yet) |
 | `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` | freshly rotated (new service-account key) |
 | `MAX_ADMIN_ACCOUNTS` | carried (optional) |
+| `PURCHASE_AUTH_GRACE_UNTIL` | `2020-01-01T00:00:00Z` — backdated, see below |
+
+**Purchase authorization is required from the first request.** `utils/purchaseAuthorization.js`
+defaults to a grace window (until `2026-08-21`) during which a bill carrying *no*
+authorization token is still charged, so tills running a pre-token bundle keep working
+across a staged rollout. This deployment has no such clients — every frontend is built
+fresh from this branch, and the kiosk already sends `purchaseToken` — and no users whose
+sales could break. The window is therefore closed by backdating the variable, in the
+production manifest, in `render.yaml`, and in `backend/.env` so development enforces the
+same rule and a missing token fails locally rather than only in production. Note the
+grace only ever covered the `missing` case; a token that *is* presented has been
+validated in full from day one.
 
 Client-URL values must be bare HTTPS origins — no path, no `/api` — or
 `validateRuntimeEnv` refuses to boot. If Phase 3 lands on different final URLs, the

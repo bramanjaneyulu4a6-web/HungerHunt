@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet, Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import StockAlertBanner from "./StockAlertBanner";
 
 const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
@@ -147,6 +148,7 @@ const Layout = () => {
 
       <main className="layout-main">
         {inWarehouse && <WarehouseContextBar />}
+        {inWarehouse && <StockAlertBanner />}
         <Outlet />
       </main>
     </div>

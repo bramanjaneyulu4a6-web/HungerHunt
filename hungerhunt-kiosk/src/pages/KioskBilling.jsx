@@ -52,39 +52,42 @@ const stockGroupNames = (products) => {
     .map((group) => group.name);
 };
 
-// Nutrition is optional: the product schema has no field for it yet, so every
-// item renders without a strip until one is added. Anything incomplete counts
-// as absent rather than showing as a row of zeroes.
+// Nutrition is transcribed off a packet by hand, so it is routinely partial.
+// Whatever the office entered is shown and the rest reads as a dash; only a
+// product with nothing at all goes without the strip entirely.
+//
+// Nothing here is derived — no macro energy share, no totals checked against
+// the calorie figure. The till repeats what the wrapper says and stops, so
+// every number on this screen traces back to one a person read off a packet.
 const readNutrition = (product) => {
   const n = product?.nutrition;
   if (!n) return null;
 
-  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
-  const calories = num(n.calories);
-  const protein = num(n.protein);
-  const carbs = num(n.carbs);
-  const fat = num(n.fat);
+  // null and "" mean never entered; 0 is a fact and survives. Plain Number()
+  // flattens the first two to 0 and would print a claim nobody made.
+  const num = (v) =>
+    v === null || v === undefined || v === "" || !Number.isFinite(Number(v))
+      ? null
+      : Number(v);
 
-  if (calories === null || protein === null || carbs === null || fat === null) {
-    return null;
-  }
-
-  return { calories, protein, carbs, fat, serving: n.serving || "" };
-};
-
-// Share of an item's energy from each macro — protein and carbohydrate at
-// 4 kcal per gram, fat at 9.
-const energySplit = ({ protein, carbs, fat }) => {
-  const kcal = { protein: protein * 4, carbs: carbs * 4, fat: fat * 9 };
-  const total = kcal.protein + kcal.carbs + kcal.fat;
-  const pct = (v) => (total > 0 ? Math.round((v / total) * 100) : 0);
-
-  return {
-    protein: { kcal: Math.round(kcal.protein), pct: pct(kcal.protein) },
-    carbs: { kcal: Math.round(kcal.carbs), pct: pct(kcal.carbs) },
-    fat: { kcal: Math.round(kcal.fat), pct: pct(kcal.fat) },
+  const macros = {
+    calories: num(n.calories),
+    protein: num(n.protein),
+    carbs: num(n.carbs),
+    fat: num(n.fat),
   };
+
+  const serving = n.serving || "";
+
+  if (Object.values(macros).every((v) => v === null) && !serving) return null;
+
+  return { ...macros, serving };
 };
+
+// What a figure nobody entered looks like. An em dash, never a 0.
+const BLANK = "\u2014";
+
+const grams = (v) => (v === null ? BLANK : `${v} g`);
 
 const toProduct = (item) => ({
   _id: item.productId?._id,
@@ -1217,19 +1220,35 @@ const KioskBilling = ({ student, onLogout }) => {
                         {p.nutrition && (
                           <div className="tile-macros">
                             <div className="tile-macro">
-                              <b className="money">{p.nutrition.calories}</b>
+                              <b className="money">
+                                {p.nutrition.calories === null
+                                  ? BLANK
+                                  : p.nutrition.calories}
+                              </b>
                               <span>kcal</span>
                             </div>
                             <div className="tile-macro">
-                              <b className="money">{p.nutrition.protein}g</b>
+                              <b className="money">
+                                {p.nutrition.protein === null
+                                  ? BLANK
+                                  : `${p.nutrition.protein}g`}
+                              </b>
                               <span>Prot</span>
                             </div>
                             <div className="tile-macro">
-                              <b className="money">{p.nutrition.carbs}g</b>
+                              <b className="money">
+                                {p.nutrition.carbs === null
+                                  ? BLANK
+                                  : `${p.nutrition.carbs}g`}
+                              </b>
                               <span>Carb</span>
                             </div>
                             <div className="tile-macro">
-                              <b className="money">{p.nutrition.fat}g</b>
+                              <b className="money">
+                                {p.nutrition.fat === null
+                                  ? BLANK
+                                  : `${p.nutrition.fat}g`}
+                              </b>
                               <span>Fat</span>
                             </div>
                           </div>
@@ -1331,57 +1350,32 @@ const KioskBilling = ({ student, onLogout }) => {
             <div className="nutrition-energy">
               <span>Energy</span>
               <b className="money">
-                {nutritionFor.nutrition.calories}
+                {nutritionFor.nutrition.calories === null
+                  ? BLANK
+                  : nutritionFor.nutrition.calories}
                 <i>kcal</i>
               </b>
             </div>
 
             <div className="nutrition-body">
-              {(() => {
-                const split = energySplit(nutritionFor.nutrition);
-
-                return [
-                  {
-                    key: "protein",
-                    label: "Protein",
-                    grams: nutritionFor.nutrition.protein,
-                    modifier: "",
-                  },
-                  {
-                    key: "carbs",
-                    label: "Carbohydrate",
-                    grams: nutritionFor.nutrition.carbs,
-                    modifier: " nutrition-bar--carb",
-                  },
-                  {
-                    key: "fat",
-                    label: "Fat",
-                    grams: nutritionFor.nutrition.fat,
-                    modifier: " nutrition-bar--fat",
-                  },
-                ].map((row) => (
-                  <div className="nutrition-row" key={row.key}>
-                    <div className="nutrition-row-t">
-                      <span>
-                        {row.label}
-                        <em className="money">
-                          {split[row.key].kcal} kcal · {split[row.key].pct}%
-                        </em>
-                      </span>
-                      <b className="money">{row.grams} g</b>
-                    </div>
-
-                    <div className={`nutrition-bar${row.modifier}`}>
-                      <i style={{ width: `${split[row.key].pct}%` }} />
-                    </div>
+              {[
+                { key: "protein", label: "Protein" },
+                { key: "carbs", label: "Carbohydrate" },
+                { key: "fat", label: "Fat" },
+              ].map((row) => (
+                <div className="nutrition-row" key={row.key}>
+                  <div className="nutrition-row-t">
+                    <span>{row.label}</span>
+                    <b className="money">
+                      {grams(nutritionFor.nutrition[row.key])}
+                    </b>
                   </div>
-                ));
-              })()}
+                </div>
+              ))}
             </div>
 
             <p className="nutrition-foot">
-              Bars show the share of this item&rsquo;s energy from each macro —
-              protein and carbohydrate at 4&nbsp;kcal per gram, fat at 9.
+              As printed on the pack. A dash means the figure was not supplied.
             </p>
           </div>
         </div>

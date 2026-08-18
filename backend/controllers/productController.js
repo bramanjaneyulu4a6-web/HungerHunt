@@ -3,11 +3,14 @@ import Product from '../models/Product.js';
 import Inventory from '../models/Inventory.js';
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
-import { isNonNegativeNumber, isWholeNonNegative } from '../utils/quantities.js';
+import { isNonNegativeNumber, isPositiveNumber, isWholeNonNegative } from '../utils/quantities.js';
 import { normalizeSubCategory, SUBCATEGORY_MAX_LENGTH } from '../utils/productSubcategory.js';
 
 
 const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
+
+// Matches the schema; packets state their basis in wildly varying words.
+const SERVING_MAX_LENGTH = 120;
 
 // Forms send strings; both spellings of true mean true, as with `active`.
 const asBoolean = (value) => value === true || value === "true";
@@ -73,6 +76,79 @@ const readPurchaseLimit = (body) => {
   };
 };
 
+/* Reads the nutrition fields off a request body.
+ *
+ * Flat keys — nutritionCalories / Protein / Carbs / Fat / Serving — for the
+ * same reason the purchase limit is flat: the product form is multipart
+ * because it carries the image, and multipart has no nested objects.
+ *
+ * Unlike the purchase limit, there is no all-or-nothing rule. A packet gets
+ * transcribed a field at a time and the office should be able to save what it
+ * has read so far, so each field is judged alone and a missing one is not an
+ * error. `present: false` when the body never mentions nutrition, so an
+ * archive toggle does not blank a product's figures on its way past.
+ */
+const NUTRITION_FIELDS = [
+  ["calories", "nutritionCalories"],
+  ["protein", "nutritionProtein"],
+  ["carbs", "nutritionCarbs"],
+  ["fat", "nutritionFat"],
+];
+
+const readNutrition = (body) => {
+  const mentions =
+    NUTRITION_FIELDS.some(([, key]) => body[key] !== undefined) ||
+    body.nutritionServing !== undefined;
+
+  if (!mentions) return { present: false };
+
+  const value = {};
+  const fields = {};
+
+  for (const [name, key] of NUTRITION_FIELDS) {
+    const raw = body[key];
+
+    if (raw === undefined) continue;
+
+    // An emptied box is the office taking a number back. It has to reach the
+    // document as an explicit null, because Mongoose drops undefined from an
+    // update and the wrong figure would survive the edit that removed it.
+    if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
+      fields[`nutrition.${name}`] = null;
+      continue;
+    }
+
+    if (!isNonNegativeNumber(raw)) {
+      return {
+        present: true,
+        error: `${name === "calories" ? "Energy" : name[0].toUpperCase() + name.slice(1)} must be a number of zero or more, or left blank.`,
+      };
+    }
+
+    value[name] = Number(raw);
+    fields[`nutrition.${name}`] = Number(raw);
+  }
+
+  if (body.nutritionServing !== undefined) {
+    const serving = String(body.nutritionServing).trim();
+
+    if (serving.length > SERVING_MAX_LENGTH) {
+      return {
+        present: true,
+        error: `Serving description must be ${SERVING_MAX_LENGTH} characters or fewer.`,
+      };
+    }
+
+    if (serving) value.serving = serving;
+    fields["nutrition.serving"] = serving || null;
+  }
+
+  // `value` builds the row from only what was typed, so a product created
+  // without figures has no nutrition at all rather than a shell of nulls;
+  // `fields` edits one macro without disturbing the others.
+  return { present: true, value, fields };
+};
+
 const uploadImage = (file) => {
   return new Promise((resolve, reject) => {
 
@@ -106,6 +182,12 @@ export const addProduct = async (req, res) => {
     // when absent so the schema default still applies — a caller that never
     // mentions reorder level should get the default, not a rejection for not
     // supplying one.
+    // Checked before anything else is written: a product that reaches the till
+    // unpriced is worse than one that never got created.
+    if (!isPositiveNumber(req.body.price)) {
+      return res.status(400).json({ message: "A product must have a price above zero." });
+    }
+
     if (req.body.reorderLevel !== undefined && !isWholeNonNegative(req.body.reorderLevel)) {
       return res.status(400).json({ message: "Reorder level must be a whole number of zero or more." });
     }
@@ -123,6 +205,12 @@ export const addProduct = async (req, res) => {
       return res.status(400).json({ message: purchaseLimit.error });
     }
 
+    const nutrition = readNutrition(req.body);
+
+    if (nutrition.error) {
+      return res.status(400).json({ message: nutrition.error });
+    }
+
     const product = await Product.create({
 
       name: req.body.name,
@@ -133,7 +221,7 @@ export const addProduct = async (req, res) => {
 
       unit: req.body.unit,
 
-      price: req.body.price || 0,
+      price: Number(req.body.price),
 
       image,
 
@@ -145,6 +233,12 @@ export const addProduct = async (req, res) => {
         : {}),
 
       ...(purchaseLimit.present ? { purchaseLimit: purchaseLimit.value } : {}),
+
+      // Only when something was actually typed: a product created with no
+      // figures should carry no nutrition key rather than an empty husk.
+      ...(nutrition.present && Object.keys(nutrition.value).length
+        ? { nutrition: nutrition.value }
+        : {}),
 
     });
 
@@ -216,8 +310,8 @@ export const updateProduct = async (req, res) => {
     if (req.body.unit !== undefined) updateData.unit = req.body.unit;
 
     if (req.body.price !== undefined) {
-      if (!isNonNegativeNumber(req.body.price)) {
-        return res.status(400).json({ message: "Price must be a non-negative number." });
+      if (!isPositiveNumber(req.body.price)) {
+        return res.status(400).json({ message: "A product must have a price above zero." });
       }
       updateData.price = Number(req.body.price);
     }
@@ -249,6 +343,16 @@ export const updateProduct = async (req, res) => {
 
     if (purchaseLimit.present) {
       Object.assign(updateData, purchaseLimit.fields);
+    }
+
+    const nutrition = readNutrition(req.body);
+
+    if (nutrition.error) {
+      return res.status(400).json({ message: nutrition.error });
+    }
+
+    if (nutrition.present) {
+      Object.assign(updateData, nutrition.fields);
     }
 
     if (req.file) {

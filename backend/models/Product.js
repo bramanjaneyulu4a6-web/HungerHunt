@@ -34,9 +34,18 @@ const productSchema = new mongoose.Schema(
     required: true
   },
 
+  // Required, and never zero. A default of 0 used to stand in for "not priced
+  // yet", but the till reads that as free and hands the goods over, so an
+  // unpriced product must not be creatable rather than creatable and dangerous.
+  // Guarded here as well as in the controller because seeds and scripts write
+  // straight through the model.
   price: {
     type: Number,
-    default: 0
+    required: true,
+    validate: {
+      validator: (v) => v > 0,
+      message: 'A product must have a price above zero.'
+    }
   },
 
   image: {
@@ -70,6 +79,49 @@ const productSchema = new mongoose.Schema(
     type: Number,
     min: 0,
     default: 0
+  },
+
+  // Copied off the packet by hand, so it arrives a field at a time and often
+  // never completes. Every field is independently optional and none carries a
+  // default: an absent macro must stay distinguishable from a typed 0, because
+  // the till prints the first as a dash and the second as "0 g", and a
+  // sugar-free drink claiming no data is a different statement from one
+  // claiming no sugar.
+  //
+  // Nothing here is derived. The till shows these numbers and only these
+  // numbers — no per-macro energy share, no totals checked against calories —
+  // because the office transcribes what the wrapper says and a computed figure
+  // sitting beside a transcribed one would look equally authoritative while
+  // resting on an assumption nobody made.
+  nutrition: {
+    calories: {
+      type: Number,
+      min: 0
+    },
+
+    protein: {
+      type: Number,
+      min: 0
+    },
+
+    carbs: {
+      type: Number,
+      min: 0
+    },
+
+    fat: {
+      type: Number,
+      min: 0
+    },
+
+    // What the figures are per — "Per 52g pack", "Per 100g". Free text
+    // because packets state it in whatever terms they please. The till falls
+    // back to "Per unit as sold" when it is blank.
+    serving: {
+      type: String,
+      trim: true,
+      maxlength: 120
+    }
   },
 
   // How much of this one product a single student may buy in a period —

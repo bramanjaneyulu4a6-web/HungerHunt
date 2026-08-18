@@ -15,9 +15,18 @@
 const numericish = (v) =>
   typeof v === "number" || (typeof v === "string" && v.trim() !== "");
 
-// Money: fractional is the point of it. Zero is allowed — "not priced".
+// Money: fractional is the point of it. Zero is allowed — an order line can be
+// worth nothing without being nonsense.
 export const isNonNegativeNumber = (v) =>
   numericish(v) && Number.isFinite(Number(v)) && Number(v) >= 0;
+
+// A shelf price, which is the one figure that may not be zero. Zero does not
+// mean "free" anywhere in this system, it means nobody has priced the thing
+// yet — and the till cannot tell those apart: it would add the line, charge
+// nothing and let the goods walk. Refusing it here is cheaper than teaching
+// every sale screen the difference.
+export const isPositiveNumber = (v) =>
+  isNonNegativeNumber(v) && Number(v) > 0;
 
 // Things on a shelf: you cannot receive half a tin, so you cannot order one.
 // Zero is allowed — it records a line that was asked for and never arrived.

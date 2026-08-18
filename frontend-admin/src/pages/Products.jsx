@@ -22,8 +22,23 @@ const EMPTY_FORM = {
   purchaseLimitEnabled: false,
   purchaseLimitQuantity: '',
   purchaseLimitPeriod: 'DAILY',
+  nutritionCalories: '',
+  nutritionProtein: '',
+  nutritionCarbs: '',
+  nutritionFat: '',
+  nutritionServing: '',
   image: null,
 };
+
+// Transcribed off the packet, one box each. All optional and independent —
+// the till shows what is filled and dashes the rest — so none is `required`
+// and a half-read wrapper still saves.
+const NUTRITION_FIELDS = [
+  ['nutritionCalories', 'Energy (kcal)', 'e.g., 280'],
+  ['nutritionProtein', 'Protein (g)', 'e.g., 3.2'],
+  ['nutritionCarbs', 'Carbohydrate (g)', 'e.g., 30.1'],
+  ['nutritionFat', 'Fat (g)', 'e.g., 16.4'],
+];
 
 const LIMIT_PERIODS = [
   ['DAILY', 'per day'],
@@ -145,6 +160,10 @@ const Products = () => {
         data.append('purchaseLimitQuantity', form.purchaseLimitQuantity);
       }
       data.append('purchaseLimitPeriod', form.purchaseLimitPeriod);
+      // Blanks are sent too: an emptied box is the office taking a figure
+      // back, and the server reads "" as clear-this-one.
+      NUTRITION_FIELDS.forEach(([key]) => data.append(key, form[key]));
+      data.append('nutritionServing', form.nutritionServing);
       if (form.image) {
         data.append('image', form.image);
       }
@@ -182,6 +201,13 @@ const Products = () => {
         ? String(product.purchaseLimit.quantity)
         : '',
       purchaseLimitPeriod: product.purchaseLimit?.period || 'DAILY',
+      // ?? not ||: a stored 0 must fill the box with "0", not read as blank
+      // and get cleared by the next save.
+      nutritionCalories: String(product.nutrition?.calories ?? ''),
+      nutritionProtein: String(product.nutrition?.protein ?? ''),
+      nutritionCarbs: String(product.nutrition?.carbs ?? ''),
+      nutritionFat: String(product.nutrition?.fat ?? ''),
+      nutritionServing: product.nutrition?.serving || '',
       image: null,
     });
     setIsProductOpen(true);
@@ -1084,10 +1110,14 @@ const Products = () => {
                 </label>
                 {/* Required like its siblings: the backend falls back to
                     price: 0 on a blank, which the till would then sell free. */}
+                {/* min 0.01, not 0: the server refuses an unpriced product
+                    outright, because the till reads zero as free and hands the
+                    goods over. Caught here so the office is told at the box
+                    rather than by a rejected save. */}
                 <input
                   id="product-price"
                   type="number"
-                  min="0"
+                  min="0.01"
                   step="0.01"
                   className="input"
                   placeholder="0.00"
@@ -1181,6 +1211,61 @@ const Products = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div>
+                <label className="field-label">Nutrition</label>
+
+                {/* Every box optional. The till prints a dash wherever one is
+                    left empty rather than a zero, so a packet read halfway is
+                    worth saving. Nothing is calculated from these figures. */}
+                <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>
+                  As printed on the pack. Leave blank what the pack does not say
+                  &mdash; the till shows a dash, not a zero.
+                </p>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                  }}
+                >
+                  {NUTRITION_FIELDS.map(([key, label, placeholder]) => (
+                    <div key={key}>
+                      <label className="field-label" htmlFor={`product-${key}`}>
+                        {label}
+                      </label>
+                      <input
+                        id={`product-${key}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        className="input"
+                        placeholder={placeholder}
+                        value={form[key]}
+                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <label className="field-label" htmlFor="product-nutritionServing">
+                    Serving these figures are per
+                  </label>
+                  <input
+                    id="product-nutritionServing"
+                    type="text"
+                    maxLength={120}
+                    className="input"
+                    placeholder="e.g., Per 52g pack"
+                    value={form.nutritionServing}
+                    onChange={(e) =>
+                      setForm({ ...form, nutritionServing: e.target.value })
+                    }
+                  />
+                </div>
               </div>
 
               <div>

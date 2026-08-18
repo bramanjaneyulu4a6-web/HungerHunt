@@ -226,3 +226,174 @@ describe('deleting a product', () => {
     assert.equal(res.status, 404);
   });
 });
+
+// Nutrition is entered by hand from a packet, so it arrives incomplete far more
+// often than not. Every field stands alone: what the office typed is stored and
+// shown, and what it left blank stays blank rather than reading as zero.
+describe('product nutrition', () => {
+  test('stores the values given and leaves the untyped ones out', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', {
+      ...NEW_PRODUCT,
+      nutritionCalories: 280,
+      nutritionProtein: 3.2,
+      nutritionServing: 'Per 52g pack',
+    });
+
+    assert.equal(res.status, 201);
+    assert.deepEqual(created.nutrition, {
+      calories: 280,
+      protein: 3.2,
+      serving: 'Per 52g pack',
+    });
+  });
+
+  test('a product with no nutrition at all is created without the field', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    assert.equal((await post('/api/products', NEW_PRODUCT)).status, 201);
+    assert.equal('nutrition' in created, false);
+  });
+
+  // Zero fat is a fact about the product; blank is the absence of one. Storing
+  // the first as the second would put a dash on the till where 0 g belongs.
+  test('a typed zero is kept as zero, not dropped as absent', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, nutritionFat: 0 });
+
+    assert.equal(res.status, 201);
+    assert.deepEqual(created.nutrition, { fat: 0 });
+  });
+
+  test('a negative macro is refused, and nothing is created', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, nutritionProtein: -1 });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('a macro that is not a number is refused', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, nutritionCarbs: 'about thirty' });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('an edit names only the macros it carries, leaving the rest standing', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { nutritionCalories: 300 });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { 'nutrition.calories': 300 });
+  });
+
+  // The only way to take back a wrong number: clearing the box means clearing
+  // the value, not leaving the old one because a blank looked like "unchanged".
+  test('a blank box clears the value it stood for', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { nutritionFat: '' });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { 'nutrition.fat': null });
+  });
+
+  test('an unrelated edit does not touch the nutrition already stored', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { active: false });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { active: false });
+  });
+
+  test('a negative macro is refused on edit too', async () => {
+    accountIs('admin');
+    const update = mock.method(Product, 'findByIdAndUpdate', async (id, data) => ({ _id: id, ...data }));
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { nutritionCalories: -5 });
+
+    assert.equal(res.status, 400);
+    assert.equal(update.mock.callCount(), 0);
+  });
+});
+
+// A price of zero is not a cheap product, it is an unpriced one — and the till
+// has no concept of "unpriced": it would add the line, charge nothing and hand
+// the goods over. So the catalogue refuses to hold one at all.
+describe('a product must carry a price', () => {
+  test('zero is refused on create, and nothing is created', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, price: 0 });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('an omitted price is refused rather than defaulted to zero', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, price: undefined });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('a negative price is refused on create too', async () => {
+    accountIs('admin');
+    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, price: -5 });
+
+    assert.equal(res.status, 400);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('zero is refused on edit, so a priced product cannot be unpriced', async () => {
+    accountIs('admin');
+    const update = mock.method(Product, 'findByIdAndUpdate', async (id, data) => ({ _id: id, ...data }));
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { price: 0 });
+
+    assert.equal(res.status, 400);
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('an archive toggle still saves without restating the price', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { active: false });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { active: false });
+  });
+});

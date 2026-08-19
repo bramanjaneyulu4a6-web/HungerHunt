@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:release": "node ../scripts/validate-frontend-release-env.mjs && vite build",
     "lint": "eslint .",
-    "test": "node --test src/utils/*.test.js",
+    "test": "node --test 'src/utils/**/*.test.js'",
     "preview": "vite preview"
   },
   "dependencies": {

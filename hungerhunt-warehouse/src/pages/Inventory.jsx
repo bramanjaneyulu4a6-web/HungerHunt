@@ -98,7 +98,7 @@ const Inventory = () => {
           // The backend now sends the shelf count on the product row itself;
           // the inventory merge stays as the fallback for a stale backend.
           const onShelf = typeof product.stock === "number" ? product.stock : (stock.get(id) ?? 0);
-          const availability = product.availability ?? availabilityOf(product, onShelf);
+          const availability = product.availability || availabilityOf(product, onShelf);
           return {
             id,
             name: product.name,

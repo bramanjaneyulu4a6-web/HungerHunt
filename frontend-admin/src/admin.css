@@ -285,6 +285,11 @@
   background: var(--warn-bg);
 }
 
+.warehouse-metric--alert .warehouse-metric__icon {
+  color: var(--alert);
+  background: var(--alert-bg);
+}
+
 .warehouse-metric > div {
   display: flex;
   flex-direction: column;

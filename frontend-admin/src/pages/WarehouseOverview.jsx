@@ -76,7 +76,7 @@ export default function WarehouseOverview() {
             <span className="warehouse-metric__icon" aria-hidden="true">⇢</span>
             <div><span>Inbound orders</span><strong>{metrics.inbound}</strong><small>Approved or partly received</small></div>
           </Card>
-          <Card className="warehouse-metric warehouse-metric--attention">
+          <Card className="warehouse-metric warehouse-metric--alert">
             <span className="warehouse-metric__icon" aria-hidden="true">⛔</span>
             <div>
               <span>Out of stock</span>

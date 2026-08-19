@@ -89,11 +89,17 @@ will be rejected.
 
 **Set explicitly even though the validator allows absence**
 
-- `TRUST_PROXY` — currently unset. Render puts a proxy in front of the service, so
-  without this every request appears to come from the proxy IP and *all clients share
-  one rate-limit bucket*: a handful of failed logins locks out everyone. Set it to the
-  integer number of hops, normally `1`. `TRUST_PROXY=true` is refused at boot on
+- `TRUST_PROXY` — **set to `3`** on this service. Render puts proxies in front of the
+  service, so without this every request appears to come from the proxy IP and *all
+  clients share one rate-limit bucket*: a handful of failed logins locks out everyone.
+  Set it to the integer number of hops. `TRUST_PROXY=true` is refused at boot on
   purpose — it would let any client spoof `X-Forwarded-For`.
+
+  The hop count was measured, not guessed, and guessing it wrong fails *silently in the
+  other direction*: at `1`, Express resolved `req.ip` to Render's rotating edge address,
+  so one client's attempts spread across several buckets and the limiter never tripped
+  at all. `2` produced a fresh bucket per request, which only a three-entry chain
+  explains. `3` was confirmed in production on 2026-08-18. Re-measure before changing it.
 
 **Also required in production** (present locally, confirm they are set in Render):
 `EMAIL_USER`, `EMAIL_PASS`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,

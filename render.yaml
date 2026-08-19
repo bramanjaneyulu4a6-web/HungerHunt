@@ -6,7 +6,7 @@
 # recreating from scratch. Values marked sync:false are secrets: set in the
 # dashboard from backend/.env.production.local, never committed.
 #
-# autoDeploy is off on purpose: a push to Ashok-work must not become a silent
+# autoDeploy is off on purpose: a push to main must not become a silent
 # production deploy. Deploys are triggered manually until the team decides otherwise.
 services:
   - type: web
@@ -16,15 +16,21 @@ services:
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /health
-    branch: Ashok-work
+    branch: main
     autoDeploy: false
     envVars:
       - key: NODE_ENV
         value: production
       - key: BUSINESS_TIME_ZONE
         value: Asia/Kolkata
+      # 3, not 1: Render fronts this service with a three-hop chain. At 1,
+      # Express resolved req.ip to a rotating edge address, so one client's
+      # failed logins scattered across several rate-limit buckets and ten never
+      # accumulated anywhere — the limiter looked configured and never tripped.
+      # Confirmed in production 2026-08-18 (401s counting down on one clock,
+      # then 429 on the eleventh). Do not lower it without re-testing.
       - key: TRUST_PROXY
-        value: "1"
+        value: "3"
       - key: MAX_ADMIN_ACCOUNTS
         value: "3"
       # Purchase authorization is required from the first request. The default

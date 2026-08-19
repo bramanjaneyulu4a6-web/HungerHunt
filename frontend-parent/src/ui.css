@@ -403,6 +403,12 @@
   border-color: var(--border);
 }
 
+.badge--warn {
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-color: var(--warn);
+}
+
 /* ---- banner ----------------------------------------------------------- */
 
 .banner {

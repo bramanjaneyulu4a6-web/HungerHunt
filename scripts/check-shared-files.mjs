@@ -65,6 +65,17 @@ const SHARED = [
     file: 'src/utils/session.js',
     apps: ['frontend-admin', 'hungerhunt-warehouse'],
   },
+  // The one availability rule (out-of-stock/low/archived), mirrored as a
+  // fallback for a deployed backend that predates the `availability` field.
+  // Admin's till and warehouse's inventory both need to compute it locally,
+  // so both copies must move together. The kiosk's own
+  // src/utils/availability.js is deliberately not this file — it's a
+  // `sellable` wrapper over menu-row shape, not the shared rule — so it does
+  // not belong in this entry.
+  {
+    file: 'src/utils/availability.js',
+    apps: ['frontend-admin', 'hungerhunt-warehouse'],
+  },
 ];
 
 const digest = (path) =>

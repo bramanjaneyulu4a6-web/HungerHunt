@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [frontend-admin, hungerhunt-kiosk]
+        app: [frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

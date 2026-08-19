@@ -11,6 +11,7 @@ export const sellable = (row) => {
     return row.availability === "AVAILABLE" || row.availability === "LOW";
   }
 
-  // Archived is off sale; absent means the row predates the flag.
+  // Legacy path, no availability field sent: active === false is off sale;
+  // an absent active field predates the flag and means active.
   return row.stock > 0 && row.productId.active !== false;
 };

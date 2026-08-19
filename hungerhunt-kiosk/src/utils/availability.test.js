@@ -27,4 +27,16 @@ describe('sellable', () => {
   test('a row with no product is never sellable', () => {
     expect(sellable({ stock: 3, productId: null })).toBe(false);
   });
+
+  test('a null row is never sellable', () => {
+    expect(sellable(null)).toBe(false);
+  });
+
+  test('an undefined row is never sellable', () => {
+    expect(sellable(undefined)).toBe(false);
+  });
+
+  test('the null-product short-circuit fires before availability is consulted', () => {
+    expect(sellable({ availability: 'AVAILABLE', productId: null })).toBe(false);
+  });
 });

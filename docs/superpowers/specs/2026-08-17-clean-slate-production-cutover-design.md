@@ -184,9 +184,11 @@ silently absorbed:
    because the branch rebind had not been made yet; that build ran old code against the new
    database for a few minutes. No writes occurred (verified: 20 collections, 1 admin, 0
    students/products/transactions).
-2. **Build command is `npm install`, not `npm ci`** as `render.yaml` specifies. The lockfile
-   is committed, so `npm ci` is available; switching is a pending cleanup. `npm install` may
-   resolve versions the test suite never saw.
+2. **Build command was `npm install`, not `npm ci`** as `render.yaml` specifies — so builds
+   could resolve versions the test suite never saw. **Switched to `npm ci` on 2026-08-19**,
+   matching `render.yaml`. Safe because the only `package.json` change since the lockfile was
+   written added a script, not a dependency; `npm ci` was verified against the committed
+   lockfile before the switch, and the service came back healthy after it.
 3. **Two old env vars were deleted** during the paste: `PORT` (Render supplies its own) and
    `PARENT_FRONTEND_URL` (a dead name from the pre-rewrite codebase).
 

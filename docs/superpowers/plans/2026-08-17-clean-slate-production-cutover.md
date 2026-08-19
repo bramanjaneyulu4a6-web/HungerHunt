@@ -591,7 +591,7 @@ by the same change.
 
 ---
 
-### Task 12: Deploy the four frontends — Steps 1–2 DONE 2026-08-18
+### Task 12: Deploy the four frontends — DONE 2026-08-19
 
 All four are live and verified from outside: each bundle carries
 `https://hungerhunt-dbat.onrender.com/api` and no `localhost`, each answers a
@@ -608,8 +608,8 @@ for Step 2.
 
 - [x] **Step 1 (OWNER): Four Vercel projects** from this repo — root directories `frontend-parent`, `frontend-admin`, `hungerhunt-kiosk`, `hungerhunt-warehouse` (warehouse is net-new; the other three may reuse the existing `hunger-hunt-*` projects if they're in reach, or be created fresh). Framework preset: Vite. Each project gets env var `VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api`. `frontend-parent` additionally gets every `VITE_FIREBASE_*` and `VITE_VAPID_KEY` value from `frontend-parent/.env` — these are public client config, safe in Vercel's env UI.
 - [x] **Step 2: Reconcile origins** — no change required; the four live URLs match the four `*_CLIENT_URL` values already in Render, the manifest and `render.yaml`.
-- [ ] **Step 3 (OWNER): End-to-end login per role** — founding admin via the deployed admin app; then create warehouse/caretaker staff accounts from the admin UI and sign into the warehouse app. Parent/student flows follow data setup (students, products) which is normal admin work, not cutover work.
-- [ ] **Step 4: Final sweep** — executor re-runs Task 11 Step 4's curls; owner confirms each deployed frontend loads over HTTPS with no CORS errors in the browser console. The system is live.
+- [x] **Step 3 (OWNER): End-to-end login per role** — done 2026-08-19. Founding admin, one warehouse account and one caretaker account, all created from the admin UI and all three signed in against the deployed apps. The caretaker needed a hostel first: the schema refuses a caretaker without one, and `hostels` was empty. The hostel created for it carries the placeholder code `TEST` and still wants renaming — edit it in place rather than replacing it, because the caretaker points at its `_id` and a code change cascades `hostelNumber` to students, while nothing deletes a hostel. Parent/student flows follow data setup, which is normal admin work, not cutover work.
+- [x] **Step 4: Final sweep** — done 2026-08-19. `/health` ready, both v1 probes 401, all four frontends 200 at the root and on a deep link, and a CORS preflight answered for each of the four origins while an unknown origin is refused. **The system is live.**
 
 ---
 

@@ -1,7 +1,7 @@
 # Clean-slate production cutover — design
 
 **Date:** 2026-08-17
-**Status:** Phases 2 and 3 complete 2026-08-18 — the backend is LIVE on Render (now tracking `main`) against `graarr_ecommerce`, and all four frontends are live on Vercel. The auth rate limiter defect (Task 11 Step 7) is closed: `TRUST_PROXY=3`.
+**Status:** COMPLETE 2026-08-19 — the system is live. Phases 2 and 3 done 2026-08-18 — the backend is LIVE on Render (now tracking `main`) against `graarr_ecommerce`, and all four frontends are live on Vercel. The auth rate limiter defect (Task 11 Step 7) is closed: `TRUST_PROXY=3`.
 **Supersedes:** the migration-shaped plan in
 [docs/backend-production-deploy.md](../../backend-production-deploy.md) — kept for
 reference; its sections 3, 4 and 7 no longer apply because no data is carried over.

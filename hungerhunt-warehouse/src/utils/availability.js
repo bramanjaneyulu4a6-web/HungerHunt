@@ -30,6 +30,10 @@ export const availabilityOf = (product, stock) => {
  * itself to the rule and call an unlinked shelf AVAILABLE. */
 export const resolveAvailability = (row) => {
   if (!row) return null;
+  // Truthy, not hasOwnProperty: the backend only ever sends one of four
+  // non-empty enum strings, so empty/absent genuinely means "no server
+  // answer" and should fall through to computing it locally. productId
+  // below is different — null there is real data, not a missing answer.
   if (row.availability) return row.availability;
   if (typeof row.stock !== "number") return null;
 

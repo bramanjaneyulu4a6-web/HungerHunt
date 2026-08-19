@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
+import { resolveAvailability } from "../utils/availability";
 import { Banner, Button, Card, PageHeader } from "../components/ui";
 
 const Billing = () => {
@@ -42,10 +43,10 @@ const Billing = () => {
       const res = await api.get("/inventory");
 
       const inventoryProducts = (Array.isArray(res.data) ? res.data : [])
-        .filter(
-          (item) =>
-            item.productId && item.stock > 0 && item.productId.active !== false
-        )
+        .filter((item) => {
+          const availability = resolveAvailability(item);
+          return availability === "AVAILABLE" || availability === "LOW";
+        })
         .map((item) => ({
           _id: item.productId._id,
           name: item.productId.name,

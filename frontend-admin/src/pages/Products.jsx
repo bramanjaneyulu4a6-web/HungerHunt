@@ -641,61 +641,61 @@ const Products = () => {
                 const availability = resolveAvailability(p);
                 return (
                   <tr key={p._id} style={availability === 'OUT_OF_STOCK' ? { opacity: 0.55 } : undefined}>
-                  <td data-label="Image">
-                    {p.image ? (
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        style={{
-                          width: 60,
-                          height: 60,
-                          objectFit: 'cover',
-                          borderRadius: 8,
-                        }}
-                      />
-                    ) : (
-                      <span style={{ color: 'var(--muted-soft)' }}>No image</span>
-                    )}
-                  </td>
-                  <td data-label="Product">
-                    <strong>{p.name}</strong>
-                    {p.active === false && (
-                      <Badge variant="neutral" style={{ marginLeft: 8 }}>
-                        Archived
-                      </Badge>
-                    )}
-                    {availability === 'OUT_OF_STOCK' && (
-                      <Badge variant="alert" style={{ marginLeft: 8 }}>
-                        Out of stock
-                      </Badge>
-                    )}
-                  </td>
-                  <td data-label="Category">{p.stockGroup?.name}</td>
-                  <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
-                  <td data-label="Unit">{p.unit?.symbol}</td>
-                  <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                    {formatINR(p.price || 0)}
-                  </td>
-                  <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
-                  <td data-label="Safety stock">{p.safetyStock ?? 0}</td>
-                  <td data-label="Per-student limit">{limitLabel(p)}</td>
-                  <td data-label="Actions">
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <Button
-                        className="btn--sm"
-                        onClick={() => handleEditInit(p)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant={p.active === false ? 'success' : 'danger'}
-                        className="btn--sm"
-                        onClick={() => setArchived(p, p.active !== false)}
-                      >
-                        {p.active === false ? 'Restore' : 'Archive'}
-                      </Button>
-                    </div>
-                  </td>
+                    <td data-label="Image">
+                      {p.image ? (
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          style={{
+                            width: 60,
+                            height: 60,
+                            objectFit: 'cover',
+                            borderRadius: 8,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ color: 'var(--muted-soft)' }}>No image</span>
+                      )}
+                    </td>
+                    <td data-label="Product">
+                      <strong>{p.name}</strong>
+                      {p.active === false && (
+                        <Badge variant="neutral" style={{ marginLeft: 8 }}>
+                          Archived
+                        </Badge>
+                      )}
+                      {availability === 'OUT_OF_STOCK' && (
+                        <Badge variant="alert" style={{ marginLeft: 8 }}>
+                          Out of stock
+                        </Badge>
+                      )}
+                    </td>
+                    <td data-label="Category">{p.stockGroup?.name}</td>
+                    <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
+                    <td data-label="Unit">{p.unit?.symbol}</td>
+                    <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                      {formatINR(p.price || 0)}
+                    </td>
+                    <td data-label="Reorder level">{p.reorderLevel ?? 5}</td>
+                    <td data-label="Safety stock">{p.safetyStock ?? 0}</td>
+                    <td data-label="Per-student limit">{limitLabel(p)}</td>
+                    <td data-label="Actions">
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button
+                          className="btn--sm"
+                          onClick={() => handleEditInit(p)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant={p.active === false ? 'success' : 'danger'}
+                          className="btn--sm"
+                          onClick={() => setArchived(p, p.active !== false)}
+                        >
+                          {p.active === false ? 'Restore' : 'Archive'}
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -760,56 +760,56 @@ const Products = () => {
                           <span>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'}</span>
                         </div>
                         <div className="catalogue-product-grid catalogue-product-rail">
-                    {subCategory.products.map((product) => {
-                      const availability = resolveAvailability(product);
-                      return (
-                        <article
-                          className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
-                          style={availability === 'OUT_OF_STOCK' ? { opacity: 0.55 } : undefined}
-                          key={product._id}
-                        >
-                        <div className="catalogue-product-image">
-                          {product.image ? (
-                            <img src={product.image} alt="" />
-                          ) : (
-                            <span aria-hidden="true">📦</span>
-                          )}
-                          {product.active === false && <Badge variant="neutral">Archived</Badge>}
-                          {availability === 'OUT_OF_STOCK' && <Badge variant="alert">Out of stock</Badge>}
-                          <div className="catalogue-product-hover-actions">
-                            <Button
-                              className="btn--sm"
-                              onClick={() => handleEditInit(product)}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant={product.active === false ? 'success' : 'danger'}
-                              className="btn--sm"
-                              onClick={() => setArchived(product, product.active !== false)}
-                            >
-                              {product.active === false ? 'Restore' : 'Archive'}
-                            </Button>
-                          </div>
-                        </div>
+                          {subCategory.products.map((product) => {
+                            const availability = resolveAvailability(product);
+                            return (
+                              <article
+                                className={`catalogue-product-card${product.active === false ? ' catalogue-product-card--archived' : ''}`}
+                                style={availability === 'OUT_OF_STOCK' ? { opacity: 0.55 } : undefined}
+                                key={product._id}
+                              >
+                                <div className="catalogue-product-image">
+                                  {product.image ? (
+                                    <img src={product.image} alt="" />
+                                  ) : (
+                                    <span aria-hidden="true">📦</span>
+                                  )}
+                                  {product.active === false && <Badge variant="neutral">Archived</Badge>}
+                                  {availability === 'OUT_OF_STOCK' && <Badge variant="alert">Out of stock</Badge>}
+                                  <div className="catalogue-product-hover-actions">
+                                    <Button
+                                      className="btn--sm"
+                                      onClick={() => handleEditInit(product)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant={product.active === false ? 'success' : 'danger'}
+                                      className="btn--sm"
+                                      onClick={() => setArchived(product, product.active !== false)}
+                                    >
+                                      {product.active === false ? 'Restore' : 'Archive'}
+                                    </Button>
+                                  </div>
+                                </div>
 
-                        <div className="catalogue-product-body">
-                          <div className="catalogue-product-title">
-                            <h3>{product.name}</h3>
-                            <strong>{formatINR(product.price || 0)}</strong>
-                          </div>
-                          <p>
-                            {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
-                          </p>
-                          <dl>
-                            <div><dt>Safety stock</dt><dd>{product.safetyStock ?? 0}</dd></div>
-                            <div><dt>Student limit</dt><dd>{limitLabel(product)}</dd></div>
-                          </dl>
+                                <div className="catalogue-product-body">
+                                  <div className="catalogue-product-title">
+                                    <h3>{product.name}</h3>
+                                    <strong>{formatINR(product.price || 0)}</strong>
+                                  </div>
+                                  <p>
+                                    {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
+                                  </p>
+                                  <dl>
+                                    <div><dt>Safety stock</dt><dd>{product.safetyStock ?? 0}</dd></div>
+                                    <div><dt>Student limit</dt><dd>{limitLabel(product)}</dd></div>
+                                  </dl>
 
-                        </div>
-                        </article>
-                      );
-                    })}
+                                </div>
+                              </article>
+                            );
+                          })}
                         </div>
                       </section>
                     ))}

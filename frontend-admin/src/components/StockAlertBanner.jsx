@@ -16,8 +16,8 @@ import { Banner } from "./ui";
 const POLL_MS = 60_000;
 const NAMED_LIMIT = 8;
 
-const nameList = (entries) => {
-  const named = entries.slice(0, NAMED_LIMIT).map((e) => e.name);
+const nameList = (entries, format = (e) => e.name) => {
+  const named = entries.slice(0, NAMED_LIMIT).map(format);
   const more = entries.length - named.length;
   return named.join(" · ") + (more > 0 ? ` · and ${more} more` : "");
 };
@@ -76,9 +76,8 @@ export default function StockAlertBanner() {
               : `${alerts.low.length} products are below their reorder level`}
             :
           </strong>{" "}
-          {alerts.low.map((e) => `${e.name} (${e.stock}/${e.reorderLevel})`).slice(0, NAMED_LIMIT).join(" · ")}
-          {alerts.low.length > NAMED_LIMIT ? ` · and ${alerts.low.length - NAMED_LIMIT} more` : ""} —{" "}
-          <Link to="/warehouse/inventory?filter=low">view</Link>
+          {nameList(alerts.low, (e) => `${e.name} (${e.stock}/${e.reorderLevel})`)} —{" "}
+          <Link to="/warehouse/inventory?filter=low">view and reorder</Link>
         </Banner>
       )}
     </div>

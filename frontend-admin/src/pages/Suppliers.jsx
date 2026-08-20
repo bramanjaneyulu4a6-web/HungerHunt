@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
+import { digitsOnly, numericFieldProps } from "../utils/numericInput";
 import {
   Badge,
   Banner,
@@ -230,11 +231,12 @@ const Suppliers = () => {
             </label>
             <input
               id="supplier-phone"
-              type="tel"
               className="input"
               style={{ marginBottom: 14 }}
+              placeholder="e.g. 9876543210"
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => setForm({ ...form, phone: digitsOnly(e.target.value, 10) })}
+              {...numericFieldProps(10, "tel")}
             />
 
             <label className="field-label" htmlFor="supplier-lead-time">

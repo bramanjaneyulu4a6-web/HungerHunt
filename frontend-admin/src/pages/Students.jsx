@@ -4,6 +4,7 @@ import api from '../utils/api';
 import Icon from '../components/Icon';
 import { formatINR } from '../utils/format';
 import { readStudentSheet } from '../utils/readStudentSheet';
+import { digitsOnly, numericFieldProps } from '../utils/numericInput';
 import {
   Banner,
   Button,
@@ -48,15 +49,27 @@ const FORM_FIELDS = [
   // one they cannot use it at all. Required on this form for that reason, so
   // an imported record that arrived without one has to be given a number
   // before any other edit to it can be saved.
-  { key: 'admissionNumber', label: 'Admission number', placeholder: 'e.g. ADM-1042', required: true },
+  //
+  // Five digits, because that is what the kiosk login asks for. This box used
+  // to take any text and suggest "ADM-1042", so a record could be saved in a
+  // shape that cannot log in — a mismatch found by a child at the till rather
+  // than by the office.
+  {
+    key: 'admissionNumber',
+    label: 'Admission number',
+    placeholder: 'e.g. 10425',
+    digits: 5,
+    required: true,
+  },
   { key: 'fatherName', label: "Father's name", placeholder: 'e.g. Ramesh Rao', required: true },
+  // Free text: grades are written 9-B, not 9.
   { key: 'grade', label: 'Grade / class', placeholder: 'e.g. 9-B', required: true },
   {
     key: 'parentPhoneNumber',
     label: 'Parent contact number',
     placeholder: 'e.g. 9876543210',
-    type: 'tel',
-    inputMode: 'numeric',
+    digits: 10,
+    autoComplete: 'tel',
     required: true,
   },
 ];
@@ -578,14 +591,22 @@ const Students = () => {
             />
 
             <div className="modal-fields">
-              {FORM_FIELDS.map(({ key, label, ...inputProps }) => (
+              {FORM_FIELDS.map(({ key, label, digits, autoComplete, ...inputProps }) => (
                 <div key={key}>
                   <label className="field-label" htmlFor={`student-${key}`}>{label}</label>
                   <input
                     id={`student-${key}`}
                     className="input"
                     value={formData[key]}
-                    onChange={(event) => setFormData({ ...formData, [key]: event.target.value })}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        [key]: digits
+                          ? digitsOnly(event.target.value, digits)
+                          : event.target.value,
+                      })
+                    }
+                    {...(digits ? numericFieldProps(digits, autoComplete) : {})}
                     {...inputProps}
                   />
                 </div>

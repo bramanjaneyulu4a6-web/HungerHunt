@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { AuthField, AuthLayout, Banner, Button } from '../components/ui';
 import { isLiveToken } from '../utils/session';
+import { digitsOnly, numericFieldProps } from '../utils/numericInput';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -34,7 +35,13 @@ const Register = () => {
   }, [canChooseRole]);
 
   const handleChange = (e) => {
-    const next = { ...formData, [e.target.name]: e.target.value };
+    // The phone box filters here rather than in AuthField: that component is
+    // one of the files kept byte-identical across all four frontends, and only
+    // this one has a digits-only field to filter.
+    const value = e.target.name === 'phone'
+      ? digitsOnly(e.target.value, 10)
+      : e.target.value;
+    const next = { ...formData, [e.target.name]: value };
     if (e.target.name === 'role' && e.target.value !== 'caretaker') next.hostelId = '';
     setFormData(next);
   };
@@ -108,13 +115,12 @@ const Register = () => {
         <AuthField
           id="phone"
           label="Phone Number"
-          type="tel"
           name="phone"
-          autoComplete="tel"
           required
-          placeholder="98765 43210"
+          placeholder="9876543210"
           value={formData.phone}
           onChange={handleChange}
+          {...numericFieldProps(10, 'tel')}
         />
 
         <AuthField

@@ -13,6 +13,7 @@
     "migrate:enterprise": "node scripts/migrateEnterpriseData.js",
     "backfill:hostels": "node scripts/backfillHostels.js",
     "backfill:product-subcategories": "node scripts/backfillProductSubcategories.js",
+    "backfill:product-mrp": "node scripts/backfillProductMrp.js",
     "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",
     "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js",
     "seed:catalogue": "node scripts/seedCatalogue.js",

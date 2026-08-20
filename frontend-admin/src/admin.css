@@ -817,6 +817,24 @@
   line-height: 1.4;
 }
 
+/* Not a field: the consequence of two of them. Set apart from the boxes above
+   it so it reads as an answer rather than another thing to fill in. */
+.field-readout {
+  padding: 12px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.field-readout strong {
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.field-readout .field-help {
+  margin-top: 4px;
+}
+
 .catalogue-product-card {
   overflow: hidden;
   background: var(--surface);

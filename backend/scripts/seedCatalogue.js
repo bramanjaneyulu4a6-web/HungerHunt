@@ -21,6 +21,7 @@ import Unit from '../models/Unit.js';
 import Inventory from '../models/Inventory.js';
 import { normalizeSubCategory } from '../utils/productSubcategory.js';
 import { isNonNegativeNumber, isPositiveNumber } from '../utils/quantities.js';
+import { finalPrice, isValidDiscountRate } from '../utils/pricing.js';
 
 if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required.');
 
@@ -41,7 +42,10 @@ for (const p of products) {
 
   if (!groupNames.has(p.stockGroup)) problems.push(`${p.name}: unknown stock group ${p.stockGroup}`);
   if (!unitNames.has(p.unit)) problems.push(`${p.name}: unknown unit ${p.unit}`);
-  if (!isPositiveNumber(p.price)) problems.push(`${p.name}: price must be above zero, got ${p.price}`);
+  if (!isPositiveNumber(p.mrp ?? p.price)) problems.push(`${p.name}: MRP must be above zero, got ${p.mrp ?? p.price}`);
+  if (p.discountRate !== undefined && !isValidDiscountRate(p.discountRate)) {
+    problems.push(`${p.name}: discount must be between 0% and under 100%, got ${p.discountRate}`);
+  }
 
   // Nutrition is optional and may be partial, but a figure that is present
   // must be a real one — the till prints these to children unedited.
@@ -81,7 +85,15 @@ try {
 
   if (!apply) {
     console.log('\nWould create:');
-    for (const p of fresh) console.log(`  ${p.stockGroup} / ${p.subCategory} — ${p.name} @ ${p.price}`);
+    for (const p of fresh) {
+      const mrp = p.mrp ?? p.price;
+      const rate = p.discountRate ?? 0;
+      const charged = finalPrice(mrp, rate);
+      console.log(
+        `  ${p.stockGroup} / ${p.subCategory} — ${p.name} @ ${mrp}` +
+          (rate ? ` less ${rate}% = ${charged}` : '')
+      );
+    }
     console.log('\nPreview only. Re-run with --apply to write.');
     process.exitCode = 2;
   } else {
@@ -112,7 +124,12 @@ try {
             stockGroup: groupIds.get(p.stockGroup),
             subCategory: normalizeSubCategory(p.subCategory),
             unit: unitIds.get(p.unit),
-            price: p.price,
+            // The catalogue file lists what the packet costs; a listing with
+            // no discountRate is simply sold at its MRP. price is never read
+            // from the file — it is arithmetic, here as everywhere else.
+            mrp: p.mrp ?? p.price,
+            discountRate: p.discountRate ?? 0,
+            price: finalPrice(p.mrp ?? p.price, p.discountRate ?? 0),
             reorderLevel: p.reorderLevel ?? 5,
             safetyStock: p.safetyStock ?? 0,
             active: p.active ?? true,

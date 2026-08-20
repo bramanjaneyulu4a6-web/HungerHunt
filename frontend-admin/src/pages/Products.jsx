@@ -16,6 +16,7 @@ import {
   WIZARD_STEPS,
   canReachStep,
   firstUnfinishedStep,
+  chargedPrice,
   stepProblem as wizardStepProblem,
 } from '../constants/productWizard';
 
@@ -24,7 +25,8 @@ const EMPTY_FORM = {
   stockGroup: '',
   subCategory: 'Others',
   unit: '',
-  price: '',
+  mrp: '',
+  discountRate: '',
   reorderLevel: '5',
   safetyStock: '0',
   purchaseLimitEnabled: false,
@@ -173,7 +175,10 @@ const Products = () => {
       data.append('stockGroup', form.stockGroup);
       data.append('subCategory', form.subCategory.trim() || 'Others');
       data.append('unit', form.unit);
-      data.append('price', form.price);
+      // price is not sent at all — the server works it out from these two and
+      // refuses a caller that tries to set it directly.
+      data.append('mrp', form.mrp);
+      data.append('discountRate', form.discountRate === '' ? '0' : form.discountRate);
       data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
       data.append('safetyStock', form.safetyStock === '' ? '0' : form.safetyStock);
       // Always sent, both fields included, so switching the limit off is a
@@ -216,7 +221,11 @@ const Products = () => {
       stockGroup: product.stockGroup?._id || '',
       subCategory: product.subCategory || 'Others',
       unit: product.unit?._id || '',
-      price: product.price ?? '',
+      // A row from before the MRP field has only the price it was selling at,
+      // which is by definition its MRP with nothing off. Same figure the
+      // backfill writes, so editing such a product settles it either way.
+      mrp: String(product.mrp ?? product.price ?? ''),
+      discountRate: String(product.discountRate ?? 0),
       reorderLevel: String(product.reorderLevel ?? 5),
       safetyStock: String(product.safetyStock ?? 0),
       purchaseLimitEnabled: Boolean(product.purchaseLimit?.enabled),
@@ -428,6 +437,20 @@ const Products = () => {
     Boolean(currentUnit) && !allowedUnits.some((unit) => unit._id === currentUnit._id);
   const unitOptions = unitIsOffMap ? [...allowedUnits, currentUnit] : allowedUnits;
 
+  // What the till will charge for what is currently typed, or null while the
+  // figures are not both usable. Recomputed by the server on save; this copy
+  // exists only so the office can see the consequence before committing.
+  const studentPays = chargedPrice(form);
+
+  // A discount the office typed that rounding gave straight back. Worth saying
+  // out loud, because the boxes look like they did something and the till will
+  // disagree.
+  const discountRoundsAway =
+    studentPays !== null &&
+    String(form.discountRate ?? '').trim() !== '' &&
+    Number(form.discountRate) > 0 &&
+    studentPays === Number(form.mrp);
+
   const stepProblem = (index) => wizardStepProblem(index, form);
   const firstProblemStep = firstUnfinishedStep(form);
 
@@ -593,6 +616,8 @@ const Products = () => {
                 <th>Category</th>
                 <th>Sub-category</th>
                 <th>Unit</th>
+                <th style={{ width: 110 }}>MRP</th>
+                <th style={{ width: 100 }}>Discount</th>
                 <th style={{ width: 120 }}>Price</th>
                 <th style={{ width: 130 }}>Reorder point</th>
                 <th style={{ width: 120 }}>Safety stock</th>
@@ -637,6 +662,14 @@ const Products = () => {
                     <td data-label="Category">{p.stockGroup?.name}</td>
                     <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
                     <td data-label="Unit">{p.unit?.symbol}</td>
+                    {/* MRP and discount are what the office set; Price is
+                        what the till charges. Shown side by side so a discount
+                        that rounded away is visible on the list rather than
+                        only inside the edit form. */}
+                    <td data-label="MRP">{formatINR(p.mrp ?? p.price ?? 0)}</td>
+                    <td data-label="Discount">
+                      {p.discountRate ? `${p.discountRate}% off` : '—'}
+                    </td>
                     <td data-label="Price" style={{ fontWeight: 600, color: 'var(--primary)' }}>
                       {formatINR(p.price || 0)}
                     </td>
@@ -766,6 +799,11 @@ const Products = () => {
                                     {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
                                   </p>
                                   <dl>
+                                    <div><dt>MRP</dt><dd>{formatINR(product.mrp ?? product.price ?? 0)}</dd></div>
+                                    <div>
+                                      <dt>Discount</dt>
+                                      <dd>{product.discountRate ? `${product.discountRate}% off` : '—'}</dd>
+                                    </div>
                                     <div><dt>Safety stock</dt><dd>{product.safetyStock ?? 0}</dd></div>
                                     <div><dt>Student limit</dt><dd>{limitLabel(product)}</dd></div>
                                   </dl>
@@ -1115,21 +1153,66 @@ const Products = () => {
                         outright, because the till reads zero as free and hands
                         the goods over. Caught here so the office is told at the
                         box rather than by a rejected save. */}
-                    <label className="field-label" htmlFor="product-price">
-                      Selling Price (₹)
+                    <label className="field-label" htmlFor="product-mrp">
+                      MRP (₹)
                     </label>
                     <input
-                      id="product-price"
+                      id="product-mrp"
                       type="number"
                       min="0.01"
                       step="0.01"
                       className="input"
                       placeholder="0.00"
                       required
-                      value={form.price}
-                      onChange={(e) => setForm({ ...form, price: e.target.value })}
+                      value={form.mrp}
+                      onChange={(e) => setForm({ ...form, mrp: e.target.value })}
                     />
-                    <p className="field-help">What a student pays at the till.</p>
+                    <p className="field-help">What the packet says, before anything comes off.</p>
+                  </div>
+
+                  <div>
+                    {/* max 99, not 100: at 100% the product costs nothing and
+                        the till reads nothing as free. */}
+                    <label className="field-label" htmlFor="product-discount">
+                      Discount (%)
+                    </label>
+                    <input
+                      id="product-discount"
+                      type="number"
+                      min="0"
+                      max="99"
+                      step="0.01"
+                      className="input"
+                      placeholder="0"
+                      value={form.discountRate}
+                      onChange={(e) => setForm({ ...form, discountRate: e.target.value })}
+                    />
+                    <p className="field-help">Leave blank for no discount.</p>
+                  </div>
+
+                  {/* The two boxes above are what the office decides; this is
+                      what the school actually charges, shown before the save
+                      rather than discovered at the till. It matters most for
+                      the case the office does not expect: rounding is always
+                      up, so a small discount on a small MRP can give the whole
+                      discount back, and that is said here plainly. */}
+                  <div className="field-readout" aria-live="polite">
+                    {studentPays === null ? (
+                      <p className="field-help">
+                        Enter an MRP and a discount to see what a student will pay.
+                      </p>
+                    ) : (
+                      <>
+                        <strong>A student pays {formatINR(studentPays)}</strong>
+                        <p className="field-help">
+                          {discountRoundsAway
+                            ? `Rounded up to the next rupee, which is the full MRP — this discount changes nothing at the till.`
+                            : `${formatINR(Number(form.mrp))} less ${
+                                form.discountRate === '' ? 0 : Number(form.discountRate)
+                              }%, rounded up to the next rupee.`}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </>
               )}

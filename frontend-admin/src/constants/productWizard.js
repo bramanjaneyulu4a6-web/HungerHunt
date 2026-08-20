@@ -17,10 +17,41 @@
 
 export const WIZARD_STEPS = [
   { title: 'Basics', hint: 'What it is, and where it sits on the kiosk.' },
-  { title: 'Price & Unit', hint: 'What it sells for, and what it is measured in.' },
+  { title: 'Price & Unit', hint: 'What the packet costs, what comes off it, and what it is measured in.' },
   { title: 'Stock', hint: 'When the office should reorder it.' },
   { title: 'Extras', hint: 'Optional. Skip and come back any time.' },
 ];
+
+/* A typed figure only — Number('') is 0 and Number('  ') is 0, so a blank box
+   would otherwise read as a perfectly good zero. */
+const typed = (v) => String(v ?? '').trim() !== '' && Number.isFinite(Number(v));
+
+const isMoney = (v) => typed(v) && Number(v) > 0;
+
+/* Blank is no discount, which is the ordinary case: most products have none
+   and the office should not have to type a zero to move on. Anything actually
+   typed has to be a real rate — below 100, because 100% prices the product at
+   nothing and the till reads nothing as free. */
+const isRate = (v) => {
+  if (String(v ?? '').trim() === '') return true;
+  return typed(v) && Number(v) >= 0 && Number(v) < 100;
+};
+
+/* What the student will actually pay, or null while the figures it needs are
+   not both usable yet.
+
+   This mirrors backend/utils/pricing.js and is deliberately a copy rather than
+   a shared module: the four frontends bundle separately from the server, and
+   the server recomputes this on every save regardless. Nothing is priced by
+   what this returns — it exists so the office sees the consequence of a
+   discount before committing to it, particularly the small-MRP case where
+   rounding up gives back the whole discount. */
+export const chargedPrice = (form) => {
+  if (!isMoney(form.mrp) || !isRate(form.discountRate)) return null;
+  const mrp = Number(form.mrp);
+  const rate = String(form.discountRate ?? '').trim() === '' ? 0 : Number(form.discountRate);
+  return Math.min(mrp, Math.ceil((mrp * (100 - rate)) / 100));
+};
 
 /* Returns what still stops this step being finished, or '' when nothing does.
    Messages are the sentence shown to the office, so they name the fix. */
@@ -35,7 +66,8 @@ export const stepProblem = (index, form) => {
     if (!form.unit) return 'Choose the unit this is measured in.';
     // Above zero, not merely present: the till reads a price of 0 as free and
     // hands the goods over, and the server refuses one outright.
-    if (!(Number(form.price) > 0)) return 'Enter a selling price above ₹0.';
+    if (!isMoney(form.mrp)) return 'Enter an MRP above ₹0.';
+    if (!isRate(form.discountRate)) return 'Enter a discount from 0% to under 100%.';
   }
 
   if (index === 2) {

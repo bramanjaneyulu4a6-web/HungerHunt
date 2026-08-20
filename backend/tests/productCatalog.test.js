@@ -54,7 +54,7 @@ const NEW_PRODUCT = {
   stockGroup: GROUP_ID,
   subCategory: 'Savoury Snacks',
   unit: UNIT_ID,
-  price: 12,
+  mrp: 12,
 };
 
 describe('creating a product', () => {
@@ -203,12 +203,6 @@ describe('updating a product', () => {
     assert.equal(res.status, 400);
   });
 
-  test('a negative price is refused', async () => {
-    accountIs('admin');
-    const res = await put(`/api/products/${PRODUCT_ID}`, { price: -3 });
-    assert.equal(res.status, 400);
-  });
-
   test('normalizes a sub-category without overwriting unrelated fields', async () => {
     accountIs('admin');
     let written;
@@ -344,52 +338,119 @@ describe('product nutrition', () => {
   });
 });
 
-// A price of zero is not a cheap product, it is an unpriced one — and the till
-// has no concept of "unpriced": it would add the line, charge nothing and hand
-// the goods over. So the catalogue refuses to hold one at all.
-describe('a product must carry a price', () => {
-  test('zero is refused on create, and nothing is created', async () => {
+// The office types what the packet says and how much comes off it; the price
+// the till charges is arithmetic, not a third thing to type. Sending it
+// directly is refused rather than ignored, so a caller left on the old
+// contract is told rather than silently having its price dropped.
+describe('pricing a product from its MRP and discount', () => {
+  test('derives the price the till charges from the MRP and the rate', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, mrp: 27, discountRate: 15 });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.mrp, 27);
+    assert.equal(created.discountRate, 15);
+    assert.equal(created.price, 23);
+  });
+
+  test('an MRP with no rate given sells at the MRP', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, mrp: 40, discountRate: undefined });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.discountRate, 0);
+    assert.equal(created.price, 40);
+  });
+
+  for (const [label, body] of [
+    ['no MRP', { mrp: undefined }],
+    ['an MRP of zero', { mrp: 0 }],
+    ['a negative MRP', { mrp: -5 }],
+    ['a rate of 100', { discountRate: 100 }],
+    ['a rate above 100', { discountRate: 250 }],
+    ['a negative rate', { discountRate: -10 }],
+    ['a rate that is not a number', { discountRate: 'half' }],
+  ]) {
+    test(`refuses ${label} on create, and nothing is created`, async () => {
+      accountIs('admin');
+      const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+      const res = await post('/api/products', { ...NEW_PRODUCT, ...body });
+
+      assert.equal(res.status, 400);
+      assert.equal(create.mock.callCount(), 0);
+    });
+  }
+
+  test('refuses a price sent straight to create', async () => {
     accountIs('admin');
     const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
 
-    const res = await post('/api/products', { ...NEW_PRODUCT, price: 0 });
+    const res = await post('/api/products', { ...NEW_PRODUCT, price: 5 });
 
     assert.equal(res.status, 400);
     assert.equal(create.mock.callCount(), 0);
   });
 
-  test('an omitted price is refused rather than defaulted to zero', async () => {
+  test('a new rate alone reprices against the stored MRP', async () => {
     accountIs('admin');
-    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+    mock.method(Product, 'findById', async () => ({ _id: PRODUCT_ID, mrp: 27, discountRate: 0 }));
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
 
-    const res = await post('/api/products', { ...NEW_PRODUCT, price: undefined });
+    const res = await put(`/api/products/${PRODUCT_ID}`, { discountRate: 15 });
 
-    assert.equal(res.status, 400);
-    assert.equal(create.mock.callCount(), 0);
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { discountRate: 15, price: 23 });
   });
 
-  test('a negative price is refused on create too', async () => {
+  test('a new MRP alone reprices against the stored rate', async () => {
     accountIs('admin');
-    const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+    mock.method(Product, 'findById', async () => ({ _id: PRODUCT_ID, mrp: 27, discountRate: 50 }));
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
 
-    const res = await post('/api/products', { ...NEW_PRODUCT, price: -5 });
+    const res = await put(`/api/products/${PRODUCT_ID}`, { mrp: 21 });
 
-    assert.equal(res.status, 400);
-    assert.equal(create.mock.callCount(), 0);
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { mrp: 21, price: 11 });
   });
 
-  test('zero is refused on edit, so a priced product cannot be unpriced', async () => {
+  // Legacy rows created before the field have no MRP. Discounting one has
+  // nothing to compute against, so the office is asked for the MRP rather
+  // than given a rate off an imagined figure.
+  test('a rate on a product with no stored MRP is refused', async () => {
     accountIs('admin');
+    mock.method(Product, 'findById', async () => ({ _id: PRODUCT_ID }));
     const update = mock.method(Product, 'findByIdAndUpdate', async (id, data) => ({ _id: id, ...data }));
 
-    const res = await put(`/api/products/${PRODUCT_ID}`, { price: 0 });
+    const res = await put(`/api/products/${PRODUCT_ID}`, { discountRate: 15 });
 
     assert.equal(res.status, 400);
     assert.equal(update.mock.callCount(), 0);
   });
 
-  test('an archive toggle still saves without restating the price', async () => {
+  test('refuses a price sent straight to an edit', async () => {
     accountIs('admin');
+    const update = mock.method(Product, 'findByIdAndUpdate', async (id, data) => ({ _id: id, ...data }));
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { price: 5 });
+
+    assert.equal(res.status, 400);
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('an edit that mentions neither never reads the product to reprice it', async () => {
+    accountIs('admin');
+    const read = mock.method(Product, 'findById', async () => ({ _id: PRODUCT_ID, mrp: 27 }));
     let written;
     mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
 
@@ -397,5 +458,6 @@ describe('a product must carry a price', () => {
 
     assert.equal(res.status, 200);
     assert.deepEqual(written, { active: false });
+    assert.equal(read.mock.callCount(), 0);
   });
 });

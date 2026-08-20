@@ -6,6 +6,7 @@ import streamifier from "streamifier";
 import { isNonNegativeNumber, isPositiveNumber, isWholeNonNegative } from '../utils/quantities.js';
 import { normalizeSubCategory, SUBCATEGORY_MAX_LENGTH } from '../utils/productSubcategory.js';
 import { availabilityOf } from '../utils/availability.js';
+import { finalPrice, isValidDiscountRate } from '../utils/pricing.js';
 
 
 const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
@@ -185,9 +186,25 @@ export const addProduct = async (req, res) => {
     // supplying one.
     // Checked before anything else is written: a product that reaches the till
     // unpriced is worse than one that never got created.
-    if (!isPositiveNumber(req.body.price)) {
-      return res.status(400).json({ message: "A product must have a price above zero." });
+    //
+    // The price is arithmetic on the two figures below, so a caller offering
+    // one is refused rather than ignored — silently dropping it would leave
+    // an old client believing it had set a price it had not.
+    if (req.body.price !== undefined) {
+      return res.status(400).json({
+        message: "Price is worked out from the MRP and discount rate, so it cannot be set directly.",
+      });
     }
+
+    if (!isPositiveNumber(req.body.mrp)) {
+      return res.status(400).json({ message: "A product must have an MRP above zero." });
+    }
+
+    if (req.body.discountRate !== undefined && !isValidDiscountRate(req.body.discountRate)) {
+      return res.status(400).json({ message: "A discount must be between 0% and under 100%." });
+    }
+
+    const discountRate = req.body.discountRate === undefined ? 0 : Number(req.body.discountRate);
 
     if (req.body.reorderLevel !== undefined && !isWholeNonNegative(req.body.reorderLevel)) {
       return res.status(400).json({ message: "Reorder level must be a whole number of zero or more." });
@@ -222,7 +239,11 @@ export const addProduct = async (req, res) => {
 
       unit: req.body.unit,
 
-      price: Number(req.body.price),
+      mrp: Number(req.body.mrp),
+
+      discountRate,
+
+      price: finalPrice(req.body.mrp, discountRate),
 
       image,
 
@@ -326,10 +347,47 @@ export const updateProduct = async (req, res) => {
     if (req.body.unit !== undefined) updateData.unit = req.body.unit;
 
     if (req.body.price !== undefined) {
-      if (!isPositiveNumber(req.body.price)) {
-        return res.status(400).json({ message: "A product must have a price above zero." });
+      return res.status(400).json({
+        message: "Price is worked out from the MRP and discount rate, so it cannot be set directly.",
+      });
+    }
+
+    if (req.body.mrp !== undefined && !isPositiveNumber(req.body.mrp)) {
+      return res.status(400).json({ message: "A product must have an MRP above zero." });
+    }
+
+    if (req.body.discountRate !== undefined && !isValidDiscountRate(req.body.discountRate)) {
+      return res.status(400).json({ message: "A discount must be between 0% and under 100%." });
+    }
+
+    // Either figure alone reprices the product, so whichever one the body does
+    // not carry is read from the stored row. Only then — an archive toggle
+    // arrives on its own and must not pay for a read it has no use for.
+    if (req.body.mrp !== undefined || req.body.discountRate !== undefined) {
+      const current = await Product.findById(req.params.id);
+
+      if (!current) {
+        return res.status(404).json({ message: "Product not found" });
       }
-      updateData.price = Number(req.body.price);
+
+      const mrp = req.body.mrp === undefined ? current.mrp : Number(req.body.mrp);
+
+      // A row from before the field has no MRP to take a discount off, and
+      // guessing one would silently invent a price. The office is asked for
+      // the figure instead.
+      if (!isPositiveNumber(mrp)) {
+        return res.status(400).json({
+          message: "This product has no MRP recorded yet. Enter one before setting a discount.",
+        });
+      }
+
+      const rate = req.body.discountRate === undefined
+        ? Number(current.discountRate || 0)
+        : Number(req.body.discountRate);
+
+      if (req.body.mrp !== undefined) updateData.mrp = mrp;
+      if (req.body.discountRate !== undefined) updateData.discountRate = rate;
+      updateData.price = finalPrice(mrp, rate);
     }
 
     if (req.body.reorderLevel !== undefined) {

@@ -296,7 +296,7 @@ const NEW_PRODUCT = {
   name: 'Chocolate',
   stockGroup: GROUP_ID,
   unit: UNIT_ID,
-  price: 20,
+  mrp: 20,
 };
 
 describe('configuring a purchase limit', () => {

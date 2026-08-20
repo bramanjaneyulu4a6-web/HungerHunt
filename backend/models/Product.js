@@ -34,11 +34,45 @@ const productSchema = new mongoose.Schema(
     required: true
   },
 
+  // What the packet says the thing costs, before the school takes anything
+  // off. This is the figure the office types; `price` below is arithmetic.
+  //
+  // Required for the same reason price is: without it a discount has nothing
+  // to compute against. Rows written before this field have no mrp at all,
+  // which is why the backfill sets it to the price they were already selling
+  // at — see scripts/backfillProductMrp.js.
+  mrp: {
+    type: Number,
+    required: true,
+    validate: {
+      validator: (v) => v > 0,
+      message: 'A product must have an MRP above zero.'
+    }
+  },
+
+  // Percent off the MRP. Below 100, not up to it: a rate of 100 prices the
+  // product at nothing, and the till reads nothing as free and hands the goods
+  // over. A giveaway is a different decision, made elsewhere.
+  discountRate: {
+    type: Number,
+    default: 0,
+    min: 0,
+    validate: {
+      validator: (v) => v < 100,
+      message: 'A discount must be below 100%.'
+    }
+  },
+
   // Required, and never zero. A default of 0 used to stand in for "not priced
   // yet", but the till reads that as free and hands the goods over, so an
   // unpriced product must not be creatable rather than creatable and dangerous.
   // Guarded here as well as in the controller because seeds and scripts write
   // straight through the model.
+  //
+  // Derived, never typed: the controller computes it from mrp and discountRate
+  // through utils/pricing.js and refuses a caller that tries to set it
+  // directly. Everything downstream — the till, pending orders, receipts —
+  // reads this one field and needs to know nothing about the discount.
   price: {
     type: Number,
     required: true,

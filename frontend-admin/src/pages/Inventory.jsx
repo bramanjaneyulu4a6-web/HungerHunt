@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import { resolveAvailability } from "../utils/availability";
+import { chargedPrice } from "../constants/productWizard";
 import RefreshButton from "../components/RefreshButton";
 import {
   Badge,
@@ -36,7 +37,8 @@ const Inventory = () => {
     setSearchParams(value === "all" ? {} : { filter: value }, { replace: true });
   const [editingProduct, setEditingProduct] = useState(null);
   const [editName, setEditName] = useState("");
-  const [editPrice, setEditPrice] = useState("");
+  const [editMrp, setEditMrp] = useState("");
+  const [editDiscountRate, setEditDiscountRate] = useState("");
   const [saving, setSaving] = useState(false);
   const [editReorderLevel, setEditReorderLevel] = useState("");
   const [editSafetyStock, setEditSafetyStock] = useState("");
@@ -73,11 +75,16 @@ const Inventory = () => {
     return item.productId?.name?.toLowerCase().includes(query);
   });
 
+  const editStudentPays = chargedPrice({ mrp: editMrp, discountRate: editDiscountRate });
+
   const startEdit = (product) => {
     if (!product) return;
     setEditingProduct(product._id);
     setEditName(product.name || "");
-    setEditPrice(product?.price ?? 0);
+    // A row from before the MRP field has only the price it was selling at,
+    // which is that price with nothing off.
+    setEditMrp(String(product?.mrp ?? product?.price ?? 0));
+    setEditDiscountRate(String(product?.discountRate ?? 0));
     setEditReorderLevel(product?.reorderLevel ?? 5);
     setEditSafetyStock(product?.safetyStock ?? 0);
   };
@@ -90,9 +97,17 @@ const Inventory = () => {
       return;
     }
 
-    const updatedPrice = parseFloat(editPrice);
-    if (isNaN(updatedPrice) || updatedPrice <= 0) {
-      toast.error("Enter a selling price above zero.");
+    const updatedMrp = parseFloat(editMrp);
+    if (isNaN(updatedMrp) || updatedMrp <= 0) {
+      toast.error("Enter an MRP above zero.");
+      return;
+    }
+
+    // Blank means no discount; anything typed has to be a real rate. 100%
+    // prices the product at nothing and the till reads nothing as free.
+    const updatedDiscount = editDiscountRate.trim() === "" ? 0 : parseFloat(editDiscountRate);
+    if (isNaN(updatedDiscount) || updatedDiscount < 0 || updatedDiscount >= 100) {
+      toast.error("Enter a discount from 0% to under 100%.");
       return;
     }
 
@@ -103,7 +118,9 @@ const Inventory = () => {
       const safetyStock = parseInt(editSafetyStock, 10);
       await api.put(`/products/${editingProduct}`, {
         name: editName.trim(),
-        price: updatedPrice,
+        // price is derived on the server from these two and refused if sent.
+        mrp: updatedMrp,
+        discountRate: updatedDiscount,
         ...(isNaN(level) || level < 0 ? {} : { reorderLevel: level }),
         ...(isNaN(safetyStock) || safetyStock < 0 ? {} : { safetyStock }),
       });
@@ -238,19 +255,46 @@ const Inventory = () => {
               onChange={(e) => setEditName(e.target.value)}
             />
 
-            <label className="field-label" htmlFor="edit-price">
-              Selling Price (₹)
+            <label className="field-label" htmlFor="edit-mrp">
+              MRP (₹)
             </label>
             <input
-              id="edit-price"
+              id="edit-mrp"
               type="number"
               step="0.01"
               min="0.01"
               className="input"
               placeholder="0.00"
-              value={editPrice}
-              onChange={(e) => setEditPrice(e.target.value)}
+              value={editMrp}
+              onChange={(e) => setEditMrp(e.target.value)}
             />
+
+            <label className="field-label" htmlFor="edit-discount">
+              Discount (%) — leave blank for none
+            </label>
+            <input
+              id="edit-discount"
+              type="number"
+              step="0.01"
+              min="0"
+              max="99"
+              className="input"
+              placeholder="0"
+              value={editDiscountRate}
+              onChange={(e) => setEditDiscountRate(e.target.value)}
+            />
+
+            {/* Same readout as the Products wizard, for the same reason: the
+                two boxes above are a decision, this is its consequence. */}
+            <div className="field-readout" style={{ margin: "10px 0 14px" }} aria-live="polite">
+              {editStudentPays === null ? (
+                <p className="field-help">
+                  Enter an MRP and a discount to see what a student will pay.
+                </p>
+              ) : (
+                <strong>A student pays {formatINR(editStudentPays)}</strong>
+              )}
+            </div>
 
             <label className="field-label" htmlFor="edit-reorder">
               Reorder level (flag when stock falls below this; 0 never flags)

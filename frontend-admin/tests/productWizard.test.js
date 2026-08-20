@@ -1,7 +1,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { WIZARD_STEPS, stepProblem, firstUnfinishedStep, canReachStep } = await import(
+const { WIZARD_STEPS, stepProblem, firstUnfinishedStep, canReachStep, chargedPrice } = await import(
   '../src/constants/productWizard.js'
 );
 
@@ -11,7 +11,8 @@ const COMPLETE = {
   stockGroup: 'group-snacks',
   subCategory: 'Biscuits & Cookies',
   unit: 'unit-g',
-  price: '20',
+  mrp: '20',
+  discountRate: '0',
   reorderLevel: '5',
   safetyStock: '0',
   purchaseLimitEnabled: false,
@@ -41,7 +42,7 @@ describe('step 1 — basics', () => {
 });
 
 describe('step 2 — price and unit', () => {
-  test('passes with a unit and a price above zero', () => {
+  test('passes with a unit and an MRP above zero', () => {
     assert.equal(stepProblem(1, COMPLETE), '');
   });
 
@@ -52,19 +53,67 @@ describe('step 2 — price and unit', () => {
     );
   });
 
-  // The till reads a zero price as free and hands the goods over, so this is
-  // the one rule here that is about money leaving the building.
-  for (const price of ['', '0', '0.00', '-5', 'free']) {
-    test(`refuses a price of ${JSON.stringify(price)}`, () => {
+  // The till reads a zero price as free and hands the goods over, and the MRP
+  // is what the price is computed from — so this is the one rule here that is
+  // about money leaving the building.
+  for (const mrp of ['', '0', '0.00', '-5', 'free']) {
+    test(`refuses an MRP of ${JSON.stringify(mrp)}`, () => {
       assert.equal(
-        stepProblem(1, withForm({ price })),
-        'Enter a selling price above ₹0.'
+        stepProblem(1, withForm({ mrp })),
+        'Enter an MRP above ₹0.'
       );
     });
   }
 
-  test('accepts the smallest price the server allows', () => {
-    assert.equal(stepProblem(1, withForm({ price: '0.01' })), '');
+  test('accepts the smallest MRP the server allows', () => {
+    assert.equal(stepProblem(1, withForm({ mrp: '0.01' })), '');
+  });
+
+  // Blank means no discount, which is the common case and should not stop the
+  // office moving on. A typed nonsense value is a different thing and does.
+  test('a blank discount is no discount, not an error', () => {
+    assert.equal(stepProblem(1, withForm({ discountRate: '' })), '');
+  });
+
+  test('accepts a fractional discount', () => {
+    assert.equal(stepProblem(1, withForm({ discountRate: '12.5' })), '');
+  });
+
+  // 100% prices the product at nothing, which the till reads as free. The
+  // server refuses it outright, so the form says so at the box.
+  for (const rate of ['100', '150', '-5', 'half']) {
+    test(`refuses a discount of ${JSON.stringify(rate)}`, () => {
+      assert.equal(
+        stepProblem(1, withForm({ discountRate: rate })),
+        'Enter a discount from 0% to under 100%.'
+      );
+    });
+  }
+});
+
+// What the office types and what the student pays are two different numbers,
+// and the form shows the second before the save so a discount that rounds
+// away to nothing is visible rather than discovered at the till.
+describe('the price the student pays', () => {
+  test('is the MRP when nothing is taken off', () => {
+    assert.equal(chargedPrice(withForm({ mrp: '27', discountRate: '0' })), 27);
+  });
+
+  test('is a blank discount treated as none', () => {
+    assert.equal(chargedPrice(withForm({ mrp: '27', discountRate: '' })), 27);
+  });
+
+  test('rounds up to the next whole rupee', () => {
+    assert.equal(chargedPrice(withForm({ mrp: '27', discountRate: '15' })), 23);
+  });
+
+  test('is null when the MRP is not yet a usable number', () => {
+    assert.equal(chargedPrice(withForm({ mrp: '' })), null);
+    assert.equal(chargedPrice(withForm({ mrp: '0' })), null);
+  });
+
+  test('is null when the discount is not a usable rate', () => {
+    assert.equal(chargedPrice(withForm({ discountRate: '100' })), null);
   });
 });
 

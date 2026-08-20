@@ -50,6 +50,18 @@
   ],
   "units": [
     {
+      "name": "Gram",
+      "symbol": "g"
+    },
+    {
+      "name": "Millilitre",
+      "symbol": "ml"
+    },
+    {
+      "name": "Litre",
+      "symbol": "L"
+    },
+    {
       "name": "Piece",
       "symbol": "pc"
     }

@@ -1,3 +1,14 @@
+/* Read-only. The measurement units are a fixed vocabulary defined in
+ * scripts/data/catalogue.json and loaded by seedCatalogue.js, because the
+ * admin console now offers units filtered by a product's category
+ * (frontend-admin/src/constants/units.js) and that map keys off the symbol.
+ * A unit invented through this endpoint would exist in the collection while
+ * matching no category, so it would never appear in the dropdown that is the
+ * only reason to create one.
+ *
+ * Adding a unit means editing the seed data and the category map, then
+ * re-running the seed — the same route category changes take.
+ */
 import express from "express";
 import Unit from "../models/Unit.js";
 import { protectAdmin } from "../middleware/authMiddleware.js";
@@ -15,40 +26,16 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
-  try {
-    const unit = await Unit.create({
-      name: req.body.name,
-      symbol: req.body.symbol,
-    });
-    res.status(201).json(unit);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
+// 405 rather than a silent 404: these verbs existed until recently, and a
+// stale deployed console still calling them should be told the route is sealed
+// rather than left to read it as a bad URL.
+const sealed = (req, res) =>
+  res.status(405).json({
+    message: "Measurement units are defined in the catalogue seed, not through the API.",
+  });
 
-router.put("/:id", async (req, res) => {
-  try {
-    const unit = await Unit.findByIdAndUpdate(
-      req.params.id,
-      { name: req.body.name, symbol: req.body.symbol },
-      { new: true, runValidators: true }
-    );
-    if (!unit) return res.status(404).json({ message: "Unit not found" });
-    res.json(unit);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-router.delete("/:id", async (req, res) => {
-  try {
-    const unit = await Unit.findByIdAndDelete(req.params.id);
-    if (!unit) return res.status(404).json({ message: "Unit not found" });
-    res.json({ message: "Unit removed" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+router.post("/", sealed);
+router.put("/:id", sealed);
+router.delete("/:id", sealed);
 
 export default router;

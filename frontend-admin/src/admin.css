@@ -1086,7 +1086,6 @@
 
 .category-editor-tab--dragging { opacity: .45; transform: scale(.97); }
 .category-editor-tab--target { border-left: 4px solid var(--primary); }
-.category-editor-tab .category-editor-rename { color: var(--primary); font-size: 14px; }
 
 .subcategory-editor {
   padding: 18px;
@@ -1111,17 +1110,15 @@
   text-transform: uppercase;
 }
 
-.subcategory-editor > header div > button {
-  padding: 0;
-  border: 0;
-  background: none;
+/* Was a rename button until categories became seed-defined. It keeps the
+   heading's weight so the dialog reads the same; only the affordance is gone. */
+.subcategory-editor > header div > h4 {
+  margin: 0;
   color: var(--ink);
   font-size: 20px;
   font-weight: 850;
-  cursor: pointer;
 }
 
-.subcategory-editor > header div > button span,
 .subcategory-editor-tile__name span {
   color: var(--primary);
   font-size: .75em;
@@ -1166,7 +1163,6 @@
 }
 
 .category-editor-add .input { flex: 1; }
-.category-editor-add--category { padding-top: 18px; border-top: 1px solid var(--border); }
 
 @media (max-width: 640px) {
   .category-editor-modal { width: calc(100vw - 20px); padding: 20px 15px; }
@@ -1512,4 +1508,168 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-soft);
+}
+
+/* ── Add / Edit Product wizard ───────────────────────────────────────────
+   The catalogue form was eleven boxes in one scroll. These four steps carry
+   the split, so the numbered rail has to read as position rather than
+   decoration: a step already satisfied is a tick and stays clickable, which is
+   what lets an edit jump straight to the one field it came for. */
+
+.product-wizard .wizard-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.product-wizard .wizard-steps > li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.wizard-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wizard-step:not(:disabled):hover {
+  border-color: var(--border-strong);
+}
+
+.wizard-step__number {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wizard-step__title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wizard-step--current {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.wizard-step--current .wizard-step__number {
+  background: var(--primary);
+  color: var(--on-dark);
+}
+
+.wizard-step--done {
+  color: var(--success-strong);
+}
+
+.wizard-step--done .wizard-step__number {
+  background: var(--success-bg-strong);
+  color: var(--success-deep);
+}
+
+.wizard-progress {
+  height: 4px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+}
+
+.wizard-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: inherit;
+  transition: width 220ms ease;
+}
+
+.wizard-hint {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Steps carry two fields or six, so the panel holds its height rather than
+   letting the dialog jump every time Next is pressed. */
+.wizard-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 268px;
+}
+
+.wizard-problem {
+  margin: 14px 0 0;
+  padding: 9px 11px;
+  background: var(--alert-bg);
+  border: 1px solid var(--alert-border);
+  border-radius: 10px;
+  color: var(--alert);
+  font-size: 13px;
+}
+
+.wizard-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wizard-actions__count {
+  color: var(--muted-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wizard-actions__next {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  /* The titles are the first thing to go: the numbers and the bar still say
+     where you are, and four labels cannot share a phone's width legibly. */
+  .wizard-step__title {
+    display: none;
+  }
+
+  .product-wizard .wizard-steps > li {
+    flex: 0 0 auto;
+  }
+
+  .wizard-panel {
+    min-height: 0;
+  }
+
+  .wizard-actions__count {
+    display: none;
+  }
 }

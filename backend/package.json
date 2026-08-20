@@ -15,7 +15,8 @@
     "backfill:product-subcategories": "node scripts/backfillProductSubcategories.js",
     "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",
     "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js",
-    "seed:catalogue": "node scripts/seedCatalogue.js"
+    "seed:catalogue": "node scripts/seedCatalogue.js",
+    "seed:units": "node scripts/seedUnits.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

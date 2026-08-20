@@ -11,6 +11,13 @@ import {
 } from '../components/ui';
 import { formatINR } from '../utils/format';
 import { resolveAvailability } from '../utils/availability';
+import { unitsForCategory } from '../constants/units';
+import {
+  WIZARD_STEPS,
+  canReachStep,
+  firstUnfinishedStep,
+  stepProblem as wizardStepProblem,
+} from '../constants/productWizard';
 
 const EMPTY_FORM = {
   name: '',
@@ -64,11 +71,8 @@ const Products = () => {
   const [units, setUnits] = useState([]);
 
   const [isGroupOpen, setIsGroupOpen] = useState(false);
-  const [isUnitOpen, setIsUnitOpen] = useState(false);
   const [isProductOpen, setIsProductOpen] = useState(false);
 
-  const [groupName, setGroupName] = useState('');
-  const [unitForm, setUnitForm] = useState({ name: '', symbol: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('kiosk');
   const [selectedGroup, setSelectedGroup] = useState('All');
@@ -81,6 +85,11 @@ const Products = () => {
   const [dragOverSubCategory, setDragOverSubCategory] = useState('');
 
   const [form, setForm] = useState(EMPTY_FORM);
+  const [step, setStep] = useState(0);
+  // A freshly opened form is not a form the office got wrong. The step's
+  // outstanding problem is held back until they try to leave the step, so
+  // "Add Product" does not greet them with "Give the product a name."
+  const [nudged, setNudged] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -143,6 +152,19 @@ const Products = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    // Steps that are not on screen have their inputs unmounted, so the browser
+    // has nothing to validate for them. Send the office back to the first
+    // unfinished one rather than letting the server refuse the save.
+    if (firstProblemStep !== -1) {
+      setStep(firstProblemStep);
+      setNudged(true);
+      // Toasted as well as shown inline, because the bounce may land on a step
+      // the office is not looking at.
+      toast.error(stepProblem(firstProblemStep));
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -211,12 +233,20 @@ const Products = () => {
       nutritionServing: product.nutrition?.serving || '',
       image: null,
     });
+    goToStep(0);
     setIsProductOpen(true);
+  };
+
+  const goToStep = (index) => {
+    setStep(index);
+    setNudged(false);
   };
 
   const clearForm = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
+    setStep(0);
+    setNudged(false);
   };
 
   const setArchived = async (product, archived) => {
@@ -236,51 +266,6 @@ const Products = () => {
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Failed to update product');
-    }
-  };
-
-  const addStockGroup = async (e) => {
-    e.preventDefault();
-    if (!groupName.trim()) return;
-
-    setSavingGroups(true);
-    try {
-      await api.post('/stock-groups', { name: groupName });
-      setGroupName('');
-      await fetchStockGroups();
-      toast.success('Category added');
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to add category');
-    } finally {
-      setSavingGroups(false);
-    }
-  };
-
-  const removeStockGroup = async (group) => {
-    const productCount = products.filter(
-      (product) => product.stockGroup?._id === group._id
-    ).length;
-
-    if (productCount > 0) {
-      toast.error('Move all products to another category before removing this category');
-      return;
-    }
-    if (!window.confirm(`Remove the empty category “${group.name}”?`)) return;
-
-    setSavingGroups(true);
-    try {
-      await api.delete(`/stock-groups/${group._id}`);
-      if (selectedGroup === group.name) setSelectedGroup('All');
-      await fetchStockGroups();
-      toast.success('Category removed');
-    } catch (error) {
-      console.error(error);
-      toast.error(
-        error.response?.data?.message || 'Failed to remove category'
-      );
-    } finally {
-      setSavingGroups(false);
     }
   };
 
@@ -311,21 +296,6 @@ const Products = () => {
       console.error(error);
       await fetchStockGroups();
       toast.error('Failed to reorder categories');
-    } finally {
-      setSavingGroups(false);
-    }
-  };
-
-  const renameCategory = async (category) => {
-    const name = window.prompt('Rename category', category.name)?.trim();
-    if (!name || name === category.name) return;
-    setSavingGroups(true);
-    try {
-      await api.put(`/stock-groups/${category._id}`, { name });
-      await Promise.all([fetchStockGroups(), fetchProducts()]);
-      toast.success('Category renamed');
-    } catch (error) {
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to rename category');
     } finally {
       setSavingGroups(false);
     }
@@ -436,22 +406,6 @@ const Products = () => {
     }
   };
 
-  const addUnit = async (e) => {
-    e.preventDefault();
-    if (!unitForm.name.trim() || !unitForm.symbol.trim()) return;
-
-    try {
-      await api.post('/units', unitForm);
-      setUnitForm({ name: '', symbol: '' });
-      fetchUnits();
-      setIsUnitOpen(false);
-      toast.success('Unit added');
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to add unit');
-    }
-  };
-
   const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
     return (
@@ -459,6 +413,23 @@ const Products = () => {
       p.subCategory?.toLowerCase().includes(query)
     );
   });
+
+  const selectedCategoryName =
+    stockGroups.find((group) => group._id === form.stockGroup)?.name || '';
+
+  /* The units this product's category allows, plus — when editing — whatever
+     the product is already saved as. Every product in the opening catalogue
+     was seeded as `pc`, and Beverages now maps to ml and L, so dropping an
+     unmapped current unit would silently re-measure a drink the moment
+     somebody opened it to fix a typo in its name. */
+  const allowedUnits = unitsForCategory(units, selectedCategoryName);
+  const currentUnit = units.find((unit) => unit._id === form.unit);
+  const unitIsOffMap =
+    Boolean(currentUnit) && !allowedUnits.some((unit) => unit._id === currentUnit._id);
+  const unitOptions = unitIsOffMap ? [...allowedUnits, currentUnit] : allowedUnits;
+
+  const stepProblem = (index) => wizardStepProblem(index, form);
+  const firstProblemStep = firstUnfinishedStep(form);
 
   const subCategorySuggestions = [
     ...new Set(
@@ -551,15 +522,8 @@ const Products = () => {
     <div className="page warehouse-page">
       <PageHeader
         title="Product Catalog"
-        subtitle="Manage products, categories, sub-categories and measurement units."
-        actions={
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Button variant="ghost" onClick={() => setIsUnitOpen(true)}>
-              + Measurement Unit
-            </Button>
-            <Button onClick={openProductModal}>+ Add Product</Button>
-          </div>
-        }
+        subtitle="Manage products and the sub-categories they sit under."
+        actions={<Button onClick={openProductModal}>+ Add Product</Button>}
       />
 
       <div className="catalogue-controls">
@@ -829,8 +793,15 @@ const Products = () => {
             <div className="modal category-editor-modal" onClick={(e) => e.stopPropagation()}>
               {modalHeader('Edit Categories', () => setIsGroupOpen(false))}
 
+              {/* Categories themselves are defined in the catalogue seed and are
+                  read-only here: their names key the unit map the product form
+                  filters on, so a rename made in this dialog would leave that
+                  category offering every unit. Order and sub-categories are
+                  free to change — nothing keys on either. */}
               <p className="stock-group-editor__help">
-                Drag tabs and tiles to set the Kiosk order. Tap any category or sub-category name to rename it.
+                Drag tabs and tiles to set the Kiosk order, and tap a sub-category name to
+                rename it. Categories themselves are fixed — adding or renaming one is a
+                change to the catalogue seed.
               </p>
 
               <div className="category-editor-tabs" role="tablist" aria-label="Category order">
@@ -863,7 +834,6 @@ const Products = () => {
                     <button type="button" role="tab" aria-selected={editorCategoryId === category._id} onClick={() => setEditorCategoryId(category._id)}>
                       {category.name}
                     </button>
-                    <button type="button" className="category-editor-rename" onClick={() => renameCategory(category)} aria-label={`Rename ${category.name}`}>✎</button>
                   </div>
                 ))}
               </div>
@@ -873,18 +843,8 @@ const Products = () => {
                   <header>
                     <div>
                       <p>Sub-categories in</p>
-                      <button type="button" id="subcategory-editor-title" onClick={() => renameCategory(selectedCategory)}>
-                        {selectedCategory.name} <span aria-hidden="true">✎</span>
-                      </button>
+                      <h4 id="subcategory-editor-title">{selectedCategory.name}</h4>
                     </div>
-                    <Button
-                      variant="danger"
-                      className="btn--sm"
-                      disabled={savingGroups || products.some((product) => product.stockGroup?._id === selectedCategory._id)}
-                      onClick={() => removeStockGroup(selectedCategory)}
-                    >
-                      Remove category
-                    </Button>
                   </header>
 
                   <div className="subcategory-tile-grid">
@@ -940,390 +900,470 @@ const Products = () => {
                 </section>
               )}
 
-              <form className="category-editor-add category-editor-add--category" onSubmit={addStockGroup}>
-                <label className="field-label" htmlFor="group-name">Add category</label>
-                <div>
-                  <input id="group-name" className="input" required value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="e.g., Food & Snacks" />
-                  <Button type="submit" disabled={savingGroups}>Add</Button>
-                </div>
-              </form>
-
               <div className="modal-actions"><Button variant="ghost" onClick={() => setIsGroupOpen(false)}>Done</Button></div>
             </div>
           </div>
         );
       })()}
 
-      {isUnitOpen && (
-        <div className="modal-backdrop" onClick={() => setIsUnitOpen(false)}>
+      {isProductOpen && (() => {
+        const problem = stepProblem(step);
+        const isLastStep = step === WIZARD_STEPS.length - 1;
+        const closeProductModal = () => {
+          if (saving) return;
+          setIsProductOpen(false);
+          clearForm();
+        };
+
+        return (
+        <div className="modal-backdrop" onClick={closeProductModal}>
           <form
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={addUnit}
-          >
-            {modalHeader('Quick Add: Measurement Unit', () =>
-              setIsUnitOpen(false)
-            )}
-
-            <label className="field-label" htmlFor="unit-name">
-              Unit Name
-            </label>
-            <input
-              id="unit-name"
-              type="text"
-              className="input"
-              style={{ marginBottom: 14 }}
-              required
-              value={unitForm.name}
-              onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })}
-              placeholder="e.g., Kilogram, Litre"
-            />
-
-            <label className="field-label" htmlFor="unit-symbol">
-              Unit Symbol
-            </label>
-            <input
-              id="unit-symbol"
-              type="text"
-              className="input"
-              required
-              value={unitForm.symbol}
-              onChange={(e) =>
-                setUnitForm({ ...unitForm, symbol: e.target.value })
-              }
-              placeholder="e.g., kg, L, pcs"
-            />
-
-            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={() => setIsUnitOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Add Unit</Button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {isProductOpen && (
-        <div
-          className="modal-backdrop"
-          onClick={() => {
-            if (saving) return;
-            setIsProductOpen(false);
-            clearForm();
-          }}
-        >
-          <form
-            className="modal"
+            className="modal product-wizard"
             style={{ maxWidth: 680 }}
             onClick={(e) => e.stopPropagation()}
             onSubmit={handleSave}
           >
             {modalHeader(
-              editingId ? '📝 Edit Product' : 'Add Product',
-              () => {
-                setIsProductOpen(false);
-                clearForm();
-              }
+              editingId ? `Edit ${form.name || 'Product'}` : 'Add Product',
+              closeProductModal
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label className="field-label" htmlFor="product-name">
-                  Product Name
-                </label>
-                <input
-                  id="product-name"
-                  type="text"
-                  className="input"
-                  placeholder="e.g., Banana Cake"
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
+            {/* Buttons, not links or plain markers: in edit mode every step is
+                already satisfied, so all four are live and the office can jump
+                straight to the field it opened the dialog for. */}
+            <ol className="wizard-steps">
+              {WIZARD_STEPS.map((wizardStep, index) => {
+                const reachable = canReachStep(index, form);
+                const state = index === step ? 'current' : index < step ? 'done' : 'ahead';
+                return (
+                  <li key={wizardStep.title}>
+                    <button
+                      type="button"
+                      className={`wizard-step wizard-step--${state}`}
+                      aria-current={index === step ? 'step' : undefined}
+                      disabled={!reachable}
+                      onClick={() => reachable && goToStep(index)}
+                    >
+                      <span className="wizard-step__number" aria-hidden="true">
+                        {index < step && !stepProblem(index) ? '✓' : index + 1}
+                      </span>
+                      <span className="wizard-step__title">{wizardStep.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
 
-              <div>
-                <label className="field-label" htmlFor="product-safety-stock">
-                  Safety Stock Buffer
-                </label>
-                <input
-                  id="product-safety-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  className="input"
-                  required
-                  value={form.safetyStock}
-                  onChange={(e) => setForm({ ...form, safetyStock: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-group">
-                  Category
-                </label>
-                <select
-                  id="product-group"
-                  className="select"
-                  value={form.stockGroup}
-                  onChange={(e) =>
-                    setForm({ ...form, stockGroup: e.target.value, subCategory: 'Others' })
-                  }
-                  required
-                >
-                  <option value="">Select Category</option>
-                  {stockGroups.map((group) => (
-                    <option key={group._id} value={group._id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-subcategory">
-                  Sub-category
-                </label>
-                <select
-                  id="product-subcategory"
-                  className="select"
-                  required
-                  value={form.subCategory}
-                  onChange={(e) => setForm({ ...form, subCategory: e.target.value })}
-                  disabled={!form.stockGroup}
-                >
-                  {subCategorySuggestions.map((name) => <option key={name} value={name}>{name}</option>)}
-                </select>
-                <p className="field-help">Manage and reorder these options from Edit Categories.</p>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-unit">
-                  Unit
-                </label>
-                <select
-                  id="product-unit"
-                  className="select"
-                  value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                  required
-                >
-                  <option value="">Select Unit</option>
-                  {units.map((unit) => (
-                    <option key={unit._id} value={unit._id}>
-                      {unit.symbol} ({unit.name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-price">
-                  Selling Price (₹)
-                </label>
-                {/* Required like its siblings: the backend falls back to
-                    price: 0 on a blank, which the till would then sell free. */}
-                {/* min 0.01, not 0: the server refuses an unpriced product
-                    outright, because the till reads zero as free and hands the
-                    goods over. Caught here so the office is told at the box
-                    rather than by a rejected save. */}
-                <input
-                  id="product-price"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  className="input"
-                  placeholder="0.00"
-                  required
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-reorder">
-                  Reorder Level (flag when stock falls below this; 0 never flags)
-                </label>
-                <input
-                  id="product-reorder"
-                  type="number"
-                  min="0"
-                  step="1"
-                  className="input"
-                  required
-                  value={form.reorderLevel}
-                  onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label
-                  className="field-label"
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-                  htmlFor="product-limit-enabled"
-                >
-                  <input
-                    id="product-limit-enabled"
-                    type="checkbox"
-                    checked={form.purchaseLimitEnabled}
-                    onChange={(e) =>
-                      setForm({ ...form, purchaseLimitEnabled: e.target.checked })
-                    }
-                  />
-                  Cap how many one student may buy
-                </label>
-
-                {form.purchaseLimitEnabled && (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 12,
-                      marginTop: 12,
-                    }}
-                  >
-                    <div>
-                      <label className="field-label" htmlFor="product-limit-quantity">
-                        Maximum quantity
-                      </label>
-                      {/* min 1: the server refuses an enabled limit of zero,
-                          because a product nobody may buy is one to archive. */}
-                      <input
-                        id="product-limit-quantity"
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="input"
-                        placeholder="e.g., 2"
-                        required
-                        value={form.purchaseLimitQuantity}
-                        onChange={(e) =>
-                          setForm({ ...form, purchaseLimitQuantity: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="field-label" htmlFor="product-limit-period">
-                        Counted
-                      </label>
-                      <select
-                        id="product-limit-period"
-                        className="select"
-                        value={form.purchaseLimitPeriod}
-                        onChange={(e) =>
-                          setForm({ ...form, purchaseLimitPeriod: e.target.value })
-                        }
-                      >
-                        {LIMIT_PERIODS.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="field-label">Nutrition</label>
-
-                {/* Every box optional. The till prints a dash wherever one is
-                    left empty rather than a zero, so a packet read halfway is
-                    worth saving. Nothing is calculated from these figures. */}
-                <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>
-                  As printed on the pack. Leave blank what the pack does not say
-                  &mdash; the till shows a dash, not a zero.
-                </p>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 12,
-                  }}
-                >
-                  {NUTRITION_FIELDS.map(([key, label, placeholder]) => (
-                    <div key={key}>
-                      <label className="field-label" htmlFor={`product-${key}`}>
-                        {label}
-                      </label>
-                      <input
-                        id={`product-${key}`}
-                        type="number"
-                        min="0"
-                        step="any"
-                        className="input"
-                        placeholder={placeholder}
-                        value={form[key]}
-                        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                  <label className="field-label" htmlFor="product-nutritionServing">
-                    Serving these figures are per
-                  </label>
-                  <input
-                    id="product-nutritionServing"
-                    type="text"
-                    maxLength={120}
-                    className="input"
-                    placeholder="e.g., Per 52g pack"
-                    value={form.nutritionServing}
-                    onChange={(e) =>
-                      setForm({ ...form, nutritionServing: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="product-image">
-                  Product Image
-                </label>
-                <input
-                  id="product-image"
-                  type="file"
-                  accept="image/*"
-                  className="input"
-                  onChange={(e) =>
-                    setForm({ ...form, image: e.target.files[0] })
-                  }
-                />
-              </div>
+            <div
+              className="wizard-progress"
+              role="progressbar"
+              aria-valuenow={step + 1}
+              aria-valuemin={1}
+              aria-valuemax={WIZARD_STEPS.length}
+              aria-label={`Step ${step + 1} of ${WIZARD_STEPS.length}`}
+            >
+              <span style={{ width: `${((step + 1) / WIZARD_STEPS.length) * 100}%` }} />
             </div>
 
-            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+            <p className="wizard-hint">{WIZARD_STEPS[step].hint}</p>
+
+            {/* Only the current step is mounted. That is what keeps `required`
+                honest — a hidden required input cannot be focused, and a
+                browser asked to report one blocks the submit with a message
+                pointing at nothing on screen. */}
+            <div className="wizard-panel">
+              {step === 0 && (
+                <>
+                  <div>
+                    <label className="field-label" htmlFor="product-name">
+                      Product Name
+                    </label>
+                    <input
+                      id="product-name"
+                      type="text"
+                      className="input"
+                      placeholder="e.g., Banana Cake"
+                      required
+                      autoFocus
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="product-group">
+                      Category
+                    </label>
+                    <select
+                      id="product-group"
+                      className="select"
+                      value={form.stockGroup}
+                      onChange={(e) => {
+                        // The unit list is a function of the category, so
+                        // changing the category drops a unit it no longer
+                        // offers — and picks the only one on offer when the
+                        // category leaves no choice, as Stationery does.
+                        const nextUnits = unitsForCategory(
+                          units,
+                          stockGroups.find((group) => group._id === e.target.value)?.name
+                        );
+                        setForm({
+                          ...form,
+                          stockGroup: e.target.value,
+                          subCategory: 'Others',
+                          unit: nextUnits.length === 1
+                            ? nextUnits[0]._id
+                            : nextUnits.some((unit) => unit._id === form.unit) ? form.unit : '',
+                        });
+                      }}
+                      required
+                    >
+                      <option value="">Select Category</option>
+                      {stockGroups.map((group) => (
+                        <option key={group._id} value={group._id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="field-help">
+                      Categories are fixed. This choice also decides which units are
+                      offered on the next step.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="product-subcategory">
+                      Sub-category
+                    </label>
+                    <select
+                      id="product-subcategory"
+                      className="select"
+                      required
+                      value={form.subCategory}
+                      onChange={(e) => setForm({ ...form, subCategory: e.target.value })}
+                      disabled={!form.stockGroup}
+                    >
+                      {subCategorySuggestions.map((name) => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                    <p className="field-help">
+                      {form.stockGroup
+                        ? 'Manage and reorder these options from Edit Categories.'
+                        : 'Choose a category first.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="product-image">
+                      Product Image
+                    </label>
+                    <input
+                      id="product-image"
+                      type="file"
+                      accept="image/*"
+                      className="input"
+                      onChange={(e) => setForm({ ...form, image: e.target.files[0] })}
+                    />
+                    <p className="field-help">
+                      {editingId
+                        ? 'Optional. Leave empty to keep the current picture.'
+                        : 'Optional. The kiosk shows a box icon without one.'}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {step === 1 && (
+                <>
+                  <div>
+                    <label className="field-label" htmlFor="product-unit">
+                      Unit
+                    </label>
+                    <select
+                      id="product-unit"
+                      className="select"
+                      value={form.unit}
+                      onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                      required
+                      autoFocus
+                    >
+                      <option value="">Select Unit</option>
+                      {unitOptions.map((unit) => (
+                        <option key={unit._id} value={unit._id}>
+                          {unit.symbol} ({unit.name})
+                        </option>
+                      ))}
+                    </select>
+                    {/* Three things this line has to cover: the ordinary case,
+                        a saved product whose unit the category no longer offers
+                        (everything in the opening catalogue is `pc`), and a
+                        backend deployed before the seed that adds g/ml/L, where
+                        the mapped symbols exist in the map but not in the
+                        database. The last one is a dead end, so it says so. */}
+                    <p className="field-help">
+                      {allowedUnits.length === 0
+                        ? `No measurement units are loaded for ${selectedCategoryName || 'this category'} yet. Run the catalogue seed on the backend to add them.`
+                        : unitIsOffMap
+                          ? `${selectedCategoryName} is normally measured in ${allowedUnits
+                              .map((unit) => unit.symbol)
+                              .join(' or ')}. This one is saved as ${currentUnit.symbol}, kept on the list so opening it does not change it.`
+                          : `The units ${selectedCategoryName || 'this category'} is sold in.`}
+                    </p>
+                  </div>
+
+                  <div>
+                    {/* min 0.01, not 0: the server refuses an unpriced product
+                        outright, because the till reads zero as free and hands
+                        the goods over. Caught here so the office is told at the
+                        box rather than by a rejected save. */}
+                    <label className="field-label" htmlFor="product-price">
+                      Selling Price (₹)
+                    </label>
+                    <input
+                      id="product-price"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      className="input"
+                      placeholder="0.00"
+                      required
+                      value={form.price}
+                      onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    />
+                    <p className="field-help">What a student pays at the till.</p>
+                  </div>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <div>
+                    <label className="field-label" htmlFor="product-reorder">
+                      Reorder Level
+                    </label>
+                    <input
+                      id="product-reorder"
+                      type="number"
+                      min="0"
+                      step="1"
+                      className="input"
+                      required
+                      autoFocus
+                      value={form.reorderLevel}
+                      onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
+                    />
+                    <p className="field-help">
+                      Flagged for reordering when stock falls below this. 0 never flags.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="product-safety-stock">
+                      Safety Stock Buffer
+                    </label>
+                    <input
+                      id="product-safety-stock"
+                      type="number"
+                      min="0"
+                      step="1"
+                      className="input"
+                      required
+                      value={form.safetyStock}
+                      onChange={(e) => setForm({ ...form, safetyStock: e.target.value })}
+                    />
+                    <p className="field-help">
+                      The cushion analytics keeps on top of the reorder level. Leave at 0
+                      unless you have a reason.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <div>
+                    <label
+                      className="field-label"
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                      htmlFor="product-limit-enabled"
+                    >
+                      <input
+                        id="product-limit-enabled"
+                        type="checkbox"
+                        checked={form.purchaseLimitEnabled}
+                        onChange={(e) =>
+                          setForm({ ...form, purchaseLimitEnabled: e.target.checked })
+                        }
+                      />
+                      Cap how many one student may buy
+                    </label>
+
+                    {form.purchaseLimitEnabled && (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 12,
+                          marginTop: 12,
+                        }}
+                      >
+                        <div>
+                          <label className="field-label" htmlFor="product-limit-quantity">
+                            Maximum quantity
+                          </label>
+                          {/* min 1: the server refuses an enabled limit of zero,
+                              because a product nobody may buy is one to archive. */}
+                          <input
+                            id="product-limit-quantity"
+                            type="number"
+                            min="1"
+                            step="1"
+                            className="input"
+                            placeholder="e.g., 2"
+                            required
+                            value={form.purchaseLimitQuantity}
+                            onChange={(e) =>
+                              setForm({ ...form, purchaseLimitQuantity: e.target.value })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <label className="field-label" htmlFor="product-limit-period">
+                            Counted
+                          </label>
+                          <select
+                            id="product-limit-period"
+                            className="select"
+                            value={form.purchaseLimitPeriod}
+                            onChange={(e) =>
+                              setForm({ ...form, purchaseLimitPeriod: e.target.value })
+                            }
+                          >
+                            {LIMIT_PERIODS.map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="field-label">Nutrition</label>
+
+                    {/* Every box optional. The till prints a dash wherever one is
+                        left empty rather than a zero, so a packet read halfway is
+                        worth saving. Nothing is calculated from these figures. */}
+                    <p className="muted" style={{ margin: '0 0 12px', fontSize: 12 }}>
+                      As printed on the pack. Leave blank what the pack does not say
+                      &mdash; the till shows a dash, not a zero.
+                    </p>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 12,
+                      }}
+                    >
+                      {NUTRITION_FIELDS.map(([key, label, placeholder]) => (
+                        <div key={key}>
+                          <label className="field-label" htmlFor={`product-${key}`}>
+                            {label}
+                          </label>
+                          <input
+                            id={`product-${key}`}
+                            type="number"
+                            min="0"
+                            step="any"
+                            className="input"
+                            placeholder={placeholder}
+                            value={form[key]}
+                            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <label className="field-label" htmlFor="product-nutritionServing">
+                        Serving these figures are per
+                      </label>
+                      <input
+                        id="product-nutritionServing"
+                        type="text"
+                        maxLength={120}
+                        className="input"
+                        placeholder="e.g., Per 52g pack"
+                        value={form.nutritionServing}
+                        onChange={(e) =>
+                          setForm({ ...form, nutritionServing: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Shown rather than enforced by disabling Next: a greyed-out button
+                with no stated reason is the thing this form was rewritten to
+                stop. Held back until Next is pressed so it reads as an answer
+                to something the office did, not as a complaint on arrival. */}
+            {problem && nudged && (
+              <p className="wizard-problem" role="status">
+                {problem}
+              </p>
+            )}
+
+            <div className="modal-actions wizard-actions">
               <Button
                 variant="ghost"
                 disabled={saving}
-                onClick={() => {
-                  setIsProductOpen(false);
-                  clearForm();
-                }}
+                onClick={step === 0 ? closeProductModal : () => goToStep(step - 1)}
               >
-                Cancel
+                {step === 0 ? 'Cancel' : '‹ Back'}
               </Button>
-              <Button
-                type="submit"
-                variant={editingId ? 'success' : 'primary'}
-                disabled={saving}
-              >
-                {saving
-                  ? 'Saving…'
-                  : editingId
-                    ? 'Update Product'
-                    : 'Save Product'}
-              </Button>
+
+              <span className="wizard-actions__count">
+                Step {step + 1} of {WIZARD_STEPS.length}
+              </span>
+
+              {isLastStep ? (
+                <Button
+                  type="submit"
+                  variant={editingId ? 'success' : 'primary'}
+                  disabled={saving}
+                >
+                  {saving
+                    ? 'Saving…'
+                    : editingId
+                      ? 'Update Product'
+                      : 'Save Product'}
+                </Button>
+              ) : (
+                <div className="wizard-actions__next">
+                  {/* Saving early is allowed once nothing is outstanding — the
+                      last step is optional, and making the office click through
+                      it to store a packet of crisps is the old form's problem
+                      in a new shape. */}
+                  {editingId && firstProblemStep === -1 && (
+                    <Button variant="ghost" disabled={saving} onClick={handleSave}>
+                      {saving ? 'Saving…' : 'Save changes'}
+                    </Button>
+                  )}
+                  <Button onClick={() => (problem ? setNudged(true) : goToStep(step + 1))}>
+                    Next ›
+                  </Button>
+                </div>
+              )}
             </div>
           </form>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

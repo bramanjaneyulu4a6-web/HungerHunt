@@ -79,16 +79,52 @@ describe('stock group management', () => {
     assert.deepEqual(update, { order: 2 });
   });
 
-  test('does not remove a group that still has products', async () => {
+  // The console sends the whole group back when tabs are dragged. Reordering
+  // must still work, and the name must not travel with it — the category name
+  // is what the admin unit map keys on, so a rename through this route would
+  // leave the product form offering every unit for that category.
+  test('ignores a name sent alongside the order', async () => {
     accountIs('admin');
-    mock.method(Product, 'exists', async () => ({ _id: 'product' }));
+    let update;
+    mock.method(StockGroup, 'findByIdAndUpdate', async (id, value) => {
+      update = value;
+      return { _id: id, name: 'Snacks', ...value };
+    });
+
+    const response = await request(`/api/stock-groups/${GROUP_ID}`, {
+      method: 'PUT',
+      body: JSON.stringify({ order: 2, name: 'Renamed' }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(update, { order: 2 });
+  });
+
+  test('refuses to create a category', async () => {
+    accountIs('admin');
+    const create = mock.method(StockGroup, 'create', async () => ({}));
+
+    const response = await request('/api/stock-groups', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Fireworks' }),
+    });
+
+    assert.equal(response.status, 405);
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  // Sealed regardless of whether the category is empty. Removing one is a seed
+  // change now, and a 409-when-in-use rule would imply the empty case works.
+  test('refuses to remove a category even when nothing uses it', async () => {
+    accountIs('admin');
+    mock.method(Product, 'exists', async () => null);
     const remove = mock.method(StockGroup, 'findByIdAndDelete', async () => ({}));
 
     const response = await request(`/api/stock-groups/${GROUP_ID}`, {
       method: 'DELETE',
     });
 
-    assert.equal(response.status, 409);
+    assert.equal(response.status, 405);
     assert.equal(remove.mock.callCount(), 0);
   });
 });

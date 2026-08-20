@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hunger Hunt Warehouse</string>
+    <string name="title_activity_main">Hunger Hunt Warehouse</string>
+    <string name="package_name">com.hungerhunt.warehouse</string>
+    <string name="custom_url_scheme">com.hungerhunt.warehouse</string>
+</resources>

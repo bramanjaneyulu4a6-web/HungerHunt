@@ -13,10 +13,12 @@ The whole stack is JavaScript — Node/Express on the server, React + Vite in th
 | `backend/` | Express + MongoDB API, Cloudinary uploads, Firebase push, Gmail SMTP | 5000 |
 | `frontend-admin/` | School office dashboard: students, products, inventory, purchases, billing, recharges | 5174 |
 | `frontend-parent/` | Parent app (also packaged as iOS/Android via Capacitor): balances, history, wallet limits, purchase password | 5173 |
-| `hungerhunt-kiosk/` | Counter terminal for staff to ring up purchases | 5175 |
-| `hungerhunt-warehouse/` | Storeroom app: suppliers, purchase orders, receiving deliveries, stock | 5176 |
+| `hungerhunt-kiosk/` | Counter terminal for staff to ring up purchases (also packaged as an Android APK) | 5175 |
+| `hungerhunt-warehouse/` | Storeroom app: suppliers, purchase orders, receiving deliveries, stock (also packaged as an Android APK) | 5176 |
 
-The parent app is a web app wrapped in Capacitor, so `frontend-parent/ios/` and `frontend-parent/android/` are native shells around the same React code — there is no separate mobile codebase.
+Three of the apps are web apps wrapped in Capacitor, so `frontend-parent/ios/`, `frontend-parent/android/`, `hungerhunt-kiosk/android/` and `hungerhunt-warehouse/android/` are native shells around the same React code — there is no separate mobile codebase.
+
+The parent app is the only one headed for the App Store and Play. The kiosk and warehouse shells are built as APKs and installed by hand onto the school's own terminal and storeroom device; they never go near a store. The two paths have different rules about signing, versions and updates, and they are written up separately — [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) for the parent app, [docs/android-apk-builds.md](docs/android-apk-builds.md) for the other two.
 
 `hungerhunt-warehouse`'s dev port is pinned with `strictPort` rather than left to float — the backend's CORS allowlist is a hardcoded array of origins, so a dev server that drifted onto a different port would be silently rejected by every request.
 
@@ -29,9 +31,8 @@ cp backend/.env.example           backend/.env
 cp frontend-admin/.env.example    frontend-admin/.env
 cp frontend-parent/.env.example   frontend-parent/.env
 cp hungerhunt-kiosk/.env.example  hungerhunt-kiosk/.env
+cp hungerhunt-warehouse/.env.example hungerhunt-warehouse/.env
 ```
-
-`hungerhunt-warehouse/` has no `.env.example` yet — copy `hungerhunt-kiosk/.env.example` as a starting point and point `VITE_API_BASE_URL` at the backend.
 
 `.env` files are gitignored. Never commit real credentials — see Security below.
 
@@ -104,12 +105,16 @@ The whole slice sits behind `FEATURE_V1_PROCUREMENT`, off unless it is set to ex
 
 ## Checks and releases
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, `eslint` for `frontend-parent`, `hungerhunt-kiosk` and `hungerhunt-warehouse`, a build of all four frontends, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps. `frontend-admin` is built but not yet linted — it has 10 outstanding eslint errors.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, the `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` test suites, `eslint` at zero warnings for all four frontends, a build of all four, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps.
 
-Shipping the parent app to the App Store or Play has its own list, including the credential rotation and push setup still outstanding: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+What CI does not cover is the native shells: it runs on Linux and builds the web bundles only, so `frontend-parent`'s iOS and Android projects and the kiosk and warehouse Android projects are exercised only when someone builds one.
+
+Shipping the parent app to the App Store or Play has its own list, including the credential rotation still outstanding: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md). Building and installing the kiosk and warehouse APKs is [docs/android-apk-builds.md](docs/android-apk-builds.md).
 
 ## Known gaps
 
 Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, refunds and voids, manual inventory adjustments, and cost/margin reporting.
 
-Native push is written but delivers nothing until the manual Firebase and Xcode steps are done — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo). The 369 backend tests cover the parent API surface and auth; the frontends have no automated tests.
+Native push is wired up and its credentials are in place on both platforms — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo) for what they are and where they go. The gap that remains is testing: the Android path has been exercised end to end, the iOS path never has on a physical iPhone, and a simulator cannot register with APNs.
+
+The 369 backend tests cover the parent API surface and auth. The frontends are lightly covered — `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` each have a suite that CI runs, mostly over utilities and the shared availability rule, plus one hook and one component in the kiosk; `frontend-parent` has none. Whole screens and flows are still verified by hand.

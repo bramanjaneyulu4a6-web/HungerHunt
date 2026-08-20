@@ -7,6 +7,11 @@ cycle. This is the list that stands between a build and a parent's phone.
 Work top to bottom. The first section is done once, before the first release
 ever goes out; everything after it is done every time.
 
+The kiosk and warehouse apps are also packaged for Android, but they are
+sideloaded rather than published, and almost nothing below applies to them —
+no store record, no review, and different rules for versions and signing. They
+have their own list: [docs/android-apk-builds.md](docs/android-apk-builds.md).
+
 ---
 
 ## Before the first release

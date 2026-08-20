@@ -115,6 +115,21 @@ if (unverifiedBillsAccepted()) {
 app.use(helmet());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+/* A dev-server origin arriving through configuration rather than the list below.
+ *
+ * These four variables also drive things like password-reset links, so in a
+ * local checkout they legitimately hold http://localhost values — and until this
+ * filter existed they were merged into the allowlist unconditionally, which
+ * quietly re-enabled in production exactly what the list below switches off. One
+ * stale variable on the deployed service was enough to do it, with nothing
+ * anywhere to say so.
+ *
+ * Only plaintext loopback is dropped. https://localhost is left alone: it is not
+ * a dev server, it is what the Android builds send.
+ */
+const isPlaintextLoopback = (origin) =>
+  /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin);
+
 const configuredOrigins = [
   process.env.ADMIN_CLIENT_URL,
   process.env.PARENT_CLIENT_URL,
@@ -123,21 +138,49 @@ const configuredOrigins = [
   ...(process.env.CORS_ORIGINS || '').split(','),
 ]
   .map((origin) => origin?.trim().replace(/\/$/, ''))
-  .filter(Boolean);
+  .filter(Boolean)
+  .filter(
+    (origin) => process.env.NODE_ENV !== 'production' || !isPlaintextLoopback(origin)
+  );
+
+/* The Vite dev servers, and only them.
+ *
+ * These are the origins the four apps are served from while someone is working
+ * on them. Nothing else ever sends one, so a production deployment has no
+ * reason to accept them — and every origin on the list is a standing invitation
+ * for a browser somewhere to make credentialed calls on a signed-in user's
+ * behalf. In production this list is empty.
+ *
+ * Local development is unaffected: a backend started without NODE_ENV=production
+ * still accepts them, so a local frontend against a local API works exactly as
+ * before. What stops working is a *dev server pointed at the live API* — that is
+ * the thing being switched off, and it is deliberate.
+ */
+const devServerOrigins =
+  process.env.NODE_ENV === "production"
+    ? []
+    : [
+        "http://localhost:5173", // frontend-parent
+        "http://localhost:5174", // frontend-admin
+        "http://localhost:5175", // hungerhunt-kiosk
+        "http://localhost:5176", // hungerhunt-warehouse (port pinned in its vite.config)
+        "http://localhost:3000",
+      ];
 
 const allowedOrigins = new Set([
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://localhost:5175",
-  "http://localhost:5176", // hungerhunt-warehouse (port pinned in its vite.config)
-  "http://localhost:3000",
+  ...devServerOrigins,
 
-  // The native parent apps are not served from a web origin at all: Capacitor
-  // hosts the bundle inside the WebView and stamps these two on every request
-  // it makes (iOS keeps the capacitor: scheme, Android serves over https). They
-  // are fixed by the platform and identical for every device, so they are not
-  // deployment configuration — without them the phone builds get a 403 on the
-  // first call and the app looks broken with nothing in the logs to say why.
+  /* Not dev servers. These two are the *native* apps.
+   *
+   * Capacitor hosts the bundle inside the WebView rather than serving it from a
+   * web origin, and stamps one of these on every request it makes (iOS keeps the
+   * capacitor: scheme, Android serves over https). They are fixed by the platform
+   * and identical on every device, so they are not deployment configuration and
+   * they must survive into production — the parent app, the kiosk APK and the
+   * warehouse APK all depend on them. Delete them while tidying away "localhost"
+   * and every installed phone build 403s on its first call, looking broken with
+   * nothing in the logs to explain why.
+   */
   "capacitor://localhost",
   "https://localhost",
 

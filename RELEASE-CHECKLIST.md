@@ -191,7 +191,7 @@ CI runs the first four of these on every push and pull request
 tagging anyway — CI does not build the native shells.
 
 ```bash
-npm test            --prefix backend            # 369 tests, all mocked; no database is touched
+npm test            --prefix backend            # 452 tests, all mocked; no database is touched
 npm run lint        --prefix frontend-parent    # must be 0 errors, 0 warnings
 npm run lint        --prefix hungerhunt-kiosk
 npm run build       --prefix frontend-parent
@@ -326,9 +326,10 @@ Worth knowing when deciding how much the green checkmarks are worth.
   than parked on red, and belongs back in the moment those are fixed — the
   change is one word in [ci.yml](.github/workflows/ci.yml).
 - **The backend has no eslint config**, so nothing lints it.
-- **There are no frontend tests.** The 369 backend tests cover the parent API
-  surface and auth; every screen is verified by hand, which is what section 5
-  is for.
+- **The parent app has no frontend tests.** The 452 backend tests cover its API
+  surface and auth, and the other three apps each have a small suite CI runs,
+  but nothing exercises a parent-app screen; every one of them is verified by
+  hand, which is what section 5 is for.
 - **Nothing tests the native shells.** CI runs on Linux and builds the web
   bundle only; iOS and Android are exercised only by an actual release.
 - **`npm run build` still has a silent fallback.** `src/services/api.js`

@@ -82,7 +82,7 @@ A parent can also switch on **purchase approval** for a child. The code is still
 ## Security notes
 
 - `.env` files and `backend/firebase-service-account.json` are gitignored. They were committed in earlier history, so **the credentials in that history must be treated as compromised and rotated**.
-- Credential endpoints and student search are rate-limited; `helmet` sets security headers; CORS is restricted to the origins listed in `server.js`.
+- Credential endpoints and student search are rate-limited; `helmet` sets security headers; CORS is restricted to the origins listed in `app.js`. The Vite dev-server origins on that list are only accepted when the server is *not* running with `NODE_ENV=production`, and a plaintext-loopback value arriving through `ADMIN_CLIENT_URL`/`PARENT_CLIENT_URL`/`KIOSK_CLIENT_URL`/`WAREHOUSE_CLIENT_URL`/`CORS_ORIGINS` is dropped in production too. `capacitor://localhost` and `https://localhost` are *not* dev origins — they are what the native Android and iOS builds send, and they stay allowed everywhere.
 - Password reset uses hashed, expiring tokens delivered by email. Forgot-password responses are deliberately generic so they cannot be used to discover which emails are registered.
 
 ## Project layout
@@ -117,4 +117,4 @@ Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-i
 
 Native push is wired up and its credentials are in place on both platforms — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo) for what they are and where they go. The gap that remains is testing: the Android path has been exercised end to end, the iOS path never has on a physical iPhone, and a simulator cannot register with APNs.
 
-The 369 backend tests cover the parent API surface and auth. The frontends are lightly covered — `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` each have a suite that CI runs, mostly over utilities and the shared availability rule, plus one hook and one component in the kiosk; `frontend-parent` has none. Whole screens and flows are still verified by hand.
+The 452 backend tests cover the parent API surface and auth. The frontends are lightly covered — `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` each have a suite that CI runs, mostly over utilities and the shared availability rule, plus one hook and one component in the kiosk; `frontend-parent` has none. Whole screens and flows are still verified by hand.

@@ -207,19 +207,27 @@ cd frontend-parent && npx cap sync              # copies dist/ into ios/ and and
       serve a copy of `dist/`, so a shell synced before the last build ships
       the previous bundle, and nothing about it looks wrong until someone
       notices the fix is missing.
-- [ ] **The bundle about to be wrapped does not mention `localhost`.** This is
+- [ ] **The bundle about to be wrapped points at the production API.** This is
       the one check that catches a build made against the wrong `.env`, and it
       catches it in seconds rather than on a tester's phone:
 
       ```bash
       cd frontend-parent
-      grep -roE 'https?://(localhost|127\.0\.0\.1|192\.168\.[0-9.]+)(:[0-9]+)?' \
-        dist android/app/src/main/assets/public ios/App/App/public
+      grep -rhoE 'https?://[a-zA-Z0-9.:-]+/api\b' \
+        dist android/app/src/main/assets/public ios/App/App/public | sort -u
       ```
 
-      No output is the pass. Any output means the `.env` was wrong at
-      `npm run build`, and both native shells now carry that same wrong bundle
-      — fix `.env`, rebuild, and re-run `npx cap sync` before going further.
+      The production API URL, printed once, is the pass. Anything local means
+      the `.env` was wrong at `npm run build` and both native shells now carry
+      that same wrong bundle — fix `.env`, rebuild, and re-run `npx cap sync`
+      before going further. More than one URL means the shells were synced
+      before the last build rather than after it.
+
+      Do not simplify this to a search for `localhost`. React-router and axios
+      both embed a literal `http://localhost` as a fallback for an unreadable
+      `window.location`, so it appears in every bundle regardless — a check
+      that always reports something is one that gets ignored, including on the
+      build where it mattered.
 
 > Never point tests or scripts at the production database. The `.env` files in
 > this repo resolve to the live Atlas cluster; the backend tests are mock-based

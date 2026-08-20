@@ -136,11 +136,19 @@ nothing about it looks wrong until someone notices the fix is missing.
 wrong `.env` in seconds rather than on the terminal:
 
 ```bash
-grep -roE 'https?://(localhost|127\.0\.0\.1|192\.168\.[0-9.]+)(:[0-9]+)?' \
-  dist android/app/src/main/assets/public
+grep -rhoE 'https?://[a-zA-Z0-9.:-]+/api\b' dist android/app/src/main/assets/public | sort -u
 ```
 
-No output is the pass.
+The production API URL, once, is the pass. Two different URLs means `dist` and
+the native assets disagree — `npx cap sync` has not run since the last build.
+
+Grepping for `localhost` on its own does **not** work here, however obvious it
+looks. Both react-router and axios embed a literal `http://localhost` as a
+fallback for when `window.location` is unreadable, so it is present in every
+bundle this repo produces, correct or not. A check that can never come back
+clean is worse than no check: the first few times it is investigated, and after
+that it is ignored — including on the build where it meant something. Match on
+the `/api` base, which only appears because `VITE_API_BASE_URL` put it there.
 
 For a throwaway build to try something on a device, `./gradlew assembleDebug`
 needs no key at all and produces `app/build/outputs/apk/debug/app-debug.apk`.

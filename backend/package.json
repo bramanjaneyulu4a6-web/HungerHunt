@@ -20,6 +20,7 @@
     "archive:retired-catalogue": "node scripts/archiveRetiredCatalogue.js",
     "assign:product-images": "node scripts/assignProductImages.js",
     "stock:opening": "node scripts/setOpeningStock.js",
+    "student:checkout": "node scripts/setStudentCheckout.js",
     "seed:units": "node scripts/seedUnits.js"
   },
   "dependencies": {

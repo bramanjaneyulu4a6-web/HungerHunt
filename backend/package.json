@@ -19,6 +19,7 @@
     "seed:catalogue": "node scripts/seedCatalogue.js",
     "archive:retired-catalogue": "node scripts/archiveRetiredCatalogue.js",
     "assign:product-images": "node scripts/assignProductImages.js",
+    "stock:opening": "node scripts/setOpeningStock.js",
     "seed:units": "node scripts/seedUnits.js"
   },
   "dependencies": {

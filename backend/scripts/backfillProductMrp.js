@@ -13,18 +13,13 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
+import { connectForScript } from './lib/connect.mjs';
+
 import Product from '../models/Product.js';
 
-if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required.');
 
 const apply = process.argv.includes('--apply');
-await mongoose.connect(process.env.MONGO_URI);
-
-// Said out loud before any figure is printed, because the failure this script
-// invites is running it against the wrong database and believing the result:
-// "no products need a backfill" reads identically whether production is
-// already done or whether a mistyped MONGO_URI quietly fell back to dev.
-console.log(`Connected to ${mongoose.connection.host} / ${mongoose.connection.name}\n`);
+await connectForScript();
 
 try {
   // Archived products are included on purpose: one restored later would

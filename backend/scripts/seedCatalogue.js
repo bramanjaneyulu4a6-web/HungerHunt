@@ -15,6 +15,8 @@ import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import mongoose from 'mongoose';
 
+import { connectForScript } from './lib/connect.mjs';
+
 import Product from '../models/Product.js';
 import StockGroup from '../models/StockGroup.js';
 import Unit from '../models/Unit.js';
@@ -23,7 +25,6 @@ import { normalizeSubCategory } from '../utils/productSubcategory.js';
 import { isNonNegativeNumber, isPositiveNumber } from '../utils/quantities.js';
 import { finalPrice, isValidDiscountRate } from '../utils/pricing.js';
 
-if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required.');
 
 const apply = process.argv.includes('--apply');
 const dataPath = new URL('./data/catalogue.json', import.meta.url);
@@ -70,12 +71,9 @@ if (problems.length) {
   process.exit(1);
 }
 
-await mongoose.connect(process.env.MONGO_URI);
+await connectForScript();
 
 try {
-  const db = mongoose.connection.name;
-  const host = mongoose.connection.host;
-  console.log(`Target: ${db} on ${host}`);
   console.log(`${stockGroups.length} stock groups, ${units.length} units, ${products.length} products\n`);
 
   const existing = new Set(

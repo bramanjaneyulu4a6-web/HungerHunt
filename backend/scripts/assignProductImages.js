@@ -19,11 +19,12 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import mongoose from 'mongoose';
 
+import { connectForScript } from './lib/connect.mjs';
+
 import Product from '../models/Product.js';
 import cloudinary from '../config/cloudinary.js';
 import { planImageAssignments, cloudinaryIdFor } from '../utils/productImageMap.js';
 
-if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required.');
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
@@ -35,8 +36,7 @@ if (!folder) {
 
 const files = await readdir(folder);
 
-await mongoose.connect(process.env.MONGO_URI);
-console.log(`Connected to ${mongoose.connection.host} / ${mongoose.connection.name}`);
+await connectForScript();
 console.log(`Reading ${folder}\n`);
 
 try {

@@ -21,11 +21,12 @@ import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import mongoose from 'mongoose';
 
+import { connectForScript } from './lib/connect.mjs';
+
 import Product from '../models/Product.js';
 import StockGroup from '../models/StockGroup.js';
 import { retiredProducts, retiredGroups } from '../utils/catalogueRetirement.js';
 
-if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required.');
 
 const apply = process.argv.includes('--apply');
 const dataPath = new URL('./data/catalogue.json', import.meta.url);
@@ -34,11 +35,7 @@ const catalogue = JSON.parse(await readFile(dataPath, 'utf8'));
 const keepProducts = catalogue.products.map((p) => p.name);
 const keepGroups = catalogue.stockGroups.map((g) => g.name);
 
-await mongoose.connect(process.env.MONGO_URI);
-
-// Printed before any figure, because the failure this invites is running it
-// against the wrong database and believing the result.
-console.log(`Connected to ${mongoose.connection.host} / ${mongoose.connection.name}\n`);
+await connectForScript();
 
 try {
   const products = await Product.find({}).select('_id name active').sort({ name: 1 }).lean();

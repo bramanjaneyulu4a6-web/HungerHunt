@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:release": "node ../scripts/validate-frontend-release-env.mjs && vite build",
+    "build": "vite build && node ../scripts/build-version.mjs",
+    "build:release": "node ../scripts/validate-frontend-release-env.mjs && vite build && node ../scripts/build-version.mjs",
     "lint": "eslint .",
     "test": "node --test 'src/utils/**/*.test.js'",
     "preview": "vite preview"

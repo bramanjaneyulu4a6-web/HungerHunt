@@ -1,5 +1,21 @@
 # Backend production deploy — plan
 
+> **⚠ HISTORICAL — superseded 2026-08-19. Do not follow this document.**
+>
+> This was the pre-cutover plan, written 2026-08-17 against a service still running
+> the old codebase. It has since been executed and overtaken, so several statements
+> below are now false: the cutover completed on 2026-08-19, `render.yaml` exists in
+> the repo, the live service runs the rewrite from `main` with the full `/api/v1`
+> surface against the `graarr_ecommerce` database, and `TRUST_PROXY` is `3`. The old
+> `hungerhunt_production` database was dropped on 2026-08-20.
+>
+> For what actually happened and the current shape of production, read
+> [the cutover spec](superpowers/specs/2026-08-17-clean-slate-production-cutover-design.md)
+> and [its plan](superpowers/plans/2026-08-17-clean-slate-production-cutover.md).
+> Kept because sections 3–7 record the reasoning behind the migration, index and
+> rollback decisions, which is still the best account of why production is shaped
+> the way it is.
+
 Deploying the `Ashok-work` backend to the live Render service. This is the plan to
 review *before* anything is pushed. Nothing here has been executed.
 

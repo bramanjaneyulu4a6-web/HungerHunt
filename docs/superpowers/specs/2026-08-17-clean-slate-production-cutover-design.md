@@ -11,7 +11,14 @@ reference; its sections 3, 4 and 7 no longer apply because no data is carried ov
 Deploy the `Ashok-work` backend to the existing Render service
 (`hungerhunt-dbat.onrender.com`) as a **fresh install against a brand-new database**,
 not an upgrade of the old one. The old `hungerhunt_production` database is never
-read, written, or migrated; it remains in the cluster as a dormant archive.
+read, written, or migrated; it remained in the cluster as a dormant archive.
+
+> **Update 2026-08-20:** the archive was dropped. The owner judged the pre-cutover
+> records — students, transactions, wallet balances and admin accounts — not worth
+> retaining, and deleted `hungerhunt_production` from Atlas. Nothing in this design
+> depended on it surviving; the cutover never read it. What changes is that the
+> statements below about it "remaining untouched" describe a state that no longer
+> exists, and no export was taken.
 
 Rejected alternatives: in-place upgrade with data migration (production is dormant —
 all cost, no benefit), new infrastructure under new accounts (changes the API URL for
@@ -37,7 +44,7 @@ Phases 2 and 3 are independent and can run in either order, because the API URL
 |---|---|
 | New production database | `graarr_ecommerce` |
 | New database user | `graarr_app` |
-| Old database (untouched) | `hungerhunt_production` |
+| Old database (dropped 2026-08-20) | `hungerhunt_production` |
 | Local dev database | `hungerhunt_dev` |
 
 ("GRAARR E-Commerce App" normalized: MongoDB database names cannot contain spaces.
@@ -231,7 +238,9 @@ Also noted: `backend/package.json` has no `engines` field, so Render chooses the
 - **Closed as of Phase 2 (2026-08-18):** the old Firebase service-account key was deleted
   in Google Cloud IAM (only `461f2109…` remains, proven at boot); the old Atlas user
   `bramanjaneyulu4a6_db_user` was deleted, so no live credential can reach
-  `hungerhunt_production` — the archive is now reachable only by creating a fresh Atlas user.
+  `hungerhunt_production` — the archive was reachable only by creating a fresh Atlas user.
+  That is moot as of 2026-08-20: a temporary scoped user was created, the database was
+  dropped, and the user was deleted again. There is nothing left to reach.
 - **Closed as of 2026-08-18 (rate limiter):** the limiter never tripped because
   `TRUST_PROXY=1` resolved `req.ip` to the rightmost forwarded-for hop — a rotating
   edge address — scattering one client across several buckets. Render's chain is
@@ -258,3 +267,6 @@ Also noted: `backend/package.json` has no `engines` field, so Render chooses the
 
 Native parent-app store release (own checklist), warehouse barcode/receiver work,
 old-database export or deletion, Vercel custom domains.
+
+(The deletion was carried out on 2026-08-20 as a separate decision, not under this
+plan — see the update at the top. No export preceded it.)

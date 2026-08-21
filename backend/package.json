@@ -17,6 +17,8 @@
     "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",
     "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js",
     "seed:catalogue": "node scripts/seedCatalogue.js",
+    "archive:retired-catalogue": "node scripts/archiveRetiredCatalogue.js",
+    "assign:product-images": "node scripts/assignProductImages.js",
     "seed:units": "node scripts/seedUnits.js"
   },
   "dependencies": {

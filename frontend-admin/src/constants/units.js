@@ -13,12 +13,14 @@
 export const UNIT_SYMBOLS = ['g', 'ml', 'L', 'pc'];
 
 const BY_CATEGORY = {
-  'Snacks': ['g', 'pc'],
+  // Packets are sold by weight and drinks by volume, which is what the
+  // categories below encode. Both broad categories keep a third unit for the
+  // shelf that does not fit the rule: ice cream sits under Food & Snacks and
+  // comes in a millilitre cup as often as a countable bar, and Personal Care
+  // sits under Essentials beside stationery counted in pieces.
+  'Food & Snacks': ['g', 'pc', 'ml'],
   'Beverages': ['ml', 'L'],
-  'Ice Cream': ['ml', 'pc'],
-  'Personal Care': ['ml', 'g', 'pc'],
-  'Stationery': ['pc'],
-  'Hostel Essentials': ['pc', 'g'],
+  'Essentials': ['pc', 'ml', 'g'],
 };
 
 const LOOKUP = new Map(

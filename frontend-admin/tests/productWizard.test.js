@@ -13,6 +13,7 @@ const COMPLETE = {
   unit: 'unit-g',
   mrp: '20',
   discountRate: '0',
+  packSize: '',
   reorderLevel: '5',
   safetyStock: '0',
   purchaseLimitEnabled: false,
@@ -86,6 +87,28 @@ describe('step 2 — price and unit', () => {
       assert.equal(
         stepProblem(1, withForm({ discountRate: rate })),
         'Enter a discount from 0% to under 100%.'
+      );
+    });
+  }
+  // Optional, so a blank box moves on. A typed figure still has to be a real
+  // one — the server refuses zero and the office should hear it at the box.
+  test('a blank pack size is not an error', () => {
+    assert.equal(stepProblem(1, withForm({ packSize: '' })), '');
+  });
+
+  test('accepts a pack size', () => {
+    assert.equal(stepProblem(1, withForm({ packSize: '250' })), '');
+  });
+
+  test('accepts a fractional pack size', () => {
+    assert.equal(stepProblem(1, withForm({ packSize: '1.5' })), '');
+  });
+
+  for (const size of ['0', '-5', 'big']) {
+    test(`refuses a pack size of ${JSON.stringify(size)}`, () => {
+      assert.equal(
+        stepProblem(1, withForm({ packSize: size })),
+        'Enter a pack size above 0, or leave it blank.'
       );
     });
   }

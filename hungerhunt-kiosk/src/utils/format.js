@@ -20,3 +20,17 @@ export const formatINR = (amount) => {
   const n = Number(amount) || 0;
   return Number.isInteger(n) ? whole.format(n) : paise.format(n);
 };
+
+// A pack size and its unit are stored apart — 250 on the product, "ml" on the
+// unit it references — and neither means anything alone. Joined here so every
+// screen says "250 ml" the same way, and so the one rule that matters lives in
+// one place: a product with no recorded size prints nothing at all, never
+// "0 ml", because an unmeasured packet and an empty one are different claims.
+export const formatPackSize = (size, unitSymbol) => {
+  const n = Number(size);
+  const symbol = String(unitSymbol ?? '').trim();
+
+  if (!Number.isFinite(n) || n <= 0 || !symbol) return '';
+
+  return `${n} ${symbol}`;
+};

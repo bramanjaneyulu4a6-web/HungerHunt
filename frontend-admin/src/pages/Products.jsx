@@ -9,7 +9,7 @@ import {
   PageHeader,
   Skeleton,
 } from '../components/ui';
-import { formatINR } from '../utils/format';
+import { formatINR, formatPackSize } from '../utils/format';
 import { resolveAvailability } from '../utils/availability';
 import { unitsForCategory } from '../constants/units';
 import {
@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   unit: '',
   mrp: '',
   discountRate: '',
+  packSize: '',
   reorderLevel: '5',
   safetyStock: '0',
   purchaseLimitEnabled: false,
@@ -100,6 +101,7 @@ const Products = () => {
     fetchStockGroups();
     fetchUnits();
   }, []);
+
 
   async function fetchProducts() {
     setLoading(true);
@@ -179,6 +181,9 @@ const Products = () => {
       // refuses a caller that tries to set it directly.
       data.append('mrp', form.mrp);
       data.append('discountRate', form.discountRate === '' ? '0' : form.discountRate);
+      // Sent even when blank: an emptied box is the office taking the size
+      // back, and the server reads "" as clear-this-one.
+      data.append('packSize', form.packSize);
       data.append('reorderLevel', form.reorderLevel === '' ? '5' : form.reorderLevel);
       data.append('safetyStock', form.safetyStock === '' ? '0' : form.safetyStock);
       // Always sent, both fields included, so switching the limit off is a
@@ -226,6 +231,9 @@ const Products = () => {
       // backfill writes, so editing such a product settles it either way.
       mrp: String(product.mrp ?? product.price ?? ''),
       discountRate: String(product.discountRate ?? 0),
+      // ?? not ||: a size is never 0, but an absent one must fill the box with
+      // '' rather than the string "null".
+      packSize: product.packSize == null ? '' : String(product.packSize),
       reorderLevel: String(product.reorderLevel ?? 5),
       safetyStock: String(product.safetyStock ?? 0),
       purchaseLimitEnabled: Boolean(product.purchaseLimit?.enabled),
@@ -271,6 +279,21 @@ const Products = () => {
       await api.put(`/products/${product._id}`, { active: !archived });
       if (editingId === product._id) clearForm();
       toast.success(archived ? 'Product archived' : 'Product restored');
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to update product');
+    }
+  };
+
+  /* Disabling is not archiving, and the message says so: the product stays on
+     sale at the admin till and stays in these lists. No confirm — it is a
+     switch the office flicks while looking at the shelf, and flicking it back
+     costs one click. */
+  const setKioskVisible = async (product, visible) => {
+    try {
+      await api.put(`/products/${product._id}`, { kioskVisible: visible });
+      toast.success(visible ? 'Showing on the kiosk' : 'Hidden from the kiosk');
       fetchProducts();
     } catch (error) {
       console.error(error);
@@ -415,13 +438,34 @@ const Products = () => {
     }
   };
 
-  const filteredProducts = products.filter((p) => {
+  const matchesSearch = (p) => {
     const query = searchQuery.toLowerCase().trim();
     return (
       p.name?.toLowerCase().includes(query) ||
       p.subCategory?.toLowerCase().includes(query)
     );
-  });
+  };
+
+  /* Archived products have a screen of their own rather than sitting greyed
+     out among the ones still being sold. A catalogue is a working list, and a
+     withdrawn product is not part of the work — but it is never deleted, so it
+     has to live somewhere findable. */
+  const archivedProducts = products.filter((p) => p.active === false && matchesSearch(p));
+
+  /* Restoring the last archived product takes its screen away with it, and the
+     tab that reaches that screen only exists while something is on it. Derived
+     here rather than corrected in an effect, so the render that empties the
+     screen is the same render that leaves it — there is no in-between frame
+     showing a view the office can no longer navigate away from. Search is
+     deliberately not part of it: a query matching nothing empties the list
+     without meaning the screen should close. */
+  const catalogueView =
+    viewMode === 'archived' && !products.some((p) => p.active === false) ? 'kiosk' : viewMode;
+
+  const filteredProducts =
+    catalogueView === 'archived'
+      ? archivedProducts
+      : products.filter((p) => p.active !== false && matchesSearch(p));
 
   const selectedCategoryName =
     stockGroups.find((group) => group._id === form.stockGroup)?.name || '';
@@ -552,19 +596,31 @@ const Products = () => {
       <div className="catalogue-controls">
         <div className="catalogue-view-toggle" role="group" aria-label="Catalogue view">
           <Button
-            variant={viewMode === 'kiosk' ? 'primary' : 'ghost'}
-            aria-pressed={viewMode === 'kiosk'}
+            variant={catalogueView === 'kiosk' ? 'primary' : 'ghost'}
+            aria-pressed={catalogueView === 'kiosk'}
             onClick={() => setViewMode('kiosk')}
           >
             Kiosk View
           </Button>
           <Button
-            variant={viewMode === 'list' ? 'primary' : 'ghost'}
-            aria-pressed={viewMode === 'list'}
+            variant={catalogueView === 'list' ? 'primary' : 'ghost'}
+            aria-pressed={catalogueView === 'list'}
             onClick={() => setViewMode('list')}
           >
             List View
           </Button>
+          {/* Only offered once there is something in it: an empty screen the
+              office can reach but never needs is one more thing to wonder
+              about. */}
+          {archivedProducts.length > 0 && (
+            <Button
+              variant={catalogueView === 'archived' ? 'primary' : 'ghost'}
+              aria-pressed={catalogueView === 'archived'}
+              onClick={() => setViewMode('archived')}
+            >
+              Archived <span className="catalogue-view-count">{archivedProducts.length}</span>
+            </Button>
+          )}
         </div>
 
         <input
@@ -595,18 +651,79 @@ const Products = () => {
       ) : filteredProducts.length === 0 ? (
         <EmptyState
           icon="📦"
-          title={searchQuery.trim() ? 'No matching products' : 'No products yet'}
+          title={
+            catalogueView === 'archived'
+              ? 'No matching archived products'
+              : searchQuery.trim()
+                ? 'No matching products'
+                : 'No products yet'
+          }
           action={
+            catalogueView !== 'archived' &&
             !searchQuery.trim() && (
               <Button onClick={openProductModal}>+ Add Product</Button>
             )
           }
         >
-          {searchQuery.trim()
-            ? `Nothing matches "${searchQuery}".`
-            : 'Add your first product to start selling.'}
+          {catalogueView === 'archived'
+            ? `Nothing archived matches "${searchQuery}".`
+            : searchQuery.trim()
+              ? `Nothing matches "${searchQuery}".`
+              : 'Add your first product to start selling.'}
         </EmptyState>
-      ) : viewMode === 'list' ? (
+      ) : catalogueView === 'archived' ? (
+        /* A screen of its own rather than greyed-out rows among the products
+           still being sold. Flat and ungrouped on purpose: these are not
+           arranged for selling, they are kept because money remembers them,
+           and the only question asked here is whether to bring one back. */
+        <section className="catalogue-archived">
+          <Banner icon="📁">
+            Archived products are off sale everywhere. Their stock and sales
+            history are kept, and restoring one puts it back where it was.
+          </Banner>
+
+          <div className="catalogue-product-grid">
+            {filteredProducts.map((product) => (
+              <article className="catalogue-product-card catalogue-product-card--archived" key={product._id}>
+                <div className="catalogue-product-image">
+                  {product.image ? (
+                    <img src={product.image} alt="" />
+                  ) : (
+                    <span aria-hidden="true">📦</span>
+                  )}
+                </div>
+
+                <div className="catalogue-product-body">
+                  <div className="catalogue-product-title">
+                    <h3>{product.name}</h3>
+                    <strong>{formatINR(product.price || 0)}</strong>
+                  </div>
+                  <p>
+                    {/* The category may no longer exist — retiring a group
+                        leaves the products that were under it pointing at
+                        nothing, and saying so is better than a blank. */}
+                    {product.stockGroup?.name || 'Category retired'}
+                    {product.subCategory ? ` · ${product.subCategory}` : ''}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <Button
+                      variant="success"
+                      className="btn--sm"
+                      onClick={() => setArchived(product, false)}
+                    >
+                      Restore
+                    </Button>
+                    <Button className="btn--sm" onClick={() => handleEditInit(product)}>
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : catalogueView === 'list' ? (
         <div className="table-wrap">
           <table className="table table--stack table--hover">
             <thead>
@@ -616,6 +733,7 @@ const Products = () => {
                 <th>Category</th>
                 <th>Sub-category</th>
                 <th>Unit</th>
+                <th style={{ width: 110 }}>Pack size</th>
                 <th style={{ width: 110 }}>MRP</th>
                 <th style={{ width: 100 }}>Discount</th>
                 <th style={{ width: 120 }}>Price</th>
@@ -653,6 +771,11 @@ const Products = () => {
                           Archived
                         </Badge>
                       )}
+                      {p.kioskVisible === false && (
+                        <Badge variant="warn" style={{ marginLeft: 8 }}>
+                          Hidden from kiosk
+                        </Badge>
+                      )}
                       {availability === 'OUT_OF_STOCK' && (
                         <Badge variant="alert" style={{ marginLeft: 8 }}>
                           Out of stock
@@ -662,6 +785,9 @@ const Products = () => {
                     <td data-label="Category">{p.stockGroup?.name}</td>
                     <td data-label="Sub-category">{p.subCategory || 'Others'}</td>
                     <td data-label="Unit">{p.unit?.symbol}</td>
+                    <td data-label="Pack size">
+                      {formatPackSize(p.packSize, p.unit?.symbol) || '—'}
+                    </td>
                     {/* MRP and discount are what the office set; Price is
                         what the till charges. Shown side by side so a discount
                         that rounded away is visible on the list rather than
@@ -684,6 +810,15 @@ const Products = () => {
                         >
                           Edit
                         </Button>
+                        {p.active !== false && (
+                          <Button
+                            variant={p.kioskVisible === false ? 'success' : 'ghost'}
+                            className="btn--sm"
+                            onClick={() => setKioskVisible(p, p.kioskVisible === false)}
+                          >
+                            {p.kioskVisible === false ? 'Enable' : 'Disable'}
+                          </Button>
+                        )}
                         <Button
                           variant={p.active === false ? 'success' : 'danger'}
                           className="btn--sm"
@@ -773,6 +908,18 @@ const Products = () => {
                                   )}
                                   {product.active === false && <Badge variant="neutral">Archived</Badge>}
                                   {availability === 'OUT_OF_STOCK' && <Badge variant="alert">Out of stock</Badge>}
+
+                                  {/* Says what is true of the product rather
+                                      than what the office did to it: students
+                                      cannot see this one. Covers the picture
+                                      because that picture is exactly what the
+                                      kiosk is not showing. */}
+                                  {product.kioskVisible === false && (
+                                    <div className="catalogue-product-disabled" aria-hidden="true">
+                                      <span>Hidden from kiosk</span>
+                                    </div>
+                                  )}
+
                                   <div className="catalogue-product-hover-actions">
                                     <Button
                                       className="btn--sm"
@@ -780,6 +927,17 @@ const Products = () => {
                                     >
                                       Edit
                                     </Button>
+                                    {product.active !== false && (
+                                      <Button
+                                        variant={product.kioskVisible === false ? 'success' : 'ghost'}
+                                        className="btn--sm"
+                                        onClick={() =>
+                                          setKioskVisible(product, product.kioskVisible === false)
+                                        }
+                                      >
+                                        {product.kioskVisible === false ? 'Enable' : 'Disable'}
+                                      </Button>
+                                    )}
                                     <Button
                                       variant={product.active === false ? 'success' : 'danger'}
                                       className="btn--sm"
@@ -796,7 +954,9 @@ const Products = () => {
                                     <strong>{formatINR(product.price || 0)}</strong>
                                   </div>
                                   <p>
-                                    {product.unit?.symbol || 'No unit'} · Reorder at {product.reorderLevel ?? 5}
+                                    {formatPackSize(product.packSize, product.unit?.symbol) ||
+                                      product.unit?.symbol ||
+                                      'No unit'} · Reorder at {product.reorderLevel ?? 5}
                                   </p>
                                   <dl>
                                     <div><dt>MRP</dt><dd>{formatINR(product.mrp ?? product.price ?? 0)}</dd></div>
@@ -1145,6 +1305,29 @@ const Products = () => {
                               .map((unit) => unit.symbol)
                               .join(' or ')}. This one is saved as ${currentUnit.symbol}, kept on the list so opening it does not change it.`
                           : `The units ${selectedCategoryName || 'this category'} is sold in.`}
+                    </p>
+                  </div>
+
+                  <div>
+                    {/* Sits with the unit rather than the price, because the
+                        number is meaningless without it: 250 of what? The
+                        symbol is shown beside the box so the office reads the
+                        pair as one figure. */}
+                    <label className="field-label" htmlFor="product-pack-size">
+                      Pack size {currentUnit?.symbol ? `(${currentUnit.symbol})` : ''}
+                    </label>
+                    <input
+                      id="product-pack-size"
+                      type="number"
+                      min="0"
+                      step="any"
+                      className="input"
+                      placeholder={currentUnit?.symbol === 'ml' ? '250' : '150'}
+                      value={form.packSize}
+                      onChange={(e) => setForm({ ...form, packSize: e.target.value })}
+                    />
+                    <p className="field-help">
+                      What is in one packet. Optional — leave blank if you do not have it.
                     </p>
                   </div>
 

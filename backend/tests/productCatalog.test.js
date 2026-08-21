@@ -461,3 +461,104 @@ describe('pricing a product from its MRP and discount', () => {
     assert.equal(read.mock.callCount(), 0);
   });
 });
+
+// What is actually in the packet — 250 for a bottle whose unit is ml, 150 for
+// a wrapper whose unit is g. Optional everywhere, because most of the
+// catalogue predates the field and a product without one still sells.
+describe('the size of the packet', () => {
+  test('stores a size given on create', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, packSize: 250 });
+
+    assert.equal(res.status, 201);
+    assert.equal(created.packSize, 250);
+  });
+
+  // Absent must stay absent rather than becoming a zero: "nobody has recorded
+  // the size" and "this packet contains nothing" are different statements, and
+  // the kiosk prints the first as no line at all.
+  test('creates without the field when no size is given', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', NEW_PRODUCT);
+
+    assert.equal(res.status, 201);
+    assert.ok(!('packSize' in created), 'packSize should be left off entirely');
+  });
+
+  test('a blank box on create is no size, not a zero', async () => {
+    accountIs('admin');
+    let created;
+    mock.method(Product, 'create', async (doc) => { created = doc; return { _id: PRODUCT_ID, ...doc }; });
+    mock.method(Inventory, 'create', async (doc) => doc);
+
+    const res = await post('/api/products', { ...NEW_PRODUCT, packSize: '' });
+
+    assert.equal(res.status, 201);
+    assert.ok(!('packSize' in created), 'a blank box should record nothing');
+  });
+
+  for (const [label, size] of [['zero', 0], ['a negative size', -5], ['words', 'big']]) {
+    test(`refuses ${label} on create`, async () => {
+      accountIs('admin');
+      const create = mock.method(Product, 'create', async (doc) => ({ _id: PRODUCT_ID, ...doc }));
+
+      const res = await post('/api/products', { ...NEW_PRODUCT, packSize: size });
+
+      assert.equal(res.status, 400);
+      assert.equal(create.mock.callCount(), 0);
+    });
+  }
+
+  test('a size can be added to a product that had none', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { packSize: 150 });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { packSize: 150 });
+  });
+
+  // Explicit null, not undefined: Mongoose drops undefined from an update, so
+  // an emptied box would otherwise leave the old figure sitting there.
+  test('an emptied box clears the size rather than leaving the old one', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { packSize: '' });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { packSize: null });
+  });
+
+  test('refuses a size of zero on edit', async () => {
+    accountIs('admin');
+    const update = mock.method(Product, 'findByIdAndUpdate', async (id, data) => ({ _id: id, ...data }));
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { packSize: 0 });
+
+    assert.equal(res.status, 400);
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('an edit that never mentions the size leaves it alone', async () => {
+    accountIs('admin');
+    let written;
+    mock.method(Product, 'findByIdAndUpdate', async (id, data) => { written = data; return { _id: id, ...data }; });
+
+    const res = await put(`/api/products/${PRODUCT_ID}`, { active: false });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(written, { active: false });
+  });
+});

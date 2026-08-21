@@ -46,6 +46,9 @@ for (const p of products) {
   if (p.discountRate !== undefined && !isValidDiscountRate(p.discountRate)) {
     problems.push(`${p.name}: discount must be between 0% and under 100%, got ${p.discountRate}`);
   }
+  if (p.packSize !== undefined && !isPositiveNumber(p.packSize)) {
+    problems.push(`${p.name}: pack size must be above zero, got ${p.packSize}`);
+  }
 
   // Nutrition is optional and may be partial, but a figure that is present
   // must be a real one — the till prints these to children unedited.
@@ -130,6 +133,10 @@ try {
             mrp: p.mrp ?? p.price,
             discountRate: p.discountRate ?? 0,
             price: finalPrice(p.mrp ?? p.price, p.discountRate ?? 0),
+            // Only when the file carries one: a listing with no size must
+            // leave the field absent rather than writing a null over a size an
+            // admin typed into the form.
+            ...(p.packSize !== undefined ? { packSize: p.packSize } : {}),
             reorderLevel: p.reorderLevel ?? 5,
             safetyStock: p.safetyStock ?? 0,
             active: p.active ?? true,

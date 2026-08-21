@@ -6,11 +6,11 @@ import { availabilityOf } from "../utils/availability.js";
 
 export const getInventory = async (req, res) => {
   try {
+    // The unit travels with the product because the kiosk prints the pack size
+    // beside its symbol — "250 ml" — and the size alone says nothing.
     const inventory = await Inventory.find().populate({
       path: "productId",
-      populate: {
-        path: "stockGroup"
-      }
+      populate: [{ path: "stockGroup" }, { path: "unit" }]
     });
 
     // Sorted here, by product name, so every screen that reads the shelf
@@ -28,13 +28,26 @@ export const getInventory = async (req, res) => {
       })));
     }
 
-    const products = inventory.map((row) => row.productId).filter(Boolean);
+    // Two different ways a product leaves the students' screen, both enforced
+    // here rather than left to the till to filter: the kiosk is a sideloaded
+    // APK, and a build that filters differently — or not at all — should not be
+    // the only thing standing between a withdrawn product and a child.
+    //
+    // Archived is the full withdrawal, restored only from the admin's archived
+    // screen. Disabled is the lighter switch: off the kiosk, still sellable by
+    // staff at the till. Both spell out `!== false`, because rows written
+    // before either field carry no flag and are on sale.
+    const visible = inventory.filter(
+      (row) => row.productId?.active !== false && row.productId?.kioskVisible !== false
+    );
+
+    const products = visible.map((row) => row.productId).filter(Boolean);
     const allowances = await getPurchaseAllowances({
       studentId: req.student.id,
       products,
     });
 
-    res.json(inventory.map((row) => {
+    res.json(visible.map((row) => {
       const item = row.toObject();
       const productId = item.productId?._id;
 

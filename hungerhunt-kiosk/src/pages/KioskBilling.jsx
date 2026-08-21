@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import api from "../utils/api";
 import RefreshButton from "../components/RefreshButton";
-import { formatINR } from "../utils/format";
+import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
@@ -98,6 +98,9 @@ const toProduct = (item) => ({
   image: item.productId?.image,
   stock: item.stock,
   stockGroup: item.productId?.stockGroup,
+  // Already joined here rather than at the tile: the size and the symbol are
+  // stored apart and only mean anything together.
+  packSize: formatPackSize(item.productId?.packSize, item.productId?.unit?.symbol),
   subCategory: item.productId?.subCategory || "Others",
   nutrition: readNutrition(item.productId),
   purchaseAllowance: item.purchaseAllowance || null,
@@ -1197,6 +1200,8 @@ const KioskBilling = ({ student, onLogout }) => {
 
                       <div className="tile-body">
                         <h3 className="tile-name">{p.name}</h3>
+
+                        {p.packSize && <p className="tile-size">{p.packSize}</p>}
 
                         {p.stockGroup?.name && (
                           <p className="tile-meta">

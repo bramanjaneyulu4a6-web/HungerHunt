@@ -1560,6 +1560,16 @@
   color: #241c13;
 }
 
+/* What is in the packet, under the name. Deliberately not styled like
+   .tile-meta: the category is a label, this is a measurement, and a student
+   comparing two drinks is reading this one. */
+.tile-size {
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
 .tile-meta {
   margin-top: 2px;
   font-size: 11px;

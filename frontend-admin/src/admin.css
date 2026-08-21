@@ -878,12 +878,52 @@
   position: absolute;
   top: 10px;
   left: 10px;
+  /* Above the disabled overlay: a product can be both out of stock and hidden,
+     and the overlay must not swallow the other thing being said about it. */
+  z-index: 1;
+}
+
+/* Sits over the picture, because the picture is the thing the kiosk is not
+   showing. Deliberately readable rather than a subtle dimming: a product the
+   office has switched off should be obvious at a glance across a grid. */
+.catalogue-product-disabled {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.catalogue-product-disabled span {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.catalogue-archived .banner {
+  margin-bottom: 16px;
+}
+
+.catalogue-view-count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .catalogue-product-hover-actions {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 2;
   display: grid;
   gap: 6px;
   opacity: 0;

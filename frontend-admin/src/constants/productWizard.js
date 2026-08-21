@@ -37,6 +37,11 @@ const isRate = (v) => {
   return typed(v) && Number(v) >= 0 && Number(v) < 100;
 };
 
+/* Blank is a size nobody has recorded — the ordinary case for a catalogue that
+   predates the field. Anything typed has to be a real measurement, because the
+   server refuses zero and a negative packet is nothing at all. */
+const isOptionalSize = (v) => String(v ?? '').trim() === '' || isMoney(v);
+
 /* What the student will actually pay, or null while the figures it needs are
    not both usable yet.
 
@@ -68,6 +73,9 @@ export const stepProblem = (index, form) => {
     // hands the goods over, and the server refuses one outright.
     if (!isMoney(form.mrp)) return 'Enter an MRP above ₹0.';
     if (!isRate(form.discountRate)) return 'Enter a discount from 0% to under 100%.';
+    // Optional: a blank box is a size nobody has recorded, which is the state
+    // most of the catalogue is in. A typed one still has to be real.
+    if (!isOptionalSize(form.packSize)) return 'Enter a pack size above 0, or leave it blank.';
   }
 
   if (index === 2) {

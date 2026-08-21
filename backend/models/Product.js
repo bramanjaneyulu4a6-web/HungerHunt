@@ -82,6 +82,23 @@ const productSchema = new mongoose.Schema(
     }
   },
 
+  // What is in the packet, counted in the product's own unit: 250 on a bottle
+  // whose unit is ml, 150 on a wrapper whose unit is g. The number alone means
+  // nothing — it is only ever shown beside that unit.
+  //
+  // Optional, and carrying no default, because the catalogue predates the
+  // field and a product without a size still sells. Absent has to stay
+  // distinguishable from a typed figure for the same reason the nutrition
+  // macros do: the kiosk prints an absent size as no line at all, and a zero
+  // would claim the packet is empty.
+  packSize: {
+    type: Number,
+    validate: {
+      validator: (v) => v === null || v > 0,
+      message: 'A pack size must be above zero, or left blank.'
+    }
+  },
+
   image: {
     type: String,
     default: ""
@@ -93,6 +110,20 @@ const productSchema = new mongoose.Schema(
   // absent means active, and every filter spells that out as
   // { active: { $ne: false } } because Mongo will not infer it.
   active: {
+    type: Boolean,
+    default: true
+  },
+
+  // Whether students can see this on the kiosk. Distinct from `active`, and
+  // deliberately so: archiving withdraws a product from sale everywhere and
+  // files it away, while disabling only takes it off the students' screen —
+  // staff can still ring it up at the admin till, and it stays in the admin's
+  // own catalogue views wearing an overlay.
+  //
+  // Same convention as `active`: rows written before the field have no flag,
+  // absent means visible, and every filter spells that out as
+  // { kioskVisible: { $ne: false } } because Mongo will not infer it.
+  kioskVisible: {
     type: Boolean,
     default: true
   },

@@ -97,6 +97,28 @@ const NUTRITION_FIELDS = [
   ["fat", "nutritionFat"],
 ];
 
+/* The size of the packet, which is optional everywhere and therefore has three
+   distinct states rather than two: never mentioned (leave whatever is there),
+   mentioned as blank (the office taking a figure back), and mentioned with a
+   number (record it).
+
+   The blank case has to reach the document as an explicit null, because
+   Mongoose drops undefined from an update and the old size would survive the
+   edit that cleared it — the same trap the nutrition fields carry. */
+const readPackSize = (body) => {
+  if (body.packSize === undefined) return { present: false };
+
+  if (body.packSize === null || (typeof body.packSize === "string" && body.packSize.trim() === "")) {
+    return { present: true, value: null };
+  }
+
+  if (!isPositiveNumber(body.packSize)) {
+    return { present: true, error: "Pack size must be a number above zero, or left blank." };
+  }
+
+  return { present: true, value: Number(body.packSize) };
+};
+
 const readNutrition = (body) => {
   const mentions =
     NUTRITION_FIELDS.some(([, key]) => body[key] !== undefined) ||
@@ -229,6 +251,12 @@ export const addProduct = async (req, res) => {
       return res.status(400).json({ message: nutrition.error });
     }
 
+    const packSize = readPackSize(req.body);
+
+    if (packSize.error) {
+      return res.status(400).json({ message: packSize.error });
+    }
+
     const product = await Product.create({
 
       name: req.body.name,
@@ -246,6 +274,15 @@ export const addProduct = async (req, res) => {
       price: finalPrice(req.body.mrp, discountRate),
 
       image,
+
+      // Only when a figure was actually typed: a product created with a blank
+      // box should carry no size at all rather than a null standing in for one.
+      ...(packSize.present && packSize.value !== null ? { packSize: packSize.value } : {}),
+
+      // Forms send strings; both spellings of true mean true.
+      ...(req.body.kioskVisible !== undefined
+        ? { kioskVisible: asBoolean(req.body.kioskVisible) }
+        : {}),
 
       ...(req.body.reorderLevel !== undefined
         ? { reorderLevel: Number(req.body.reorderLevel) }
@@ -409,6 +446,10 @@ export const updateProduct = async (req, res) => {
       updateData.active = asBoolean(req.body.active);
     }
 
+    if (req.body.kioskVisible !== undefined) {
+      updateData.kioskVisible = asBoolean(req.body.kioskVisible);
+    }
+
     const purchaseLimit = readPurchaseLimit(req.body);
 
     if (purchaseLimit.error) {
@@ -427,6 +468,16 @@ export const updateProduct = async (req, res) => {
 
     if (nutrition.present) {
       Object.assign(updateData, nutrition.fields);
+    }
+
+    const packSize = readPackSize(req.body);
+
+    if (packSize.error) {
+      return res.status(400).json({ message: packSize.error });
+    }
+
+    if (packSize.present) {
+      updateData.packSize = packSize.value;
     }
 
     if (req.file) {

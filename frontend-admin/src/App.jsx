@@ -21,6 +21,7 @@ const Inventory = lazy(() => import('./pages/Inventory'));
 const Products = lazy(() => import('./pages/Products'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const AccountingExport = lazy(() => import('./pages/AccountingExport'));
+const StaffReports = lazy(() => import('./pages/StaffReports'));
 
 const RouteFallback = () => (
   <div className="route-fallback" role="status" aria-live="polite">
@@ -48,6 +49,7 @@ function App() {
             <Route path="/billing" element={<Billing />} />
             <Route path="/recharge-history" element={<RechargeHistory />} />
             <Route path="/accounting-export" element={<AccountingExport />} />
+            <Route path="/reports" element={<StaffReports />} />
             <Route path="/warehouse" element={<WarehouseOverview />} />
             <Route path="/warehouse/review" element={<ProcurementReview />} />
             <Route path="/warehouse/orders" element={<ProcurementOrders />} />

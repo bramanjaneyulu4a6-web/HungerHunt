@@ -16,12 +16,20 @@ const itemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* Every operational act on a package, in the order it happened.
+ *
+ * actorId is absent in exactly one case: a transition written by a migration
+ * rather than by a person, which carries its explanation in the note instead —
+ * see scripts/backfillCollectedPackages.js. Every route that writes here takes
+ * the actor from the authenticated session, so an entry with no actor is a
+ * record of the rules changing, never of a request that forgot to say who it
+ * was from. */
 const transitionSchema = new mongoose.Schema(
   {
     from: { type: String, required: true },
     to: { type: String, required: true },
     at: { type: Date, required: true },
-    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     note: { type: String, maxlength: 200, default: '' },
   },
   { _id: false }
@@ -92,6 +100,15 @@ const fulfillmentOrderSchema = new mongoose.Schema(
     deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     deliveryNote: { type: String, maxlength: 200, default: '' },
     proofOfDelivery: proofOfDeliverySchema,
+
+    /* The step after delivery: the student taking the package from the
+       caretaker, proved by typing their own purchase code on the caretaker's
+       device. collectedBy is the caretaker account whose screen it was typed
+       on — the custodian of the moment, not its author. The student is the
+       author, and the order already names them. */
+    collectedAt: Date,
+    collectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+
     cancelledAt: Date,
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     transitions: { type: [transitionSchema], default: [] },
@@ -123,5 +140,8 @@ fulfillmentOrderSchema.index({ orderedAt: -1 });
 fulfillmentOrderSchema.index({ studentId: 1, orderedAt: -1 });
 fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliverBy: 1 });
 fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliveredAt: -1 });
+
+// The caretaker's receipt log: their hostel's collected packages, newest first.
+fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, collectedAt: -1 });
 
 export default mongoose.model('FulfillmentOrder', fulfillmentOrderSchema);

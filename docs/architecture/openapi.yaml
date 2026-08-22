@@ -392,11 +392,15 @@ paths:
                   minLength: 2
                   maxLength: 60
                   description: >-
-                    Required for DELIVERED. The whole of the delivery proof, alongside the
-                    authenticated staff account and server timestamp, which are taken from the
-                    session and the clock rather than this body. A name or dorm role only:
-                    values containing six or more consecutive digits, an "@", or a URL are
-                    rejected so identity numbers and contact details cannot be stored here.
+                    Required for DELIVERED: who at the hostel took the package from the
+                    warehouse, named by the staff member handing it over. The whole of the
+                    delivery proof alongside the authenticated staff account and server
+                    timestamp, which are taken from the session and the clock rather than
+                    this body. A name or dorm role only: values containing six or more
+                    consecutive digits, an "@", or a URL are rejected so identity numbers
+                    and contact details cannot be stored here.
+                    COLLECTED is not a value this route accepts — see
+                    /caretaker/fulfillment-orders/{id}/collect.
       responses:
         '200':
           description: Transition recorded
@@ -417,6 +421,225 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /caretaker/fulfillment-orders/{id}/collect:
+    post:
+      summary: Record that the student has taken their package from the caretaker
+      description: >-
+        The step after delivery, and the only fulfilment transition no member of staff can
+        make. The caretaker's session says which hostel is asking and is scoped to it; the
+        student's own four-digit purchase code, typed on the caretaker's screen, is what
+        says the right student is standing there. The code is checked against the same
+        consecutive-miss counter and fifteen-minute lock as checkout, so a wrong code at the
+        dorm door counts against the same five attempts — a second door with its own count
+        would be a way around the first. Only a DELIVERED package can be collected, and that
+        is checked before the code is, so a student whose package has not arrived does not
+        spend an attempt finding out.
+      operationId: collectFulfillmentOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  pattern: '^\d{4}$'
+                  description: The student's own purchase code. Never stored or echoed.
+      responses:
+        '200':
+          description: Collection recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/FulfillmentOrder' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The package is not one this hostel can hand over yet, or was collected already
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '423':
+          description: Too many wrong codes; this student's code is locked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /caretaker/reports:
+    post:
+      summary: Raise a package issue or a professional complaint
+      description: >-
+        A caretaker's channel to the school office. Two kinds share one record: ORDER_ISSUE is
+        about one package and carries orderId, scoped to the caretaker's own hostel exactly as
+        the collection route is (another hostel's package answers 404, never a refusal, so this
+        cannot be used to learn one exists); COMPLAINT is anything else, including about the
+        warehouse or another member of staff. Nothing about who is reporting is read from the
+        body — the name, role and hostel are copied onto the report from the roster and the
+        session. Raising an issue never changes the package: a reported package stays
+        collectable, because a student owed food should not lose it while an office reads a
+        message.
+      operationId: createStaffReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, category, note]
+              properties:
+                kind: { $ref: '#/components/schemas/StaffReportKind' }
+                category:
+                  type: string
+                  description: >-
+                    One of the fixed categories for this kind. ORDER_ISSUE: MISSING_ITEM,
+                    WRONG_ITEM, DAMAGED, NOT_THEIR_ORDER, CODE_NOT_WORKING, OTHER. COMPLAINT:
+                    WORKING_CONDITIONS, STAFF_CONDUCT, STUDENT_WELFARE, DELIVERY_SERVICE,
+                    APP_PROBLEM, OTHER.
+                note: { type: string, minLength: 10, maxLength: 1000 }
+                orderId:
+                  type: string
+                  pattern: '^[a-fA-F0-9]{24}$'
+                  description: Required for ORDER_ISSUE, ignored for COMPLAINT.
+      responses:
+        '201':
+          description: Report raised
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/StaffReport' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429':
+          description: This caretaker already has 25 reports the office has not answered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    get:
+      summary: The caretaker's own reports and what came back
+      description: >-
+        Filtered to the account in the session; there is no query that widens it. The reply the
+        office wrote is included, and the name of the admin who wrote it — every admin sees the
+        office queue and any may answer any report, so the answer carries its author. The
+        internal handling trail stays with the office.
+      operationId: listOwnStaffReports
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        '200':
+          description: The caretaker's reports, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/StaffReport' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /reports:
+    get:
+      summary: The office queue of caretaker reports
+      description: >-
+        Every admin account reaches the same queue; there is no owner and no assignment.
+        Deliberately not open to warehouse or caretaker accounts: a complaint may be about
+        either, and a channel its subject can read is not one anybody uses twice. Ordered
+        oldest-first while showing what is still owed, newest-first when read as a log — not by
+        status, which sorts alphabetically and would rank ACKNOWLEDGED above unread OPEN.
+      operationId: listStaffReports
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OUTSTANDING, OPEN, ACKNOWLEDGED, RESOLVED] }
+          description: OUTSTANDING means OPEN or ACKNOWLEDGED — everything the office still owes.
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/StaffReportKind' }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        '200':
+          description: Reports, with the outstanding count in meta
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/StaffReport' } }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /reports/{id}/status:
+    post:
+      summary: Acknowledge or answer a caretaker's report
+      description: >-
+        ACKNOWLEDGED may be silent — it means "read, being looked at". RESOLVED requires a note,
+        because that note is what the caretaker who raised it reads. Reopening is not a
+        transition: a matter that comes back is a new report, so the trail of what was said and
+        when it was answered stays readable.
+      operationId: transitionStaffReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { type: string, enum: [ACKNOWLEDGED, RESOLVED] }
+                note:
+                  type: string
+                  maxLength: 500
+                  description: Required for RESOLVED. Shown to the caretaker who raised the report.
+      responses:
+        '200':
+          description: Handling recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/StaffReport' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The report was already answered, or changed concurrently
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 components:
   securitySchemes:
     bearerAuth:
@@ -427,9 +650,57 @@ components:
     PurchaseOrderStatus:
       type: string
       enum: [PENDING_REVIEW, APPROVED, REJECTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED]
+    StaffReportKind:
+      type: string
+      enum: [ORDER_ISSUE, COMPLAINT]
+    StaffReport:
+      type: object
+      description: >-
+        A report raised by a caretaker. raisedBy and handling are present only in the admin
+        console's view; the caretaker reading their own report sees the reply but not who wrote
+        it.
+      required: [id, kind, category, note, status, raisedAt]
+      properties:
+        id: { type: string }
+        kind: { $ref: '#/components/schemas/StaffReportKind' }
+        category: { type: string }
+        categoryLabel: { type: string, description: The category in the words the apps show. }
+        note: { type: string }
+        status: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        raisedAt: { type: string, format: date-time }
+        acknowledgedAt: { type: [string, 'null'], format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        resolutionNote: { type: string, description: What the office said back. Read by the caretaker. }
+        answeredBy:
+          type: string
+          description: >-
+            Name of the admin who resolved it, snapshotted at the time. Shown to the caretaker
+            with the reply, because every admin can answer any report and the answer carries its
+            author. Empty until the report is resolved.
+        order:
+          type: [object, 'null']
+          description: Present on ORDER_ISSUE. Carries no price — a caretaker never sees what a package cost.
+          required: [id, studentName, statusAtReport]
+          properties:
+            id: { type: string }
+            studentName: { type: string }
+            hostelNumber: { type: string }
+            statusAtReport: { $ref: '#/components/schemas/FulfillmentOrderStatus' }
+        raisedBy:
+          type: object
+          description: Admin view only. Copied from the roster when the report was raised.
+          properties:
+            id: { type: string }
+            name: { type: string }
+            role: { type: string }
+            hostelNumber: { type: string }
+        handling:
+          type: array
+          description: Admin view only. Append-only trail of who read and answered it.
+          items: { type: object }
     FulfillmentOrderStatus:
       type: string
-      enum: [PENDING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED]
+      enum: [PENDING, PACKED, OUT_FOR_DELIVERY, DELIVERED, COLLECTED, CANCELLED]
     FulfillmentOrder:
       type: object
       required: [id, transactionId, studentId, student, items, totalAmount, status, businessWeekStart, orderedAt, deliverBy]
@@ -452,7 +723,17 @@ components:
         deliverBy: { type: string, format: date-time }
         packedAt: { type: [string, 'null'], format: date-time }
         dispatchedAt: { type: [string, 'null'], format: date-time }
-        deliveredAt: { type: [string, 'null'], format: date-time }
+        deliveredAt:
+          type: [string, 'null']
+          format: date-time
+          description: When the warehouse handed the package to the hostel's caretaker.
+        collectedAt:
+          type: [string, 'null']
+          format: date-time
+          description: >-
+            When the student took the package from the caretaker, recorded only by that
+            student entering their own purchase code. Null while the package is still
+            with the caretaker.
         deliveryNote: { type: string }
         proofOfDelivery:
           type: [object, 'null']

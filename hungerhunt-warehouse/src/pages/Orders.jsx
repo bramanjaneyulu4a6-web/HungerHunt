@@ -11,9 +11,14 @@ import { formatINR } from "../utils/format";
    are waiting on. Each card is one package and offers exactly one next step,
    so the job reads as a queue rather than a form. */
 
+/* The shift ends at the hostel door. Handing the package to the caretaker is
+   the warehouse's last act on it, and it is the one that asks a question:
+   who took it. What happens after — the student turning up for it — is the
+   caretaker's screen, and nothing here can close a package on their behalf. */
 const ACTIONS = {
   PENDING: { status: "PACKED", label: "Mark packed" },
   PACKED: { status: "OUT_FOR_DELIVERY", label: "Send to dorm" },
+  OUT_FOR_DELIVERY: { status: "DELIVERED", label: "Handed to caretaker" },
 };
 
 const VIEWS = [
@@ -111,12 +116,32 @@ const Orders = () => {
     const action = ACTIONS[order.status];
     if (!action) return;
 
+    /* A name, typed by the person who just handed the package over. The prompt
+       stays a prompt on purpose: package barcodes are coming, and the scan
+       will fill this in without anyone typing. */
+    let receivedBy;
+
+    if (action.status === "DELIVERED") {
+      receivedBy = window.prompt(
+        `Who at hostel ${order.student.hostelNumber} took this package? Enter their name — no ID or phone numbers.`,
+        ""
+      )?.trim();
+      if (!receivedBy) return;
+    }
+
     setBusyId(order.id);
     try {
       await api.post(`/v1/fulfillment-orders/${order.id}/transition`, {
         status: action.status,
+        ...(receivedBy ? { receivedBy } : {}),
       });
-      toast.success(action.status === "OUT_FOR_DELIVERY" ? "Package sent to caretaker" : "Package updated");
+      toast.success(
+        action.status === "DELIVERED"
+          ? `Handed to ${receivedBy} · the student collects it with their code`
+          : action.status === "OUT_FOR_DELIVERY"
+            ? "Package sent to caretaker"
+            : "Package updated"
+      );
       await load();
     } catch (error) {
       console.error(error);
@@ -174,7 +199,7 @@ const Orders = () => {
   const orderCard = (order, { showActions = false, showAcknowledge = false } = {}) => {
     const action = ACTIONS[order.status];
     const overdue = new Date(order.deliverBy).getTime() < asOf &&
-      !["DELIVERED", "CANCELLED"].includes(order.status);
+      !["DELIVERED", "COLLECTED", "CANCELLED"].includes(order.status);
 
     return (
       <article key={order.id} className="wh-card wh-order">
@@ -209,12 +234,14 @@ const Orders = () => {
         </div>
 
         <p className="wh-remaining" style={{ color: overdue ? "var(--wh-red)" : undefined }}>
-          {order.deliveredAt
-            ? `Delivered ${new Date(order.deliveredAt).toLocaleString()}`
-            : deadlineText(order.deliverBy, asOf)}
+          {order.collectedAt
+            ? `Collected by the student ${new Date(order.collectedAt).toLocaleString()}`
+            : order.deliveredAt
+              ? `Handed over ${new Date(order.deliveredAt).toLocaleString()}`
+              : deadlineText(order.deliverBy, asOf)}
         </p>
         {order.proofOfDelivery?.receivedBy && (
-          <p className="wh-remaining">Received by {order.proofOfDelivery.receivedBy}</p>
+          <p className="wh-remaining">Handed to {order.proofOfDelivery.receivedBy}</p>
         )}
         {showAcknowledge && (
           <button type="button" className="wh-cta" disabled={busyId === order.id} onClick={() => acknowledge(order)}>
@@ -243,6 +270,7 @@ const Orders = () => {
         <div><strong>{report.summary.packages}</strong><span>Packages ordered</span></div>
         <div><strong>{report.summary.openOverdue}</strong><span>Currently overdue</span></div>
         <div><strong>{report.delivery.delivered}</strong><span>Delivered</span></div>
+        <div><strong>{report.delivery.awaitingCollection}</strong><span>Waiting at hostels</span></div>
         <div>
           <strong>{report.delivery.onTimeRate === null ? "—" : `${Math.round(report.delivery.onTimeRate * 100)}%`}</strong>
           <span>Delivered on time</span>

@@ -19,7 +19,9 @@ import {
 } from '../../../domain/fulfillment/overdue.js';
 import {
   buildProofOfDelivery,
+  proofOfDeliveryProblem,
 } from '../../../domain/fulfillment/proofOfDelivery.js';
+import { checkPurchaseCode } from '../../../domain/students/purchaseCodeCheck.js';
 import {
   ApplicationError,
   ConflictError,
@@ -33,6 +35,7 @@ const transitionFields = Object.freeze({
   [OrderStatus.PACKED]: ['packedAt', 'packedBy'],
   [OrderStatus.OUT_FOR_DELIVERY]: ['dispatchedAt', 'dispatchedBy'],
   [OrderStatus.DELIVERED]: ['deliveredAt', 'deliveredBy'],
+  [OrderStatus.COLLECTED]: ['collectedAt', 'collectedBy'],
   [OrderStatus.CANCELLED]: ['cancelledAt', 'cancelledBy'],
 });
 
@@ -62,6 +65,7 @@ const serialize = (order, { includeMoney = true } = {}) => ({
   packedAt: order.packedAt,
   dispatchedAt: order.dispatchedAt,
   deliveredAt: order.deliveredAt,
+  collectedAt: order.collectedAt,
   deliveryNote: order.deliveryNote || '',
   proofOfDelivery: order.proofOfDelivery
     ? {
@@ -97,23 +101,32 @@ const readObjectId = (value) => {
   return value;
 };
 
+/* The caretaker's queue is wider than the storeroom's. A package the warehouse
+   has delivered is finished work upstream and is only starting downstream: it
+   is sitting in the caretaker's room waiting for its student to come and type
+   their code. So DELIVERED stays on this screen and leaves it only when the
+   student has actually taken the package. */
+const CARETAKER_LIVE_STATUSES = Object.freeze([...OPEN_STATUSES, OrderStatus.DELIVERED]);
+
 export const list = async (req, res) => {
   const caretaker = req.staff.role === 'caretaker';
   const status = caretaker ? null : readStatus(req.query);
 
   const filter = {
-    ...(status ? { status } : { status: { $in: OPEN_STATUSES } }),
+    ...(status
+      ? { status }
+      : { status: { $in: caretaker ? CARETAKER_LIVE_STATUSES : OPEN_STATUSES } }),
     ...(caretaker ? { 'studentSnapshot.hostelId': req.staff.hostelId } : {}),
   };
   const ordersQuery = FulfillmentOrder.find(filter)
     .sort({ deliverBy: 1 })
     .limit(MAX_ACTIVE)
     .lean();
-  const [orders, receivableCount] = caretaker
+  const [orders, awaitingCollection] = caretaker
     ? await Promise.all([
         ordersQuery,
         FulfillmentOrder.countDocuments({
-          status: OrderStatus.OUT_FOR_DELIVERY,
+          status: OrderStatus.DELIVERED,
           'studentSnapshot.hostelId': req.staff.hostelId,
         }),
       ])
@@ -124,24 +137,28 @@ export const list = async (req, res) => {
     meta: {
       requestId: req.context.requestId,
       count: orders.length,
-      ...(caretaker ? { receivableCount } : {}),
+      ...(caretaker ? { awaitingCollection } : {}),
     },
   });
 };
 
 /* The caretaker's history has no date window: it is a receipt log for the
    hostel, not an operational report. It stays bounded through pagination and
-   never includes prices or another hostel's packages. */
+   never includes prices or another hostel's packages.
+
+   It logs collections, not deliveries — a package the caretaker is still
+   holding has not left their hands, and belongs on the queue they work from
+   rather than in the record of what students have taken. */
 export const caretakerHistory = async (req, res) => {
   const { page, limit, skip } = readPaging(req.query);
   const filter = {
-    status: OrderStatus.DELIVERED,
+    status: OrderStatus.COLLECTED,
     'studentSnapshot.hostelId': req.staff.hostelId,
   };
 
   const [orders, total] = await Promise.all([
     FulfillmentOrder.find(filter)
-      .sort({ deliveredAt: -1, _id: -1 })
+      .sort({ collectedAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -161,45 +178,89 @@ export const caretakerHistory = async (req, res) => {
   });
 };
 
-/* One database operation receives the caretaker's current queue. The status
-   predicate makes it race-safe with individual confirmations: a package that
-   changed after the count was shown is not overwritten or recorded twice. */
-export const receiveAll = async (req, res) => {
-  const now = new Date();
-  const receivedBy = String(req.staff.email).trim().slice(0, 60);
-  const filter = {
-    status: OrderStatus.OUT_FOR_DELIVERY,
+/* The last step, and the only one in this file a member of staff cannot take.
+ *
+ * A package is collected when the student it belongs to types their own
+ * purchase code on the caretaker's screen. The caretaker's account is what
+ * gets the request through the door and says which hostel is asking; the code
+ * is what says the right student is standing there. Neither alone is enough,
+ * which is the whole point of having replaced "received all" with this: one
+ * tap used to close a hundred packages nobody had handed to anybody.
+ *
+ * The code is checked against the same counter and the same lock as the till.
+ * See src/domain/students/purchaseCodeCheck.js for why that sharing matters. */
+const COLLECTION_LOCKED_MESSAGE =
+  'Too many wrong codes for this student. Their code is locked for a few' +
+  ' minutes — try again later, or a parent can set a new one in the app.';
+
+export const confirmCollection = async (req, res) => {
+  const id = readObjectId(req.params.id);
+
+  /* The package is checked before the code is. A student standing at the
+     wrong moment — their package still in the van, or already collected —
+     should not spend one of five attempts finding that out. */
+  const current = await FulfillmentOrder.findOne({
+    _id: id,
     'studentSnapshot.hostelId': req.staff.hostelId,
-  };
-  const result = await FulfillmentOrder.updateMany(
-    filter,
+  }).lean();
+  if (!current) throw new NotFoundError('Fulfilment order');
+
+  if (!canTransitionOrder(current.status, OrderStatus.COLLECTED)) {
+    throw new ConflictError(
+      current.status === OrderStatus.COLLECTED
+        ? 'This package has already been collected.'
+        : `Package is ${current.status}; it can only be collected once the warehouse has delivered it to your hostel.`,
+      { currentStatus: current.status, requestedStatus: OrderStatus.COLLECTED }
+    );
+  }
+
+  const check = await checkPurchaseCode({
+    studentId: current.studentId,
+    code: req.body.code,
+    lockedMessage: COLLECTION_LOCKED_MESSAGE,
+  });
+
+  if (!check.ok) {
+    // The refusal is the checker's to word — including the deliberate silence
+    // about whether a locked student's code was the right one.
+    throw new ApplicationError(check.body.message, {
+      status: check.status,
+      code: check.body.code || (check.status === 404 ? 'NOT_FOUND' : 'INVALID_PURCHASE_CODE'),
+    });
+  }
+
+  const now = new Date();
+  const updated = await FulfillmentOrder.findOneAndUpdate(
+    {
+      _id: current._id,
+      status: OrderStatus.DELIVERED,
+      'studentSnapshot.hostelId': req.staff.hostelId,
+    },
     {
       $set: {
-        status: OrderStatus.DELIVERED,
-        deliveredAt: now,
-        deliveredBy: req.staff.id,
-        proofOfDelivery: buildProofOfDelivery({
-          receivedBy,
-          recordedBy: req.staff.id,
-          recordedAt: now,
-        }),
-        deliveryNote: '',
+        status: OrderStatus.COLLECTED,
+        collectedAt: now,
+        collectedBy: req.staff.id,
       },
       $push: {
         transitions: {
-          from: OrderStatus.OUT_FOR_DELIVERY,
-          to: OrderStatus.DELIVERED,
+          from: current.status,
+          to: OrderStatus.COLLECTED,
           at: now,
           actorId: req.staff.id,
           note: '',
         },
       },
     },
-    { runValidators: true }
-  );
+    { new: true, runValidators: true }
+  ).lean();
+
+  if (!updated) {
+    throw new ConflictError('Package changed while it was being collected. Refresh and retry.');
+  }
 
   res.json({
-    data: { receivedCount: result.modifiedCount },
+    data: serialize(updated, { includeMoney: false }),
     meta: { requestId: req.context.requestId },
   });
 };
@@ -333,7 +394,7 @@ export const report = async (req, res) => {
   const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
 
   const orders = await FulfillmentOrder.find({ orderedAt: { $gte: from, $lt: to } })
-    .select('status orderedAt deliverBy packedAt dispatchedAt deliveredAt proofOfDelivery.receivedBy')
+    .select('status orderedAt deliverBy packedAt dispatchedAt deliveredAt collectedAt proofOfDelivery.receivedBy')
     .limit(MAX_REPORT_ORDERS + 1)
     .lean();
 
@@ -359,16 +420,12 @@ export const transition = async (req, res) => {
   if (!orderStatuses.includes(to) || to === OrderStatus.PENDING) {
     throw new ValidationError([{ field: 'status', message: 'Unknown transition target.' }]);
   }
-  const caretaker = req.staff.role === 'caretaker';
-  if (caretaker && to !== OrderStatus.DELIVERED) {
-    throw new ApplicationError('Caretakers may only confirm delivered packages.', {
-      status: 403,
-      code: 'FORBIDDEN',
-    });
-  }
-  if (!caretaker && to === OrderStatus.DELIVERED) {
+  /* Only the student can finish a package, and they do it by typing their
+     code on the caretaker's screen — never through this route, which is the
+     storeroom's. See confirmCollection. */
+  if (to === OrderStatus.COLLECTED) {
     throw new ApplicationError(
-      'Warehouse staff may dispatch packages; only the assigned caretaker can mark them received.',
+      'A package is collected by the student entering their purchase code, not by staff.',
       { status: 403, code: 'FORBIDDEN' }
     );
   }
@@ -403,12 +460,7 @@ export const transition = async (req, res) => {
     });
   }
 
-  const current = caretaker
-    ? await FulfillmentOrder.findOne({
-        _id: req.params.id,
-        'studentSnapshot.hostelId': req.staff.hostelId,
-      }).lean()
-    : await FulfillmentOrder.findById(req.params.id).lean();
+  const current = await FulfillmentOrder.findById(req.params.id).lean();
   if (!current) throw new NotFoundError('Fulfilment order');
   if (!canTransitionOrder(current.status, to)) {
     throw new ConflictError(
@@ -422,10 +474,17 @@ export const transition = async (req, res) => {
   const note = String(req.body.note || '').trim().slice(0, 200);
   const set = { status: to, [timestampField]: now, [actorField]: req.staff.id };
 
-  /* Receipt is asserted only by the assigned caretaker. Their account and the
-     server clock are the proof; neither identity nor time comes from the body. */
+  /* Delivery is the warehouse handing the package over at the hostel, and the
+     one fact only the person handing it over knows is who took it. So that
+     name comes from the body — and it is the sole part of this record that
+     does: the account recording it and the time are taken from the session and
+     the clock, so a mistyped or invented name still sits beside a staff member
+     and a minute that can be asked about. */
   if (to === OrderStatus.DELIVERED) {
-    const receivedBy = String(req.staff.email).trim().slice(0, 60);
+    const receivedBy = String(req.body.receivedBy ?? '').trim();
+    const problem = proofOfDeliveryProblem(receivedBy);
+
+    if (problem) throw new ValidationError([{ field: 'receivedBy', message: problem }]);
 
     set.proofOfDelivery = buildProofOfDelivery({
       receivedBy,
@@ -436,11 +495,7 @@ export const transition = async (req, res) => {
   }
 
   const updated = await FulfillmentOrder.findOneAndUpdate(
-    {
-      _id: current._id,
-      status: current.status,
-      ...(caretaker ? { 'studentSnapshot.hostelId': req.staff.hostelId } : {}),
-    },
+    { _id: current._id, status: current.status },
     {
       $set: set,
       $push: {
@@ -461,7 +516,7 @@ export const transition = async (req, res) => {
   }
 
   res.json({
-    data: serialize(updated, { includeMoney: !caretaker }),
+    data: serialize(updated),
     meta: { requestId: req.context.requestId },
   });
 };

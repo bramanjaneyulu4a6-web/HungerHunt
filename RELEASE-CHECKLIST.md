@@ -92,6 +92,34 @@ These are open items, not formalities. Each one is a real gap today.
       after deploy.** It shelves every product that predates inventory-at-creation
       (idempotent — running it again touches nothing that already has a row).
 
+- [ ] **Run `npm run backfill:collected-packages -- --prod --apply` from
+      `backend/` once after deploy.** Delivery no longer ends a package: the
+      warehouse marks `DELIVERED` when it hands the package to the caretaker,
+      and the student's own purchase code marks it `COLLECTED`. Every package
+      delivered under the old rule would otherwise sit in its caretaker's queue
+      forever, asking children to type a code for food they ate weeks ago.
+      Preview it first without `--apply`, and pass `--since=<deploy time>` if
+      packages have already been delivered under the new rule.
+
+- [ ] **Tell the caretakers that "Received all" is gone.** They no longer
+      confirm anything on their own — each student types their four-digit
+      purchase code on the caretaker's screen to take their own package, and
+      five wrong codes lock that student out of both the dorm door and the
+      till for fifteen minutes.
+
+- [ ] **Tell the storeroom that they now name who took the package.** Marking
+      a package handed over asks for the caretaker's name at the hostel door;
+      a name only, no ID or phone numbers, which the server refuses.
+
+- [ ] **Tell the admins that caretaker reports are everyone's.** Caretakers can
+      now raise a package issue at handover and a professional complaint about
+      anything; both land in the admin console under *Caretaker reports* and
+      nowhere else. Every admin sees the same queue, any of them may answer any
+      report, and the answer is recorded and shown to the caretaker **under the
+      name of the admin who wrote it**. An undismissable banner counts what is
+      unanswered on every screen — nothing else notifies anyone, because staff
+      accounts have no email or push channel.
+
 - [ ] **Tell the counter staff that admin billing no longer charges.** An order
       raised from the admin console now always goes to the parent to approve —
       the student's four-digit code is not asked for there any more, and
@@ -326,7 +354,7 @@ Worth knowing when deciding how much the green checkmarks are worth.
   than parked on red, and belongs back in the moment those are fixed — the
   change is one word in [ci.yml](.github/workflows/ci.yml).
 - **The backend has no eslint config**, so nothing lints it.
-- **The parent app has no frontend tests.** The 458 backend tests cover its API
+- **The parent app has no frontend tests.** The 601 backend tests cover its API
   surface and auth, and the other three apps each have a small suite CI runs,
   but nothing exercises a parent-app screen; every one of them is verified by
   hand, which is what section 5 is for.

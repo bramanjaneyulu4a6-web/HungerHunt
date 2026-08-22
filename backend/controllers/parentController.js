@@ -405,6 +405,11 @@ const parentPackageView = (order, now) => ({
   packedAt: order.packedAt || null,
   dispatchedAt: order.dispatchedAt || null,
   deliveredAt: order.deliveredAt || null,
+  /* Two different facts, and a parent wants both: deliveredAt is when the
+     warehouse handed the package to the hostel's caretaker, collectedAt is
+     when their child actually took it from them. Until the second exists the
+     package is at the dorm, not with the child. */
+  collectedAt: order.collectedAt || null,
   receivedBy: order.proofOfDelivery?.receivedBy || "",
   overdue: isOverdue(order, now),
 });

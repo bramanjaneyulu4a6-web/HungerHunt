@@ -1,7 +1,12 @@
 import { OrderStatus, orderStatuses } from './orderState.js';
 import { isOverdue } from './overdue.js';
 
-export const DELIVERY_REPORT_SCHEMA_VERSION = '1.0';
+// Both states in which the warehouse has handed the package over at the hostel.
+const DELIVERED_STATUSES = Object.freeze([OrderStatus.DELIVERED, OrderStatus.COLLECTED]);
+
+/* 1.1 added collection: the counts below stopped being able to say whether a
+   delivered package ever reached the student it was for. */
+export const DELIVERY_REPORT_SCHEMA_VERSION = '1.1';
 
 /* An operational report, not a staff scorecard and not a customer list.
  *
@@ -51,8 +56,10 @@ export const buildDeliveryReport = ({ orders, from, to, now = new Date(), timeZo
   const packToDispatch = [];
   const dispatchToDeliver = [];
   const orderToDeliver = [];
+  const deliverToCollect = [];
 
   let delivered = 0;
+  let collected = 0;
   let onTime = 0;
   let late = 0;
   let receiverRecorded = 0;
@@ -69,9 +76,17 @@ export const buildDeliveryReport = ({ orders, from, to, now = new Date(), timeZo
     if (order.dispatchedAt && order.deliveredAt) {
       dispatchToDeliver.push(hoursBetween(order.dispatchedAt, order.deliveredAt));
     }
+    if (order.deliveredAt && order.collectedAt) {
+      deliverToCollect.push(hoursBetween(order.deliveredAt, order.collectedAt));
+    }
 
-    if (order.status === OrderStatus.DELIVERED && order.deliveredAt) {
+    /* Delivery is measured at the hostel door, so a package the student has
+       since collected is still a delivered package — it must be counted here
+       too, or every on-time delivery would quietly leave the numerator the
+       moment its student turned up for it. */
+    if (DELIVERED_STATUSES.includes(order.status) && order.deliveredAt) {
       delivered += 1;
+      if (order.status === OrderStatus.COLLECTED) collected += 1;
       orderToDeliver.push(hoursBetween(order.orderedAt, order.deliveredAt));
 
       if (new Date(order.deliveredAt).getTime() <= new Date(order.deliverBy).getTime()) {
@@ -99,6 +114,10 @@ export const buildDeliveryReport = ({ orders, from, to, now = new Date(), timeZo
     },
     delivery: {
       delivered,
+      // Of the delivered packages, how many are actually in a student's hands.
+      // The gap is what is sitting in caretakers' rooms.
+      collected,
+      awaitingCollection: delivered - collected,
       onTime,
       late,
       // Null rather than 1 or 0 when nothing was delivered: "no data" and
@@ -114,6 +133,7 @@ export const buildDeliveryReport = ({ orders, from, to, now = new Date(), timeZo
       packToDispatch: durations(packToDispatch),
       dispatchToDeliver: durations(dispatchToDeliver),
       orderToDeliver: durations(orderToDeliver),
+      deliverToCollect: durations(deliverToCollect),
     },
   };
 };

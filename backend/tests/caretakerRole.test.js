@@ -9,6 +9,8 @@ process.env.NODE_ENV = 'test';
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const Student = (await import('../models/Student.js')).default;
+const bcrypt = (await import('bcryptjs')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -57,10 +59,33 @@ const send = (method, path, body, authToken = token) => fetch(base + path, {
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 
+const STUDENT_ID = '507f191e810c19729de860e5';
+const CODE = '4821';
+
+/* The collection route reads the student the order names and compares the
+   typed code against the stored hash. Both are mocked here; what the tests
+   are about is which packages the code is allowed to move, and what a wrong
+   or locked code costs. */
+const studentWithCode = async (overrides = {}) => {
+  const hash = await bcrypt.hash(CODE, 4);
+  mock.method(Student, 'findById', () => ({
+    select: async () => ({
+      _id: STUDENT_ID,
+      active: true,
+      purchasePassword: hash,
+      purchaseCodeIsPin: true,
+      purchaseCodeAttempts: 0,
+      purchaseCodeLockedUntil: null,
+      ...overrides,
+    }),
+  }));
+  mock.method(Student, 'updateOne', async () => ({ modifiedCount: 1 }));
+};
+
 const order = (hostelId = HOSTEL_ID) => ({
   _id: ORDER_ID,
   transactionId: '507f191e810c19729de860e4',
-  studentId: '507f191e810c19729de860e5',
+  studentId: STUDENT_ID,
   studentSnapshot: { name: 'Asha', admissionNumber: 'A-10', hostelNumber: 'D-4', hostelId },
   items: [{ productId: '507f191e810c19729de860e6', name: 'Juice', quantity: 2, price: 10 }],
   totalAmount: 20,
@@ -83,7 +108,7 @@ describe('caretaker fulfillment scope', () => {
     });
     mock.method(FulfillmentOrder, 'countDocuments', async (value) => {
       assert.deepEqual(value, {
-        status: 'OUT_FOR_DELIVERY',
+        status: 'DELIVERED',
         'studentSnapshot.hostelId': HOSTEL_ID,
       });
       return 2;
@@ -91,18 +116,20 @@ describe('caretaker fulfillment scope', () => {
 
     const response = await send('GET', '/api/v1/caretaker/fulfillment-orders');
     assert.equal(response.status, 200);
+    /* DELIVERED belongs on this list: the warehouse has finished with the
+       package but the student has not taken it yet. */
     assert.deepEqual(filter, {
-      status: { $in: ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY'] },
+      status: { $in: ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'] },
       'studentSnapshot.hostelId': HOSTEL_ID,
     });
     const body = await response.json();
     assert.equal(body.data[0].status, 'PENDING');
     assert.equal(body.data[0].totalAmount, undefined);
     assert.equal(body.data[0].items[0].price, undefined);
-    assert.equal(body.meta.receivableCount, 2);
+    assert.equal(body.meta.awaitingCollection, 2);
   });
 
-  test('pages delivered history for only the assigned hostel without prices', async () => {
+  test('pages collected history for only the assigned hostel without prices', async () => {
     authenticateCaretaker();
     let filter;
     let sort;
@@ -114,8 +141,9 @@ describe('caretaker fulfillment scope', () => {
         limit: () => chain,
         lean: async () => [{
           ...order(),
-          status: 'DELIVERED',
+          status: 'COLLECTED',
           deliveredAt: new Date('2026-08-14T10:00:00.000Z'),
+          collectedAt: new Date('2026-08-14T16:00:00.000Z'),
         }],
       };
       return chain;
@@ -127,11 +155,13 @@ describe('caretaker fulfillment scope', () => {
 
     const response = await send('GET', '/api/v1/caretaker/fulfillment-orders/history?page=1&limit=25');
     assert.equal(response.status, 200);
+    /* A package the caretaker is still holding is work, not history. Only a
+       package its student has taken leaves the queue for this log. */
     assert.deepEqual(filter, {
-      status: 'DELIVERED',
+      status: 'COLLECTED',
       'studentSnapshot.hostelId': HOSTEL_ID,
     });
-    assert.deepEqual(sort, { deliveredAt: -1, _id: -1 });
+    assert.deepEqual(sort, { collectedAt: -1, _id: -1 });
     const body = await response.json();
     assert.equal(body.data[0].totalAmount, undefined);
     assert.equal(body.data[0].items[0].price, undefined);
@@ -139,38 +169,121 @@ describe('caretaker fulfillment scope', () => {
     assert.equal(body.meta.total, 26);
   });
 
-  test('receives every out-for-delivery package in the assigned hostel', async () => {
+  test('the student\'s own code is what marks a package collected', async () => {
     authenticateCaretaker();
+    await studentWithCode();
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      lean: async () => ({ ...order(), status: 'DELIVERED' }),
+    }));
     let filter;
     let update;
-    mock.method(FulfillmentOrder, 'updateMany', async (value, changes) => {
-      filter = value;
-      update = changes;
-      return { modifiedCount: 3 };
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (requestedFilter, requested) => {
+      filter = requestedFilter;
+      update = requested;
+      return { lean: async () => ({ ...order(), status: 'COLLECTED', ...requested.$set }) };
     });
 
-    const response = await send('POST', '/api/v1/caretaker/fulfillment-orders/receive-all');
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: CODE,
+    });
+
     assert.equal(response.status, 200);
+    // Still scoped to the hostel at the moment of the write, not only at read.
     assert.deepEqual(filter, {
-      status: 'OUT_FOR_DELIVERY',
+      _id: ORDER_ID,
+      status: 'DELIVERED',
       'studentSnapshot.hostelId': HOSTEL_ID,
     });
-    assert.equal(update.$set.status, 'DELIVERED');
-    assert.equal(update.$set.proofOfDelivery.receivedBy, 'd4.caretaker@example.com');
-    assert.equal(String(update.$set.deliveredBy), STAFF_ID);
-    assert.equal(update.$push.transitions.from, 'OUT_FOR_DELIVERY');
-    assert.equal(update.$push.transitions.to, 'DELIVERED');
+    assert.equal(update.$set.status, 'COLLECTED');
+    assert.equal(String(update.$set.collectedBy), STAFF_ID);
+    assert.equal(update.$push.transitions.from, 'DELIVERED');
+    assert.equal(update.$push.transitions.to, 'COLLECTED');
     const body = await response.json();
-    assert.equal(body.data.receivedCount, 3);
-    assert.equal(typeof body.meta.requestId, 'string');
+    assert.equal(body.data.status, 'COLLECTED');
+    // A caretaker never sees what a package cost, on this route either.
+    assert.equal(body.data.totalAmount, undefined);
   });
 
-  test('refuses every other transition before looking up the order', async () => {
+  test('a wrong code collects nothing and is counted against the student', async () => {
     authenticateCaretaker();
-    const find = mock.method(FulfillmentOrder, 'findOne', () => { throw new Error('must not run'); });
-    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/transition`, { status: 'PACKED' });
-    assert.equal(response.status, 403);
-    assert.equal(find.mock.callCount(), 0);
+    await studentWithCode();
+    let miss;
+    mock.method(Student, 'updateOne', async (_filter, update) => {
+      miss = update;
+      return { modifiedCount: 1 };
+    });
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      lean: async () => ({ ...order(), status: 'DELIVERED' }),
+    }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
+      throw new Error('must not update');
+    });
+
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: '0000',
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(update.mock.callCount(), 0);
+    // The same counter the till reads — five misses lock both doors.
+    assert.deepEqual(miss, { $inc: { purchaseCodeAttempts: 1 } });
+  });
+
+  test('a locked code is refused without reading the hash', async () => {
+    authenticateCaretaker();
+    await studentWithCode({
+      purchaseCodeLockedUntil: new Date(Date.now() + 60_000),
+    });
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      lean: async () => ({ ...order(), status: 'DELIVERED' }),
+    }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
+      throw new Error('must not update');
+    });
+
+    // Even the right code: answering a locked student differently would tell
+    // a guesser they had just found it.
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: CODE,
+    });
+
+    assert.equal(response.status, 423);
+    assert.equal((await response.json()).error.code, 'CODE_LOCKED');
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('a package the warehouse has not delivered yet costs no code attempt', async () => {
+    authenticateCaretaker();
+    const student = mock.method(Student, 'findById', () => { throw new Error('must not run'); });
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      lean: async () => ({ ...order(), status: 'OUT_FOR_DELIVERY' }),
+    }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
+      throw new Error('must not update');
+    });
+
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: CODE,
+    });
+
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).message, /delivered it to your hostel/i);
+    assert.equal(student.mock.callCount(), 0);
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('a package already collected is not collected twice', async () => {
+    authenticateCaretaker();
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      lean: async () => ({ ...order(), status: 'COLLECTED' }),
+    }));
+
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: CODE,
+    });
+
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).message, /already been collected/i);
   });
 
   test('answers 404 for an order outside the assigned hostel', async () => {
@@ -180,45 +293,21 @@ describe('caretaker fulfillment scope', () => {
       filter = value;
       return { lean: async () => null };
     });
-    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/transition`, { status: 'DELIVERED' });
+    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`, {
+      code: CODE,
+    });
     assert.equal(response.status, 404);
     assert.deepEqual(filter, { _id: ORDER_ID, 'studentSnapshot.hostelId': HOSTEL_ID });
   });
 
-  test('cannot receive an order before warehouse dispatch', async () => {
+  test('a caretaker has no transition route left to reach for', async () => {
     authenticateCaretaker();
-    mock.method(FulfillmentOrder, 'findOne', () => ({
-      lean: async () => ({ ...order(), status: 'PENDING' }),
-    }));
-    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
-      throw new Error('must not update');
-    });
-
     const response = await send(
       'POST',
       `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/transition`,
       { status: 'DELIVERED' }
     );
-    assert.equal(response.status, 409);
-    assert.equal(update.mock.callCount(), 0);
-  });
-
-  test('records the authenticated account and ignores receivedBy in the body', async () => {
-    authenticateCaretaker();
-    mock.method(FulfillmentOrder, 'findOne', () => ({ lean: async () => order() }));
-    let update;
-    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, value) => {
-      update = value;
-      return { lean: async () => ({ ...order(), status: 'DELIVERED', ...value.$set }) };
-    });
-
-    const response = await send('POST', `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/transition`, {
-      status: 'DELIVERED',
-      receivedBy: 'Untrusted body value',
-    });
-    assert.equal(response.status, 200);
-    assert.equal(update.$set.proofOfDelivery.receivedBy, 'd4.caretaker@example.com');
-    assert.equal(String(update.$set.proofOfDelivery.recordedBy), STAFF_ID);
+    assert.equal(response.status, 404);
   });
 });
 
@@ -240,13 +329,13 @@ describe('caretakers do not inherit warehouse access', () => {
 });
 
 describe('warehouse accounts do not inherit caretaker access', () => {
-  test('warehouse cannot mark an order delivered through its own route', async () => {
+  test('warehouse cannot collect a package on the student\'s behalf', async () => {
     authenticateWarehouse();
     const find = mock.method(FulfillmentOrder, 'findById', () => { throw new Error('must not run'); });
     const response = await send(
       'POST',
       `/api/v1/fulfillment-orders/${ORDER_ID}/transition`,
-      { status: 'DELIVERED', receivedBy: 'Warehouse' },
+      { status: 'COLLECTED' },
       warehouseToken
     );
     assert.equal(response.status, 403);
@@ -261,13 +350,13 @@ describe('warehouse accounts do not inherit caretaker access', () => {
     );
   });
 
-  test('the caretaker delivery transition is forbidden', async () => {
+  test('the caretaker collection route is forbidden', async () => {
     authenticateWarehouse();
     assert.equal(
       (await send(
         'POST',
-        `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/transition`,
-        { status: 'DELIVERED' },
+        `/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/collect`,
+        { code: CODE },
         warehouseToken
       )).status,
       403
@@ -276,7 +365,6 @@ describe('warehouse accounts do not inherit caretaker access', () => {
 
   for (const [method, path] of [
     ['GET', '/api/v1/caretaker/fulfillment-orders/history'],
-    ['POST', '/api/v1/caretaker/fulfillment-orders/receive-all'],
   ]) {
     test(`${method} ${path} is forbidden`, async () => {
       authenticateWarehouse();

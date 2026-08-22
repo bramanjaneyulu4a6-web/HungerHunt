@@ -517,10 +517,187 @@
 }
 .wh-cta:disabled { opacity: 0.45; cursor: default; }
 
-.wh-receive-all {
+/* The handover box. A student is standing at the desk with a queue behind
+   them, so the code field is finger-sized and the digits are spaced far enough
+   apart to be checked at a glance before the button is pressed. */
+.wh-collect {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--wh-line);
+}
+
+.wh-collect-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--wh-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wh-collect-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.wh-collect-input {
+  flex: 0 0 44%;
+  padding: 16px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.wh-collect-cta {
+  flex: 1;
+  margin-top: 0;
+  padding: 16px;
+  background: var(--wh-green);
+  color: var(--wh-amber-ink);
+}
+
+/* The office channel. Deliberately quieter than the collection controls above
+   it: raising an issue is the exception, and a button that shouts as loudly as
+   "Hand over" would get pressed by mistake with a student waiting. */
+.wh-report-link {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wh-muted);
+  background: none;
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.wh-report-link:hover,
+.wh-report-link:focus-visible { color: var(--wh-red); border-color: var(--wh-red); }
+.wh-report-link:disabled { opacity: 0.45; cursor: default; }
+
+.wh-collect--reporting { border-top-style: solid; }
+
+.wh-report-open {
   margin: 0 0 16px;
   background: var(--wh-green);
   color: var(--wh-amber-ink);
+}
+
+.wh-report-form { margin-top: 12px; }
+
+/* Buttons rather than a select: a caretaker files one of these with a student
+   in front of them, and every option should be one tap away and readable. */
+.wh-report-choices {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.wh-report-choice {
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--wh-ink);
+  background: var(--wh-panel);
+  border: 1px solid var(--wh-line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.wh-report-choice.active {
+  border-color: var(--wh-amber);
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--wh-amber);
+}
+
+.wh-report-note {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.wh-report-count {
+  margin: 6px 0 0;
+  color: var(--wh-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.wh-report-actions {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 12px;
+}
+
+.wh-report-cancel { flex: 0 0 38%; margin-top: 0; }
+.wh-report-send { flex: 1; margin-top: 0; }
+
+.wh-report-said {
+  margin: 12px 0 0;
+  color: var(--wh-ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* The reply is the reason this screen exists, so it is the part that is
+   framed rather than the complaint above it. */
+.wh-report-answer {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(63, 178, 127, 0.1);
+  border-left: 3px solid var(--wh-green);
+  border-radius: 0 12px 12px 0;
+}
+
+.wh-report-answer p { margin: 0; line-height: 1.5; }
+.wh-report-answer .wh-history-date { margin-top: 6px; }
+
+.wh-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--wh-muted);
+  font-size: 14px;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.wh-back-icon { transform: rotate(90deg); }
+
+.caretaker-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.caretaker-reports-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-dim, var(--wh-ink));
+  background: var(--surface, var(--wh-panel-raised));
+  border: 1px solid var(--border, var(--wh-line));
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.caretaker-reports-btn:hover,
+.caretaker-reports-btn:focus-visible {
+  border-color: var(--wh-amber);
+  color: var(--wh-amber);
 }
 
 .wh-history-date {
@@ -531,7 +708,7 @@
 
 .wh-order-progress {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   margin: 16px 0 8px;
 }

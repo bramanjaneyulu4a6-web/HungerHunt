@@ -3,11 +3,17 @@ import { Link } from 'react-router-dom';
 import { Card } from './ui';
 import { formatINR } from '../utils/format';
 
+/* Two endings, not one. DELIVERED is the warehouse having handed the package
+   to the hostel's caretaker; COLLECTED is the child having taken it from
+   them, which only their own purchase code can record. A parent reading
+   "Delivered" should understand the package is at the dorm and not yet in
+   their child's hands, so it is not the word "Delivered" on its own. */
 const ORDER_STATUS_LABELS = {
   PENDING: 'Order received',
   PACKED: 'Packed',
   OUT_FOR_DELIVERY: 'On the way',
-  DELIVERED: 'Delivered',
+  DELIVERED: 'At the hostel',
+  COLLECTED: 'Collected',
   CANCELLED: 'Cancelled and refunded',
 };
 
@@ -67,9 +73,15 @@ export default function OrderCard({ order, index = 0, showStudent = false }) {
 
       <div className="order-card__meta">
         <div>
-          <span>{order.deliveredAt ? 'Delivered' : order.overdue ? 'Overdue since' : 'Expected by'}</span>
+          <span>
+            {order.collectedAt
+              ? 'Collected'
+              : order.deliveredAt
+                ? 'At the hostel since'
+                : order.overdue ? 'Overdue since' : 'Expected by'}
+          </span>
           <strong className={order.overdue ? 'order-card__overdue' : ''}>
-            {formatDateTime(order.deliveredAt || order.deliverBy)}
+            {formatDateTime(order.collectedAt || order.deliveredAt || order.deliverBy)}
           </strong>
         </div>
         <div>
@@ -78,7 +90,7 @@ export default function OrderCard({ order, index = 0, showStudent = false }) {
         </div>
         {order.receivedBy && (
           <div>
-            <span>Received by</span>
+            <span>Handed to</span>
             <strong>{order.receivedBy}</strong>
           </div>
         )}

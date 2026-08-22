@@ -63,7 +63,9 @@ PENDING_REVIEW --approve--> APPROVED --partial receipt--> PARTIALLY_RECEIVED
 
 `REJECTED`, `RECEIVED` and `CANCELLED` are terminal. Review uses a conditional database update whose filter includes `status: PENDING_REVIEW`; simultaneous decisions cannot both win. A losing request receives `409 STATE_CONFLICT`, including the current and expected status.
 
-Fulfilment uses `PENDING → PACKED → OUT_FOR_DELIVERY → DELIVERED`, with cancellation allowed before dispatch. State changes should always go through the domain policy, never arbitrary status assignments in controllers.
+Fulfilment uses `PENDING → PACKED → OUT_FOR_DELIVERY → DELIVERED → COLLECTED`, with cancellation allowed before dispatch. Warehouse staff drive it as far as `DELIVERED`, naming the caretaker they handed the package to; `COLLECTED` is reached only by the student entering their own purchase code on the caretaker's screen, and no staff route can set it. State changes should always go through the domain policy, never arbitrary status assignments in controllers.
+
+Caretakers also raise reports — a problem with one package, or a professional complaint about anything — through `POST /api/v1/caretaker/reports`, and read their own through `GET` on the same path. These are answered from the admin console only (`/api/v1/reports`, `protectAdmin`). A warehouse account cannot read them, deliberately: a complaint may be about the warehouse.
 
 ## Security and operations
 

@@ -8,6 +8,7 @@ import Inventory from "./pages/Inventory";
 import Purchases from "./pages/Purchases";
 import Receive from "./pages/Receive";
 import CaretakerOrders from "./pages/CaretakerOrders";
+import CaretakerReports from "./pages/CaretakerReports";
 import { clearSession } from "./utils/session";
 
 /* Three tabs, in the order the shift runs: what students are waiting for,
@@ -70,7 +71,26 @@ const readStaffProfile = () => {
   }
 };
 
-const CaretakerShell = ({ children }) => {
+/* The way to the office, kept in the app bar rather than behind a tab.
+   It has to be reachable from wherever the caretaker is standing when
+   something goes wrong, and it must not compete with the three things the
+   packages screen is for. */
+const ReportsButton = () => {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      type="button"
+      className="caretaker-reports-btn"
+      onClick={() => navigate("/reports")}
+    >
+      <Icon name="receipt" size={18} />
+      <span>Reports</span>
+    </button>
+  );
+};
+
+const CaretakerShell = ({ children, identity = true }) => {
   const profile = readStaffProfile();
   const hostel = profile.hostel || {};
   const hostelLabel = [hostel.code, hostel.name].filter(Boolean).join(" — ");
@@ -82,9 +102,13 @@ const CaretakerShell = ({ children }) => {
           <img src="/Logo.jpeg" alt="" className="caretaker-header__logo" />
           <span><strong>Hunger Hunt</strong><small>Caretaker</small></span>
         </div>
-        <SignOutButton bare />
+        <div className="caretaker-header__actions">
+          <ReportsButton />
+          <SignOutButton bare />
+        </div>
       </header>
 
+      {identity && (
       <section className="caretaker-identity" aria-label="Signed-in caretaker">
         <div className="caretaker-identity__avatar" aria-hidden="true">
           {(profile.name || "C").trim().charAt(0).toUpperCase()}
@@ -101,6 +125,7 @@ const CaretakerShell = ({ children }) => {
           <span><small>Your hostel</small><strong>{hostelLabel || "Hostel unavailable"}</strong></span>
         </div>
       </section>
+      )}
 
       {children}
     </div>
@@ -146,6 +171,14 @@ const StaffRoutes = () => {
     return (
       <Routes>
         <Route path="/" element={<ProtectedRoute><CaretakerShell><CaretakerOrders /></CaretakerShell></ProtectedRoute>} />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <CaretakerShell identity={false}><CaretakerReports /></CaretakerShell>
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

@@ -1731,3 +1731,91 @@
     display: none;
   }
 }
+
+/* Caretaker reports. The note a caretaker wrote is the content of the card and
+   is set at reading size, not at metadata size — somebody described a problem
+   in their own words and the screen should treat that as the point. */
+.report-card { margin-bottom: 16px; }
+
+.report-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.report-card__title { margin: 0; font-size: 16px; }
+
+.report-card__meta {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.report-card__order {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.03));
+  border-radius: var(--radius-sm);
+}
+
+.report-card__note {
+  margin: 14px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.report-card__answer {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--success, #2e8758);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(46, 135, 88, 0.08);
+}
+
+.report-card__answer p { margin: 0; line-height: 1.6; }
+
+.report-card__answer-label {
+  margin-bottom: 4px !important;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Who already has this one. Sits under the report rather than beside the
+   badges: it answers "should I start typing?", which is a question you ask
+   after reading, not before. */
+.report-card__handled {
+  margin-top: 10px !important;
+  font-style: italic;
+}
+
+.report-card__resolve { margin-top: 16px; }
+
+.report-card__resolve label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.report-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}

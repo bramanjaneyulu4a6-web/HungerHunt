@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 import RefreshButton from '../components/RefreshButton';
+import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 
 const HISTORY_PAGE_SIZE = 25;
 const REFRESH_INTERVAL_MS = 15_000;
-const STATUS_STEPS = ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY'];
+const CODE_LENGTH = 4;
+const STATUS_STEPS = ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 const STATUS_DETAILS = {
   PENDING: {
     label: 'Order received',
@@ -21,9 +24,88 @@ const STATUS_DETAILS = {
   },
   OUT_FOR_DELIVERY: {
     label: 'On the way',
-    detail: 'This package is ready to be received at the hostel.',
+    detail: 'The warehouse is bringing this package to you.',
     badge: 'partial',
   },
+  DELIVERED: {
+    label: 'With you',
+    detail: 'You have this package. The student takes it by typing their code below.',
+    badge: 'partial',
+  },
+};
+
+/* The handover, and the only thing on this screen that changes a package.
+ *
+ * The student types their own purchase code — the same four digits they use
+ * at the till — and that is what records the package as theirs. It is not the
+ * caretaker's tap: a caretaker confirming on a student's behalf is exactly
+ * what this screen stopped being able to do, because the button that used to
+ * close a hundred packages at once could not tell the difference between a
+ * package handed over and a package still on the shelf. */
+const CollectionCode = ({ order, busy, onConfirm }) => {
+  const [code, setCode] = useState('');
+  const [reporting, setReporting] = useState(false);
+  const ready = code.length === CODE_LENGTH && !busy;
+
+  /* The way out of this screen when the handover cannot happen as it should —
+     the food is wrong, the box is damaged, the student says the package is not
+     theirs, or they simply cannot produce their code. Reporting changes nothing
+     about the package: it stays here, still collectable, because a student who
+     is owed food should not lose it while an office reads a message. */
+  if (reporting) {
+    return (
+      <section className="wh-collect wh-collect--reporting" aria-label={`Report an issue with ${order.student.name}'s package`}>
+        <p className="wh-field-label">Issue with {order.student.name}&rsquo;s package</p>
+        <ReportForm
+          kind="ORDER_ISSUE"
+          categories={ORDER_ISSUE_CATEGORIES}
+          orderId={order.id}
+          submitLabel="Send to the office"
+          onCancel={() => setReporting(false)}
+          onFiled={() => setReporting(false)}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <form
+      className="wh-collect"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (ready) onConfirm(order, code, () => setCode(''));
+      }}
+    >
+      <label className="wh-collect-label" htmlFor={`code-${order.id}`}>
+        {order.student.name.split(' ')[0]} types their purchase code
+      </label>
+      <div className="wh-collect-row">
+        <input
+          id={`code-${order.id}`}
+          className="wh-input wh-collect-input"
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+          inputMode="numeric"
+          autoComplete="off"
+          type="password"
+          placeholder="••••"
+          aria-label={`Purchase code for ${order.student.name}`}
+          disabled={busy}
+        />
+        <button type="submit" className="wh-cta wh-collect-cta" disabled={!ready}>
+          {busy ? 'Checking…' : 'Hand over'}
+        </button>
+      </div>
+      <button
+        type="button"
+        className="wh-report-link"
+        disabled={busy}
+        onClick={() => setReporting(true)}
+      >
+        Issue with this package
+      </button>
+    </form>
+  );
 };
 
 const PackageLines = ({ items }) => (
@@ -58,8 +140,7 @@ const CaretakerOrders = () => {
   const [loadError, setLoadError] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   const [busyId, setBusyId] = useState(null);
-  const [receivingAll, setReceivingAll] = useState(false);
-  const [receivableCount, setReceivableCount] = useState(0);
+  const [awaitingCollection, setAwaitingCollection] = useState(0);
   const loadMoreRef = useRef(null);
   const arrivalRequestRef = useRef(0);
 
@@ -71,7 +152,7 @@ const CaretakerOrders = () => {
       const response = await api.get('/v1/caretaker/fulfillment-orders');
       if (requestNumber !== arrivalRequestRef.current) return;
       setOrders(response.data.data || []);
-      setReceivableCount(response.data.meta?.receivableCount || 0);
+      setAwaitingCollection(response.data.meta?.awaitingCollection || 0);
     } catch (error) {
       console.error(error);
       if (requestNumber === arrivalRequestRef.current) setLoadError(true);
@@ -127,37 +208,23 @@ const CaretakerOrders = () => {
     setHistoryLoaded(false);
   };
 
-  const confirmDelivery = async (order) => {
+  const collect = async (order, code, clearCode) => {
     setBusyId(order.id);
     try {
-      await api.post(`/v1/caretaker/fulfillment-orders/${order.id}/transition`, { status: 'DELIVERED' });
-      toast.success('Package marked received');
+      await api.post(`/v1/caretaker/fulfillment-orders/${order.id}/collect`, { code });
+      clearCode();
+      toast.success(`${order.student.name} has their package`);
       invalidateHistory();
       await loadArrivals();
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || 'Could not confirm this delivery');
+      /* The code is wrong, or locked, or the package moved under us. Every one
+         of those is the server's sentence to read out, not a generic failure:
+         a caretaker who is told "wrong code" hands the phone back to the
+         student, and one who is told the code is locked stops trying. */
+      toast.error(error.response?.data?.message || 'Could not confirm this collection');
     } finally {
       setBusyId(null);
-    }
-  };
-
-  const receiveAll = async () => {
-    const count = receivableCount;
-    if (!count || !window.confirm(`Confirm that all ${count} packages have arrived at your hostel?`)) return;
-
-    setReceivingAll(true);
-    try {
-      const response = await api.post('/v1/caretaker/fulfillment-orders/receive-all');
-      const receivedCount = response.data.data?.receivedCount || 0;
-      toast.success(`${receivedCount} ${receivedCount === 1 ? 'package' : 'packages'} received`);
-      invalidateHistory();
-      await loadArrivals();
-    } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || 'Could not receive all packages');
-    } finally {
-      setReceivingAll(false);
     }
   };
 
@@ -177,7 +244,11 @@ const CaretakerOrders = () => {
       <div className="wh-row">
         <div>
           <h1 className="wh-title">Hostel packages</h1>
-          <p className="wh-subtitle">Track every paid order through warehouse dispatch and hostel receipt</p>
+          <p className="wh-subtitle">
+            {awaitingCollection > 0
+              ? `${awaitingCollection} ${awaitingCollection === 1 ? 'package is' : 'packages are'} with you, waiting for their student`
+              : 'Track every paid order from the warehouse to the student it belongs to'}
+          </p>
         </div>
         <RefreshButton onRefresh={refresh} />
       </div>
@@ -193,15 +264,10 @@ const CaretakerOrders = () => {
 
       {view === 'arriving' ? (
         <>
-          <button type="button" className="wh-cta wh-receive-all" disabled={loading || receivingAll || receivableCount === 0}
-            onClick={receiveAll}>
-            {receivingAll ? 'Receiving…' : `Received all (${receivableCount})`}
-          </button>
-
           {loadError && <Banner variant="alert" icon="⚠️">Could not load arriving packages.</Banner>}
           {loading ? <Skeleton height={240} radius={14} /> : orders.length === 0 && !loadError ? (
             <EmptyState icon="✓" title="You're all caught up" variant="success">
-              No paid packages for your hostel are currently in progress.
+              Nothing is on its way to your hostel, and no package is waiting to be collected.
             </EmptyState>
           ) : currentOrders.map((order) => {
             const status = STATUS_DETAILS[order.status] || {
@@ -229,11 +295,8 @@ const CaretakerOrders = () => {
 
                 <p className="wh-status-detail">{status.detail}</p>
                 <PackageLines items={order.items} />
-                {order.status === 'OUT_FOR_DELIVERY' && (
-                  <button type="button" className="wh-cta" disabled={busyId === order.id || receivingAll}
-                    onClick={() => confirmDelivery(order)}>
-                    {busyId === order.id ? 'Receiving…' : 'Mark as received'}
-                  </button>
+                {order.status === 'DELIVERED' && (
+                  <CollectionCode order={order} busy={busyId === order.id} onConfirm={collect} />
                 )}
               </article>
             );
@@ -244,16 +307,18 @@ const CaretakerOrders = () => {
           {historyError && <Banner variant="alert" icon="⚠️">Could not load package history.</Banner>}
           {!historyLoaded && historyLoading ? <Skeleton height={240} radius={14} /> : history.length === 0 && !historyError ? (
             <EmptyState icon="package" title="No package history yet">
-              Received packages will appear here.
+              Packages appear here once their student has collected them.
             </EmptyState>
           ) : history.map((order) => (
             <article key={order.id} className="wh-card wh-order">
               <div className="wh-row">
                 <StudentDetails order={order} />
-                <span className="wh-badge wh-badge--partial">RECEIVED</span>
+                <span className="wh-badge wh-badge--partial">COLLECTED</span>
               </div>
               <p className="wh-history-date">
-                {order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : 'Delivery time unavailable'}
+                {order.collectedAt
+                  ? new Date(order.collectedAt).toLocaleString()
+                  : 'Collection time unavailable'}
               </p>
               <PackageLines items={order.items} />
             </article>

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Outlet, Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import StockAlertBanner from "./StockAlertBanner";
+import ReportAlertBanner from "./ReportAlertBanner";
 
 const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
   { path: "/billing", label: "Point of Sale", icon: "◫" },
   { path: "/students", label: "Students", icon: "♙" },
   { path: "/hostels", label: "Hostels", icon: "⌂" },
+  { path: "/reports", label: "Caretaker reports", icon: "✎" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },
   { path: "/accounting-export", label: "TallyPrime Export", icon: "⇩" },
 ];
@@ -149,6 +151,8 @@ const Layout = () => {
       <main className="layout-main">
         {inWarehouse && <WarehouseContextBar />}
         {inWarehouse && <StockAlertBanner />}
+        {/* Every screen except the queue itself, which already is the queue. */}
+        {!location.pathname.startsWith("/reports") && <ReportAlertBanner />}
         <Outlet />
       </main>
     </div>

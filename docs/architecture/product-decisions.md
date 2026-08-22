@@ -32,7 +32,7 @@ use.
 The aggregate follows guarded transitions:
 
 ```text
-PENDING --pack--> PACKED --dispatch--> OUT_FOR_DELIVERY --deliver--> DELIVERED
+PENDING --pack--> PACKED --dispatch--> OUT_FOR_DELIVERY --hand over--> DELIVERED --student's code--> COLLECTED
    |
    +--cancel--> CANCELLED
 
@@ -41,14 +41,33 @@ PACKED --cancel--> CANCELLED
 
 Each transition records its timestamp and authenticated staff actor.
 
+`DELIVERED` and `COLLECTED` are two different facts and are deliberately not
+one state. `DELIVERED` is the warehouse handing the package to the hostel's
+caretaker, which is the act the 48-hour deadline measures and where the
+storeroom's job ends. `COLLECTED` is the student taking it from the caretaker
+afterwards. Collapsing them would let a package sit in a caretaker's room for
+a week and still read as delivered on time, and — as the "received all" button
+that this replaced showed — would let one tap close a hundred packages that
+nobody had handed to anybody.
+
+Only the delivery deadline treats `DELIVERED` as finished. The caretaker's own
+queue keeps a delivered package until its student has taken it, and the
+delivery report counts collected packages as delivered while reporting the gap
+between the two separately.
+
 ### Proof of delivery
 
 Delivery is the one transition that asserts something about a person outside
 the system, so it is the one that must be proved. The proof is the smallest
-thing that answers "who took it": a short receiver note naming the student or
-the dorm representative, plus the authenticated staff account that recorded it
-and the server timestamp. The account and the time come from the session and
-the clock, never from the request body, so neither can be typed in.
+thing that answers "who took it": a short receiver note naming the caretaker
+who took the package at the hostel, plus the authenticated staff account that
+recorded it and the server timestamp. The account and the time come from the
+session and the clock, never from the request body, so neither can be typed
+in.
+
+The note is written by the warehouse, not the hostel: the person handing a
+package over names who they handed it to, and the person receiving it does not
+get to name themselves.
 
 The receiver note is required to record a delivery, is capped at 60
 characters, and is rejected if it contains six or more consecutive digits, an
@@ -61,12 +80,93 @@ and any other personal data about the receiver are explicitly not collected,
 here or anywhere else. The free-text validation above is what keeps the note
 from quietly becoming the place such data is stored regardless.
 
+### Proof of collection
+
+The last step has no free-text proof at all, because it does not need one. A
+package is collected when the student it belongs to types their own four-digit
+purchase code on the caretaker's screen. The caretaker's session gets the
+request through the door and scopes it to their hostel; the code is what says
+the right student is standing there. Neither alone is enough.
+
+The code is checked against **the same** consecutive-miss counter and
+fifteen-minute lock as checkout, deliberately: five wrong codes at the dorm
+door lock the till too, and the other way round. A second door with its own
+count would not be a second lock — it would be a way around the first one, and
+four digits is ten thousand codes to anyone allowed to keep guessing. The
+package's state is checked before the code is, so a student whose package has
+not arrived yet does not spend one of five attempts learning that.
+
+No member of staff can record a collection, on any route. The storeroom's
+transition endpoint refuses `COLLECTED` outright, and the caretaker's route
+has no transition endpoint at all.
+
+### What a caretaker can raise
+
+A caretaker has one channel to the school office and two things to put in it,
+sharing one record because they need the same handling and the same trail:
+
+- **An issue with a package**, raised from the code-entry panel at the moment
+  of handover — something missing, the wrong items, damage, a student saying
+  the package is not theirs, or a student who cannot produce their code.
+- **A professional complaint about anything**, including about the warehouse,
+  about another member of staff, or about the job.
+
+Raising a package issue **does not hold the package**. It stays collectable,
+because a student who is owed food should not lose it while an office reads a
+message, and one missing juice should not stop them taking the rest.
+
+These are read in the admin console and **nowhere else** — not in the warehouse
+app, not by another caretaker. That follows from the second kind: a complaint
+that can be read by the people it might be about is not a complaint channel,
+and the caretaker filing one has to be able to know that before they type.
+There is deliberately no warehouse route to this data.
+
+Nothing about who is reporting comes from the request body. The name, role and
+hostel are copied onto the report from the roster and the session, because a
+report is a statement by a person and the only trustworthy source for which
+person is the session that carried it here. An order issue is scoped to the
+caretaker's own hostel exactly as collection is, and another hostel's package
+answers 404 rather than a refusal — the same answer as one that does not exist.
+
+**Every admin account sees the same queue**, and any of them may answer
+anything in it. There is no owner and no assignment — which is exactly why the
+report records **who answered it**, by name, snapshotted at the time so it
+still reads correctly after that person leaves. A shared responsibility with no
+name attached to its discharge is nobody's. The caretaker is shown that name
+alongside the reply; an answer somebody has signed is a different piece of
+writing from an anonymous one.
+
+Because no owner means nobody is prompted, an undismissable banner counts the
+unanswered reports on every screen of the console, naming how long the oldest
+has waited. Nothing else tells staff a report exists: there is no staff email
+and no staff push channel, so without it a complaint sits unread until somebody
+happens to open the right page. The banner clears when the queue does.
+
+The office can acknowledge a report silently, which means "read, being looked
+at" and shows the other admins who has picked it up, but **resolving one
+requires a note**: that note is what the caretaker who raised it reads, and a
+channel that closes reports without answering them teaches people to stop
+writing. Reopening is not a transition; a matter that comes back is a new
+report, so the record of what was said, by whom, and when stays readable.
+
+The queue is ordered oldest-first while it shows what is still owed, and
+newest-first when read as a log. Deliberately not ordered by status: the three
+values sort alphabetically, which would put a report somebody is already
+handling ahead of one nobody has read.
+
+One caretaker may hold 25 unanswered reports before being asked to wait. That
+bounds the collection against a stuck client rather than rate-limiting by the
+clock — a caretaker having a bad week may legitimately file several in an hour,
+and a limiter that punished that would teach them to stop reporting.
+
 ### Parent visibility
 
 The owning parent — and only the owning parent — can see each of their
 children's packages: its state, the time it was ordered, the delivery
-deadline, the times it was packed, dispatched and delivered, and the receiver
-note once it exists. The deadline is read from the order rather than
+deadline, the times it was packed, dispatched, delivered and collected, and
+the receiver note once it exists. Delivered and collected are shown as the
+different things they are — "At the hostel" is not "Collected", and a parent
+should be able to tell that their child has not picked the package up yet. The deadline is read from the order rather than
 recalculated, so the parent and the storeroom are always looking at the same
 one and no client needs to know the 48-hour rule or the business timezone.
 

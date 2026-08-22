@@ -116,8 +116,11 @@ describe('overdue policy', () => {
     assert.deepEqual([...OPEN_STATUSES].sort(), ['OUT_FOR_DELIVERY', 'PACKED', 'PENDING']);
   });
 
-  test('a delivered or cancelled package is never late, however old', () => {
+  test('a delivered, collected or cancelled package is never late, however old', () => {
     assert.equal(isOverdue(orderFixture({ status: 'DELIVERED' }), now), false);
+    // The deadline measures the warehouse reaching the hostel, so a package
+    // waiting there for its student is not the storeroom's overdue work.
+    assert.equal(isOverdue(orderFixture({ status: 'COLLECTED' }), now), false);
     assert.equal(isOverdue(orderFixture({ status: 'CANCELLED' }), now), false);
     assert.equal(isOverdue(orderFixture({ status: 'PACKED' }), now), true);
   });
@@ -159,9 +162,9 @@ describe('overdue policy', () => {
 
 describe('proof-of-delivery policy', () => {
   test('a receiver must be recorded', () => {
-    assert.match(proofOfDeliveryProblem(''), /who received/i);
-    assert.match(proofOfDeliveryProblem('   '), /who received/i);
-    assert.match(proofOfDeliveryProblem(undefined), /who received/i);
+    assert.match(proofOfDeliveryProblem(''), /who at the hostel/i);
+    assert.match(proofOfDeliveryProblem('   '), /who at the hostel/i);
+    assert.match(proofOfDeliveryProblem(undefined), /who at the hostel/i);
   });
 
   test('a name is accepted, and a room number with it', () => {
@@ -267,19 +270,41 @@ describe('delivery reporting', () => {
 });
 
 describe('warehouse-to-caretaker handoff', () => {
-  test('warehouse cannot record delivery after dispatch', async () => {
-    const find = mock.method(FulfillmentOrder, 'findById', () => {
-      throw new Error('authorization must fail before reading the order');
+  test('the warehouse names the caretaker it handed the package to', async () => {
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => orderFixture({ status: 'OUT_FOR_DELIVERY' }),
+    }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requested) => {
+      update = requested;
+      return { lean: async () => orderFixture({ status: 'DELIVERED', ...requested.$set }) };
     });
 
     const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Warehouse supplied value' }),
+      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Meena, D-4 caretaker' }),
     });
 
-    assert.equal(response.status, 403);
-    assert.match((await response.json()).message, /only the assigned caretaker/i);
-    assert.equal(find.mock.callCount(), 0);
+    assert.equal(response.status, 200);
+    assert.equal(update.$set.proofOfDelivery.receivedBy, 'Meena, D-4 caretaker');
+    assert.equal(update.$push.transitions.to, 'DELIVERED');
+  });
+
+  test('a receiver that hides an identity number is refused', async () => {
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => orderFixture({ status: 'OUT_FOR_DELIVERY' }),
+    }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
+      throw new Error('must not run');
+    });
+
+    const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Meena 9876543210' }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(update.mock.callCount(), 0);
   });
 });
 
@@ -496,7 +521,7 @@ describe('delivery history and operational reports', () => {
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.meta.deterministic, true);
-    assert.equal(body.data.schemaVersion, '1.0');
+    assert.equal(body.data.schemaVersion, '1.1');
     assert.equal(body.data.range.timeZone, 'Asia/Kolkata');
     assert.equal(body.data.delivery.delivered, 1);
     assert.equal(JSON.stringify(body.data).includes('Asha'), false);
@@ -589,6 +614,23 @@ describe('what the parent is shown about a package', () => {
     const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
     assert.equal(packages[0].overdue, false);
     assert.equal(packages[0].receivedBy, 'Asha');
+    // Delivered to the hostel, not yet taken by the child — and a parent must
+    // be able to tell those apart.
+    assert.equal(packages[0].collectedAt, null);
+  });
+
+  test('a collected package tells the parent when their child took it', async () => {
+    listOneOrder({
+      status: 'COLLECTED',
+      deliveredAt: new Date('2026-08-11T10:00:00.000Z'),
+      collectedAt: new Date('2026-08-11T16:30:00.000Z'),
+      proofOfDelivery: { receivedBy: 'Meena', recordedBy: STAFF_ID, recordedAt: new Date() },
+    });
+
+    const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
+    assert.equal(packages[0].status, 'COLLECTED');
+    assert.equal(packages[0].collectedAt, '2026-08-11T16:30:00.000Z');
+    assert.equal(packages[0].overdue, false);
   });
 
   test('no staff account, audit trail, or ledger reference travels to the parent', async () => {

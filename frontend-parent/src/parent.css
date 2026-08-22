@@ -351,6 +351,14 @@ body {
   --order-surface: #f2fbf5;
 }
 
+/* Collected is the only truly finished state, so it is the settled one: the
+   same green, deepened, rather than a sixth colour to learn. */
+.order-card--collected {
+  --order-accent: #1f6b43;
+  --order-border: #a8d6bc;
+  --order-surface: #eef9f2;
+}
+
 .order-card--cancelled {
   --order-accent: #b95a5a;
   --order-border: #efcccc;

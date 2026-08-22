@@ -25,6 +25,8 @@ import purchaseOrderRoutes from './src/interfaces/http/routes/purchaseOrderRoute
 import analyticsRoutes from './src/interfaces/http/routes/analyticsRoutes.js';
 import fulfillmentOrderRoutes from './src/interfaces/http/routes/fulfillmentOrderRoutes.js';
 import caretakerFulfillmentOrderRoutes from './src/interfaces/http/routes/caretakerFulfillmentOrderRoutes.js';
+import caretakerReportRoutes from './src/interfaces/http/routes/caretakerReportRoutes.js';
+import staffReportRoutes from './src/interfaces/http/routes/staffReportRoutes.js';
 import accountingExportRoutes from './src/interfaces/http/routes/accountingExportRoutes.js';
 import replenishmentDraftRoutes from './src/interfaces/http/routes/replenishmentDraftRoutes.js';
 import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
@@ -249,6 +251,8 @@ if (v1ProcurementEnabled) {
   app.use('/api/v1/analytics', analyticsRoutes);
   app.use('/api/v1/fulfillment-orders', fulfillmentOrderRoutes);
   app.use('/api/v1/caretaker/fulfillment-orders', caretakerFulfillmentOrderRoutes);
+  app.use('/api/v1/caretaker/reports', caretakerReportRoutes);
+  app.use('/api/v1/reports', staffReportRoutes);
   app.use('/api/v1/accounting-exports', accountingExportRoutes);
   app.use('/api/v1/replenishment-drafts', replenishmentDraftRoutes);
 }

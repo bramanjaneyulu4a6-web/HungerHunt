@@ -47,8 +47,20 @@ Updated: 2026-08-13
   history. Parents can track package state and the stored deadline; Warehouse
   has snoozed, auditable overdue alerts plus bounded history and aggregate
   delivery reports. Delivery requires a privacy-minimized receiver note tied to
-  the authenticated staff account and server time. Pre-dispatch cancellation
-  is backed by the reversal ledger described below.
+  the authenticated staff account and server time, naming the caretaker the
+  package was handed to at the hostel. A package is finished only when the
+  student takes it: `COLLECTED` is reached by that student entering their own
+  purchase code on the caretaker's screen, checked against the same miss
+  counter and lock as checkout, and no staff route can set it. Pre-dispatch
+  cancellation is backed by the reversal ledger described below.
+- Caretakers can raise a package issue from the handover screen and a
+  professional complaint about anything from their app's reports screen, and
+  read the office's answer to both. Reporting never holds a package. The queue
+  is answered from the admin console alone — a complaint may be about the
+  warehouse, so no warehouse or caretaker account can read one. Every admin
+  sees the same queue with no owner or assignment, so each answer records the
+  admin who wrote it and shows that name to the caretaker, and an
+  undismissable banner counts unanswered reports on every console screen.
 - Admin can download a bounded, privacy-minimized TallyPrime XML voucher export.
   Wallet top-ups and paid orders become balanced Receipt/Sales vouchers with
   stable source-derived numbers, exact money validation, business-timezone

@@ -1,13 +1,24 @@
 import { OrderStatus } from './orderState.js';
 
-/* A package that is still owed to a student. DELIVERED and CANCELLED are the
-   two ways a package stops being work, so everything else is open — written
-   as the complement rather than a hand-kept list, so a new intermediate state
-   is counted as open the moment it exists instead of silently escaping alerts. */
+/* The states in which a package is finished as far as the delivery deadline
+   is concerned. CANCELLED never arrives; DELIVERED means the warehouse has
+   handed it to the hostel's caretaker, which is the act the 48-hour deadline
+   measures; COLLECTED is that same package afterwards, in the student's hands.
+
+   Written as a list of endings, with everything else counted as open, so a new
+   intermediate state is chased by the alert board the moment it exists rather
+   than escaping it silently. That is also why COLLECTED had to be named here
+   the day it was added: it comes after the ending, not before it, and left out
+   it would have put every finished package back on the overdue board. */
+export const CLOSED_STATUSES = Object.freeze([
+  OrderStatus.DELIVERED,
+  OrderStatus.COLLECTED,
+  OrderStatus.CANCELLED,
+]);
+
+// A package that is still owed to a student by the storeroom.
 export const OPEN_STATUSES = Object.freeze(
-  Object.values(OrderStatus).filter(
-    (status) => status !== OrderStatus.DELIVERED && status !== OrderStatus.CANCELLED
-  )
+  Object.values(OrderStatus).filter((status) => !CLOSED_STATUSES.includes(status))
 );
 
 /* How long one acknowledgement quiets a package for.

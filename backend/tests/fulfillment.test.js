@@ -111,8 +111,13 @@ describe('dorm fulfilment policy', () => {
     assert.equal(canTransitionOrder('PENDING', 'PACKED'), true);
     assert.equal(canTransitionOrder('PACKED', 'OUT_FOR_DELIVERY'), true);
     assert.equal(canTransitionOrder('OUT_FOR_DELIVERY', 'DELIVERED'), true);
+    assert.equal(canTransitionOrder('DELIVERED', 'COLLECTED'), true);
     assert.equal(canTransitionOrder('PENDING', 'DELIVERED'), false);
     assert.equal(canTransitionOrder('DELIVERED', 'PACKED'), false);
+    // Collection is the end of the line, and it cannot be reached early: a
+    // package still in the van has not been handed to anyone.
+    assert.equal(canTransitionOrder('OUT_FOR_DELIVERY', 'COLLECTED'), false);
+    assert.equal(canTransitionOrder('COLLECTED', 'DELIVERED'), false);
   });
 
   test('records an atomic expected-state transition and staff audit entry', async () => {
@@ -154,26 +159,30 @@ describe('dorm fulfilment policy', () => {
     assert.equal((await response.json()).data.status, 'PACKED');
   });
 
-  test('warehouse cannot complete delivery without a caretaker', async () => {
+  test('the warehouse records delivery by naming who at the hostel took it', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
-    const find = mock.method(FulfillmentOrder, 'findById', () => { throw new Error('must not run'); });
-
-    const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: 'DELIVERED' }),
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => ({ _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' }),
+    }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
+      update = requestedUpdate;
+      return {
+        lean: async () => ({
+          _id: ORDER_ID,
+          transactionId: TRANSACTION_ID,
+          studentId: STUDENT_ID,
+          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          items: [],
+          totalAmount: 40,
+          status: 'DELIVERED',
+          businessWeekStart: new Date(),
+          orderedAt: new Date(),
+          deliverBy: new Date(),
+          ...requestedUpdate.$set,
+        }),
+      };
     });
-
-    assert.equal(response.status, 403);
-    assert.match((await response.json()).message, /only the assigned caretaker/i);
-    assert.equal(find.mock.callCount(), 0);
-    assert.match(proofOfDeliveryProblem('Call 9876543210'), /Do not enter/);
-    assert.equal(proofOfDeliveryProblem('Asha, dorm warden'), null);
-  });
-
-  test('warehouse cannot bypass the handoff by supplying receiver proof', async () => {
-    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
-    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => { throw new Error('must not run'); });
 
     const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
@@ -181,8 +190,50 @@ describe('dorm fulfilment policy', () => {
       body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Asha, dorm warden' }),
     });
 
-    assert.equal(response.status, 403);
+    assert.equal(response.status, 200);
+    assert.equal(update.$set.proofOfDelivery.receivedBy, 'Asha, dorm warden');
+    assert.equal(String(update.$set.proofOfDelivery.recordedBy), STAFF_ID);
+    assert.equal(String(update.$set.deliveredBy), STAFF_ID);
+  });
+
+  test('a delivery that names nobody is refused before the order is read', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => ({ _id: ORDER_ID, status: 'OUT_FOR_DELIVERY' }),
+    }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
+      throw new Error('must not run');
+    });
+
+    const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: 'DELIVERED' }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(
+      (await response.json()).error.details.map((detail) => detail.field),
+      ['receivedBy']
+    );
     assert.equal(update.mock.callCount(), 0);
+    assert.match(proofOfDeliveryProblem('Call 9876543210'), /Do not enter/);
+    assert.equal(proofOfDeliveryProblem('Asha, dorm warden'), null);
+  });
+
+  test('no member of staff can collect a package on a student\'s behalf', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    const find = mock.method(FulfillmentOrder, 'findById', () => { throw new Error('must not run'); });
+
+    const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: 'COLLECTED' }),
+    });
+
+    assert.equal(response.status, 403);
+    assert.match((await response.json()).message, /purchase code/i);
+    assert.equal(find.mock.callCount(), 0);
   });
 
   test('acknowledged overdue alerts are suppressed until their snooze expires', () => {
@@ -217,15 +268,21 @@ describe('dorm fulfilment policy', () => {
           proofOfDelivery: { receivedBy: 'Asha' },
         },
         {
-          status: 'DELIVERED',
+          status: 'COLLECTED',
           orderedAt: '2026-08-09T10:00:00.000Z',
           deliverBy: '2026-08-11T10:00:00.000Z',
           deliveredAt: '2026-08-11T12:00:00.000Z',
+          collectedAt: '2026-08-11T18:00:00.000Z',
         },
       ],
     });
 
+    // Two delivered, of which one has since been taken by its student. A
+    // collection must not quietly remove a package from the delivery figures.
     assert.equal(report.delivery.delivered, 2);
+    assert.equal(report.delivery.collected, 1);
+    assert.equal(report.delivery.awaitingCollection, 1);
+    assert.equal(report.durations.deliverToCollect.medianHours, 6);
     assert.equal(report.delivery.onTime, 1);
     assert.equal(report.delivery.late, 1);
     assert.equal(report.delivery.onTimeRate, 0.5);

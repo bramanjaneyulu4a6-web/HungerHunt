@@ -1,6 +1,29 @@
 # Caretaker role — design
 
-**Status:** spec only. No implementation plan, no task breakdown.
+**Status:** implemented, then **partly superseded on 2026-08-22**. The role, its
+gate, the hostel binding and the hostel-scoped queue below are all live and
+still accurate. What changed is the part this spec was built around — who ends
+a package's life.
+
+> **Superseded 2026-08-22 — the caretaker no longer marks a package received.**
+>
+> Confirming receipt was moved off the caretaker entirely. The warehouse now
+> records `DELIVERED` when it hands the package over at the hostel, naming the
+> caretaker who took it in `proofOfDelivery.receivedBy` — so the receiver note
+> is written by the storeroom again, and the reasoning in *Who the receiver is*
+> below is inverted: the person handing a package over names who they handed it
+> to, and the person receiving it does not name themselves.
+>
+> A package is then finished by a new state, `COLLECTED`, which only the
+> **student** can reach, by typing their own purchase code on the caretaker's
+> screen. `POST /:id/transition` is gone from the caretaker's route surface and
+> `POST /:id/collect` has taken its place; the "Received all" button described
+> under *Warehouse app* was removed rather than replaced, because one tap that
+> closed a hostel's whole queue could not tell a package that had been handed
+> over from one still on the shelf.
+>
+> See [product-decisions.md](../../architecture/product-decisions.md) —
+> *Proof of delivery* and *Proof of collection* — for the current rules.
 
 ## The job
 

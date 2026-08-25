@@ -9,6 +9,7 @@
     "test": "node --test",
     "seed:dev-accounts": "node scripts/seedDevAccounts.js",
     "audit:wallets": "node scripts/reconcileWallets.js",
+    "reconcile:payments": "node scripts/reconcilePaymentIntents.js",
     "load:test": "node scripts/loadTest.js",
     "migrate:enterprise": "node scripts/migrateEnterpriseData.js",
     "backfill:hostels": "node scripts/backfillHostels.js",

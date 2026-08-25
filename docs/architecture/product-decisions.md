@@ -321,6 +321,85 @@ compatibility period and will migrate with the original ledgers. The paise
 cutover was explicitly deferred, so cancellation reversals retain the current
 rupee representation until that work resumes.
 
+## 6. UPI payments: PhonePe, two rails, degrade instead of strand
+
+Parents can now bring outside money into HungerHunt over UPI, through PhonePe's
+Standard Checkout v2: OAuth-authenticated order creation, a hosted checkout
+page, and a server-to-server status API that is the only source of truth for
+whether money actually moved. The integration is restricted to UPI payment
+modes only — UPI Intent, UPI Collect, and UPI QR — and that restriction is a
+cost decision, not a convenience one. Bank-to-bank UPI carries 0% MDR;
+enabling CARD or NET_BANKING on the same checkout would start charging the
+school a merchant fee on every payment. Nothing about the current design
+prevents adding those modes later, but doing so is a pricing decision for the
+school to make deliberately, not a checkbox to flip while wiring in a feature.
+
+### Two rails, never both
+
+A UPI payment funds exactly one of two things, and money never takes both
+routes for the same rupee. Paying for a pending order settles that order
+directly: the wallet is left untouched, and the resulting `Transaction`
+records that explicitly by writing an identical `previousBalance` and
+`remainingBalance` rather than a debit that never happened. Topping up credits
+the student's wallet balance instead, through the same `WalletAdjustment`
+ledger the admin desk's top-ups already use, distinguished only by
+`source: PARENT_UPI` and a `paymentIntentId` in place of an admin's
+`performedBy`. One ledger, two provenances, and Accounts' export keeps a
+single funding-clearing mapping across both.
+
+### Degrade, never strand
+
+An order can stop being buyable between the moment a parent starts paying for
+it and the moment PhonePe confirms the money arrived — another approval could
+have gone through first, the order could have expired, or its price could
+have changed. Once the payment is captured, refusing to buy the order can
+never mean refusing the money too: v1 ships with no refund API, so a captured
+UPI payment that can no longer buy its order is credited to the student's
+wallet instead, and the intent is marked `degradedToTopup`. The parent is
+never out of pocket; the money is simply sitting as balance rather than
+having paid for the order it was intended for, and both the parent app and
+the pending-order screen say so in plain language rather than leaving a
+payment that looks stuck.
+
+### Only `settlePaymentIntent` moves money
+
+Exactly one function in the codebase turns a captured PhonePe payment into a
+`Transaction` or a `WalletAdjustment`, and it earns that position by refusing
+to trust anything it is handed. Every caller — the webhook, the parent app's
+own status poll, and the reconcile sweep — passes it nothing but an intent id;
+`settlePaymentIntent` re-reads status from PhonePe's server API itself, every
+single time, before deciding anything. A webhook body is a doorbell, not a
+bank statement: it says a payment might be worth looking at, and the answer
+still comes from asking PhonePe directly. This is also what makes the same
+function safe to call concurrently and repeatedly, from a crash, a retry, or
+three callers racing each other — it is the only place a `PENDING` intent can
+become `APPLYING`, the only place `APPLYING` can become `APPLIED`, and every
+path into it ends up idempotent for exactly that reason.
+
+### Closed-loop wallet: no cash-out, and that is load-bearing
+
+The wallet a parent tops up is spendable only at the school's own tuck shop.
+There is no cash-out, no transfer, and no way to pay a third party from it.
+That restriction is not merely a product simplification — it is what keeps
+the wallet a closed-system Prepaid Payment Instrument, which is exempt from
+RBI's PPI authorisation regime specifically because the money cannot leave
+the system it was loaded into. **A future "withdraw to bank" or "transfer
+balance" feature would change that regulatory status, and must never be added
+without first confirming what authorisation it would require.** This is the
+single most important sentence in this section: it is far cheaper to leave
+this feature unbuilt than to build it and discover afterward that it turned
+a closed-loop wallet into a regulated payment instrument.
+
+### `AMOUNT_MISMATCH` is a queue for a person, not a retry target
+
+If PhonePe reports a captured amount that does not match what the intent
+asked for, the intent is marked `AMOUNT_MISMATCH` and left there, terminally.
+Nothing in the system attempts to reconcile that gap automatically — a wrong
+amount is exactly the kind of thing an automated system should stop in front
+of rather than guess about. The reconcile sweep (`npm run reconcile:payments`)
+surfaces the standing count of these on every run, so a human at the school
+picks it up rather than a parent's money sitting silently unresolved.
+
 ## Implementation order
 
 1. Operational accounting export (implemented for TallyPrime XML).
@@ -329,3 +408,6 @@ rupee representation until that work resumes.
 4. Resume the deferred integer-paise migration before adding further financial
    movement types.
 5. Revisit LLM only in response to an approved business need.
+6. UPI payments via PhonePe (implemented; see decision 6 above). Production
+   cutover — live PhonePe Business credentials, a registered webhook URL, and
+   a scheduled reconcile sweep — remains outstanding.

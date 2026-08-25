@@ -640,6 +640,147 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /payments/intents:
+    servers:
+      - url: /api/payments
+    post:
+      summary: Start a UPI payment, either an order settlement or a wallet top-up
+      description: >-
+        Parent session only. Creates a `PaymentIntent` row and hands it to PhonePe's Standard
+        Checkout v2, restricted to UPI payment modes (UPI Intent, Collect, QR) so the merchant fee
+        stays at 0%. Nothing this endpoint returns marks money as received — the intent is created
+        `PENDING` and only `settlePaymentIntent` ever moves it to `APPLIED`, after re-checking with
+        PhonePe. Open `redirectUrl` in a browser (a webview will not resolve `upi://` links) and
+        then poll `GET /payments/intents/{id}` for the outcome.
+      operationId: createPaymentIntent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/CreateTopupPaymentIntentRequest' }
+                - { $ref: '#/components/schemas/CreateOrderPaymentIntentRequest' }
+      responses:
+        '201':
+          description: Intent created and accepted by PhonePe
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [intent, redirectUrl]
+                properties:
+                  intent: { $ref: '#/components/schemas/PaymentIntentView' }
+                  redirectUrl:
+                    type: string
+                    format: uri
+                    description: PhonePe's hosted checkout page. Open it; do not construct one.
+        '400':
+          description: >-
+            purpose is neither TOPUP nor ORDER, or a TOPUP amountRupees is not a whole number of
+            rupees between 1 and 20000
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: >-
+            TOPUP: studentId does not belong to the signed-in parent. ORDER: pendingOrderId does
+            not exist, or does not belong to the signed-in parent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: >-
+            ORDER only: the pending order is no longer awaiting payment (already approved,
+            rejected, or expired)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '502':
+          description: PhonePe's create-order call failed or did not answer. Nothing was charged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  /payments/intents/{id}:
+    servers:
+      - url: /api/payments
+    get:
+      summary: Read a payment intent, re-verified against PhonePe if not yet terminal
+      description: >-
+        Parent session only, scoped to intents that belong to that parent — one that does not
+        exist and one that belongs to someone else answer identically with 404. Polling this route
+        IS the recovery path for a dropped webhook: whenever the stored status is CREATED,
+        PENDING, or APPLYING, the handler calls `settlePaymentIntent` before responding, which asks
+        PhonePe's status API directly rather than trusting anything cached. The response carries
+        `Cache-Control: no-store`.
+      operationId: getPaymentIntent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+      responses:
+        '200':
+          description: Current intent state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [intent]
+                properties:
+                  intent: { $ref: '#/components/schemas/PaymentIntentView' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /payments/phonepe/webhook:
+    servers:
+      - url: /api/payments
+    post:
+      security: []
+      summary: PhonePe's server-to-server payment notification
+      description: >-
+        Not a parent or staff route — PhonePe is the only caller, authenticated by an
+        `Authorization` header carrying the hex `SHA256(username:password)` of the credentials
+        configured on the PhonePe dashboard, compared with a constant-time check. The body's own
+        claims are never trusted: on a recognised `merchantOrderId` (read from either
+        `payload.merchantOrderId` or a top-level `merchantOrderId`, to tolerate either shape) the
+        handler calls `settlePaymentIntent`, which re-asks PhonePe's status API rather than
+        believing this payload. The response is 200 once the request authenticates and the intent
+        lookup succeeds — including for an unrecognised order id — because PhonePe would otherwise
+        retry a failure retrying cannot fix. The one deliberate exception is a database error
+        during the lookup itself, answered 500 so PhonePe retries a problem a retry actually can
+        fix.
+      operationId: phonepeWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: PhonePe's own webhook payload, forwarded as sent. Shape is provider-owned.
+      responses:
+        '200':
+          description: >-
+            Authenticated and processed (or the order id was not recognised — still 200, since a
+            retry would not help)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties: { received: { type: boolean, const: true } }
+        '401':
+          description: Missing or incorrect webhook credential hash
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '500':
+          description: >-
+            The intent lookup itself failed (a database error, not an unknown order). PhonePe
+            should retry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 components:
   securitySchemes:
     bearerAuth:
@@ -915,6 +1056,59 @@ components:
               properties:
                 deterministic: { type: boolean, const: true }
                 llmReady: { type: boolean, const: true }
+    PaymentIntentPurpose:
+      type: string
+      enum: [ORDER, TOPUP]
+    PaymentIntentStatus:
+      type: string
+      description: >-
+        CREATED -> PENDING -> APPLYING -> APPLIED, with PENDING also able to leave to FAILED,
+        EXPIRED, or AMOUNT_MISMATCH. Only settlePaymentIntent ever writes APPLYING or APPLIED.
+      enum: [CREATED, PENDING, APPLYING, APPLIED, FAILED, EXPIRED, AMOUNT_MISMATCH]
+    CreateTopupPaymentIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose, studentId, amountRupees]
+      properties:
+        purpose: { type: string, const: TOPUP }
+        studentId: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        amountRupees:
+          type: integer
+          minimum: 1
+          maximum: 20000
+          description: Whole rupees only. Converted to integer paise before PhonePe ever sees it.
+    CreateOrderPaymentIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose, pendingOrderId]
+      properties:
+        purpose: { type: string, const: ORDER }
+        pendingOrderId:
+          type: string
+          pattern: '^[a-fA-F0-9]{24}$'
+          description: >-
+            Must be one of the signed-in parent's own orders, still PENDING and unexpired. The
+            amount charged is the order's total at the moment the intent is created, not
+            re-priced later — an order edited after this point is settled as a degraded top-up
+            instead of buying the (now different) order.
+    PaymentIntentView:
+      type: object
+      description: The parent-facing view of a PaymentIntent. Never carries provider credentials or raw PhonePe payloads.
+      required: [id, purpose, status, amountPaise, amountRupees, degradedToTopup, pendingOrderId, createdAt]
+      properties:
+        id: { type: string }
+        purpose: { $ref: '#/components/schemas/PaymentIntentPurpose' }
+        status: { $ref: '#/components/schemas/PaymentIntentStatus' }
+        amountPaise: { type: integer, minimum: 1 }
+        amountRupees: { type: number, minimum: 0.01, description: amountPaise converted back for display only. }
+        degradedToTopup:
+          type: boolean
+          description: >-
+            True only for an APPLIED ORDER intent whose order could no longer be bought once the
+            money arrived (stock gone, order edited or expired). The captured amount was credited
+            to the wallet instead of buying anything, because v1 has no refund API.
+        pendingOrderId: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
     ErrorEnvelope:
       type: object
       required: [message, error, meta]

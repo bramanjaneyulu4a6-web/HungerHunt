@@ -74,6 +74,52 @@ Updated: 2026-08-13
   wallet and inventory, cancels the package, releases its weekly slot, and
   preserves the original sale. Parents see the refund and Tally receives a
   Credit Note. Spending-limit calculations net reversals from gross purchases.
+- Parents can pay by UPI through PhonePe Standard Checkout v2, restricted to
+  UPI-only payment modes so the merchant fee stays at 0%. A `PaymentIntent`
+  row tracks every attempt from `CREATED` through `APPLIED` (or out to
+  `FAILED`/`EXPIRED`/`AMOUNT_MISMATCH`), and only `settlePaymentIntent` ever
+  moves money — it re-reads status from PhonePe's server API on every call,
+  never trusting a webhook body or a client's say-so. A UPI order payment
+  bypasses the wallet entirely; a top-up credits it through the same
+  `WalletAdjustment` ledger admin top-ups use. A captured payment whose order
+  can no longer be bought is credited to the wallet instead
+  (`degradedToTopup`) rather than left stranded, because v1 has no refund
+  API. `npm run reconcile:payments` sweeps unfinished intents and is the net
+  under a dropped webhook. See `docs/architecture/product-decisions.md`
+  section 6 for the reasoning, including why the wallet's closed-loop design
+  (no cash-out) is not incidental.
+
+### Deliberately absent
+
+- **No refund API.** A captured payment that cannot buy its order becomes a
+  wallet credit, not a reversal to the parent's bank account. There is no
+  code path, planned or partial, that sends money back out over UPI.
+- **No admin-facing payments screen.** `PaymentIntent` rows — including the
+  `AMOUNT_MISMATCH` backlog — are visible only by querying the database or
+  reading the reconcile sweep's output. Nothing in the Admin app lists or
+  searches them yet.
+- **iOS is configured but untested on real hardware**, the same status
+  `RELEASE-CHECKLIST.md` already records for native push: the UPI intent
+  schemes (`phonepe`, `gpay`, `paytm`, `bhim`, `tez`, `upi`) are declared in
+  `frontend-parent/ios/App/App/Info.plist` so the checkout page can hand off
+  to an installed UPI app, but that hand-off has only run on Android. It has
+  never been built and run on a physical iPhone, and the iOS Simulator cannot
+  install a UPI app to test against in the first place.
+- **Two route-registration lines are deliberately uncommitted** in the
+  working tree: the `paymentRoutes` import and `app.use('/api/payments',
+  paymentRoutes)` in `backend/app.js`, and the `/payment-return` route in
+  `frontend-parent/src/App.jsx`. Both files are mid-refactor for unrelated
+  work (the admin activation flow and the `/api/v1` mount restructuring), so
+  wiring the payment routes into them was left for that refactor to land
+  first rather than committed underneath it. Until those two lines are
+  committed, `POST /api/payments/intents` and its siblings exist in the
+  repository but nothing serves them, and PhonePe's checkout would have
+  nowhere to redirect back to.
+- **Not live.** The feature is sandbox-ready, not production-ready: going
+  live needs PhonePe Business production credentials, the production webhook
+  URL registered on the PhonePe dashboard, `PHONEPE_ENV=production` set, and
+  one real ₹1 transaction completed end to end before it is announced to
+  parents.
 
 ## Required deployment actions
 
@@ -92,6 +138,12 @@ Updated: 2026-08-13
    intentionally does not test MongoDB.
 6. Leave `FEATURE_V1_PROCUREMENT` unset or `true`. `false` is an emergency kill
    switch and temporarily hides review-workflow orders from the clients.
+7. Schedule `npm run reconcile:payments` on a cron (Render cron job or
+   equivalent), not just run it by hand. The webhook and the parent's own
+   status poll cover the common case, but a dropped webhook is only ever
+   recovered by this sweep or by a parent happening to reopen the payment
+   screen — without a schedule, a stuck `PaymentIntent` can sit unresolved
+   indefinitely.
 
 ## Product decisions recorded; implementation remains staged
 

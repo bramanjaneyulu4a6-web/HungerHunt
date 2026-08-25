@@ -58,6 +58,23 @@
         </provider>
     </application>
 
+    <!-- Android 11+ hides other packages unless declared. The PhonePe checkout
+         opened from this app needs to see the installed UPI apps to build the
+         intent drawer; without these it looks like the parent has none. -->
+    <queries>
+        <package android:name="com.phonepe.app" />                       <!-- PhonePe -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" /><!-- Google Pay -->
+        <package android:name="net.one97.paytm" />                       <!-- Paytm -->
+        <package android:name="in.org.npci.upiapp" />                    <!-- BHIM -->
+        <package android:name="com.csam.icici.bank.imobile" />           <!-- iMobile -->
+        <intent>
+            <!-- Any other app registered for upi://pay, so a parent on a
+                 bank app not listed above still gets an entry. -->
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" android:host="pay" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

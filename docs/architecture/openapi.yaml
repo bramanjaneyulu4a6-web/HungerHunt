@@ -1064,6 +1064,14 @@ components:
       description: >-
         CREATED -> PENDING -> APPLYING -> APPLIED, with PENDING also able to leave to FAILED,
         EXPIRED, or AMOUNT_MISMATCH. Only settlePaymentIntent ever writes APPLYING or APPLIED.
+        CREATED -> FAILED is a common path too, not an edge case: it is what createPaymentIntent
+        writes immediately when PhonePe's create-order call itself fails, before any PENDING
+        intent exists. A stale CREATED can also resolve terminally through settle, the same way
+        a stale PENDING can, since GET /payments/intents/{id} re-settles a CREATED intent as
+        readily as a PENDING one. APPLYING -> PENDING is a real transition as well, though never
+        an ordinary state read: the reconcile sweep releases a claim stuck in APPLYING for more
+        than five minutes back to PENDING so a crashed apply attempt can be retried, since settle
+        otherwise refuses to touch an APPLYING row at all.
       enum: [CREATED, PENDING, APPLYING, APPLIED, FAILED, EXPIRED, AMOUNT_MISMATCH]
     CreateTopupPaymentIntentRequest:
       type: object
@@ -1111,6 +1119,12 @@ components:
         createdAt: { type: string, format: date-time }
     ErrorEnvelope:
       type: object
+      description: >-
+        The structured v1 error contract. Paths backed by a legacy (pre-v1) controller —
+        including every /payments/* path in this document — do not actually produce this shape:
+        they send only { message }, with no error object and no meta. Where this schema is
+        referenced from such a path, read it as documenting message alone; error and meta will
+        not be present on the wire.
       required: [message, error, meta]
       properties:
         message: { type: string, description: Legacy-client compatibility alias. }

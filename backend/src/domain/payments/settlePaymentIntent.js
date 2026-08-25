@@ -59,9 +59,22 @@ const findPriorApplication = async (claimed, session) => {
   }
 
   if (claimed.purpose === 'ORDER') {
+    // Scoped to this intent's own merchantOrderId, not just the order —
+    // PaymentIntent carries no unique index on pendingOrderId, so nothing
+    // stops a parent abandoning a stuck attempt and creating a second
+    // intent against the same PENDING order. Without the idempotencyKey
+    // term, a second, distinct intent that completes would match the
+    // FIRST intent's Transaction (chargeCart persists the paying intent's
+    // merchantOrderId onto it, see utils/checkout.js) and finish APPLIED
+    // carrying someone else's transactionId, with its own money landing
+    // nowhere. Keyed like approvePendingOrder's own "APPROVED with my key"
+    // replay check, a genuine self-replay still matches; a different
+    // intent for the same order does not, and falls through to apply (and,
+    // since the order is no longer PENDING, correctly degrades to a top-up).
     const transactionQuery = Transaction.findOne({
       sourceType: 'UPI_ORDER_PAYMENT',
       sourceId: claimed.pendingOrderId,
+      idempotencyKey: claimed.merchantOrderId,
     });
     const priorTransaction = session ? await transactionQuery.session(session) : await transactionQuery;
 
@@ -81,7 +94,18 @@ const creditAsTopup = async (intent, session) => {
   const studentQuery = Student.findById(intent.studentId);
   const student = session ? await studentQuery.session(session) : await studentQuery;
 
-  if (!student || student.active === false) {
+  // No active check, deliberately: creditWallet itself matches by _id alone
+  // (activeOnly defaults false — utils/walletAccount.js), and a captured
+  // payment for a since-deactivated student must still land somewhere. This
+  // design's core promise is the parent is never out of pocket; refusing to
+  // credit an archived (never deleted) student's wallet would strand real
+  // money to protect nothing, and — since the claim release on this throw
+  // makes every retry hit the same wall — would do it by looping forever
+  // rather than by reaching any terminal or quarantine state a human could
+  // find. A deactivated student's balance is still a ledger the office
+  // reconciles; crediting it and leaving the payout for a manual move there
+  // is recoverable, unlike money with nowhere to go at all.
+  if (!student) {
     throw new Error(`Student ${intent.studentId} not found for credit`);
   }
 

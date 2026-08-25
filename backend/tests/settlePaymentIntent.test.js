@@ -374,6 +374,7 @@ test('a crashed-then-replayed ORDER settle finds the prior transaction and never
   mock.method(Transaction, 'findOne', async (filter) => {
     assert.equal(filter.sourceType, 'UPI_ORDER_PAYMENT');
     assert.equal(String(filter.sourceId), ORDER_ID);
+    assert.equal(filter.idempotencyKey, MERCHANT_ORDER_ID); // scoped to this intent, not just the order
     return { _id: 'txn-original' };
   });
 
@@ -443,6 +444,95 @@ test('a crashed-then-replayed degraded ORDER settle finds the prior credit, not 
   assert.equal(result.walletAdjustmentId, 'wa-degraded-original');
   assert.equal(result.degradedToTopup, true); // still recorded as a degrade, not a fresh top-up
   assert.equal(result.status, 'APPLIED');
+});
+
+test('a second intent against the same pendingOrderId does not steal the first intent\'s transaction', async () => {
+  // PaymentIntent carries no unique index on pendingOrderId (Task 7, which
+  // creates intents, isn't written yet), so nothing stops a parent abandoning
+  // a stuck attempt and creating a second intent for the same PENDING order.
+  // If both complete, the second intent's findPriorApplication lookup must
+  // not match the FIRST intent's Transaction just because it targets the
+  // same order — that would finish the second intent APPLIED carrying
+  // someone else's transactionId, with the second payment landing nowhere.
+  const FIRST_INTENT_MERCHANT_ORDER_ID = 'HH-first-attempt';
+  const SECOND_INTENT_MERCHANT_ORDER_ID = MERCHANT_ORDER_ID; // this settle's own intent
+
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID, merchantOrderId: SECOND_INTENT_MERCHANT_ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) =>
+    Promise.resolve(intentDoc({
+      purpose: 'ORDER', pendingOrderId: ORDER_ID, merchantOrderId: SECOND_INTENT_MERCHANT_ORDER_ID,
+      status: 'APPLYING',
+      ...(update?.$set || {}),
+    })));
+  mock.method(WalletAdjustment, 'findOne', async () => null);
+
+  // A fake single-document Transaction collection: only the FIRST intent's
+  // key is on the existing row. A generic field-by-field match (not a
+  // hand-picked check) is what proves the filter itself is intent-scoped —
+  // if `idempotencyKey` were missing from the real filter, this same stub
+  // would still (incorrectly) match on sourceType/sourceId alone.
+  const existingTransaction = {
+    _id: 'txn-first-intent', sourceType: 'UPI_ORDER_PAYMENT',
+    sourceId: ORDER_ID, idempotencyKey: FIRST_INTENT_MERCHANT_ORDER_ID,
+  };
+  mock.method(Transaction, 'findOne', async (filter) =>
+    (Object.entries(filter).every(([key, value]) => String(existingTransaction[key]) === String(value))
+      ? existingTransaction
+      : null));
+
+  // The order is no longer PENDING — the first intent already bought it —
+  // so this second intent's own claim attempt correctly fails, and the
+  // money must degrade to a top-up rather than vanish.
+  mock.method(PendingOrder, 'findOneAndUpdate', () => Promise.resolve(null));
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 0, active: true }));
+  mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 100 }));
+  let adjustment;
+  mock.method(WalletAdjustment, 'create', (docs) => {
+    adjustment = Array.isArray(docs) ? docs[0] : docs;
+    return Promise.resolve([{ _id: 'wa-second-intent', ...adjustment }]);
+  });
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+    chargeCart: async () => { throw new Error('must not be called — order is no longer PENDING'); },
+  });
+
+  assert.notEqual(result.transactionId, 'txn-first-intent');
+  assert.equal(result.walletAdjustmentId, 'wa-second-intent');
+  assert.equal(result.degradedToTopup, true);
+  assert.equal(adjustment.idempotencyKey, SECOND_INTENT_MERCHANT_ORDER_ID);
+});
+
+test('a completed payment for an inactive student still credits the wallet and reaches APPLIED', async () => {
+  // creditWallet matches by _id alone (activeOnly defaults false), so a
+  // captured payment for a since-deactivated student must credit fine
+  // rather than throw — a throw here releases the claim and every retry
+  // (webhook, poll, sweep) hits the same wall forever, and the provider's
+  // captured money never lands anywhere.
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
+  noPriorApplication();
+  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) =>
+    Promise.resolve(intentDoc({ status: 'APPLYING', ...(update?.$set || {}) })));
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 40, active: false }));
+  mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 140 }));
+  let adjustment;
+  mock.method(WalletAdjustment, 'create', (docs) => {
+    adjustment = Array.isArray(docs) ? docs[0] : docs;
+    return Promise.resolve([{ _id: 'wa1', ...adjustment }]);
+  });
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+  });
+
+  assert.equal(adjustment.source, 'PARENT_UPI');
+  assert.equal(adjustment.amount, 100);
+  assert.equal(adjustment.previousBalance, 40);
+  assert.equal(adjustment.newBalance, 140);
+  assert.equal(result.status, 'APPLIED');
+  assert.equal(result.degradedToTopup, false);
 });
 
 test('a throwing charge releases both the intent claim and the order claim (fail-open) and rethrows', async () => {

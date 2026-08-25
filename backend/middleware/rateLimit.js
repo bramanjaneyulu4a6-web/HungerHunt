@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // Local testing should never lock a developer out. Keep this tied to the exact
 // development environment so an unset, misspelled, staging, or production
@@ -41,4 +41,48 @@ export const searchLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many searches. Please slow down." },
+});
+
+/* The payment limiters below key by parent account, not IP: they are mounted
+   after protectParent, so a parent id is always present, and a school's
+   worth of parents behind one NAT must never share a bucket on the routes
+   their money moves through. The IP fallback exists only for safety if a
+   limiter is ever mounted before the auth gate. */
+const parentKeyGenerator = (req) =>
+  (req.parent?.id ? `parent:${req.parent.id}` : ipKeyGenerator(req.ip));
+
+/* Creating a payment intent writes a DB row AND registers an order with
+   PhonePe, on the merchant's credentials. Unlimited, a buggy or hostile
+   client could hammer PhonePe until it throttles the account — at which
+   point settlement itself (poll, webhook-settle, sweep all use that same
+   API) breaks for every parent, not just the noisy one.
+
+   Twenty per fifteen minutes: a real parent starts a handful of payments in
+   a sitting — an order, a top-up or three across children, a retry after a
+   fumbled UPI PIN. Twenty is several times that; a client that exceeds it
+   is misbehaving, and cutting it off protects everyone else's settlement. */
+export const paymentCreateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  keyGenerator: parentKeyGenerator,
+  skip: skipAuthLimitsInDevelopment,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many payment attempts. Please wait a few minutes and try again." },
+});
+
+/* Every read of an unfinished intent makes the backend call PhonePe's status
+   API server-to-server — polling IS the recovery path, so this must never
+   throttle a legitimate parent mid-payment. The app polls every 3 seconds
+   for up to 5 minutes: 20 a minute from one surface, 40 if the in-app card
+   and the return page ever poll the same payment at once. 120 a minute is
+   triple that worst case — only a loop gone wrong can reach it. */
+export const paymentStatusLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: parentKeyGenerator,
+  skip: skipAuthLimitsInDevelopment,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many status checks. Please wait a moment and try again." },
 });

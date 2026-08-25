@@ -67,6 +67,27 @@ const openCheckout = async (redirectUrl) => {
   }
 };
 
+/* Dismisses the native checkout tab (Custom Tab / SFSafariViewController)
+ * once the in-app poll knows the real answer. Without this, every native
+ * payment ends with the parent staring at whatever the checkout tab landed
+ * on — PhonePe's redirect arrives in a browser that shares no localStorage
+ * with the app, so /payment-return greets them with a login screen — while
+ * the app underneath is already showing the truth. Closing the tab returns
+ * them to that truth.
+ *
+ * Native only: on the web there is no Capacitor browser to close (the web
+ * checkout is a popup or the same tab), and Browser.close() there rejects
+ * with "not implemented". The catch also covers the tab the parent already
+ * dismissed by hand — nothing to close is success, not an error. */
+const closeCheckout = async () => {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await Browser.close();
+  } catch {
+    // Already closed, or never opened — either way the parent is in the app.
+  }
+};
+
 export const startPayment = async (createFn) => {
   const { intent, redirectUrl } = await createFn();
   await openCheckout(redirectUrl);
@@ -135,7 +156,12 @@ export const pollIntent = async (
     failures = 0;
     onUpdate?.(intent);
 
-    if (TERMINAL_STATUSES.includes(intent.status)) return intent;
+    if (TERMINAL_STATUSES.includes(intent.status)) {
+      // The ledger has answered; the checkout tab is now just something
+      // standing between the parent and the app that shows that answer.
+      await closeCheckout();
+      return intent;
+    }
     if (Date.now() >= deadline) return intent;
 
     await wait(intervalMs, signal);

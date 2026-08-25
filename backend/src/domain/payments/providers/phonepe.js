@@ -76,7 +76,15 @@ const authorizedJson = async (url, options = {}) => {
     // stated expiry (hours) with a process restart as the only remedy —
     // evict on 401 so the next call re-authenticates instead.
     if (response.status === 401) cachedToken = null;
-    throw new Error(`PhonePe ${options.method || 'GET'} ${url} failed (${response.status}): ${body?.message || 'no message'}`);
+    const error = new Error(`PhonePe ${options.method || 'GET'} ${url} failed (${response.status}): ${body?.message || 'no message'}`);
+    // The reconcile sweep needs to tell "PhonePe says this order does not
+    // exist" (4xx — never retryable, eligible to age out) from "PhonePe or
+    // the network hiccupped" (everything else — keep retrying forever).
+    // Deliberately only set here, on PG API responses: a token-endpoint
+    // failure in getAccessToken carries no statusCode, so bad credentials
+    // can never masquerade as a missing order.
+    error.statusCode = response.status;
+    throw error;
   }
   return body;
 };

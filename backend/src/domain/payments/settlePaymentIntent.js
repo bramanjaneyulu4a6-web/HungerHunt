@@ -173,7 +173,27 @@ const applyToOrder = async (intent, session, chargeCart, onClaim) => {
 
   // The parent paid the total they were shown. If the order was edited since
   // (the till can reprice), the paid amount no longer buys this order.
-  if (rupeesToPaise(order.totalAmount) !== intent.amountPaise) {
+  //
+  // rupeesToPaise throws by design on a total that isn't a whole-paise amount
+  // (more than two decimal places is a data bug, not a rounding job). Before
+  // payment that throw is a harmless 500; here, after capture, it would fire
+  // mid-settle on EVERY retry — webhook, poll, sweep — looping the intent
+  // PENDING ⇄ APPLYING forever with the parent's money stuck. A total that
+  // cannot even be expressed in paise cannot possibly match what was paid,
+  // so it is just another way this order can no longer be bought: release
+  // the claim and let the caller degrade to a wallet credit, exactly like a
+  // reprice — the money must land somewhere.
+  let orderTotalPaise = null;
+  try {
+    orderTotalPaise = rupeesToPaise(order.totalAmount);
+  } catch (err) {
+    console.warn(
+      `Order ${order._id} total ${order.totalAmount} does not convert to paise (${err.message});` +
+      ` degrading intent ${intent._id} to a wallet credit.`
+    );
+  }
+
+  if (orderTotalPaise !== intent.amountPaise) {
     await releaseOrder();
     return null;
   }
@@ -226,11 +246,32 @@ export const settlePaymentIntent = async (intentId, deps = {}) => {
   }
 
   if (providerStatus.state !== 'COMPLETED') {
-    // A state this code has never heard of gets quarantined loudly, not paid.
-    return (await markTerminal(intent._id, intent.status, {
-      status: 'FAILED', providerState: providerStatus.state,
-      failureReason: `Unknown provider state ${providerStatus.state}`,
-    })) || PaymentIntent.findById(intentId);
+    // A state this code has never heard of is the moment it knows LEAST about
+    // what happened — a pre-attempt state, a state PhonePe added later, an
+    // order-level failure while checkout still allows a retry. Making that
+    // terminal would be a one-way door taken blind: mark it FAILED and the
+    // parent is told "nothing was charged", completes the payment in their
+    // UPI app anyway, and no webhook, poll or sweep ever consults PhonePe
+    // about this intent again — captured money, invisible forever. So: never
+    // paid, but never terminal either. The intent stays where it is (the
+    // sweep keeps re-asking PhonePe every run), the verbatim state is
+    // recorded for the operator, and the sweep counts these rows alongside
+    // AMOUNT_MISMATCH as needing a human. Worst case is "still checking",
+    // never a false "nothing was charged".
+    console.warn(
+      `Unrecognised PhonePe state ${JSON.stringify(providerStatus.state)} for intent ${intent._id}` +
+      ` (${intent.merchantOrderId}); leaving it open for reconciliation.`
+    );
+    return (await PaymentIntent.findOneAndUpdate(
+      { _id: intent._id, status: intent.status },
+      {
+        $set: {
+          providerState: providerStatus.state,
+          failureReason: `Unrecognised provider state ${providerStatus.state} — left open, still checking with PhonePe`,
+        },
+      },
+      { new: true }
+    )) || PaymentIntent.findById(intentId);
   }
 
   if (providerStatus.amountPaise !== intent.amountPaise) {

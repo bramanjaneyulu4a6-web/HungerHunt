@@ -231,6 +231,60 @@ test('a paid ORDER whose total was repriced since payment degrades without ever 
   assert.equal(result.degradedToTopup, true);
 });
 
+test('a paid ORDER whose total no longer converts to paise degrades instead of looping forever', async () => {
+  // rupeesToPaise throws by design on a total with more than two decimal
+  // places. If the order is edited to such a total AFTER capture, an
+  // unguarded conversion would throw mid-settle on every retry — webhook,
+  // poll, sweep — looping the intent PENDING ⇄ APPLYING forever with the
+  // parent's money stuck. It must instead be treated as "this order can no
+  // longer be bought": claim released, no charge, money lands as a wallet
+  // credit.
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  noPriorApplication();
+
+  const orderUpdates = [];
+  mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) => {
+    orderUpdates.push({ filter, update });
+    if (update?.$set?.status === 'PROCESSING') {
+      // 100.005 rupees is not a whole-paise amount: rupeesToPaise refuses it.
+      return Promise.resolve({
+        _id: ORDER_ID, studentId: STUDENT_ID, totalAmount: 100.005,
+        items: [{ productId: 'pr1', quantity: 1, price: 100.005 }], status: 'PROCESSING',
+      });
+    }
+    return Promise.resolve({ _id: ORDER_ID });
+  });
+
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 0, active: true }));
+  mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 100 }));
+  let adjustment;
+  mock.method(WalletAdjustment, 'create', (docs) => {
+    adjustment = Array.isArray(docs) ? docs[0] : docs;
+    return Promise.resolve([{ _id: 'wa1', ...adjustment }]);
+  });
+
+  let chargeCartCalls = 0;
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+    chargeCart: async () => {
+      chargeCartCalls += 1;
+      return { ok: true, transaction: { _id: 'should-not-happen' } };
+    },
+  });
+
+  assert.equal(chargeCartCalls, 0);
+  // The claim was released, not stranded at PROCESSING.
+  assert.ok(orderUpdates.some((u) =>
+    u.update?.$set?.status === 'PENDING' && u.update?.$unset?.approvalKey === 1));
+  // Invariant 2: the captured money landed as a wallet credit, visibly marked.
+  assert.equal(adjustment.source, 'PARENT_UPI');
+  assert.equal(result.degradedToTopup, true);
+  assert.equal(result.status, 'APPLIED');
+});
+
 test('a paid ORDER that still buys applies the charge and approves the order', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
     purpose: 'ORDER', pendingOrderId: ORDER_ID,
@@ -304,22 +358,42 @@ test('provider EXPIRED marks the intent EXPIRED and moves nothing', async () => 
   assert.equal(result.status, 'EXPIRED');
 });
 
-test('an unrecognised provider state is quarantined as FAILED, not paid', async () => {
+test('an unrecognised provider state is recorded but stays open — never terminal, never paid', async () => {
+  // The old behaviour marked these FAILED, permanently: the parent's app said
+  // "nothing was charged", the parent completed the payment in their UPI app
+  // anyway, and no webhook, poll or sweep ever consulted PhonePe about the
+  // intent again — captured money, invisible forever. The fixed behaviour
+  // leaves the intent where it is (so the sweep keeps re-asking PhonePe),
+  // records the verbatim state and a failureReason for the operator, and
+  // moves no money. Worst case is "still checking", never a false "nothing
+  // was charged".
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
   const updates = [];
   mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) => {
-    updates.push(update);
-    return Promise.resolve(intentDoc({ status: 'FAILED' }));
+    updates.push({ filter, update });
+    return Promise.resolve(intentDoc({ ...(update?.$set || {}) }));
   });
+  const credits = mock.method(Student, 'findOneAndUpdate', () => Promise.resolve(null));
 
   const result = await settlePaymentIntent(INTENT_ID, {
     provider: fakeProvider(async () => ({ state: 'SOME_NEW_STATE' })),
   });
 
-  const failedUpdate = updates.find((u) => u.$set?.status === 'FAILED');
-  assert.ok(failedUpdate);
-  assert.match(failedUpdate.$set.failureReason, /SOME_NEW_STATE/);
-  assert.equal(result.status, 'FAILED');
+  // No write may touch status at all: not FAILED, not any other terminal
+  // state, and not the APPLYING claim either.
+  assert.equal(updates.some((u) => u.update?.$set?.status !== undefined), false);
+
+  // But it is not silent: the verbatim state and a reason are recorded, on a
+  // status-guarded update so a concurrent settle is never clobbered.
+  const recorded = updates.find((u) => u.update?.$set?.providerState === 'SOME_NEW_STATE');
+  assert.ok(recorded);
+  assert.match(recorded.update.$set.failureReason, /SOME_NEW_STATE/);
+  assert.deepEqual(recorded.filter, { _id: INTENT_ID, status: 'PENDING' });
+
+  // Still open — the sweep's CREATED/PENDING filter keeps finding it — and
+  // no money moved.
+  assert.equal(result.status, 'PENDING');
+  assert.equal(credits.mock.callCount(), 0);
 });
 
 test('a terminal intent is returned as-is without re-consulting the provider', async () => {

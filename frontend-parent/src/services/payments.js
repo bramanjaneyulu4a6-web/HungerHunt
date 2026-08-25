@@ -24,8 +24,8 @@ export const createOrderPayment = (pendingOrderId) =>
 export const createTopup = (studentId, amountRupees) =>
   API.post('/payments/intents', { purpose: 'TOPUP', studentId, amountRupees }).then((r) => r.data);
 
-export const getIntent = (intentId) =>
-  API.get(`/payments/intents/${intentId}`).then((r) => r.data.intent);
+export const getIntent = (intentId, { signal } = {}) =>
+  API.get(`/payments/intents/${intentId}`, { signal }).then((r) => r.data.intent);
 
 /* Opens PhonePe's hosted checkout. On a phone this is the system browser,
  * where upi:// intent links actually resolve to installed UPI apps; inside
@@ -33,8 +33,19 @@ export const getIntent = (intentId) =>
 const openCheckout = async (redirectUrl) => {
   if (Capacitor.isNativePlatform()) {
     await Browser.open({ url: redirectUrl });
-  } else {
-    window.open(redirectUrl, '_blank', 'noopener');
+    return;
+  }
+
+  // This runs after two awaits, so it is outside the call stack that started
+  // from the parent's tap — a browser is free to treat it as a popup rather
+  // than a user gesture. Safari in particular returns null instead of
+  // opening anything, which would otherwise leave the parent staring at a
+  // page that visibly did nothing. Same-tab is a safe fallback on web:
+  // PhonePe's checkout redirects straight back to /payment-return when it's
+  // done, so nothing is lost by not having a separate tab.
+  const popup = window.open(redirectUrl, '_blank', 'noopener');
+  if (!popup) {
+    window.location.assign(redirectUrl);
   }
 };
 
@@ -44,20 +55,71 @@ export const startPayment = async (createFn) => {
   return { intentId: intent.id };
 };
 
+const wait = (ms, signal) =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+
+const isAuthRequiredError = (err) =>
+  err?.response?.status === 401 && err?.response?.data?.code === 'AUTH_REQUIRED';
+
+// A handful of consecutive misses is almost always the phone's radio
+// renegotiating as the parent switches back from their UPI app, not a real
+// outage. Give that a few beats to pass before surfacing anything — but do
+// surface it, rather than spinning forever on "Checking with the bank…".
+const MAX_CONSECUTIVE_POLL_FAILURES = 4;
+
 /* Every GET below makes the backend re-check with PhonePe, so polling is
  * also the recovery path for a dropped webhook. 3s cadence, 5 minute cap —
  * a UPI payment that has not resolved by then shows as "still processing"
- * and the backend's reconcile sweep owns it from there. */
-export const pollIntent = async (intentId, { onUpdate, intervalMs = 3000, timeoutMs = 300000 } = {}) => {
+ * and the backend's reconcile sweep owns it from there.
+ *
+ * A single network hiccup must not kill this loop — it exists precisely for
+ * the moment right after the parent returns from their UPI app, which is
+ * exactly when the connection is most likely to hiccup. Transient errors are
+ * swallowed and retried; only a run of MAX_CONSECUTIVE_POLL_FAILURES in a
+ * row is treated as something the caller needs to know about. An expired
+ * session (401 AUTH_REQUIRED) is not transient — the shared axios instance
+ * is already logging the parent out and redirecting to /login, so that error
+ * is rethrown immediately instead of being retried into a dead token. */
+export const pollIntent = async (
+  intentId,
+  { onUpdate, intervalMs = 3000, timeoutMs = 300000, signal } = {}
+) => {
   const deadline = Date.now() + timeoutMs;
+  let failures = 0;
 
   for (;;) {
-    const intent = await getIntent(intentId);
+    if (signal?.aborted) return null;
+
+    let intent;
+    try {
+      intent = await getIntent(intentId, { signal });
+    } catch (err) {
+      if (signal?.aborted) return null;
+      if (isAuthRequiredError(err)) throw err;
+
+      failures += 1;
+      if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) throw err;
+
+      await wait(intervalMs, signal);
+      continue;
+    }
+
+    failures = 0;
     onUpdate?.(intent);
 
     if (TERMINAL_STATUSES.includes(intent.status)) return intent;
     if (Date.now() >= deadline) return intent;
 
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    await wait(intervalMs, signal);
   }
 };

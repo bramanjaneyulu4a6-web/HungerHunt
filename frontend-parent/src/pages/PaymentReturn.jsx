@@ -8,11 +8,9 @@ import { Banner, Button, Card, EmptyState } from '../components/ui';
  * services/payments.js. On native, the same intent is usually still being
  * polled by the screen that started the payment; this page is the web
  * fallback and the "I closed the app mid-payment" recovery view. */
+// APPLIED is split out below — it needs to say what was applied to, which
+// depends on the intent's purpose (an order settled vs. a wallet top-up).
 const COPY = {
-  APPLIED: {
-    title: 'Payment received',
-    detail: 'The money has been applied. You can head back to the app.',
-  },
   FAILED: {
     title: 'Payment failed',
     detail: 'Nothing was charged. You can try again from the order.',
@@ -28,21 +26,70 @@ const COPY = {
   },
 };
 
+const appliedCopy = (purpose) => ({
+  title: 'Payment received',
+  detail:
+    purpose === 'TOPUP'
+      ? 'The wallet has been topped up. You can head back to the app.'
+      : purpose === 'ORDER'
+        ? 'Your order is paid for. You can head back to the app.'
+        : 'The money has been applied. You can head back to the app.',
+});
+
+const STILL_PROCESSING = {
+  title: 'Still checking',
+  detail:
+    "Your payment is still being processed. It's safe — the school's system will finish confirming it even if you close this page. Check back in a few minutes.",
+};
+
+const pollFailedCopy = () => ({
+  title: "Can't reach the server right now",
+  detail:
+    "Your money is safe — nothing on this page decides whether a payment went through, so a connection hiccup here doesn't affect it. Try again, or check back in a few minutes.",
+});
+
 export default function PaymentReturn() {
   const [params] = useSearchParams();
   const intentId = params.get('intent');
   const [intent, setIntent] = useState(null);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [pollFailed, setPollFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!intentId) return undefined;
     let cancelled = false;
+    const controller = new AbortController();
 
-    pollIntent(intentId, { onUpdate: (i) => !cancelled && setIntent(i) }).catch(() => {});
+    pollIntent(intentId, {
+      onUpdate: (i) => !cancelled && setIntent(i),
+      signal: controller.signal,
+    })
+      .then((finalIntent) => {
+        if (cancelled) return;
+        // pollIntent only resolves (rather than rejects) without a terminal
+        // status when the 5-minute cap lapsed — the poll gave up, the
+        // payment did not fail.
+        if (finalIntent && !TERMINAL_STATUSES.includes(finalIntent.status)) {
+          setGaveUp(true);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // An expired session already gets a hard redirect to /login from the
+        // shared axios instance (see services/api.js) — showing an error
+        // here too would just flash confusing text on the way out.
+        const isAuthRequired =
+          err?.response?.status === 401 && err?.response?.data?.code === 'AUTH_REQUIRED';
+        if (isAuthRequired) return;
+        setPollFailed(true);
+      });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [intentId]);
+  }, [intentId, attempt]);
 
   if (!intentId) {
     return (
@@ -61,11 +108,17 @@ export default function PaymentReturn() {
 
   const terminal = intent && TERMINAL_STATUSES.includes(intent.status);
   const copy = terminal
-    ? COPY[intent.status]
-    : {
-        title: 'Checking with the bank…',
-        detail: 'Hold on — confirming your payment. This usually takes a few seconds.',
-      };
+    ? intent.status === 'APPLIED'
+      ? appliedCopy(intent.purpose)
+      : COPY[intent.status]
+    : pollFailed
+      ? pollFailedCopy()
+      : gaveUp
+        ? STILL_PROCESSING
+        : {
+            title: 'Checking with the bank…',
+            detail: 'Hold on — confirming your payment. This usually takes a few seconds.',
+          };
 
   return (
     <div className="page">
@@ -91,7 +144,27 @@ export default function PaymentReturn() {
             </Banner>
           )}
 
-          <Button to="/" variant={terminal ? 'primary' : 'ghost'} block style={{ marginTop: 24 }}>
+          {pollFailed && (
+            <Button
+              variant="primary"
+              block
+              style={{ marginTop: 24 }}
+              onClick={() => {
+                setGaveUp(false);
+                setPollFailed(false);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </Button>
+          )}
+
+          <Button
+            to="/"
+            variant={terminal ? 'primary' : 'ghost'}
+            block
+            style={{ marginTop: pollFailed ? 12 : 24 }}
+          >
             Back to the app
           </Button>
         </Card>

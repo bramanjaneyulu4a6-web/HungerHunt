@@ -100,9 +100,12 @@ test('a parent cannot create a topup for a student that is not theirs', async ()
 
 test('an order intent snapshots the order total in paise', async () => {
   asParent();
-  mock.method(PendingOrder, 'findOne', async () =>
-    ({ _id: ORDER_ID, parentId: PARENT_ID, studentId: STUDENT_ID, status: 'PENDING',
-       totalAmount: 149.5, expiresAt: new Date(Date.now() + 3600_000) }));
+  let capturedFilter;
+  mock.method(PendingOrder, 'findOne', async (filter) => {
+    capturedFilter = filter;
+    return { _id: ORDER_ID, parentId: PARENT_ID, studentId: STUDENT_ID, status: 'PENDING',
+       totalAmount: 149.5, expiresAt: new Date(Date.now() + 3600_000) };
+  });
   let createdDoc;
   mock.method(PaymentIntent, 'create', async (doc) => {
     createdDoc = doc;
@@ -118,6 +121,10 @@ test('an order intent snapshots the order total in paise', async () => {
   assert.equal(res.status, 201);
   assert.equal(createdDoc.amountPaise, 14950);
   assert.equal(String(createdDoc.pendingOrderId), ORDER_ID);
+  // Pins the cross-parent guard itself: a query that dropped parentId would
+  // let this test keep passing even though it would let a parent pay
+  // someone else's order.
+  assert.equal(capturedFilter.parentId, PARENT_ID);
 });
 
 test('reading a pending intent settles it first', async () => {
@@ -125,15 +132,22 @@ test('reading a pending intent settles it first', async () => {
   const settled = mock.method(settle, 'settlePaymentIntent', async () =>
     ({ _id: INTENT_ID, parentId: PARENT_ID, purpose: 'TOPUP', status: 'APPLIED',
        amountPaise: 50000, degradedToTopup: false, pendingOrderId: null, createdAt: new Date() }));
-  mock.method(PaymentIntent, 'findOne', async () =>
-    ({ _id: INTENT_ID, parentId: PARENT_ID, purpose: 'TOPUP', status: 'PENDING',
-       amountPaise: 50000, degradedToTopup: false, pendingOrderId: null, createdAt: new Date() }));
+  let capturedFilter;
+  mock.method(PaymentIntent, 'findOne', async (filter) => {
+    capturedFilter = filter;
+    return { _id: INTENT_ID, parentId: PARENT_ID, purpose: 'TOPUP', status: 'PENDING',
+       amountPaise: 50000, degradedToTopup: false, pendingOrderId: null, createdAt: new Date() };
+  });
 
   const res = await send('GET', `/api/payments/intents/${INTENT_ID}`);
 
   assert.equal(res.status, 200);
   assert.equal((await res.json()).intent.status, 'APPLIED');
   assert.equal(settled.mock.callCount(), 1);
+  // Pins the cross-parent guard itself: a query that dropped parentId would
+  // let this test keep passing even though it would let a parent read
+  // someone else's intent.
+  assert.equal(capturedFilter.parentId, PARENT_ID);
 });
 
 test('the webhook rejects a bad credential hash and never settles', async () => {
@@ -171,4 +185,22 @@ test('a webhook for an unknown order still answers 200 and stays quiet', async (
     body: JSON.stringify({ payload: { merchantOrderId: 'HH-nobody' } }),
   });
   assert.equal(res.status, 200);
+});
+
+test('a webhook whose lookup rejects still answers instead of crashing the process', async () => {
+  // A bare, un-caught await here would reject the handler's promise; Express
+  // 4 does not catch that, and with no unhandledRejection handler installed
+  // it would take the whole backend down rather than answer PhonePe at all.
+  // This only proves a response comes back — see paymentController.js for
+  // why 500 (not the usual always-200) is the deliberate answer here.
+  mock.method(PaymentIntent, 'findOne', async () => {
+    throw new Error('mongo buffering timed out');
+  });
+  const auth = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
+  const res = await fetch(base + '/api/payments/phonepe/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ payload: { merchantOrderId: `HH-${INTENT_ID}` } }),
+  });
+  assert.equal(res.status, 500);
 });

@@ -139,18 +139,37 @@ export const phonepeWebhook = async (req, res) => {
   const merchantOrderId =
     req.body?.payload?.merchantOrderId || req.body?.merchantOrderId || null;
 
-  if (merchantOrderId) {
-    const intent = await PaymentIntent.findOne({ merchantOrderId });
-    if (intent) {
-      // The webhook body is a doorbell, not a bank statement: settle
-      // re-reads status server-to-server and ignores what the body claims.
-      await settle.settlePaymentIntent(intent._id).catch((err) => {
-        console.error('Webhook settle failed for', merchantOrderId, err);
-      });
+  try {
+    if (merchantOrderId) {
+      const intent = await PaymentIntent.findOne({ merchantOrderId });
+      if (intent) {
+        // The webhook body is a doorbell, not a bank statement: settle
+        // re-reads status server-to-server and ignores what the body claims.
+        await settle.settlePaymentIntent(intent._id).catch((err) => {
+          console.error('Webhook settle failed for', merchantOrderId, err);
+        });
+      }
     }
+  } catch (err) {
+    // The lookup itself failed — a mongo disconnect or buffer timeout, not
+    // "order not found". Express 4 does not catch a rejected async handler,
+    // and this process installs no unhandledRejection handler, so leaving
+    // this await bare would take the whole backend down and PhonePe would
+    // get no response at all — strictly worse than any status code below.
+    //
+    // Answered as 500, not the usual always-200: an unknown order is a
+    // problem retrying cannot fix (the always-200 contract is for that
+    // case), but a transient DB error is exactly the kind of problem a
+    // retry *can* fix, so PhonePe should be told to try again rather than
+    // have this webhook silently swallow a real infrastructure failure.
+    console.error('Webhook lookup failed for', merchantOrderId, err);
+    return res.status(500).json({ message: 'Temporarily unable to process this webhook.' });
   }
 
-  // Always 200 once authenticated: a 5xx would make PhonePe hammer retries
-  // for problems a retry cannot fix. The reconcile script owns stragglers.
+  // Always 200 once authenticated and the lookup succeeded: a 5xx here
+  // would make PhonePe hammer retries for problems a retry cannot fix
+  // (an unknown order, for instance). The reconcile script and the
+  // parent's own poll own any straggler that legitimately needs another
+  // look.
   res.json({ received: true });
 };

@@ -62,6 +62,16 @@ const TOPUP_STILL_PROCESSING = {
     "Still checking. Your payment is still being processed. It's safe — the school's system will finish confirming it even if you close this page. Check back in a few minutes.",
 };
 
+// pollIntent only rejects after several consecutive network failures, which
+// happens after checkout already opened — the payment may have gone
+// through. Same reassurance PaymentReturn.jsx gives for the same failure.
+const TOPUP_POLL_FAILED_COPY = {
+  variant: 'alert',
+  icon: '⚠️',
+  text:
+    "Can't reach the server right now. Your money is safe — nothing on this page decides whether a payment went through, so a connection hiccup here doesn't affect it. Try again, or check back in a few minutes.",
+};
+
 const formatDate = (value) =>
   new Intl.DateTimeFormat('en-IN', {
     day: 'numeric',
@@ -229,8 +239,9 @@ export default function ChildDetails() {
   const [approvalBanner, setApprovalBanner] = useState({ type: '', message: '' });
 
   const [topupAmount, setTopupAmount] = useState('');
-  // null | { status: 'INVALID' | 'FAILED', message } (never left the
-  // browser) | the intent itself (mid-poll or terminal, from pollIntent).
+  // null | the intent itself (mid-poll or terminal, from pollIntent) | a
+  // client-made { synthetic: true, status, message } for a validation
+  // failure, a start failure, or a poll failure.
   const [topupState, setTopupState] = useState(null);
   // Separate from `topupState`: this is the one flag that actually blocks
   // the button and picks the "Waiting for the bank…" label, independent of
@@ -238,6 +249,10 @@ export default function ChildDetails() {
   const [topupBusy, setTopupBusy] = useState(false);
   const topupAbortRef = useRef(null);
   const mountedRef = useRef(true);
+  // The last intent this form started paying — kept so "Try again" after a
+  // poll failure can resume checking the same payment instead of starting
+  // a second one.
+  const lastTopupIntentRef = useRef(null);
 
   // "Try again" bumps this to run the effect below again, which keeps the one
   // copy of the request inside the effect that owns and cancels it.
@@ -459,8 +474,12 @@ export default function ChildDetails() {
       ]
     : BASE_TABS;
 
-  const refreshPending = async (message) => {
+  const refreshPending = async (message, { degradedToTopup = false } = {}) => {
     setPendingNotice(message || 'Approval updated.');
+    // A degraded UPI order payment moved the money into wallet balance
+    // instead of paying for the order — the balance line on this page is
+    // now stale and needs its own refresh, separate from the pending list.
+    if (degradedToTopup) refreshWallet();
     try {
       const response = await API.get('/pending-orders/parent');
       const childOrders = (response.data.orders || []).filter(
@@ -501,22 +520,14 @@ export default function ChildDetails() {
     setTopupState(null);
   };
 
-  const addMoney = async () => {
-    const amountRupees = Number(topupAmount);
-    if (!Number.isInteger(amountRupees) || amountRupees < 1 || amountRupees > 20000) {
-      setTopupState({ status: 'INVALID', message: 'Enter a whole rupee amount between 1 and 20,000.' });
-      return;
-    }
+  const isAuthRequiredError = (err) =>
+    err?.response?.status === 401 && err?.response?.data?.code === 'AUTH_REQUIRED';
 
-    setTopupState(null);
-    setTopupBusy(true);
-    const controller = new AbortController();
-    topupAbortRef.current = controller;
-
+  // Split from addMoney so "Try again" after a poll failure can resume
+  // checking the same intent without creating a second one (a second
+  // startPayment call would open a second checkout).
+  const runTopupPoll = async (intentId, controller) => {
     try {
-      const { intentId } = await startPayment(() => createTopup(id, amountRupees));
-      if (!mountedRef.current) return;
-
       const finalIntent = await pollIntent(intentId, {
         onUpdate: (intent) => mountedRef.current && setTopupState(intent),
         signal: controller.signal,
@@ -535,27 +546,88 @@ export default function ChildDetails() {
       }
     } catch (err) {
       if (!mountedRef.current) return;
-      setTopupState({
-        status: 'FAILED',
-        message: err.response?.data?.message || 'Could not start the payment.',
-      });
+      // The shared axios instance is already redirecting to /login for
+      // this case; a FAILED banner here too would just flash confusing
+      // text on the way out.
+      if (isAuthRequiredError(err)) return;
+
+      // pollIntent only rejects after several consecutive network
+      // failures, which happens after checkout already opened — the
+      // payment may well have gone through. This is a connectivity
+      // problem with checking, not evidence the payment failed.
+      setTopupState({ status: 'POLL_FAILED', synthetic: true });
     } finally {
       if (mountedRef.current) setTopupBusy(false);
     }
   };
 
+  const addMoney = async () => {
+    const amountRupees = Number(topupAmount);
+    if (!Number.isInteger(amountRupees) || amountRupees < 1 || amountRupees > 20000) {
+      setTopupState({
+        status: 'INVALID',
+        synthetic: true,
+        message: 'Enter a whole rupee amount between 1 and 20,000.',
+      });
+      return;
+    }
+
+    setTopupState(null);
+    setTopupBusy(true);
+    const controller = new AbortController();
+    topupAbortRef.current = controller;
+
+    let intentId;
+    try {
+      ({ intentId } = await startPayment(() => createTopup(id, amountRupees)));
+    } catch (err) {
+      if (mountedRef.current) {
+        if (!isAuthRequiredError(err)) {
+          setTopupState({
+            status: 'FAILED',
+            synthetic: true,
+            message: err.response?.data?.message || 'Could not start the payment.',
+          });
+        }
+        setTopupBusy(false);
+      }
+      return;
+    }
+
+    if (!mountedRef.current) return;
+    lastTopupIntentRef.current = intentId;
+    await runTopupPoll(intentId, controller);
+  };
+
+  // Resumes checking the same intent after a poll failure, rather than
+  // starting an entirely new payment.
+  const retryTopupPoll = () => {
+    const intentId = lastTopupIntentRef.current;
+    if (!intentId) return;
+    setTopupState(null);
+    setTopupBusy(true);
+    const controller = new AbortController();
+    topupAbortRef.current = controller;
+    runTopupPoll(intentId, controller);
+  };
+
+  // Keyed on the client-made `synthetic` flag rather than presence of a
+  // `.message` field, so a future backend field happening to be named
+  // `message` on a non-terminal intent can't be mistaken for one of ours.
   const topupTerminal =
     topupState &&
     typeof topupState === 'object' &&
-    (topupState.message || TERMINAL_STATUSES.includes(topupState.status));
+    (topupState.synthetic || TERMINAL_STATUSES.includes(topupState.status));
 
   // pollIntent's 5-minute cap lapsed and handed back the last non-terminal
   // status it saw — the poll gave up, the payment itself did not fail.
   const topupGaveUp = !topupBusy && topupState && typeof topupState === 'object' && !topupTerminal;
 
   const topupCopy = topupTerminal
-    ? topupState.message
-      ? { variant: 'alert', icon: '⚠️', text: topupState.message }
+    ? topupState.synthetic
+      ? topupState.status === 'POLL_FAILED'
+        ? TOPUP_POLL_FAILED_COPY
+        : { variant: 'alert', icon: '⚠️', text: topupState.message }
       : TOPUP_TERMINAL_COPY[topupState.status]
     : topupGaveUp
       ? TOPUP_STILL_PROCESSING
@@ -798,6 +870,11 @@ export default function ChildDetails() {
               <Banner variant={topupCopy.variant} icon={topupCopy.icon} style={{ marginTop: 16 }}>
                 {topupCopy.text}
               </Banner>
+            )}
+            {topupState?.status === 'POLL_FAILED' && !topupBusy && (
+              <Button variant="ghost" block onClick={retryTopupPoll} style={{ marginTop: 8 }}>
+                Try again
+              </Button>
             )}
           </Card>
 

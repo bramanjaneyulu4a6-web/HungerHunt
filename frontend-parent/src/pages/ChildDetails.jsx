@@ -16,6 +16,7 @@ import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
+import { createTopup, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
@@ -23,6 +24,43 @@ const BASE_TABS = [
   { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
 ];
+
+const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
+
+// Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
+// same language wherever a payment lands.
+const TOPUP_TERMINAL_COPY = {
+  APPLIED: {
+    variant: 'success',
+    icon: '✅',
+    text: 'Payment received. The wallet has been topped up.',
+  },
+  FAILED: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment failed. Nothing was charged. You can try again.',
+  },
+  EXPIRED: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment window closed. The payment was not completed in time. Nothing was charged.',
+  },
+  AMOUNT_MISMATCH: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment needs a check. The payment arrived but did not match what was expected. The school office will sort it out — your money is safe.',
+  },
+};
+
+// pollIntent's 5-minute cap lapsed without a terminal status — it gave up,
+// the payment did not fail. Same framing PaymentReturn.jsx uses for the
+// same situation.
+const TOPUP_STILL_PROCESSING = {
+  variant: 'warn',
+  icon: 'ℹ️',
+  text:
+    "Still checking. Your payment is still being processed. It's safe — the school's system will finish confirming it even if you close this page. Check back in a few minutes.",
+};
 
 const formatDate = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -190,6 +228,17 @@ export default function ChildDetails() {
   const [approvalSaving, setApprovalSaving] = useState(false);
   const [approvalBanner, setApprovalBanner] = useState({ type: '', message: '' });
 
+  const [topupAmount, setTopupAmount] = useState('');
+  // null | { status: 'INVALID' | 'FAILED', message } (never left the
+  // browser) | the intent itself (mid-poll or terminal, from pollIntent).
+  const [topupState, setTopupState] = useState(null);
+  // Separate from `topupState`: this is the one flag that actually blocks
+  // the button and picks the "Waiting for the bank…" label, independent of
+  // which shape `topupState` currently holds.
+  const [topupBusy, setTopupBusy] = useState(false);
+  const topupAbortRef = useRef(null);
+  const mountedRef = useRef(true);
+
   // "Try again" bumps this to run the effect below again, which keeps the one
   // copy of the request inside the effect that owns and cancels it.
   const [attempt, setAttempt] = useState(0);
@@ -197,6 +246,16 @@ export default function ChildDetails() {
     setLoading(true);
     setAttempt((n) => n + 1);
   };
+
+  // A parent who navigates away mid-payment must not leave pollIntent's
+  // 3-second loop running in the background for up to 5 minutes.
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      topupAbortRef.current?.abort();
+    },
+    []
+  );
 
   useEffect(() => {
     // A reply for a child this screen has already left must not land on it.
@@ -415,6 +474,93 @@ export default function ChildDetails() {
     }
   };
 
+  // A targeted re-fetch of just the balance, so a successful top-up updates
+  // this page's balance line without disturbing the pending-orders list or
+  // showing the full-page skeleton the way `retry` does.
+  const refreshWallet = async () => {
+    try {
+      const walletRes = await API.get(`/parent/child/${id}/wallet`);
+      if (!mountedRef.current) return;
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              wallet: walletRes.data.wallet,
+              student: { ...prev.student, pocketMoney: walletRes.data.wallet.balance },
+            }
+          : prev
+      );
+    } catch {
+      // The payment already applied server-side. A push or the next
+      // foreground refresh will catch up if this follow-up read fails.
+    }
+  };
+
+  const setQuickTopupAmount = (amount) => {
+    setTopupAmount(String(amount));
+    setTopupState(null);
+  };
+
+  const addMoney = async () => {
+    const amountRupees = Number(topupAmount);
+    if (!Number.isInteger(amountRupees) || amountRupees < 1 || amountRupees > 20000) {
+      setTopupState({ status: 'INVALID', message: 'Enter a whole rupee amount between 1 and 20,000.' });
+      return;
+    }
+
+    setTopupState(null);
+    setTopupBusy(true);
+    const controller = new AbortController();
+    topupAbortRef.current = controller;
+
+    try {
+      const { intentId } = await startPayment(() => createTopup(id, amountRupees));
+      if (!mountedRef.current) return;
+
+      const finalIntent = await pollIntent(intentId, {
+        onUpdate: (intent) => mountedRef.current && setTopupState(intent),
+        signal: controller.signal,
+      });
+      if (!mountedRef.current) return;
+
+      setTopupState(finalIntent);
+
+      if (finalIntent?.status === 'APPLIED') {
+        // Two things are stale after a successful top-up: the balance shown
+        // on this page, and the recharge history immediately below this
+        // form — the parent's own top-up must appear in it without a
+        // manual reload.
+        refreshWallet();
+        recharges.reload();
+      }
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setTopupState({
+        status: 'FAILED',
+        message: err.response?.data?.message || 'Could not start the payment.',
+      });
+    } finally {
+      if (mountedRef.current) setTopupBusy(false);
+    }
+  };
+
+  const topupTerminal =
+    topupState &&
+    typeof topupState === 'object' &&
+    (topupState.message || TERMINAL_STATUSES.includes(topupState.status));
+
+  // pollIntent's 5-minute cap lapsed and handed back the last non-terminal
+  // status it saw — the poll gave up, the payment itself did not fail.
+  const topupGaveUp = !topupBusy && topupState && typeof topupState === 'object' && !topupTerminal;
+
+  const topupCopy = topupTerminal
+    ? topupState.message
+      ? { variant: 'alert', icon: '⚠️', text: topupState.message }
+      : TOPUP_TERMINAL_COPY[topupState.status]
+    : topupGaveUp
+      ? TOPUP_STILL_PROCESSING
+      : null;
+
   /* Shared by both history tabs: the first load shows skeletons, a failure
      offers to retry, and a full page offers the next one. */
   const renderList = (list, { empty, children }) => {
@@ -599,6 +745,62 @@ export default function ChildDetails() {
 
       {activeTab === 'recharges' && (
         <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
+          <Card style={{ marginBottom: 24 }}>
+            <h2 className="section-title" style={{ fontSize: 20 }}>
+              Add money
+            </h2>
+            <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
+              Top up {student.name}&apos;s wallet by UPI.
+            </p>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              {QUICK_TOPUP_AMOUNTS.map((amount) => (
+                <Button
+                  key={amount}
+                  variant="ghost"
+                  className="btn--sm"
+                  disabled={topupBusy}
+                  onClick={() => setQuickTopupAmount(amount)}
+                >
+                  {formatINR(amount)}
+                </Button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 160px' }}>
+                <label className="field-label" htmlFor="topup-amount">
+                  Amount (₹)
+                </label>
+                <input
+                  id="topup-amount"
+                  className="input"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="20000"
+                  step="1"
+                  value={topupAmount}
+                  disabled={topupBusy}
+                  onChange={(e) => {
+                    setTopupAmount(e.target.value);
+                    setTopupState(null);
+                  }}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <Button disabled={topupBusy} onClick={addMoney}>
+                {topupBusy ? 'Waiting for the bank…' : 'Add money by UPI'}
+              </Button>
+            </div>
+
+            {topupCopy && (
+              <Banner variant={topupCopy.variant} icon={topupCopy.icon} style={{ marginTop: 16 }}>
+                {topupCopy.text}
+              </Banner>
+            )}
+          </Card>
+
           <h2 className="section-title">Recharge History</h2>
 
           {renderList(recharges, {

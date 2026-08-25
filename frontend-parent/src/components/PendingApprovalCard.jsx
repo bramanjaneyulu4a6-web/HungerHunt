@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import API from '../services/api';
 import { formatINR } from '../utils/format';
-import { Button, Card } from './ui';
+import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
+import { createOrderPayment, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -13,6 +14,45 @@ const formatExpiry = (value) =>
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
+
+// Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
+// same language wherever a payment lands — whether that's this card or the
+// page PhonePe redirects back to.
+const PAY_UPI_TERMINAL_COPY = {
+  APPLIED: {
+    variant: 'success',
+    icon: '✅',
+    text: 'Payment received. Your order is paid for.',
+  },
+  FAILED: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment failed. Nothing was charged. You can try again.',
+  },
+  EXPIRED: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment window closed. The payment was not completed in time. Nothing was charged.',
+  },
+  AMOUNT_MISMATCH: {
+    variant: 'alert',
+    icon: '⚠️',
+    text: 'Payment needs a check. The payment arrived but did not match what was expected. The school office will sort it out — your money is safe.',
+  },
+};
+
+const DEGRADED_TOPUP_NOTE =
+  'The order itself could not go through after payment, so instead of losing the money, the full amount was added to the wallet as balance. Nothing was lost — it is sitting as credit rather than having paid for that order.';
+
+// pollIntent's 5-minute cap lapsed without a terminal status — it gave up,
+// the payment did not fail. Same framing PaymentReturn.jsx uses for the
+// same situation.
+const PAY_UPI_STILL_PROCESSING = {
+  variant: 'warn',
+  icon: 'ℹ️',
+  text:
+    "Still checking. Your payment is still being processed. It's safe — the school's system will finish confirming it even if you close this page. Check back in a few minutes.",
+};
 
 const initialQuantities = (order) =>
   Object.fromEntries(
@@ -30,11 +70,32 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState(null);
   const [constraint, setConstraint] = useState(null);
+  // null | the intent (mid-poll or terminal) | a synthetic
+  // { status: 'FAILED', message } when the payment never even reached the
+  // bank (e.g. the network dropped before an intent existed).
+  const [payState, setPayState] = useState(null);
+  // Separate from `busy`: `busy` blocks every action on this card while a
+  // UPI payment is in flight, but the "Waiting for the bank…" label must
+  // only show while this specific flow is the one running it.
+  const [payBusy, setPayBusy] = useState(false);
   const student = order.studentId || {};
+
+  const payAbortRef = useRef(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+
+  // A parent who navigates away mid-payment must not leave pollIntent's
+  // 3-second loop running in the background for up to 5 minutes.
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      payAbortRef.current?.abort();
+    },
+    []
+  );
 
   const total = useMemo(
     () =>
@@ -116,6 +177,62 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
       () => API.post(`/pending-orders/${order._id}/reject`),
       'Request declined.'
     );
+
+  // Deliberately not gated behind the insufficient-balance guard that blocks
+  // Approve — paying by UPI is exactly what a parent reaches for when the
+  // wallet doesn't cover the order.
+  const payByUpi = async () => {
+    setBusy(true);
+    setPayBusy(true);
+    setPayState(null);
+    setError(null);
+    const controller = new AbortController();
+    payAbortRef.current = controller;
+
+    try {
+      const { intentId } = await startPayment(() => createOrderPayment(order._id));
+      if (!mountedRef.current) return;
+
+      const finalIntent = await pollIntent(intentId, {
+        onUpdate: (intent) => mountedRef.current && setPayState(intent),
+        signal: controller.signal,
+      });
+      if (!mountedRef.current) return;
+
+      if (finalIntent?.status === 'APPLIED') {
+        onResolved?.('Paid by UPI. The order is paid for.');
+      }
+      setPayState(finalIntent);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setPayState({
+        status: 'FAILED',
+        message: err.response?.data?.message || 'Could not start the payment.',
+      });
+    } finally {
+      if (mountedRef.current) {
+        setBusy(false);
+        setPayBusy(false);
+      }
+    }
+  };
+
+  const payTerminal =
+    payState &&
+    typeof payState === 'object' &&
+    (payState.message || TERMINAL_STATUSES.includes(payState.status));
+
+  // pollIntent's 5-minute cap lapsed and handed back the last non-terminal
+  // status it saw — the poll gave up, the payment itself did not fail.
+  const payGaveUp = !payBusy && payState && typeof payState === 'object' && !payTerminal;
+
+  const payCopy = payTerminal
+    ? payState.message
+      ? { variant: 'alert', icon: '⚠️', text: payState.message }
+      : PAY_UPI_TERMINAL_COPY[payState.status]
+    : payGaveUp
+      ? PAY_UPI_STILL_PROCESSING
+      : null;
 
   const placeOrder = async () => {
     if (!approvalKey.current) {
@@ -478,12 +595,32 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           </div>
         </div>
       ) : (
-        <div className="pending-actions">
-          <Button variant="dark" block disabled={busy || edited || empty || insufficient} onClick={() => setConfirming('approve')}>
-            {busy ? 'Working…' : `Approve ${formatINR(total)}`}
-          </Button>
-          <Button variant="alert" className="btn--cancel-order" block disabled={busy} onClick={() => setConfirming('decline')}>Decline</Button>
-        </div>
+        <>
+          <div className="pending-actions">
+            <Button variant="dark" block disabled={busy || edited || empty || insufficient} onClick={() => setConfirming('approve')}>
+              {busy ? 'Working…' : `Approve ${formatINR(total)}`}
+            </Button>
+            <Button variant="alert" className="btn--cancel-order" block disabled={busy} onClick={() => setConfirming('decline')}>Decline</Button>
+          </div>
+          {/* Not gated on `insufficient` — a wallet that can't cover the order
+              is exactly when a parent reaches for this button. */}
+          <div className="pending-actions">
+            <Button variant="ghost" block disabled={busy || edited} onClick={payByUpi}>
+              {payBusy ? 'Waiting for the bank…' : 'Pay by UPI'}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {payCopy && (
+        <Banner variant={payCopy.variant} icon={payCopy.icon} style={{ marginTop: 12 }}>
+          {payCopy.text}
+        </Banner>
+      )}
+      {payTerminal && payState.degradedToTopup && (
+        <Banner variant="warn" icon="ℹ️" style={{ marginTop: 8 }}>
+          {DEGRADED_TOPUP_NOTE}
+        </Banner>
       )}
     </Card>
   );

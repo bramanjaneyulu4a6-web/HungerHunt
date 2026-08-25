@@ -24,8 +24,17 @@ export const createOrderPayment = (pendingOrderId) =>
 export const createTopup = (studentId, amountRupees) =>
   API.post('/payments/intents', { purpose: 'TOPUP', studentId, amountRupees }).then((r) => r.data);
 
+// The shared axios instance sets no per-request timeout, so a hung
+// connection (as opposed to one that fails fast) would otherwise hold a poll
+// attempt open for the browser default — minutes, not seconds — which would
+// quietly blow past the "4 consecutive failures" bound pollIntent relies on
+// to surface something to the parent in a reasonable time.
+const POLL_TIMEOUT_MS = 10000;
+
 export const getIntent = (intentId, { signal } = {}) =>
-  API.get(`/payments/intents/${intentId}`, { signal }).then((r) => r.data.intent);
+  API.get(`/payments/intents/${intentId}`, { signal, timeout: POLL_TIMEOUT_MS }).then(
+    (r) => r.data.intent
+  );
 
 /* Opens PhonePe's hosted checkout. On a phone this is the system browser,
  * where upi:// intent links actually resolve to installed UPI apps; inside
@@ -43,8 +52,17 @@ const openCheckout = async (redirectUrl) => {
   // page that visibly did nothing. Same-tab is a safe fallback on web:
   // PhonePe's checkout redirects straight back to /payment-return when it's
   // done, so nothing is lost by not having a separate tab.
-  const popup = window.open(redirectUrl, '_blank', 'noopener');
-  if (!popup) {
+  //
+  // Deliberately no 'noopener' in the features string: per spec that makes
+  // window.open return null even when the popup opens fine, which would
+  // make the check below fire on every successful open too — a guaranteed
+  // second, same-tab checkout on top of the one that just opened. Instead
+  // get the same security benefit by hand: null the new window's opener
+  // reference once we know it actually opened.
+  const popup = window.open(redirectUrl, '_blank');
+  if (popup) {
+    popup.opener = null;
+  } else {
     window.location.assign(redirectUrl);
   }
 };

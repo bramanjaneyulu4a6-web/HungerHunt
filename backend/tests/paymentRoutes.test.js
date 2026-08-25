@@ -1,0 +1,174 @@
+import test, { after, afterEach, before, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+
+process.env.JWT_SECRET ||= 'test-secret';
+process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
+process.env.NODE_ENV = 'test';
+process.env.PHONEPE_ENV = 'sandbox';
+process.env.PHONEPE_CLIENT_ID = 'x';
+process.env.PHONEPE_CLIENT_SECRET = 'x';
+process.env.PHONEPE_WEBHOOK_USERNAME = 'hookuser';
+process.env.PHONEPE_WEBHOOK_PASSWORD = 'hookpass';
+process.env.PHONEPE_REDIRECT_BASE_URL = 'https://parent.example';
+
+const mongoose = (await import('mongoose')).default;
+const Parent = (await import('../models/Parent.js')).default;
+const PendingOrder = (await import('../models/PendingOrder.js')).default;
+const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
+// Stubbed through their default export objects, not the module namespace:
+// mock.method() on an ES module namespace throws "Cannot redefine property"
+// on this repo's Node (v26.7.0). The controller under test reaches both
+// through the same default objects for exactly this reason.
+const phonepe = (await import('../src/domain/payments/providers/phonepe.js')).default;
+const settle = (await import('../src/domain/payments/settlePaymentIntent.js')).default;
+const { signParentToken } = await import('../utils/tokens.js');
+const app = (await import('../app.js')).default;
+
+mongoose.set('bufferTimeoutMS', 200);
+
+const PARENT_ID = '507f1f77bcf86cd799439001';
+const STUDENT_ID = '507f1f77bcf86cd799439011';
+const ORDER_ID = '507f1f77bcf86cd799439031';
+const INTENT_ID = '507f1f77bcf86cd799439051';
+
+// signParentToken(id, phone, tokenVersion = 0) — verified against the current
+// utils/tokens.js and how controllers/parentController.js calls it, not the
+// object-shaped call in the original brief.
+const parentToken = signParentToken(PARENT_ID, '9999999999');
+
+let server, base;
+before(async () => {
+  server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  base = `http://127.0.0.1:${server.address().port}`;
+});
+after(() => new Promise((resolve) => server.close(resolve)));
+afterEach(() => mock.restoreAll());
+
+const asParent = () => mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+
+const send = (method, path, body, headers = {}) =>
+  fetch(base + path, {
+    method,
+    headers: { Authorization: `Bearer ${parentToken}`, 'Content-Type': 'application/json', ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+test('a topup intent is created and returns the checkout url', async () => {
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createPayment', async ({ merchantOrderId, amountPaise, redirectUrl }) => {
+    assert.equal(amountPaise, 50000);
+    assert.ok(redirectUrl.startsWith('https://parent.example/payment-return?intent='));
+    return { providerOrderId: 'OMO1', redirectUrl: 'https://pg.example/co', state: 'PENDING' };
+  });
+
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 500 });
+
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.redirectUrl, 'https://pg.example/co');
+  assert.equal(body.intent.status, 'PENDING');
+  assert.equal(createdDoc.amountPaise, 50000);
+});
+
+test('topup amounts are validated', async () => {
+  asParent();
+  for (const amountRupees of [0, -5, 20001, 10.5, 'abc']) {
+    const res = await send('POST', '/api/payments/intents',
+      { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees });
+    assert.equal(res.status, 400, `accepted ${amountRupees}`);
+  }
+});
+
+test('a parent cannot create a topup for a student that is not theirs', async () => {
+  // First exists() call authenticates the token; second checks ownership.
+  let calls = 0;
+  mock.method(Parent, 'exists', async () => (calls++ === 0 ? { _id: PARENT_ID } : null));
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 100 });
+  assert.equal(res.status, 404);
+});
+
+test('an order intent snapshots the order total in paise', async () => {
+  asParent();
+  mock.method(PendingOrder, 'findOne', async () =>
+    ({ _id: ORDER_ID, parentId: PARENT_ID, studentId: STUDENT_ID, status: 'PENDING',
+       totalAmount: 149.5, expiresAt: new Date(Date.now() + 3600_000) }));
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (f, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createPayment', async () =>
+    ({ providerOrderId: 'OMO2', redirectUrl: 'https://pg.example/co2', state: 'PENDING' }));
+
+  const res = await send('POST', '/api/payments/intents', { purpose: 'ORDER', pendingOrderId: ORDER_ID });
+
+  assert.equal(res.status, 201);
+  assert.equal(createdDoc.amountPaise, 14950);
+  assert.equal(String(createdDoc.pendingOrderId), ORDER_ID);
+});
+
+test('reading a pending intent settles it first', async () => {
+  asParent();
+  const settled = mock.method(settle, 'settlePaymentIntent', async () =>
+    ({ _id: INTENT_ID, parentId: PARENT_ID, purpose: 'TOPUP', status: 'APPLIED',
+       amountPaise: 50000, degradedToTopup: false, pendingOrderId: null, createdAt: new Date() }));
+  mock.method(PaymentIntent, 'findOne', async () =>
+    ({ _id: INTENT_ID, parentId: PARENT_ID, purpose: 'TOPUP', status: 'PENDING',
+       amountPaise: 50000, degradedToTopup: false, pendingOrderId: null, createdAt: new Date() }));
+
+  const res = await send('GET', `/api/payments/intents/${INTENT_ID}`);
+
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).intent.status, 'APPLIED');
+  assert.equal(settled.mock.callCount(), 1);
+});
+
+test('the webhook rejects a bad credential hash and never settles', async () => {
+  const settled = mock.method(settle, 'settlePaymentIntent', async () => null);
+  const res = await fetch(base + '/api/payments/phonepe/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'wrong' },
+    body: JSON.stringify({ payload: { merchantOrderId: `HH-${INTENT_ID}` } }),
+  });
+  assert.equal(res.status, 401);
+  assert.equal(settled.mock.callCount(), 0);
+});
+
+test('an authenticated webhook settles by merchantOrderId and answers 200', async () => {
+  mock.method(PaymentIntent, 'findOne', async () => ({ _id: INTENT_ID }));
+  const settled = mock.method(settle, 'settlePaymentIntent', async () => ({ status: 'APPLIED' }));
+  const auth = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
+
+  const res = await fetch(base + '/api/payments/phonepe/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ event: 'checkout.order.completed', payload: { merchantOrderId: `HH-${INTENT_ID}` } }),
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal(settled.mock.callCount(), 1);
+});
+
+test('a webhook for an unknown order still answers 200 and stays quiet', async () => {
+  mock.method(PaymentIntent, 'findOne', async () => null);
+  const auth = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
+  const res = await fetch(base + '/api/payments/phonepe/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ payload: { merchantOrderId: 'HH-nobody' } }),
+  });
+  assert.equal(res.status, 200);
+});

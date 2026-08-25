@@ -48,6 +48,7 @@ export const chargeCart = async ({
   sourceType = 'DIRECT_CHECKOUT',
   sourceId,
   idempotencyKey,
+  funding = 'WALLET',
 }) => {
   const studentQuery = Student.findById(studentId);
   const student = session ? await studentQuery.session(session) : await studentQuery;
@@ -122,12 +123,16 @@ export const chargeCart = async ({
 
   if (!withinLimits.ok) return withinLimits;
 
-  if (student.walletControl?.enabled) {
+  if (funding === 'WALLET' && student.walletControl?.enabled) {
     const spendingQuery = Transaction.aggregate([
       {
         $match: {
           studentId: student._id,
-          createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) }
+          createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) },
+          // UPI-paid orders are the parent's own money, spent with the
+          // parent's own thumb on the pay button. They neither need the
+          // child-spending limit's consent nor consume its allowance.
+          sourceType: { $ne: 'UPI_ORDER_PAYMENT' },
         }
       },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } }
@@ -176,12 +181,19 @@ export const chargeCart = async ({
     applied.push({ productId: orderItem.productId, quantity: orderItem.quantity });
   }
 
-  // Same guard on the wallet: the balance must still cover the bill.
-  const debited = await debitWallet(studentId, totalAmount, { session });
+  // WALLET funding spends the child's balance; EXTERNAL funding is money
+  // that already arrived from outside (a parent's UPI payment), so the
+  // wallet is left exactly as it was and the transaction records an
+  // unchanged before/after as proof it was never touched.
+  let debited = student;
 
-  if (!debited) {
-    await restoreStock(applied, session);
-    return { ok: false, status: 400, message: 'Insufficient pocket money balance!' };
+  if (funding === 'WALLET') {
+    debited = await debitWallet(studentId, totalAmount, { session });
+
+    if (!debited) {
+      await restoreStock(applied, session);
+      return { ok: false, status: 400, message: 'Insufficient pocket money balance!' };
+    }
   }
 
   let transaction;
@@ -192,8 +204,8 @@ export const chargeCart = async ({
       studentId,
       items: transactionItems,
       totalAmount,
-      previousBalance: debited.pocketMoney + totalAmount,
-      remainingBalance: debited.pocketMoney,
+      previousBalance: funding === 'WALLET' ? debited.pocketMoney + totalAmount : student.pocketMoney,
+      remainingBalance: funding === 'WALLET' ? debited.pocketMoney : student.pocketMoney,
       sourceType,
       ...(sourceId ? { sourceId } : {}),
       ...(idempotencyKey ? { idempotencyKey } : {}),
@@ -210,7 +222,7 @@ export const chargeCart = async ({
     }
   } catch (err) {
     await restoreStock(applied, session);
-    await creditWallet(studentId, totalAmount, { session });
+    if (funding === 'WALLET') await creditWallet(studentId, totalAmount, { session });
     throw err;
   }
 

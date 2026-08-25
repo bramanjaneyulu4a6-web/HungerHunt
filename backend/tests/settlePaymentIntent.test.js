@@ -10,6 +10,7 @@ process.env.PHONEPE_CLIENT_SECRET = 'x';
 const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
+const Transaction = (await import('../models/Transaction.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const { settlePaymentIntent } = await import('../src/domain/payments/settlePaymentIntent.js');
 
@@ -19,23 +20,46 @@ const { settlePaymentIntent } = await import('../src/domain/payments/settlePayme
  * `TypeError: Cannot redefine property`. settlePaymentIntent instead takes
  * the provider and chargeCart as an injectable second `deps` argument, so
  * these tests pass fakes through `deps` rather than patching modules. Model
- * statics (PaymentIntent, PendingOrder, WalletAdjustment, Student) are plain
- * objects and patch fine with mock.method, exactly as elsewhere in the
- * suite (see tests/staffReports.test.js). */
+ * statics (PaymentIntent, PendingOrder, WalletAdjustment, Transaction,
+ * Student) are plain objects and patch fine with mock.method, exactly as
+ * elsewhere in the suite (see tests/staffReports.test.js). */
 
 afterEach(() => mock.restoreAll());
 
 const INTENT_ID = '507f1f77bcf86cd799439051';
 const ORDER_ID = '507f1f77bcf86cd799439031';
 const STUDENT_ID = '507f1f77bcf86cd799439011';
+const MERCHANT_ORDER_ID = `HH-${INTENT_ID}`;
 
 const intentDoc = (overrides = {}) => ({
   _id: INTENT_ID, parentId: 'p1', studentId: STUDENT_ID, purpose: 'TOPUP',
-  pendingOrderId: null, amountPaise: 10000, merchantOrderId: `HH-${INTENT_ID}`,
+  pendingOrderId: null, amountPaise: 10000, merchantOrderId: MERCHANT_ORDER_ID,
   status: 'PENDING', degradedToTopup: false, ...overrides,
 });
 
 const fakeProvider = (getOrderStatus) => ({ getOrderStatus });
+
+// Every claimed intent now runs findPriorApplication() before doing
+// anything. Most tests are exercising a fresh (non-replay) settle, so both
+// lookups come back empty.
+const noPriorApplication = () => {
+  mock.method(WalletAdjustment, 'findOne', async () => null);
+  mock.method(Transaction, 'findOne', async () => null);
+};
+
+// The claim write for an ORDER-purpose intent must echo back the purpose it
+// was claiming, and everything the real $set would have persisted (status,
+// degradedToTopup, ...) — intentDoc()'s own defaults would otherwise
+// silently mask either the ORDER branch or the final degradedToTopup flag
+// under test. (This is the bug found in the brief's own reference tests:
+// its stub only echoed `status`, so purpose silently reverted to the
+// default 'TOPUP' and the ORDER branch was never actually exercised.)
+const orderIntentClaimStub = (filter, update) =>
+  Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+    status: 'APPLYING',
+    ...(update?.$set || {}),
+  }));
 
 test('a still-pending provider order moves nothing', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
@@ -70,6 +94,7 @@ test('an amount mismatch is quarantined, not applied', async () => {
 
 test('a completed TOPUP credits the wallet exactly once through the claim', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
+  noPriorApplication();
 
   const updates = [];
   mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) => {
@@ -80,6 +105,10 @@ test('a completed TOPUP credits the wallet exactly once through the claim', asyn
     }
     return Promise.resolve(intentDoc({ status: 'APPLIED' }));
   });
+  // Pre-credit balance: WalletAdjustment is now written before the wallet
+  // is credited, so creditAsTopup reads the student's current balance via
+  // findById first, then $inc's it.
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 40, active: true }));
   mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 140 }));
   let adjustment;
   mock.method(WalletAdjustment, 'create', (docs) => {
@@ -95,9 +124,10 @@ test('a completed TOPUP credits the wallet exactly once through the claim', asyn
   assert.deepEqual(claim.filter, { _id: INTENT_ID, status: 'PENDING' });
   assert.equal(adjustment.source, 'PARENT_UPI');
   assert.equal(adjustment.amount, 100);           // rupees, converted from 10000 paise
-  assert.equal(adjustment.previousBalance, 40);   // 140 after a 100 credit
-  assert.equal(adjustment.newBalance, 140);
+  assert.equal(adjustment.previousBalance, 40);
+  assert.equal(adjustment.newBalance, 140);       // 40 + a 100 credit
   assert.equal(String(adjustment.paymentIntentId), INTENT_ID);
+  assert.equal(adjustment.idempotencyKey, MERCHANT_ORDER_ID); // load-bearing for the shared unique index
   assert.equal(result.status, 'APPLIED');
 });
 
@@ -119,25 +149,20 @@ test('a paid ORDER whose stock died degrades to a wallet credit', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
     purpose: 'ORDER', pendingOrderId: ORDER_ID,
   })));
-  // The stub for every intent write must echo back the ORDER purpose it was
-  // claiming, and everything the real $set would have persisted (status,
-  // degradedToTopup, ...) — intentDoc()'s own defaults would otherwise
-  // silently mask either the ORDER branch or the final degradedToTopup flag
-  // under test.
-  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) =>
-    Promise.resolve(intentDoc({
-      purpose: 'ORDER', pendingOrderId: ORDER_ID,
-      status: 'APPLYING',
-      ...(update?.$set || {}),
-    })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  noPriorApplication();
 
   // Pending order claim succeeds, totals match…
-  mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) =>
-    Promise.resolve(update?.$set?.status === 'PROCESSING'
+  const orderUpdates = [];
+  mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) => {
+    orderUpdates.push({ filter, update });
+    return Promise.resolve(update?.$set?.status === 'PROCESSING'
       ? { _id: ORDER_ID, studentId: STUDENT_ID, totalAmount: 100,
           items: [{ productId: 'pr1', quantity: 1, price: 100 }], status: 'PROCESSING' }
-      : { _id: ORDER_ID }));
+      : { _id: ORDER_ID });
+  });
 
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 0, active: true }));
   mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 100 }));
   let adjustment;
   mock.method(WalletAdjustment, 'create', (docs) => {
@@ -153,18 +178,65 @@ test('a paid ORDER whose stock died degrades to a wallet credit', async () => {
 
   assert.equal(adjustment.source, 'PARENT_UPI');
   assert.equal(result.degradedToTopup, true);
+  // releaseOrder() must actually have run: the claimed order goes back to
+  // PENDING with its approvalKey/processingAt cleared, distinguishing this
+  // charge-refusal degrade from a reprice degrade (covered separately below)
+  // that never even reaches chargeCart.
+  assert.ok(orderUpdates.some((u) =>
+    u.update?.$set?.status === 'PENDING' && u.update?.$unset?.approvalKey === 1));
+});
+
+test('a paid ORDER whose total was repriced since payment degrades without ever charging', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  noPriorApplication();
+
+  const orderUpdates = [];
+  mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) => {
+    orderUpdates.push({ filter, update });
+    if (update?.$set?.status === 'PROCESSING') {
+      // Repriced since the parent paid: 150 rupees no longer matches the
+      // 10000 paise (100 rupees) captured on the intent.
+      return Promise.resolve({
+        _id: ORDER_ID, studentId: STUDENT_ID, totalAmount: 150,
+        items: [{ productId: 'pr1', quantity: 1, price: 150 }], status: 'PROCESSING',
+      });
+    }
+    return Promise.resolve({ _id: ORDER_ID });
+  });
+
+  mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 0, active: true }));
+  mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 100 }));
+  mock.method(WalletAdjustment, 'create', (docs) => {
+    const adjustment = Array.isArray(docs) ? docs[0] : docs;
+    return Promise.resolve([{ _id: 'wa1', ...adjustment }]);
+  });
+
+  let chargeCartCalls = 0;
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+    chargeCart: async () => {
+      chargeCartCalls += 1;
+      return { ok: true, transaction: { _id: 'should-not-happen' } };
+    },
+  });
+
+  // This is what fails if the total-match check is ever removed or inverted:
+  // a repriced order must degrade before chargeCart is ever called.
+  assert.equal(chargeCartCalls, 0);
+  assert.ok(orderUpdates.some((u) =>
+    u.update?.$set?.status === 'PENDING' && u.update?.$unset?.approvalKey === 1));
+  assert.equal(result.degradedToTopup, true);
 });
 
 test('a paid ORDER that still buys applies the charge and approves the order', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
     purpose: 'ORDER', pendingOrderId: ORDER_ID,
   })));
-  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) =>
-    Promise.resolve(intentDoc({
-      purpose: 'ORDER', pendingOrderId: ORDER_ID,
-      status: 'APPLYING',
-      ...(update?.$set || {}),
-    })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  noPriorApplication();
 
   const orderUpdates = [];
   mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) => {
@@ -193,6 +265,7 @@ test('a paid ORDER that still buys applies the charge and approves the order', a
   assert.equal(chargeCartCalledWith.funding, 'EXTERNAL');
   assert.equal(chargeCartCalledWith.sourceType, 'UPI_ORDER_PAYMENT');
   assert.equal(String(chargeCartCalledWith.sourceId), ORDER_ID);
+  assert.equal(chargeCartCalledWith.idempotencyKey, MERCHANT_ORDER_ID); // load-bearing for the shared unique index
   assert.ok(orderUpdates.some((u) => u.update?.$set?.status === 'APPROVED'));
   assert.equal(result.status, 'APPLIED');
   assert.equal(result.degradedToTopup, false);
@@ -215,6 +288,40 @@ test('provider FAILED marks the intent FAILED and moves nothing', async () => {
   assert.equal(result.status, 'FAILED');
 });
 
+test('provider EXPIRED marks the intent EXPIRED and moves nothing', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
+  const updates = [];
+  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) => {
+    updates.push(update);
+    return Promise.resolve(intentDoc({ status: 'EXPIRED' }));
+  });
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'EXPIRED' })),
+  });
+
+  assert.ok(updates.some((u) => u.$set?.status === 'EXPIRED'));
+  assert.equal(result.status, 'EXPIRED');
+});
+
+test('an unrecognised provider state is quarantined as FAILED, not paid', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
+  const updates = [];
+  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) => {
+    updates.push(update);
+    return Promise.resolve(intentDoc({ status: 'FAILED' }));
+  });
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'SOME_NEW_STATE' })),
+  });
+
+  const failedUpdate = updates.find((u) => u.$set?.status === 'FAILED');
+  assert.ok(failedUpdate);
+  assert.match(failedUpdate.$set.failureReason, /SOME_NEW_STATE/);
+  assert.equal(result.status, 'FAILED');
+});
+
 test('a terminal intent is returned as-is without re-consulting the provider', async () => {
   mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({ status: 'APPLIED' })));
   const providerCalls = mock.fn(async () => ({ state: 'COMPLETED', amountPaise: 10000 }));
@@ -233,4 +340,145 @@ test('an intent already APPLYING is left for the worker mid-apply', async () => 
 
   assert.equal(providerCalls.mock.callCount(), 0);
   assert.equal(result.status, 'APPLYING');
+});
+
+test('a lost race on marking terminal re-fetches instead of returning null', async () => {
+  // Simulates: this call read the intent as PENDING, but by the time its
+  // markTerminal write lands, another caller has already moved it (e.g. to
+  // APPLYING) — the filter {_id, status: fromStatus} matches nothing and
+  // findOneAndUpdate resolves null. The old `... || intent` never awaited
+  // the promise (always truthy) and so never triggered; this asserts the
+  // fixed behaviour re-fetches the fresh document instead of surfacing null.
+  let findByIdCalls = 0;
+  mock.method(PaymentIntent, 'findById', () => {
+    findByIdCalls += 1;
+    return Promise.resolve(findByIdCalls === 1 ? intentDoc() : intentDoc({ status: 'APPLYING' }));
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', () => Promise.resolve(null));
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'FAILED' })),
+  });
+
+  assert.equal(findByIdCalls, 2);
+  assert.ok(result);
+  assert.equal(result.status, 'APPLYING');
+});
+
+test('a crashed-then-replayed ORDER settle finds the prior transaction and never re-charges', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  mock.method(WalletAdjustment, 'findOne', async () => null);
+  mock.method(Transaction, 'findOne', async (filter) => {
+    assert.equal(filter.sourceType, 'UPI_ORDER_PAYMENT');
+    assert.equal(String(filter.sourceId), ORDER_ID);
+    return { _id: 'txn-original' };
+  });
+
+  const orderClaims = mock.method(PendingOrder, 'findOneAndUpdate', () => Promise.resolve(null));
+  const chargeCartCalls = mock.fn(async () => ({ ok: true, transaction: { _id: 'txn-should-not-happen' } }));
+  const walletCreates = mock.method(WalletAdjustment, 'create', async () => [{ _id: 'wa-should-not-happen' }]);
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+    chargeCart: chargeCartCalls,
+  });
+
+  assert.equal(orderClaims.mock.callCount(), 0); // applyToOrder never even attempted the claim
+  assert.equal(chargeCartCalls.mock.callCount(), 0);
+  assert.equal(walletCreates.mock.callCount(), 0);
+  assert.equal(result.transactionId, 'txn-original');
+  assert.equal(result.degradedToTopup, false);
+  assert.equal(result.status, 'APPLIED');
+});
+
+test('a crashed-then-replayed TOPUP settle finds the prior adjustment and never credits again', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc()));
+  mock.method(PaymentIntent, 'findOneAndUpdate', (filter, update) =>
+    Promise.resolve(intentDoc({ status: 'APPLYING', ...(update?.$set || {}) })));
+  mock.method(WalletAdjustment, 'findOne', async (filter) => {
+    assert.equal(String(filter.paymentIntentId), INTENT_ID);
+    return { _id: 'wa-original' };
+  });
+
+  const walletCreates = mock.method(WalletAdjustment, 'create', async () => [{ _id: 'wa-should-not-happen' }]);
+  const credits = mock.method(Student, 'findOneAndUpdate', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 999 }));
+  const studentReads = mock.method(Student, 'findById', () => Promise.resolve({ _id: STUDENT_ID, pocketMoney: 999 }));
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+  });
+
+  assert.equal(walletCreates.mock.callCount(), 0);
+  assert.equal(credits.mock.callCount(), 0);
+  assert.equal(studentReads.mock.callCount(), 0);
+  assert.equal(result.walletAdjustmentId, 'wa-original');
+  assert.equal(result.degradedToTopup, false);
+  assert.equal(result.status, 'APPLIED');
+});
+
+test('a crashed-then-replayed degraded ORDER settle finds the prior credit, not a second one', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  // A prior attempt already degraded this intent to a wallet credit — the
+  // WalletAdjustment exists even though this is an ORDER-purpose intent.
+  mock.method(WalletAdjustment, 'findOne', async () => ({ _id: 'wa-degraded-original' }));
+  const transactionLookup = mock.method(Transaction, 'findOne', async () => null);
+
+  const orderClaims = mock.method(PendingOrder, 'findOneAndUpdate', () => Promise.resolve(null));
+  const walletCreates = mock.method(WalletAdjustment, 'create', async () => [{ _id: 'wa-should-not-happen' }]);
+
+  const result = await settlePaymentIntent(INTENT_ID, {
+    provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+    chargeCart: async () => { throw new Error('must not be called'); },
+  });
+
+  assert.equal(transactionLookup.mock.callCount(), 0); // adjustment found first; never even checks Transaction
+  assert.equal(orderClaims.mock.callCount(), 0);
+  assert.equal(walletCreates.mock.callCount(), 0);
+  assert.equal(result.walletAdjustmentId, 'wa-degraded-original');
+  assert.equal(result.degradedToTopup, true); // still recorded as a degrade, not a fresh top-up
+  assert.equal(result.status, 'APPLIED');
+});
+
+test('a throwing charge releases both the intent claim and the order claim (fail-open) and rethrows', async () => {
+  mock.method(PaymentIntent, 'findById', () => Promise.resolve(intentDoc({
+    purpose: 'ORDER', pendingOrderId: ORDER_ID,
+  })));
+  mock.method(PaymentIntent, 'findOneAndUpdate', orderIntentClaimStub);
+  noPriorApplication();
+
+  mock.method(PendingOrder, 'findOneAndUpdate', (filter, update) =>
+    Promise.resolve(update?.$set?.status === 'PROCESSING'
+      ? { _id: ORDER_ID, studentId: STUDENT_ID, totalAmount: 100,
+          items: [{ productId: 'pr1', quantity: 1, price: 100 }], status: 'PROCESSING' }
+      : null));
+
+  const intentReleases = [];
+  mock.method(PaymentIntent, 'updateOne', (filter, update) => {
+    intentReleases.push({ filter, update });
+    return Promise.resolve({});
+  });
+  const orderReleases = [];
+  mock.method(PendingOrder, 'updateOne', (filter, update) => {
+    orderReleases.push({ filter, update });
+    return Promise.resolve({});
+  });
+
+  await assert.rejects(
+    () => settlePaymentIntent(INTENT_ID, {
+      provider: fakeProvider(async () => ({ state: 'COMPLETED', amountPaise: 10000 })),
+      chargeCart: async () => { throw new Error('boom'); },
+    }),
+    /boom/
+  );
+
+  assert.ok(intentReleases.some((c) =>
+    c.filter.status === 'APPLYING' && c.update.$set.status === 'PENDING'));
+  assert.ok(orderReleases.some((c) =>
+    c.filter.status === 'PROCESSING' && c.update.$set.status === 'PENDING' && c.update.$unset.approvalKey === 1));
 });

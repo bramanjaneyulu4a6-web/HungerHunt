@@ -74,3 +74,41 @@ test('webhook auth is the SHA256 of username:password, compared in constant time
   assert.equal(adapter.verifyWebhookAuth(undefined), false);
   assert.equal(adapter.verifyWebhookAuth(''), false);
 });
+
+test('webhook auth does not throw on same-character-length non-ASCII input', () => {
+  // 64 JS characters (matching a sha256 hex digest's string length) but,
+  // once UTF-8 encoded, more than 64 bytes — must fail cleanly, not throw.
+  const nonAsciiSameLength = 'é'.repeat(64);
+  assert.doesNotThrow(() => adapter.verifyWebhookAuth(nonAsciiSameLength));
+  assert.equal(adapter.verifyWebhookAuth(nonAsciiSameLength), false);
+});
+
+test('a 401 evicts the cached token so the next call re-fetches one', async () => {
+  let tokenFetches = 0;
+  let statusFetches = 0;
+  mock.method(globalThis, 'fetch', async (url) => {
+    if (String(url).includes('/oauth/token')) {
+      tokenFetches += 1;
+      return jsonResponse({ access_token: `tok${tokenFetches}`, expires_at: Math.floor(Date.now() / 1000) + 3600 });
+    }
+    statusFetches += 1;
+    if (statusFetches === 1) {
+      return jsonResponse({ message: 'UNAUTHORIZED' }, 401);
+    }
+    return jsonResponse({ state: 'COMPLETED', amount: 100 });
+  });
+
+  await assert.rejects(() => adapter.getOrderStatus('HH-abc'));
+  assert.equal(tokenFetches, 1);
+
+  const status = await adapter.getOrderStatus('HH-abc');
+  assert.deepEqual(status, { state: 'COMPLETED', amountPaise: 100 });
+  assert.equal(tokenFetches, 2, 'the 401 should have evicted the cached token, forcing a second token fetch');
+});
+
+test('the default export is the same functions as the named exports', () => {
+  assert.equal(adapter.default.createPayment, adapter.createPayment);
+  assert.equal(adapter.default.getOrderStatus, adapter.getOrderStatus);
+  assert.equal(adapter.default.verifyWebhookAuth, adapter.verifyWebhookAuth);
+  assert.equal(adapter.default._resetTokenCacheForTests, adapter._resetTokenCacheForTests);
+});

@@ -72,6 +72,10 @@ const authorizedJson = async (url, options = {}) => {
   });
   const body = await response.json();
   if (!response.ok) {
+    // A rejected/rotated token would otherwise wedge the cache until its
+    // stated expiry (hours) with a process restart as the only remedy —
+    // evict on 401 so the next call re-authenticates instead.
+    if (response.status === 401) cachedToken = null;
     throw new Error(`PhonePe ${options.method || 'GET'} ${url} failed (${response.status}): ${body?.message || 'no message'}`);
   }
   return body;
@@ -130,8 +134,14 @@ export const verifyWebhookAuth = (authorizationHeader) => {
   const expected = crypto.createHash('sha256').update(`${username}:${password}`).digest('hex');
   const presented = String(authorizationHeader).trim().toLowerCase();
 
-  if (presented.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+  // Compare BYTE length, not string length — a header can carry latin1
+  // high bytes (Node's HTTP parser accepts obs-text) that are more bytes
+  // than characters once UTF-8 encoded, and timingSafeEqual throws on a
+  // byte-length mismatch rather than just returning false.
+  const presentedBuffer = Buffer.from(presented);
+  const expectedBuffer = Buffer.from(expected);
+  if (presentedBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(presentedBuffer, expectedBuffer);
 };
 
 export default { createPayment, getOrderStatus, verifyWebhookAuth, _resetTokenCacheForTests };

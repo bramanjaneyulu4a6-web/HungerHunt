@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   remainingBalance: { type: Number, required: true },
   sourceType: {
     type: String,
-    enum: ['DIRECT_CHECKOUT', 'PARENT_APPROVAL'],
+    enum: ['DIRECT_CHECKOUT', 'PARENT_APPROVAL', 'UPI_ORDER_PAYMENT'],
     default: 'DIRECT_CHECKOUT',
   },
   sourceId: { type: mongoose.Schema.Types.ObjectId },
@@ -28,6 +28,16 @@ transactionSchema.index(
     unique: true,
     partialFilterExpression: { sourceType: 'PARENT_APPROVAL' },
     name: 'one_transaction_per_parent_approval',
+  }
+);
+// Mirror of one_transaction_per_parent_approval for the externally funded
+// path: one charge per pending order, however many times a webhook replays.
+transactionSchema.index(
+  { sourceType: 1, sourceId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { sourceType: 'UPI_ORDER_PAYMENT' },
+    name: 'one_transaction_per_upi_payment',
   }
 );
 

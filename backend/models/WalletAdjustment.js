@@ -11,11 +11,27 @@ const walletAdjustmentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Who put the money in. ADMIN rows are the office topping up at the desk
+    // and carry performedBy; PARENT_UPI rows are money that arrived through a
+    // payment intent and carry paymentIntentId instead. One ledger, two
+    // provenances — the Tally export keeps a single funding-clearing mapping.
+    source: {
+      type: String,
+      enum: ['ADMIN', 'PARENT_UPI'],
+      default: 'ADMIN',
+      required: true,
+    },
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Admin',
-      required: true,
+      required: function () { return this.source !== 'PARENT_UPI'; },
       index: true,
+    },
+    paymentIntentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PaymentIntent',
+      required: function () { return this.source === 'PARENT_UPI'; },
+      default: null,
     },
     type: {
       type: String,
@@ -35,6 +51,17 @@ walletAdjustmentSchema.index({ studentId: 1, createdAt: -1 });
 walletAdjustmentSchema.index(
   { performedBy: 1, idempotencyKey: 1 },
   { unique: true, name: 'one_wallet_adjustment_per_admin_request' }
+);
+
+// DB-level backstop for the settle claim: even if two processes both think
+// they won, only one top-up row per intent can ever exist.
+walletAdjustmentSchema.index(
+  { paymentIntentId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { paymentIntentId: { $type: 'objectId' } },
+    name: 'one_wallet_adjustment_per_payment_intent',
+  }
 );
 
 export default mongoose.model('WalletAdjustment', walletAdjustmentSchema);

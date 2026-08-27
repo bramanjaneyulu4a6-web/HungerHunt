@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   AGE_OUT_DAYS,
   KNOWN_PROVIDER_STATES,
+  ORDER_NOT_FOUND_CODES,
   isProviderOrderMissing,
   shouldAgeOut,
   unknownProviderStateFilter,
@@ -16,13 +17,42 @@ const intentCreatedDaysAgo = (days) => ({
   createdAt: new Date(NOW.getTime() - days * DAY_MS),
 });
 
+// Shaped like what the adapter actually throws for PhonePe's documented
+// "no entry found for given merchant order id" body.
 const orderMissingError = (statusCode = 400) =>
-  Object.assign(new Error(`PhonePe GET .../status failed (${statusCode}): no such order`), { statusCode });
+  Object.assign(new Error(`PhonePe GET .../status failed (${statusCode}): INVALID_MERCHANT_ORDER_ID`), {
+    statusCode,
+    providerCode: 'INVALID_MERCHANT_ORDER_ID',
+  });
+
+// A 4xx that is NOT the provider saying the order is unknown: a malformed
+// request, a rejected credential, a wrong base URL. The adapter tags these
+// with whatever code PhonePe sent, or null when it sent none.
+const otherProviderError = (statusCode, providerCode = null) =>
+  Object.assign(new Error(`PhonePe GET .../status failed (${statusCode})`), {
+    statusCode,
+    providerCode,
+  });
 
 describe('isProviderOrderMissing', () => {
-  test('a 400 or 404 from the PG API means the order does not exist', () => {
+  test("PhonePe's own INVALID_MERCHANT_ORDER_ID means the order does not exist", () => {
+    // The code decides, whichever 4xx status PhonePe chooses to send it on —
+    // the docs do not pin one, so neither does this.
     assert.equal(isProviderOrderMissing(orderMissingError(400)), true);
     assert.equal(isProviderOrderMissing(orderMissingError(404)), true);
+    assert.deepEqual([...ORDER_NOT_FOUND_CODES], ['INVALID_MERCHANT_ORDER_ID']);
+  });
+
+  /* The reason this gate reads the code and not the status. Every error
+     below is a 4xx that a misconfiguration produces for an order that may
+     well exist with the parent's money captured against it: reading the bare
+     status would age all of them out to FAILED a week later. */
+  test('a bare 400 or 404 is NOT "order missing" — only the named code is', () => {
+    assert.equal(isProviderOrderMissing(otherProviderError(400)), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(404)), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(400, 'BAD_REQUEST')), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(401, 'UNAUTHORIZED')), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(404, 'Api Mapping Not Found')), false);
   });
 
   // Everything a retry can fix must keep retrying forever: network errors
@@ -32,11 +62,12 @@ describe('isProviderOrderMissing', () => {
   // the order's existence.
   test('network, 5xx, 429 and token errors are not "order missing"', () => {
     assert.equal(isProviderOrderMissing(new Error('fetch failed')), false);
-    assert.equal(isProviderOrderMissing(orderMissingError(500)), false);
-    assert.equal(isProviderOrderMissing(orderMissingError(503)), false);
-    assert.equal(isProviderOrderMissing(orderMissingError(429)), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(500)), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(503)), false);
+    assert.equal(isProviderOrderMissing(otherProviderError(429)), false);
     assert.equal(isProviderOrderMissing(new Error('PhonePe token request failed (400)')), false);
     assert.equal(isProviderOrderMissing(undefined), false);
+    assert.equal(isProviderOrderMissing(null), false);
   });
 });
 
@@ -56,7 +87,12 @@ describe('shouldAgeOut', () => {
   // with real captured money, and must never be written off.
   test('age alone never retires an intent — retryable errors loop forever', () => {
     assert.equal(shouldAgeOut(intentCreatedDaysAgo(365), new Error('fetch failed'), NOW), false);
-    assert.equal(shouldAgeOut(intentCreatedDaysAgo(365), orderMissingError(503), NOW), false);
+    assert.equal(shouldAgeOut(intentCreatedDaysAgo(365), otherProviderError(503), NOW), false);
+    // The case this gate exists for: an ancient intent whose status read is
+    // 4xx-ing for some reason PhonePe did not name. It stays open and stays
+    // in the report rather than being written off.
+    assert.equal(shouldAgeOut(intentCreatedDaysAgo(365), otherProviderError(400), NOW), false);
+    assert.equal(shouldAgeOut(intentCreatedDaysAgo(365), otherProviderError(404), NOW), false);
   });
 
   test('a missing createdAt is never aged out', () => {

@@ -66,6 +66,47 @@ test('a failed provider response throws rather than returning junk', async () =>
   await assert.rejects(() => adapter.getOrderStatus('HH-abc'));
 });
 
+/* The reconcile sweep decides whether to retire an intent from the error
+   this throws, and it reads providerCode — not the status — to do it. See
+   reconcilePolicy.isProviderOrderMissing. */
+test('a PG error carries PhonePe\'s own code through to the caller', async () => {
+  const withStatusBody = (body, status) =>
+    mock.method(globalThis, 'fetch', async (url) =>
+      String(url).includes('/oauth/token')
+        ? jsonResponse({ access_token: 't', expires_at: Math.floor(Date.now() / 1000) + 3600 })
+        : jsonResponse(body, status));
+
+  withStatusBody(
+    { code: 'INVALID_MERCHANT_ORDER_ID', message: 'No entry found for given merchant order id' },
+    400
+  );
+  const missing = await adapter.getOrderStatus('HH-nope').catch((e) => e);
+  assert.equal(missing.providerCode, 'INVALID_MERCHANT_ORDER_ID');
+  assert.equal(missing.statusCode, 400);
+
+  mock.restoreAll();
+  adapter._resetTokenCacheForTests();
+
+  // A 4xx with no code at all must not look like a named reason — null, not
+  // undefined-and-hopeful, and never the status standing in for a code.
+  withStatusBody({ message: 'Bad Request' }, 400);
+  const bare = await adapter.getOrderStatus('HH-nope').catch((e) => e);
+  assert.equal(bare.providerCode, null);
+  assert.equal(bare.statusCode, 400);
+});
+
+test('a token failure carries neither statusCode nor providerCode', async () => {
+  mock.method(globalThis, 'fetch', async () =>
+    jsonResponse({ code: 'INVALID_MERCHANT_ORDER_ID', message: 'nonsense' }, 400));
+  const err = await adapter.getOrderStatus('HH-abc').catch((e) => e);
+  // Bad credentials must never be readable as "this order does not exist":
+  // the token endpoint throws before any PG response is inspected, so
+  // neither field is ever set — whatever that endpoint happened to return.
+  assert.equal(err.statusCode, undefined);
+  assert.equal(err.providerCode, undefined);
+  assert.match(err.message, /token request failed/);
+});
+
 test('webhook auth is the SHA256 of username:password, compared in constant time', () => {
   const good = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
   assert.equal(adapter.verifyWebhookAuth(good), true);

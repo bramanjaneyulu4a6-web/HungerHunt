@@ -145,7 +145,9 @@ export default function StaffReports() {
               <div>
                 <h2 className="report-card__title">{report.categoryLabel}</h2>
                 <p className="report-card__meta">
+                  {report.reportNumber ? `Report #${report.reportNumber} · ` : ''}
                   {report.raisedBy?.name || 'Unknown caretaker'}
+                  {report.raisedBy?.role === 'student' ? ' (student, from the handover screen)' : ''}
                   {report.raisedBy?.hostelNumber ? ` · Hostel ${report.raisedBy.hostelNumber}` : ''}
                   {' · '}
                   {formatWhen(report.raisedAt)}
@@ -167,6 +169,15 @@ export default function StaffReports() {
                 {report.order.hostelNumber ? ` at hostel ${report.order.hostelNumber}` : ''} — it was{' '}
                 {report.order.statusAtReport.replaceAll('_', ' ').toLowerCase()} when this was raised.
                 The package was not held; the student could still collect it.
+              </p>
+            )}
+
+            {report.affectedItems?.length > 0 && (
+              <p className="report-card__order">
+                Affected items:{' '}
+                {report.affectedItems
+                  .map((item) => `${item.name} ×${item.quantity}`)
+                  .join(', ')}
               </p>
             )}
 

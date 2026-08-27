@@ -105,7 +105,7 @@ export const loginAdmin = async (req, res) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     const password = req.body?.password;
     const admin = await Admin.findOne({ email });
-    if (!admin || !(await bcrypt.compare(password, admin.password))) {
+    if (!admin || admin.active === false || !(await bcrypt.compare(password, admin.password))) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -201,7 +201,7 @@ export const forgotPassword = async (req, res) => {
         to: admin.email,
         resetUrl: `${baseUrl}/reset-password/${raw}`,
       });
-    } catch (mailError) {
+    } catch (_mailError) {
       admin.resetPasswordToken = undefined;
       admin.resetPasswordExpire = undefined;
       await admin.save();

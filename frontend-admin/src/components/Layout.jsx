@@ -6,7 +6,7 @@ import ReportAlertBanner from "./ReportAlertBanner";
 const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
   { path: "/billing", label: "Point of Sale", icon: "◫" },
-  { path: "/students", label: "Students", icon: "♙" },
+  { path: "/users", label: "Users", icon: "♙" },
   { path: "/hostels", label: "Hostels", icon: "⌂" },
   { path: "/reports", label: "Caretaker reports", icon: "✎" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },

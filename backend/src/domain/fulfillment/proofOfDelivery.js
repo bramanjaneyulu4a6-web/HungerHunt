@@ -1,8 +1,8 @@
 /* What HungerHunt keeps as proof that a package left the warehouse and reached
  * the hostel — that is, who the storeroom handed it to at the door.
  *
- * The policy is deliberately the smallest thing that answers "who took it?":
- * a short receiver note, plus the staff account that recorded it and when.
+ * The policy records the receiver's name and callback number, plus the staff
+ * account that recorded the handoff and when.
  * The authenticated actor and the timestamp are the parts that carry weight —
  * they come from the session and the clock, not from whoever is typing — and
  * the note is only there to say which caretaker at the hostel it was.
@@ -14,14 +14,13 @@
  * package over names who they handed it to, and the person receiving it does
  * not get to name themselves.
  *
- * Explicitly not collected: photographs, signatures, identity-document images
- * or numbers, phone numbers, addresses, or anything else about the receiver.
- * A delivery is an operational fact, and none of that is needed to record it.
- * The validations below are what keeps the free-text box from quietly becoming
- * the place such data is stored anyway. */
+ * Photographs, signatures, identity-document images or numbers, addresses and
+ * free-form contact details are not collected. The phone number has its own
+ * validated field so it cannot be hidden inside the receiver name. */
 
 export const RECEIVER_MIN_LENGTH = 2;
 export const RECEIVER_MAX_LENGTH = 60;
+export const RECEIVER_PHONE_LENGTH = 10;
 
 /* Six or more digits in a row is how an admission number, an ID card, an Aadhaar
    fragment or a phone number arrives in a box meant for a name. Room and floor
@@ -43,7 +42,7 @@ export const proofOfDeliveryProblem = (receivedBy) => {
   }
 
   if (IDENTIFIER_RUN.test(value)) {
-    return 'Record a name only. Do not enter ID, admission, or phone numbers.';
+    return 'Enter the receiver name only here. Use the separate phone number field for contact details.';
   }
 
   if (CONTACT_MARKER.test(value)) {
@@ -53,8 +52,26 @@ export const proofOfDeliveryProblem = (receivedBy) => {
   return null;
 };
 
-export const buildProofOfDelivery = ({ receivedBy, recordedBy, recordedAt }) => ({
+export const normalizeReceiverPhone = (value) => {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+};
+
+export const receiverPhoneProblem = (value) => {
+  const input = String(value ?? '').trim();
+  const phone = normalizeReceiverPhone(input);
+
+  if (!input) return 'Enter the receiver phone number.';
+  if (/[^\d+\s()-]/.test(input) || phone.length !== RECEIVER_PHONE_LENGTH) {
+    return `Enter a valid ${RECEIVER_PHONE_LENGTH}-digit phone number.`;
+  }
+
+  return null;
+};
+
+export const buildProofOfDelivery = ({ receivedBy, receiverPhone, recordedBy, recordedAt }) => ({
   receivedBy: String(receivedBy).trim(),
+  receiverPhone: normalizeReceiverPhone(receiverPhone),
   recordedBy,
   recordedAt,
 });

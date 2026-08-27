@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 import RefreshButton from '../components/RefreshButton';
 import ReportForm from '../components/ReportForm';
@@ -9,7 +9,6 @@ import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 
 const HISTORY_PAGE_SIZE = 25;
 const REFRESH_INTERVAL_MS = 15_000;
-const CODE_LENGTH = 4;
 const STATUS_STEPS = ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 const STATUS_DETAILS = {
   PENDING: {
@@ -29,29 +28,26 @@ const STATUS_DETAILS = {
   },
   DELIVERED: {
     label: 'With you',
-    detail: 'You have this package. The student takes it by typing their code below.',
+    detail:
+      'You have this package. Tap Order Complete and hand the screen to the student — their code finishes it.',
     badge: 'partial',
   },
 };
 
-/* The handover, and the only thing on this screen that changes a package.
+/* The handover starts here but no longer happens here. Order Complete opens a
+ * full screen the caretaker turns toward the student — their receipt, their
+ * code field, their Help button. The code is still the student's own four
+ * digits and still the only thing that changes the package: this button just
+ * gives that act a screen of its own instead of a box squeezed into a card.
  *
- * The student types their own purchase code — the same four digits they use
- * at the till — and that is what records the package as theirs. It is not the
- * caretaker's tap: a caretaker confirming on a student's behalf is exactly
- * what this screen stopped being able to do, because the button that used to
- * close a hundred packages at once could not tell the difference between a
- * package handed over and a package still on the shelf. */
-const CollectionCode = ({ order, busy, onConfirm }) => {
-  const [code, setCode] = useState('');
+ * The report link stays on the card because it is the caretaker's channel, not
+ * the student's — for the package that is not theirs, the code that will not
+ * come, the things a caretaker notices before a student is even standing
+ * there. Reporting changes nothing about the package either way. */
+const DeliveredActions = ({ order }) => {
+  const navigate = useNavigate();
   const [reporting, setReporting] = useState(false);
-  const ready = code.length === CODE_LENGTH && !busy;
 
-  /* The way out of this screen when the handover cannot happen as it should —
-     the food is wrong, the box is damaged, the student says the package is not
-     theirs, or they simply cannot produce their code. Reporting changes nothing
-     about the package: it stays here, still collectable, because a student who
-     is owed food should not lose it while an office reads a message. */
   if (reporting) {
     return (
       <section className="wh-collect wh-collect--reporting" aria-label={`Report an issue with ${order.student.name}'s package`}>
@@ -69,42 +65,18 @@ const CollectionCode = ({ order, busy, onConfirm }) => {
   }
 
   return (
-    <form
-      className="wh-collect"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (ready) onConfirm(order, code, () => setCode(''));
-      }}
-    >
-      <label className="wh-collect-label" htmlFor={`code-${order.id}`}>
-        {order.student.name.split(' ')[0]} types their purchase code
-      </label>
-      <div className="wh-collect-row">
-        <input
-          id={`code-${order.id}`}
-          className="wh-input wh-collect-input"
-          value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-          inputMode="numeric"
-          autoComplete="off"
-          type="password"
-          placeholder="••••"
-          aria-label={`Purchase code for ${order.student.name}`}
-          disabled={busy}
-        />
-        <button type="submit" className="wh-cta wh-collect-cta" disabled={!ready}>
-          {busy ? 'Checking…' : 'Hand over'}
-        </button>
-      </div>
+    <div className="wh-collect">
       <button
         type="button"
-        className="wh-report-link"
-        disabled={busy}
-        onClick={() => setReporting(true)}
+        className="wh-cta wh-collect-open"
+        onClick={() => navigate(`/collect/${order.id}`, { state: { order } })}
       >
+        Order Complete
+      </button>
+      <button type="button" className="wh-report-link" onClick={() => setReporting(true)}>
         Issue with this package
       </button>
-    </form>
+    </div>
   );
 };
 
@@ -139,7 +111,6 @@ const CaretakerOrders = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [historyError, setHistoryError] = useState(false);
-  const [busyId, setBusyId] = useState(null);
   const [awaitingCollection, setAwaitingCollection] = useState(0);
   const loadMoreRef = useRef(null);
   const arrivalRequestRef = useRef(0);
@@ -200,33 +171,6 @@ const CaretakerOrders = () => {
     observer.observe(node);
     return () => observer.disconnect();
   }, [historyHasMore, historyLoaded, historyLoading, historyPage, loadHistory, view]);
-
-  const invalidateHistory = () => {
-    setHistory([]);
-    setHistoryPage(0);
-    setHistoryHasMore(true);
-    setHistoryLoaded(false);
-  };
-
-  const collect = async (order, code, clearCode) => {
-    setBusyId(order.id);
-    try {
-      await api.post(`/v1/caretaker/fulfillment-orders/${order.id}/collect`, { code });
-      clearCode();
-      toast.success(`${order.student.name} has their package`);
-      invalidateHistory();
-      await loadArrivals();
-    } catch (error) {
-      console.error(error);
-      /* The code is wrong, or locked, or the package moved under us. Every one
-         of those is the server's sentence to read out, not a generic failure:
-         a caretaker who is told "wrong code" hands the phone back to the
-         student, and one who is told the code is locked stops trying. */
-      toast.error(error.response?.data?.message || 'Could not confirm this collection');
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   const showView = async (nextView) => {
     setView(nextView);
@@ -295,9 +239,7 @@ const CaretakerOrders = () => {
 
                 <p className="wh-status-detail">{status.detail}</p>
                 <PackageLines items={order.items} />
-                {order.status === 'DELIVERED' && (
-                  <CollectionCode order={order} busy={busyId === order.id} onConfirm={collect} />
-                )}
+                {order.status === 'DELIVERED' && <DeliveredActions order={order} />}
               </article>
             );
           })}

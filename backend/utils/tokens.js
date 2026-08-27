@@ -81,50 +81,6 @@ export const signStudentToken = (id, admissionNumber) =>
 export const signParentToken = (id, phone, tokenVersion = 0) =>
   jwt.sign({ id, phone, role: 'parent', v: tokenVersion }, parentSecret(), { expiresIn: '7d' });
 
-// Tokens issued before this change carry no role and were signed with
-// JWT_SECRET. Rejecting them outright would sign out every parent and admin the
-// moment this deploys, including the till mid-sale, so they stay acceptable
-// until the date below, by which point every one of them has expired on its own.
-//
-// The date has to be one parent-token lifetime past the *deploy*, not past the
-// change: until this reaches production, production is still handing out
-// roleless tokens, and the clock has not started. It was originally 2026-08-14,
-// seven days after the change was written. That assumed a same-day deploy, which
-// did not happen — so it is the 20th, and it should move again if the deploy
-// does. LEGACY_TOKEN_GRACE_UNTIL is how, without a release.
-//
-// This is a scheduled cutover, not a flag: it ends by itself, and nothing has
-// to be remembered. Once the date has passed, this whole branch and
-// legacyAccepted can be deleted.
-const DEFAULT_GRACE_UNTIL = '2026-08-20T00:00:00Z';
-
-export const legacyGraceUntil = () =>
-  new Date(process.env.LEGACY_TOKEN_GRACE_UNTIL || DEFAULT_GRACE_UNTIL);
-
-export const legacyTokensAccepted = () => Date.now() < legacyGraceUntil().getTime();
-
-const legacyAccepted = legacyTokensAccepted;
-
-// The second key and the legacy window are ordered, and the order is easy to
-// get wrong because neither setting mentions the other.
-//
-// Setting PARENT_JWT_SECRET invalidates every parent token signed with
-// JWT_SECRET — which, while it is unset, is all of them. The legacy window is
-// the only thing that carries those across: inside it verifyToken also tries
-// the admin key for parent tokens, so the changeover costs nobody their
-// session. Outside it, the same change signs out every parent at once.
-//
-// That makes the grace date a deadline for setting the key, not only a date for
-// deleting dead code. So "PARENT_JWT_SECRET is not set" means two different
-// things either side of it, and the startup warning has to say which — a note
-// in a document is read when somebody goes looking, which is not the moment
-// this matters.
-export const parentSecretChangeover = () => ({
-  pending: parentSecretIsShared(),
-  free: legacyTokensAccepted(),
-  deadline: legacyGraceUntil(),
-});
-
 // Returns the payload when the token is a valid token *for this role*, and null
 // otherwise. Callers treat null as "not authorized" and never see why.
 //
@@ -133,51 +89,19 @@ export const parentSecretChangeover = () => ({
 // the token is not a parent's.
 export const verifyToken = (token, role) => {
   const wantsStaff = role === 'staff' || isStaffRole(role);
-  const secrets = [
-    wantsStaff
-      ? adminSecret()
-      : role === 'student'
-        ? studentSecret()
-        : parentSecret(),
-  ];
-
-  // A legacy parent token was signed with JWT_SECRET, which is a different key
-  // from the parent one once PARENT_JWT_SECRET is set. Nothing equivalent is
-  // needed for staff: their secret has not changed.
-  if (role === 'parent' && legacyAccepted() && parentSecret() !== adminSecret()) {
-    secrets.push(adminSecret());
-  }
+  const secret = wantsStaff
+    ? adminSecret()
+    : role === 'student'
+      ? studentSecret()
+      : parentSecret();
 
   const accepts = (claimed) =>
     role === 'staff' ? isStaffRole(claimed) : claimed === role;
 
-  for (const secret of secrets) {
-    let payload;
-
-    try {
-      payload = jwt.verify(token, secret);
-    } catch {
-      continue;
-    }
-
-    if (accepts(payload.role)) return payload;
-
-    // Signed correctly but claiming to be something else, or issued before the
-    // claim existed. Either way the answer is settled — do not try the next key.
-    //
-    // A roleless staff token is a full admin's: cashiers did not exist when any
-    // of them was issued, so there is no reading of one that grants less.
-    //
-    // The student role is excluded outright rather than left to the date. No
-    // student token predates the claim, so a roleless one is never a student's
-    // — and while STUDENT_JWT_SECRET is unset the student key *is* the admin
-    // key, which is what those legacy tokens were signed with. Without this,
-    // every legacy admin token would open a kiosk session as whatever student
-    // its id happened to name.
-    return payload.role === undefined && role !== 'student' && legacyAccepted()
-      ? payload
-      : null;
+  try {
+    const payload = jwt.verify(token, secret);
+    return accepts(payload.role) ? payload : null;
+  } catch {
+    return null;
   }
-
-  return null;
 };

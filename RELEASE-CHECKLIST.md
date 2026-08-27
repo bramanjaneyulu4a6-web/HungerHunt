@@ -60,15 +60,14 @@ These are open items, not formalities. Each one is a real gap today.
       terminals away — which is exactly why it is easy to forget. While it is
       unset, a kiosk session is signed with the same key as a staff token.
 
-- [ ] **Know what the open kiosk route exposes, and decide it is still what you
-      want.** `POST /students/kiosk-session` takes an admission number and no
-      secret, by decision. Anyone who can reach the API can walk the number
-      space and read back names and wallet balances, and open a session as any
-      student. They cannot spend: the four-digit code still gates checkout, and
-      five wrong ones lock it for fifteen minutes. The rate limiter is the only
-      other thing in front of it. The upgrade path, if the logs ever show
-      enumeration, is one-time device enrollment — written up in
-      `docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md`.
+- [x] **The kiosk is intentionally public, with no device credential or
+      enrollment.** This product decision was confirmed on 2026-08-27.
+      `POST /students/kiosk-session` takes an admission number and no secret.
+      Anyone who can reach the API can try admission numbers and open a student
+      session, but cannot spend: the four-digit purchase code still gates
+      checkout, five wrong attempts lock it for fifteen minutes, and the open
+      route is tightly rate-limited. Keep enumeration visible in operational
+      logs; device enrollment is not part of the intended product.
 
 - [ ] **Create warehouse account(s) in the admin console (Account type →
       Warehouse).** A warehouse account can see and raise purchase orders,
@@ -349,12 +348,7 @@ On a real device, against production, signed in as a real parent:
 
 Worth knowing when deciding how much the green checkmarks are worth.
 
-- **`frontend-admin` is not linted by CI.** `eslint .` reports 10 errors there
-  today, mostly react-hooks rules. It is left out of the lint matrix rather
-  than parked on red, and belongs back in the moment those are fixed — the
-  change is one word in [ci.yml](.github/workflows/ci.yml).
-- **The backend has no eslint config**, so nothing lints it.
-- **The parent app has no frontend tests.** The 601 backend tests cover its API
+- **The parent app has no frontend tests.** The backend tests cover its API
   surface and auth, and the other three apps each have a small suite CI runs,
   but nothing exercises a parent-app screen; every one of them is verified by
   hand, which is what section 5 is for.

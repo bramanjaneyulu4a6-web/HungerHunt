@@ -276,7 +276,7 @@ paths:
       description: >-
         Parent session only, and only for a student linked to that account. Privacy-minimized: it
         carries package states, times, the stored delivery deadline, the items paid for, and the
-        short receiver note — never staff accounts, the transition trail, internal delivery notes,
+        short receiver name — never the receiver phone, staff accounts, the transition trail, internal delivery notes,
         or the wallet transaction reference.
       operationId: listChildFulfillmentPackages
       parameters:
@@ -394,13 +394,15 @@ paths:
                   description: >-
                     Required for DELIVERED: who at the hostel took the package from the
                     warehouse, named by the staff member handing it over. The whole of the
-                    delivery proof alongside the authenticated staff account and server
-                    timestamp, which are taken from the session and the clock rather than
-                    this body. A name or dorm role only: values containing six or more
-                    consecutive digits, an "@", or a URL are rejected so identity numbers
-                    and contact details cannot be stored here.
+                    delivery proof alongside the receiverPhone, authenticated staff account
+                    and server timestamp. A name or dorm role only: phone digits belong in
+                    receiverPhone, while an "@" or URL is rejected.
                     COLLECTED is not a value this route accepts — see
                     /caretaker/fulfillment-orders/{id}/collect.
+                receiverPhone:
+                  type: string
+                  pattern: '^\d{10}$'
+                  description: Required for DELIVERED. The receiver's 10-digit callback number.
       responses:
         '200':
           description: Transition recorded
@@ -931,9 +933,10 @@ components:
         deliveryNote: { type: string }
         proofOfDelivery:
           type: [object, 'null']
-          required: [receivedBy, recordedBy, recordedAt]
+          required: [receivedBy, receiverPhone, recordedBy, recordedAt]
           properties:
             receivedBy: { type: string, maxLength: 60 }
+            receiverPhone: { type: string, pattern: '^\d{10}$' }
             recordedBy: { type: string, description: The staff account that recorded the handover. }
             recordedAt: { type: string, format: date-time }
     ParentPackage:

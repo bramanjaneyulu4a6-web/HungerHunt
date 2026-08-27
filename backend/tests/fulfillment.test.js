@@ -20,6 +20,7 @@ const {
 } = await import('../src/domain/fulfillment/overdue.js');
 const {
   proofOfDeliveryProblem,
+  receiverPhoneProblem,
 } = await import('../src/domain/fulfillment/proofOfDelivery.js');
 const {
   buildDeliveryReport,
@@ -187,11 +188,16 @@ describe('dorm fulfilment policy', () => {
     const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Asha, dorm warden' }),
+      body: JSON.stringify({
+        status: 'DELIVERED',
+        receivedBy: 'Asha, dorm warden',
+        receiverPhone: '98765 43210',
+      }),
     });
 
     assert.equal(response.status, 200);
     assert.equal(update.$set.proofOfDelivery.receivedBy, 'Asha, dorm warden');
+    assert.equal(update.$set.proofOfDelivery.receiverPhone, '9876543210');
     assert.equal(String(update.$set.proofOfDelivery.recordedBy), STAFF_ID);
     assert.equal(String(update.$set.deliveredBy), STAFF_ID);
   });
@@ -214,11 +220,13 @@ describe('dorm fulfilment policy', () => {
     assert.equal(response.status, 400);
     assert.deepEqual(
       (await response.json()).error.details.map((detail) => detail.field),
-      ['receivedBy']
+      ['receivedBy', 'receiverPhone']
     );
     assert.equal(update.mock.callCount(), 0);
-    assert.match(proofOfDeliveryProblem('Call 9876543210'), /Do not enter/);
+    assert.match(proofOfDeliveryProblem('Call 9876543210'), /separate phone number field/);
     assert.equal(proofOfDeliveryProblem('Asha, dorm warden'), null);
+    assert.equal(receiverPhoneProblem('+91 98765 43210'), null);
+    assert.match(receiverPhoneProblem('1234'), /10-digit/);
   });
 
   test('no member of staff can collect a package on a student\'s behalf', async () => {

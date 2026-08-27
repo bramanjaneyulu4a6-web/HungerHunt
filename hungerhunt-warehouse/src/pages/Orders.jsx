@@ -48,6 +48,11 @@ const deadlineText = (deliverBy, asOf) => {
   return `${overdue ? "Overdue since" : "Deliver by"} ${date.toLocaleString()}`;
 };
 
+const formatPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 10 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : value;
+};
+
 const Orders = () => {
   const range = initialRange();
   const [view, setView] = useState("active");
@@ -61,6 +66,7 @@ const Orders = () => {
   const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [asOf, setAsOf] = useState(0);
+  const [handoff, setHandoff] = useState(null);
 
   /* A package line stores the name and price it was sold at, never a picture —
      that would freeze a photo into a financial record. The catalogue is asked
@@ -116,36 +122,62 @@ const Orders = () => {
     const action = ACTIONS[order.status];
     if (!action) return;
 
-    /* A name, typed by the person who just handed the package over. The prompt
-       stays a prompt on purpose: package barcodes are coming, and the scan
-       will fill this in without anyone typing. */
-    let receivedBy;
-
     if (action.status === "DELIVERED") {
-      receivedBy = window.prompt(
-        `Who at hostel ${order.student.hostelNumber} took this package? Enter their name — no ID or phone numbers.`,
-        ""
-      )?.trim();
-      if (!receivedBy) return;
+      setHandoff({ order, receivedBy: "", receiverPhone: "", error: "" });
+      return;
     }
 
     setBusyId(order.id);
     try {
       await api.post(`/v1/fulfillment-orders/${order.id}/transition`, {
         status: action.status,
-        ...(receivedBy ? { receivedBy } : {}),
       });
       toast.success(
-        action.status === "DELIVERED"
-          ? `Handed to ${receivedBy} · the student collects it with their code`
-          : action.status === "OUT_FOR_DELIVERY"
-            ? "Package sent to caretaker"
-            : "Package updated"
+        action.status === "OUT_FOR_DELIVERY"
+          ? "Package sent to caretaker"
+          : "Package updated"
       );
       await load();
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Could not update this package");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const submitHandoff = async (event) => {
+    event.preventDefault();
+    if (!handoff) return;
+
+    const receivedBy = handoff.receivedBy.trim();
+    const receiverPhone = handoff.receiverPhone.replace(/\D/g, "");
+    if (receivedBy.length < 2) {
+      setHandoff((current) => ({ ...current, error: "Enter the receiver's name." }));
+      return;
+    }
+    if (receiverPhone.length !== 10) {
+      setHandoff((current) => ({ ...current, error: "Enter a valid 10-digit phone number." }));
+      return;
+    }
+
+    setBusyId(handoff.order.id);
+    setHandoff((current) => ({ ...current, error: "" }));
+    try {
+      await api.post(`/v1/fulfillment-orders/${handoff.order.id}/transition`, {
+        status: "DELIVERED",
+        receivedBy,
+        receiverPhone,
+      });
+      toast.success(`Handed to ${receivedBy} · the student collects it with their code`);
+      setHandoff(null);
+      await load();
+    } catch (error) {
+      console.error(error);
+      setHandoff((current) => current ? {
+        ...current,
+        error: error.response?.data?.message || "Could not record this handoff.",
+      } : current);
     } finally {
       setBusyId(null);
     }
@@ -241,7 +273,12 @@ const Orders = () => {
               : deadlineText(order.deliverBy, asOf)}
         </p>
         {order.proofOfDelivery?.receivedBy && (
-          <p className="wh-remaining">Handed to {order.proofOfDelivery.receivedBy}</p>
+          <p className="wh-remaining">
+            Handed to {order.proofOfDelivery.receivedBy}
+            {order.proofOfDelivery.receiverPhone
+              ? ` · ${formatPhone(order.proofOfDelivery.receiverPhone)}`
+              : ""}
+          </p>
         )}
         {showAcknowledge && (
           <button type="button" className="wh-cta" disabled={busyId === order.id} onClick={() => acknowledge(order)}>
@@ -348,6 +385,101 @@ const Orders = () => {
           showActions: view === "active",
           showAcknowledge: view === "alerts",
         }))
+      )}
+
+      {handoff && (
+        <div className="wh-handoff-backdrop" role="presentation">
+          <form
+            className="wh-handoff-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="handoff-title"
+            onSubmit={submitHandoff}
+          >
+            <div className="wh-handoff-heading">
+              <span className="wh-handoff-mark" aria-hidden="true">✓</span>
+              <div>
+                <p className="wh-handoff-kicker">Final delivery step</p>
+                <h2 id="handoff-title">Who received the package?</h2>
+              </div>
+            </div>
+
+            <div className="wh-handoff-package">
+              <div>
+                <span>Student</span>
+                <strong>{handoff.order.student.name}</strong>
+              </div>
+              <div>
+                <span>Hostel</span>
+                <strong>{handoff.order.student.hostelNumber}</strong>
+              </div>
+            </div>
+
+            <p className="wh-handoff-copy">
+              Record the caretaker who accepted this package so the handoff can be traced later.
+            </p>
+
+            {handoff.error && <div className="wh-handoff-error" role="alert">{handoff.error}</div>}
+
+            <label className="wh-handoff-field" htmlFor="receiver-name">
+              <span>Receiver name</span>
+              <input
+                id="receiver-name"
+                className="wh-input"
+                type="text"
+                value={handoff.receivedBy}
+                maxLength={60}
+                autoComplete="name"
+                autoFocus
+                placeholder="e.g. Meena, hostel caretaker"
+                onChange={(event) => setHandoff((current) => ({
+                  ...current,
+                  receivedBy: event.target.value,
+                  error: "",
+                }))}
+              />
+            </label>
+
+            <label className="wh-handoff-field" htmlFor="receiver-phone">
+              <span>Phone number</span>
+              <div className="wh-handoff-phone">
+                <span aria-hidden="true">+91</span>
+                <input
+                  id="receiver-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  value={handoff.receiverPhone}
+                  maxLength={10}
+                  placeholder="98765 43210"
+                  onChange={(event) => setHandoff((current) => ({
+                    ...current,
+                    receiverPhone: event.target.value.replace(/\D/g, "").slice(0, 10),
+                    error: "",
+                  }))}
+                />
+              </div>
+            </label>
+
+            <div className="wh-handoff-actions">
+              <button
+                type="button"
+                className="wh-handoff-cancel"
+                disabled={busyId === handoff.order.id}
+                onClick={() => setHandoff(null)}
+              >
+                Go back
+              </button>
+              <button
+                type="submit"
+                className="wh-handoff-submit"
+                disabled={busyId === handoff.order.id}
+              >
+                {busyId === handoff.order.id ? "Recording…" : "Confirm handoff"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

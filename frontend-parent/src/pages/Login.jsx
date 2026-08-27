@@ -52,7 +52,7 @@ export default function Login() {
       subtitle="Enter your phone number and password to access your account"
       footer={
         <>
-          New here? <Link to="/register">Register account</Link>
+          Have a school-issued code? <Link to="/activate">Activate account</Link>
         </>
       }
     >

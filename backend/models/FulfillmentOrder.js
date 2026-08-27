@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 
 import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
-import { RECEIVER_MAX_LENGTH } from '../src/domain/fulfillment/proofOfDelivery.js';
+import {
+  RECEIVER_MAX_LENGTH,
+  RECEIVER_PHONE_LENGTH,
+} from '../src/domain/fulfillment/proofOfDelivery.js';
 
 export const WEEKLY_ORDER_INDEX = 'one_fulfillment_order_per_student_business_week';
 
@@ -35,13 +38,14 @@ const transitionSchema = new mongoose.Schema(
   { _id: false }
 );
 
-/* The whole of what a delivery is proved by: a short receiver note, the staff
-   account that recorded it, and when. The note is capped and validated in
-   src/domain/fulfillment/proofOfDelivery.js — no images, signatures, identity
-   numbers, or contact details are stored, here or anywhere else. */
+/* Delivery proof keeps the receiver name and callback number beside the staff
+   account and server time. Existing records predate receiverPhone, so the
+   schema permits an empty legacy value while every new DELIVERED transition
+   requires and validates it in the domain policy. */
 const proofOfDeliverySchema = new mongoose.Schema(
   {
     receivedBy: { type: String, required: true, maxlength: RECEIVER_MAX_LENGTH },
+    receiverPhone: { type: String, maxlength: RECEIVER_PHONE_LENGTH, default: '' },
     recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
     recordedAt: { type: Date, required: true },
   },

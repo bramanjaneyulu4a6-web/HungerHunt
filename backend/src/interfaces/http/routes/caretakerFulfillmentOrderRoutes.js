@@ -3,6 +3,7 @@ import express from 'express';
 import { protectCaretaker } from '../../../../middleware/authMiddleware.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import * as controller from '../controllers/fulfillmentOrderController.js';
+import * as reportController from '../controllers/staffReportController.js';
 
 const router = express.Router();
 
@@ -17,5 +18,19 @@ const router = express.Router();
 router.get('/', protectCaretaker, asyncHandler(controller.list));
 router.get('/history', protectCaretaker, asyncHandler(controller.caretakerHistory));
 router.post('/:id/collect', protectCaretaker, asyncHandler(controller.confirmCollection));
+
+/* The student's own report, from the handover screen. It rides the caretaker's
+   session because that is whose device the screen is on, but the raiser
+   recorded is the student, and filing one never touches the package. */
+router.post(
+  '/:id/student-report',
+  protectCaretaker,
+  asyncHandler(reportController.createStudentOrderIssue)
+);
+router.get(
+  '/:id/student-reports',
+  protectCaretaker,
+  asyncHandler(reportController.listStudentOrderReports)
+);
 
 export default router;

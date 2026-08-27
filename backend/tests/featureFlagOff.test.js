@@ -19,7 +19,7 @@ before(async () => {
 });
 
 describe('FEATURE_V1_PROCUREMENT off', () => {
-  test('the versioned routes are not mounted at all', async () => {
+  test('procurement routes are not mounted', async () => {
     const response = await fetch(`${base}/api/v1/purchase-orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -30,6 +30,15 @@ describe('FEATURE_V1_PROCUREMENT off', () => {
     // 404 from the catch-all, not 401/403 from a mounted route's guard.
     assert.equal(response.status, 404);
     assert.match(body.message, /^Route not found: POST \/api\/v1\/purchase-orders/);
+  });
+
+  test('unrelated v1 operations remain mounted with their normal contract', async () => {
+    const response = await fetch(`${base}/api/v1/fulfillment-orders`);
+    const body = await response.json();
+
+    assert.equal(response.status, 401);
+    assert.match(body.message, /not authorized/i);
+    assert.ok(response.headers.get('x-request-id'));
   });
 
   test('legacy routes keep the pre-slice error shape and no request id', async () => {

@@ -21,7 +21,8 @@ import {
 // purchasePassword and walletControl to the parent. Handing a request body
 // straight to the driver let these routes quietly set any of them.
 const WRITABLE_FIELDS = ['name', 'fatherName', 'grade', 'parentPhoneNumber', 'admissionNumber'];
-const IMPORT_FIELDS = [...WRITABLE_FIELDS, 'hostelNumber'];
+const STUDENT_SORT_FIELDS = new Set(['admissionNumber', 'name', 'grade', 'hostelNumber', 'pocketMoney', 'createdAt']);
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const pickWritable = (body) => {
   const source = body ?? {};
@@ -70,14 +71,35 @@ export const addStudent = async (req, res) => {
 
 export const getStudents = async (req, res) => {
   try {
-    const filter = req.query.all === '1' ? {} : { active: { $ne: false } };
+    const status = String(req.query.status || '').trim().toLowerCase();
+    const filter = req.query.all === '1' || status === 'all'
+      ? {}
+      : status === 'archived'
+        ? { active: false }
+        : { active: { $ne: false } };
+    const search = String(req.query.q || '').trim();
+    if (search) {
+      const pattern = new RegExp(escapeRegex(search), 'i');
+      filter.$or = [
+        { name: pattern },
+        { admissionNumber: pattern },
+        { fatherName: pattern },
+        { hostelNumber: pattern },
+        { parentPhoneNumber: pattern },
+      ];
+    }
+    if (req.query.hostelId) filter.hostelId = req.query.hostelId;
+
     const page = Math.max(parseInt(req.query.page) || 0, 0);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
+    const sortField = STUDENT_SORT_FIELDS.has(req.query.sort) ? req.query.sort : 'name';
+    const sortDirection = req.query.direction === 'desc' ? -1 : 1;
+    const sort = { [sortField]: sortDirection, _id: 1 };
 
     // Paginated only when asked for, so existing callers keep the full list.
     if (page > 0 && limit > 0) {
       const [students, total] = await Promise.all([
-        Student.find(filter).sort({ name: 1 }).skip((page - 1) * limit).limit(limit),
+        Student.find(filter).sort(sort).skip((page - 1) * limit).limit(limit),
         Student.countDocuments(filter),
       ]);
 
@@ -85,7 +107,8 @@ export const getStudents = async (req, res) => {
     }
 
     const query = Student.find(filter);
-    res.json(await (typeof query.limit === 'function' ? query.limit(500) : query));
+    if (typeof query.sort !== 'function' || typeof query.limit !== 'function') return res.json(await query);
+    res.json(await query.sort(sort).limit(500));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -199,27 +222,101 @@ export const restoreStudent = async (req, res) => {
 // Bulk Import using JSON data from Frontend (Parsed from XLSX on client-side)
 export const bulkImportStudents = async (req, res) => {
   try {
-    const { students } = req.body; // Array of student objects
+    const { students } = req.body;
     if (!Array.isArray(students) || students.length === 0) {
-      return res.status(400).json({ message: 'Invalid or empty dataset received.' });
+      return res.status(400).json({ message: 'Invalid student sheet.', invalidCells: [] });
     }
 
-    // Sheet column headings arrive as keys verbatim, so a column called
-    // pocketMoney or purchasePassword would land on the new record as-is.
+    const cell = (row, index, field) =>
+      row?.__importCells?.[field] || `${field} (row ${Number(row?.__importRow) || index + 2})`;
+    const invalidCells = [];
+    const addInvalid = (row, index, field, message) => invalidCells.push({
+      row: Number(row?.__importRow) || index + 2,
+      column: field,
+      cell: cell(row, index, field),
+      message,
+    });
+
+    const normalized = students.map((row) => ({
+      ...row,
+      name: String(row?.name ?? '').trim(),
+      admissionNumber: String(row?.admissionNumber ?? '').trim(),
+      fatherName: String(row?.fatherName ?? '').trim(),
+      hostelNumber: normalizeHostelCode(row?.hostelNumber),
+      grade: String(row?.grade ?? '').trim(),
+      parentPhoneNumber: String(row?.parentPhoneNumber ?? '').trim(),
+    }));
+
+    normalized.forEach((row, index) => {
+      if (!row.name) addInvalid(students[index], index, 'name', 'Student name is required.');
+      if (!/^\d{5}$/.test(row.admissionNumber)) {
+        addInvalid(students[index], index, 'admissionNumber', 'Admission number must be exactly 5 digits.');
+      }
+      if (!row.fatherName) addInvalid(students[index], index, 'fatherName', "Father's name is required.");
+      if (!row.hostelNumber) addInvalid(students[index], index, 'hostelNumber', 'Hostel code is required.');
+      if (!row.grade) addInvalid(students[index], index, 'grade', 'Grade / class is required.');
+      if (!/^\d{10}$/.test(row.parentPhoneNumber)) {
+        addInvalid(students[index], index, 'parentPhoneNumber', 'Parent phone number must be exactly 10 digits.');
+      }
+    });
+
+    const seenAdmissions = new Map();
+    const seenIdentities = new Map();
+    normalized.forEach((row, index) => {
+      if (row.admissionNumber) {
+        if (seenAdmissions.has(row.admissionNumber)) {
+          addInvalid(students[index], index, 'admissionNumber', `Duplicate of ${cell(students[seenAdmissions.get(row.admissionNumber)], seenAdmissions.get(row.admissionNumber), 'admissionNumber')}.`);
+        } else seenAdmissions.set(row.admissionNumber, index);
+      }
+      const identity = `${row.name.toLowerCase()}\0${row.fatherName.toLowerCase()}\0${row.parentPhoneNumber}`;
+      if (row.name && row.fatherName && row.parentPhoneNumber) {
+        if (seenIdentities.has(identity)) {
+          const firstIndex = seenIdentities.get(identity);
+          const firstRow = Number(students[firstIndex]?.__importRow) || firstIndex + 2;
+          addInvalid(students[index], index, 'name', `Duplicate student row; first appears on row ${firstRow}.`);
+        } else seenIdentities.set(identity, index);
+      }
+    });
+
     const requestedCodes = students.map((row) => normalizeHostelCode(row?.hostelNumber));
     const uniqueCodes = [...new Set(requestedCodes.filter(Boolean))];
     const hostels = await Hostel.find({ code: { $in: uniqueCodes }, active: true }).lean();
     const byCode = new Map(hostels.map((hostel) => [hostel.code, hostel]));
-    const unknownHostels = [...new Set(requestedCodes.filter((code) => !byCode.has(code)))];
-    if (unknownHostels.length) {
-      return res.status(400).json({
-        message: `Unknown or inactive hostels: ${unknownHostels.map((code) => code || '(blank)').join(', ')}. Add or correct them before importing.`,
-        unknownHostels,
+    normalized.forEach((row, index) => {
+      if (row.hostelNumber && !byCode.has(row.hostelNumber)) {
+        addInvalid(students[index], index, 'hostelNumber', `Hostel ${row.hostelNumber} does not exist or is inactive.`);
+      }
+    });
+
+    const duplicateFilters = normalized.flatMap((row) => [
+      ...(row.admissionNumber ? [{ admissionNumber: row.admissionNumber }] : []),
+      ...(row.name && row.fatherName && row.parentPhoneNumber ? [{
+        name: row.name,
+        fatherName: row.fatherName,
+        parentPhoneNumber: row.parentPhoneNumber,
+      }] : []),
+    ]);
+    const existing = duplicateFilters.length ? await Student.find({ $or: duplicateFilters }).lean() : [];
+    for (const found of existing) {
+      normalized.forEach((row, index) => {
+        if (found.admissionNumber && found.admissionNumber === row.admissionNumber) {
+          addInvalid(students[index], index, 'admissionNumber', 'This admission number already exists.');
+        } else if (
+          found.name === row.name &&
+          found.fatherName === row.fatherName &&
+          found.parentPhoneNumber === row.parentPhoneNumber
+        ) {
+          addInvalid(students[index], index, 'name', 'This student already exists.');
+        }
       });
     }
 
-    const rows = students.map((row, index) => {
-      const hostel = byCode.get(requestedCodes[index]);
+    if (invalidCells.length) {
+      return res.status(400).json({ message: 'Invalid student sheet.', invalidCells });
+    }
+
+    const rows = normalized.map((row) => {
+      const hostel = byCode.get(row.hostelNumber);
       return {
         ...pickWritable(row),
         hostelId: hostel._id,
@@ -227,26 +324,24 @@ export const bulkImportStudents = async (req, res) => {
       };
     });
 
-    // Dropping a column the uploader meant to import should not be silent —
-    // otherwise the sheet looks like it applied and only the balances disagree.
-    const ignoredColumns = [
-      ...new Set(students.flatMap((row) => Object.keys(row ?? {}))),
-    ].filter((column) => !IMPORT_FIELDS.includes(column));
-
-    await Student.insertMany(rows, { ordered: false });
-
-    // Looked up by identity rather than from the insert result, so rows that
-    // landed alongside a rejected duplicate are linked too.
+    // Validation and duplicate checks happen before this point. Ordered insert
+    // inside a transaction makes the final write all-or-nothing even if a
+    // concurrent import claims one of the unique values in the last instant.
+    await withMongoTransaction(async (session) => {
+      await Student.insertMany(rows, { ordered: true, ...sessionOptions(session) });
+    });
     const linked = await linkQuietly(await findStudentsByIdentity(rows));
 
     res.status(201).json({
-      message: 'Bulk entry successful!',
+      message: 'All students imported successfully.',
       imported: rows.length,
       linkedToParents: linked,
-      ...(ignoredColumns.length ? { ignoredColumns } : {}),
     });
   } catch (error) {
-    res.status(400).json({ message: 'Some records might be duplicate entries.', error: error.message });
+    res.status(400).json({
+      message: 'The sheet could not be imported. No students were added.',
+      error: error.message,
+    });
   }
 };
 
@@ -259,8 +354,6 @@ export const bulkImportStudents = async (req, res) => {
 // the order, and the screen says so rather than letting the request fail.
 const SEARCH_FIELDS =
   "_id name fatherName hostelId hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const searchStudents = async (req, res) => {
   try {

@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import Admin from '../../../../models/Admin.js';
+import Counter from '../../../../models/Counter.js';
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
 import Hostel from '../../../../models/Hostel.js';
 import StaffReport from '../../../../models/StaffReport.js';
@@ -8,6 +9,8 @@ import {
   OPEN_REPORT_STATUSES,
   ReportKind,
   ReportStatus,
+  STUDENT_ORDER_ISSUE_CATEGORIES,
+  affectedItemsProblem,
   canTransitionReport,
   categoriesFor,
   categoryProblem,
@@ -15,6 +18,7 @@ import {
   reportKinds,
   reportNoteProblem,
   reportStatuses,
+  studentCategoryNeedsItems,
 } from '../../../domain/reports/staffReport.js';
 import {
   ApplicationError,
@@ -42,6 +46,12 @@ const serialize = (report, { forRaiser = false } = {}) => ({
   categoryLabel: categoriesFor(report.kind)[report.category] || report.category,
   note: report.note,
   status: report.status,
+  reportNumber: report.reportNumber ?? null,
+  affectedItems: (report.affectedItems || []).map(({ productId, name, quantity }) => ({
+    productId: String(productId),
+    name,
+    quantity,
+  })),
   raisedAt: report.createdAt,
   order: report.order
     ? {
@@ -172,6 +182,127 @@ export const create = async (req, res) => {
   res.status(201).json({
     data: serialize(created.toObject(), { forRaiser: true }),
     meta: { requestId: req.context.requestId },
+  });
+};
+
+/* Raised by the student, at the handover screen, through the caretaker's
+ * session. The caretaker's account carries it — students have no staff
+ * accounts — but the raiser on the record is the student the package belongs
+ * to, because the words in it are theirs.
+ *
+ * Filing one changes nothing about the package. The student goes straight back
+ * to the code screen and takes their food; the report travels on its own. */
+export const createStudentOrderIssue = async (req, res) => {
+  const orderId = readObjectId(req.params.id, 'orderId');
+  const category = String(req.body.category || '').toUpperCase();
+  const note = String(req.body.note ?? '').trim();
+  const items = req.body.items;
+
+  const details = [];
+  if (!Object.hasOwn(STUDENT_ORDER_ISSUE_CATEGORIES, category)) {
+    details.push({ field: 'category', message: 'Choose one of the listed categories.' });
+  }
+  const noteProblem = reportNoteProblem(note);
+  if (noteProblem) details.push({ field: 'note', message: noteProblem });
+  if (details.length) throw new ValidationError(details);
+
+  const outstanding = await StaffReport.countDocuments({
+    raisedBy: req.staff.id,
+    status: { $in: OPEN_REPORT_STATUSES },
+  });
+
+  if (outstanding >= MAX_OPEN_PER_CARETAKER) {
+    throw new ApplicationError(
+      'This hostel has too many reports still being handled. Ask your caretaker to wait for answers before sending more.',
+      { status: 429, code: 'TOO_MANY_OPEN_REPORTS' }
+    );
+  }
+
+  // Scoped exactly as collection is: another hostel's package reads as absent.
+  const current = await FulfillmentOrder.findOne({
+    _id: orderId,
+    'studentSnapshot.hostelId': req.staff.hostelId,
+  })
+    .select('studentSnapshot status items')
+    .lean();
+  if (!current) throw new NotFoundError('Fulfilment order');
+
+  /* The handover screen is the only place this report can come from, and it
+     only exists once the package is with the caretaker. Anything earlier is
+     the warehouse's problem to hear about through the caretaker's own
+     channel. */
+  if (current.status !== 'DELIVERED') {
+    throw new ConflictError(
+      `Package is ${current.status}; a student can only report it at the handover screen.`
+    );
+  }
+
+  const itemsProblem = affectedItemsProblem(category, items, current.items);
+  if (itemsProblem) throw new ValidationError([{ field: 'items', message: itemsProblem }]);
+
+  /* Names are copied from the order, not trusted from the client: the client
+     sends ids and counts, and the record says what those ids were called at
+     the time. */
+  const orderedById = new Map(current.items.map((item) => [String(item.productId), item]));
+  const affectedItems = studentCategoryNeedsItems(category)
+    ? items.map(({ productId, quantity }) => ({
+        productId,
+        name: orderedById.get(String(productId)).name,
+        quantity,
+      }))
+    : undefined;
+
+  const reportNumber = await Counter.nextSequence('staff-report');
+
+  const created = await StaffReport.create({
+    kind: ReportKind.ORDER_ISSUE,
+    category,
+    note,
+    reportNumber,
+    raisedBy: req.staff.id,
+    raiser: {
+      name: current.studentSnapshot?.name || 'Student',
+      role: 'student',
+      hostelNumber: current.studentSnapshot?.hostelNumber || '',
+    },
+    hostelId: req.staff.hostelId,
+    order: {
+      orderId: current._id,
+      studentName: current.studentSnapshot?.name || '',
+      hostelNumber: current.studentSnapshot?.hostelNumber || '',
+      statusAtReport: current.status,
+    },
+    ...(affectedItems ? { affectedItems } : {}),
+    status: ReportStatus.OPEN,
+  });
+
+  res.status(201).json({
+    data: serialize(created.toObject(), { forRaiser: true }),
+    meta: { requestId: req.context.requestId },
+  });
+};
+
+/* What the handover screen shows back under the code field: every report a
+ * student has raised about this order, with its number and its status. Only
+ * student-raised reports — the caretaker's own channel about the same package
+ * is between the caretaker and the office, and this list is read by the
+ * student. Scoped to the caretaker's hostel through the report's own hostelId,
+ * so another hostel's order simply lists nothing. */
+export const listStudentOrderReports = async (req, res) => {
+  const orderId = readObjectId(req.params.id, 'orderId');
+
+  const reports = await StaffReport.find({
+    'order.orderId': orderId,
+    hostelId: req.staff.hostelId,
+    'raiser.role': 'student',
+  })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  res.json({
+    data: reports.map((report) => serialize(report, { forRaiser: true })),
+    meta: { requestId: req.context.requestId, count: reports.length },
   });
 };
 

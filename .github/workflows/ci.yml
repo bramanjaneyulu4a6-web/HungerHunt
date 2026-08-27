@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main, Ashok-work]
   pull_request:
 
 # A second push supersedes the first; nothing is learned from finishing a run
@@ -31,6 +30,8 @@ jobs:
         working-directory: backend
         env:
           JWT_SECRET: ci-test-secret
+      - run: npm run lint
+        working-directory: backend
 
   shared-files:
     name: Shared files in sync
@@ -69,8 +70,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The backend has no eslint config yet; every shipped frontend is held
-        # to zero warnings here.
+        # Every shipped frontend is held to zero warnings here. Backend lint is
+        # part of the backend job above.
         app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5

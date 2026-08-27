@@ -27,7 +27,11 @@ const {
   overdueByMinutes,
   partitionAlerts,
 } = await import('../src/domain/fulfillment/overdue.js');
-const { proofOfDeliveryProblem } = await import('../src/domain/fulfillment/proofOfDelivery.js');
+const {
+  normalizeReceiverPhone,
+  proofOfDeliveryProblem,
+  receiverPhoneProblem,
+} = await import('../src/domain/fulfillment/proofOfDelivery.js');
 const { buildDeliveryReport } = await import('../src/domain/fulfillment/deliveryReport.js');
 const app = (await import('../app.js')).default;
 
@@ -173,9 +177,9 @@ describe('proof-of-delivery policy', () => {
     assert.equal(proofOfDeliveryProblem('Dorm warden'), null);
   });
 
-  test('identity, admission, and phone numbers are refused', () => {
-    assert.match(proofOfDeliveryProblem('Asha 9876543210'), /ID, admission, or phone/i);
-    assert.match(proofOfDeliveryProblem('234567890123'), /ID, admission, or phone/i);
+  test('numbers stay out of the receiver-name field', () => {
+    assert.match(proofOfDeliveryProblem('Asha 9876543210'), /separate phone number field/i);
+    assert.match(proofOfDeliveryProblem('234567890123'), /separate phone number field/i);
   });
 
   test('contact details are refused', () => {
@@ -186,6 +190,15 @@ describe('proof-of-delivery policy', () => {
   test('the note stays short', () => {
     assert.match(proofOfDeliveryProblem('a'.repeat(61)), /60 characters/);
     assert.equal(proofOfDeliveryProblem('a'.repeat(60)), null);
+  });
+
+  test('the callback number is required, validated, and normalized', () => {
+    assert.match(receiverPhoneProblem(''), /phone number/i);
+    assert.match(receiverPhoneProblem('9876'), /10-digit/i);
+    assert.match(receiverPhoneProblem('not-a-phone'), /10-digit/i);
+    assert.equal(receiverPhoneProblem('98765 43210'), null);
+    assert.equal(receiverPhoneProblem('+91 98765-43210'), null);
+    assert.equal(normalizeReceiverPhone('+91 98765-43210'), '9876543210');
   });
 });
 
@@ -282,11 +295,16 @@ describe('warehouse-to-caretaker handoff', () => {
 
     const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Meena, D-4 caretaker' }),
+      body: JSON.stringify({
+        status: 'DELIVERED',
+        receivedBy: 'Meena, D-4 caretaker',
+        receiverPhone: '9876543210',
+      }),
     });
 
     assert.equal(response.status, 200);
     assert.equal(update.$set.proofOfDelivery.receivedBy, 'Meena, D-4 caretaker');
+    assert.equal(update.$set.proofOfDelivery.receiverPhone, '9876543210');
     assert.equal(update.$push.transitions.to, 'DELIVERED');
   });
 
@@ -300,7 +318,11 @@ describe('warehouse-to-caretaker handoff', () => {
 
     const response = await asStaff(`/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
       method: 'POST',
-      body: JSON.stringify({ status: 'DELIVERED', receivedBy: 'Meena 9876543210' }),
+      body: JSON.stringify({
+        status: 'DELIVERED',
+        receivedBy: 'Meena 9876543210',
+        receiverPhone: '9876543210',
+      }),
     });
 
     assert.equal(response.status, 400);

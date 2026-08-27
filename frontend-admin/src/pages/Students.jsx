@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import Icon from '../components/Icon';
@@ -6,6 +6,7 @@ import { formatINR } from '../utils/format';
 import { readStudentSheet } from '../utils/readStudentSheet';
 import { digitsOnly, numericFieldProps } from '../utils/numericInput';
 import {
+  Badge,
   Banner,
   Button,
   EmptyState,
@@ -42,6 +43,7 @@ const SORTABLE_COLUMNS = [
   { key: 'hostelNumber', label: 'Hostel' },
   { key: 'pocketMoney', label: 'Wallet', align: 'right' },
 ];
+const PAGE_SIZE = 50;
 
 const FORM_FIELDS = [
   { key: 'name', label: 'Student name', placeholder: 'e.g. Asha Rao', required: true },
@@ -90,11 +92,14 @@ const ModalHead = ({ title, subtitle, onClose }) => (
   </header>
 );
 
-const Students = () => {
+const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChanged }) => {
   const [students, setStudents] = useState([]);
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [hostelFilter, setHostelFilter] = useState('');
@@ -110,34 +115,56 @@ const Students = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [importErrors, setImportErrors] = useState([]);
 
   const [topupStudent, setTopupStudent] = useState(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupKey, setTopupKey] = useState('');
   const [topupSaving, setTopupSaving] = useState(false);
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  async function fetchStudents() {
+  const fetchStudents = useCallback(async (requestedPage = 1) => {
     setLoading(true);
     setLoadError(false);
 
     try {
-      const [studentsResponse, hostelsResponse] = await Promise.all([
-        api.get('/students'),
-        api.get('/hostels'),
-      ]);
-      setStudents(studentsResponse.data);
-      setHostels(hostelsResponse.data);
+      const { data } = await api.get('/students', { params: {
+        page: requestedPage,
+        limit: PAGE_SIZE,
+        status: 'active',
+        q: searchQuery.trim() || undefined,
+        hostelId: hostelFilter || undefined,
+        sort: sortConfig.key,
+        direction: sortConfig.direction,
+      } });
+      setStudents(data.students || []);
+      setPage(data.page || requestedPage);
+      setPages(data.pages || 1);
+      setTotal(data.total || 0);
     } catch (error) {
       console.error(error);
       setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }
+  }, [hostelFilter, searchQuery, sortConfig.direction, sortConfig.key]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => fetchStudents(1), 250);
+    return () => window.clearTimeout(timer);
+  }, [fetchStudents]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const { data } = await api.get('/hostels');
+        setHostels(data || []);
+      } catch (error) {
+        console.error(error);
+        setLoadError(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const openCreate = () => {
     setEditingId(null);
@@ -211,7 +238,8 @@ const Students = () => {
       setEditorOpen(false);
       setEditingId(null);
       setFormData(EMPTY_FORM);
-      fetchStudents();
+      fetchStudents(page);
+      onUsersChanged?.();
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Failed to save student record');
@@ -245,7 +273,8 @@ const Students = () => {
       setEditorOpen(false);
       setEditingId(null);
       setFormData(EMPTY_FORM);
-      fetchStudents();
+      fetchStudents(students.length === 1 && page > 1 ? page - 1 : page);
+      onUsersChanged?.();
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Failed to archive student profile');
@@ -264,34 +293,21 @@ const Students = () => {
     }
 
     setUploading(true);
+    setImportErrors([]);
 
     try {
       const parsed = await readStudentSheet(excelFile);
-      const knownCodes = new Set(hostels.filter((hostel) => hostel.active).map((hostel) => hostel.code));
-      const unknown = [...new Set(parsed
-        .map((student) => String(student.hostelNumber ?? '').trim().toUpperCase())
-        .filter((code) => !knownCodes.has(code)))];
-      if (unknown.length) {
-        throw new Error(`Unknown or inactive hostels: ${unknown.map((code) => code || '(blank)').join(', ')}. Add or correct them before importing.`);
-      }
-      const response = await api.post('/students/bulk', { students: parsed });
+      await api.post('/students/bulk', { students: parsed });
 
       toast.success('Bulk upload successful');
-
-      // Columns the server would not import — say so, or the sheet looks
-      // like it applied in full.
-      const ignored = response.data?.ignoredColumns;
-      if (ignored?.length) {
-        toast.error(
-          `Not imported: ${ignored.join(', ')}. Only name, admissionNumber, fatherName, hostelNumber, grade and parentPhoneNumber are read from the sheet.`
-        );
-      }
       setExcelFile(null);
       form.reset?.();
       setImportOpen(false);
-      fetchStudents();
+      fetchStudents(1);
+      onUsersChanged?.();
     } catch (error) {
       console.error(error);
+      setImportErrors(error?.response?.data?.invalidCells || error?.invalidCells || []);
       toast.error(error?.response?.data?.message || error?.message || 'Bulk import failed');
     } finally {
       setUploading(false);
@@ -339,7 +355,7 @@ const Students = () => {
       setTopupStudent(null);
       setTopupKey('');
       setTopupAmount('');
-      fetchStudents();
+      fetchStudents(page);
     } catch (error) {
       console.error(error);
       toast.error(error?.response?.data?.message || 'Top-up failed');
@@ -355,35 +371,7 @@ const Students = () => {
     }));
   };
 
-  const visible = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-
-    const filtered = students.filter((student) => {
-      if (hostelFilter && student.hostelId !== hostelFilter) return false;
-      if (!query) return true;
-      return (
-        student.name?.toLowerCase().includes(query) ||
-        student.hostelNumber?.toString().toLowerCase().includes(query) ||
-        student.admissionNumber?.toString().toLowerCase().includes(query)
-      );
-    });
-
-    return [...filtered].sort((a, b) => {
-      const first = a[sortConfig.key] ?? '';
-      const second = b[sortConfig.key] ?? '';
-
-      if (typeof first === 'number' && typeof second === 'number') {
-        return sortConfig.direction === 'asc' ? first - second : second - first;
-      }
-
-      const compared = first.toString().localeCompare(second.toString(), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      });
-      return sortConfig.direction === 'asc' ? compared : -compared;
-    });
-  }, [students, searchQuery, hostelFilter, sortConfig]);
-
+  const visible = students;
   const filtering = Boolean(searchQuery.trim() || hostelFilter);
   const editingStudent = editingId ? students.find((row) => row._id === editingId) : null;
 
@@ -400,13 +388,13 @@ const Students = () => {
   ));
 
   return (
-    <div className="page">
+    <div className={embedded ? 'users-tab-panel' : 'page'}>
       <PageHeader
-        title="Student Directory"
-        subtitle="Find a student, keep their profile current, and top up their wallet."
+        title="Students"
+        subtitle="Find a student, manage their profile, and see whether parent access is active."
         actions={
           <div className="header-actions">
-            <Button variant="ghost" className="btn--sm" onClick={() => setImportOpen(true)}>
+            <Button variant="ghost" className="btn--sm" onClick={() => { setImportErrors([]); setImportOpen(true); }}>
               <Icon name="upload" size={16} />
               Import from Excel
             </Button>
@@ -449,8 +437,8 @@ const Students = () => {
           {loading
             ? 'Loading…'
             : filtering
-              ? `${visible.length} of ${students.length} students`
-              : `${students.length} student${students.length === 1 ? '' : 's'}`}
+              ? `${total} matching student${total === 1 ? '' : 's'}`
+              : `${total} student${total === 1 ? '' : 's'}`}
         </p>
       </div>
 
@@ -464,7 +452,7 @@ const Students = () => {
       ) : loadError ? (
         <Banner variant="alert" icon="⚠️">
           Couldn't load the student directory. Check your connection and{' '}
-          <button type="button" className="link-button" onClick={fetchStudents}>
+          <button type="button" className="link-button" onClick={() => fetchStudents(page)}>
             try again
           </button>
           .
@@ -472,26 +460,27 @@ const Students = () => {
       ) : visible.length === 0 ? (
         <EmptyState
           icon="🎓"
-          title={students.length === 0 ? 'No students yet' : 'No matching students'}
+          title={filtering ? 'No matching students' : 'No students yet'}
           action={
-            students.length === 0 ? (
-              <Button onClick={openCreate}>Add the first student</Button>
-            ) : (
+            filtering ? (
               <Button
                 variant="ghost"
                 onClick={() => { setSearchQuery(''); setHostelFilter(''); }}
               >
                 Clear filters
               </Button>
+            ) : (
+              <Button onClick={openCreate}>Add the first student</Button>
             )
           }
         >
-          {students.length === 0
-            ? 'Add one at a time, or import the roll from a spreadsheet.'
-            : 'Nothing matches the current search and hostel filter.'}
+          {filtering
+            ? 'Nothing matches the current search and hostel filter.'
+            : 'Add one at a time, or import the roll from a spreadsheet.'}
         </EmptyState>
       ) : (
-        <div className="table-wrap">
+        <>
+          <div className="table-wrap">
           <table className="table table--stack table--hover">
             <thead>
               <tr>
@@ -526,6 +515,7 @@ const Students = () => {
                     </th>
                   );
                 })}
+                <th>Linked parent</th>
                 <th className="th-actions">Actions</th>
               </tr>
             </thead>
@@ -551,6 +541,13 @@ const Students = () => {
                       {formatINR(student.pocketMoney)}
                     </span>
                   </td>
+                  <td data-label="Linked parent">{(() => {
+                    const parent = parentByStudent.get(String(student._id));
+                    if (!parent) return <span className="cell-unset">Not linked</span>;
+                    if (!parent.active) return <Badge variant="neutral">Inactive · {parent.fatherName}</Badge>;
+                    if (parent.activationRequired) return <Badge variant="warn">Awaiting activation · {parent.fatherName}</Badge>;
+                    return <Badge variant="success">Active · {parent.fatherName}</Badge>;
+                  })()}</td>
                   <td data-label="Actions">
                     <div className="cell-actions">
                       <Button
@@ -573,7 +570,15 @@ const Students = () => {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+          {pages > 1 && (
+            <nav className="table-pagination" aria-label="Student directory pages">
+              <Button variant="ghost" className="btn--sm" disabled={page <= 1 || loading} onClick={() => fetchStudents(page - 1)}>Previous</Button>
+              <span>Page {page} of {pages}</span>
+              <Button variant="ghost" className="btn--sm" disabled={page >= pages || loading} onClick={() => fetchStudents(page + 1)}>Next</Button>
+            </nav>
+          )}
+        </>
       )}
 
       {editorOpen && (
@@ -696,6 +701,15 @@ const Students = () => {
               <strong>parentPhoneNumber</strong>. Every hostel in the sheet must already exist and be
               active, or the import is refused before anything is written.
             </p>
+
+            {importErrors.length > 0 && (
+              <Banner variant="alert" icon="⚠️" className="import-errors">
+                <strong>Correct these cells:</strong>
+                <ul>{importErrors.map((item, index) => (
+                  <li key={`${item.cell}-${index}`}><strong>{item.cell}</strong> — {item.message}</li>
+                ))}</ul>
+              </Banner>
+            )}
 
             <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
               <Button variant="ghost" disabled={uploading} onClick={() => setImportOpen(false)}>

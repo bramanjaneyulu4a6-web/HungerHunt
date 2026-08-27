@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-  registerParent,
+  activateParent,
   loginParent,
   getParentDashboardDetails,
   getChildDetails,
@@ -24,7 +24,7 @@ import { authLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
-router.post('/register', authLimiter, registerParent);
+router.post('/activate', authLimiter, activateParent);
 router.post('/login', authLimiter, loginParent);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPassword);

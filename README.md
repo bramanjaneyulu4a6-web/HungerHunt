@@ -2,7 +2,7 @@
 
 Enterprise implementation and deployment status: [docs/architecture/implementation-status.md](docs/architecture/implementation-status.md)
 
-A school meal and pocket-money system. Students carry a wallet balance; staff bill purchases at a kiosk; parents watch spending and set limits from their phone.
+A school meal and pocket-money system. Students order at a self-service kiosk; parents watch spending and set limits from their phone.
 
 The whole stack is JavaScript — Node/Express on the server, React + Vite in the four clients.
 
@@ -13,7 +13,7 @@ The whole stack is JavaScript — Node/Express on the server, React + Vite in th
 | `backend/` | Express + MongoDB API, Cloudinary uploads, Firebase push, Gmail SMTP | 5000 |
 | `frontend-admin/` | School office dashboard: students, products, inventory, purchases, billing, recharges | 5174 |
 | `frontend-parent/` | Parent app (also packaged as iOS/Android via Capacitor): balances, history, wallet limits, purchase password | 5173 |
-| `hungerhunt-kiosk/` | Counter terminal for staff to ring up purchases (also packaged as an Android APK) | 5175 |
+| `hungerhunt-kiosk/` | Student self-service ordering terminal (also packaged as an Android APK) | 5175 |
 | `hungerhunt-warehouse/` | Storeroom app: suppliers, purchase orders, receiving deliveries, stock (also packaged as an Android APK) | 5176 |
 
 Three of the apps are web apps wrapped in Capacitor, so `frontend-parent/ios/`, `frontend-parent/android/`, `hungerhunt-kiosk/android/` and `hungerhunt-warehouse/android/` are native shells around the same React code — there is no separate mobile codebase.
@@ -68,12 +68,13 @@ Set `TRUST_PROXY` when deploying behind a proxy or managed host (usually `1`, th
 
 ## Authentication
 
-Two separate identities share one JWT secret:
+The API has three explicit token boundaries:
 
-- **Admin** (`protectAdmin`) — the office dashboard *and* the kiosk. The kiosk signs in with staff admin credentials; everything it calls (student search, payment verification, billing) requires that token.
-- **Parent** (`protectParent`) — the parent app. Parents may only act on students linked to their own account; the server enforces this on every child-scoped endpoint rather than trusting the ID in the request.
+- **Staff** (`protectAdmin` and role-specific staff guards) use `JWT_SECRET` for the office, warehouse and caretaker experiences.
+- **Parents** (`protectParent`) use `PARENT_JWT_SECRET`. Parents may only act on linked students; the server enforces ownership on every child-scoped endpoint.
+- **Students** (`protectStudent`) receive short-lived kiosk sessions signed with `STUDENT_JWT_SECRET` after entering their admission number. The kiosk device itself is deliberately public and has no account, device credential or enrollment step. The four-digit purchase code is still required at checkout before money can move.
 
-There are exactly two secrets in the system, and they belong to different people. A student has a **purchase code**: four digits, set by the parent, typed at the counter, and nothing else — the counter refuses anything that is not four digits before it reaches the database. A parent has their **account password**, which signs them into the app and is also what resets a child's code when it is forgotten. A student never has a password; a parent never types a code to buy anything.
+Production must use three different secrets. Parent accounts cannot self-register: an admin creates the account and gives the parent a one-time activation code, which the parent uses to choose a password and sign in. A student has a four-digit **purchase code**, set by the parent and entered at the kiosk; it is separate from the parent's account password.
 
 Four digits because of where it is used: on a touch screen, by a child, with a queue behind them. What bounds the spending is the wallet balance, the spending limit and the approval flow below — not the length of the code.
 
@@ -101,11 +102,11 @@ Each frontend follows the standard Vite layout: `src/pages`, `src/components`, `
 
 The Warehouse–Accounts procurement boundary is migrating to Clean Architecture under `backend/src`: domain policies and deterministic analytics, application use cases/DTOs, Mongoose repository adapters, and versioned HTTP controllers/routes. Existing unversioned endpoints remain compatibility adapters. See [the architecture and analytics design](docs/architecture/warehouse-accounts.md) and the [OpenAPI 3.1 contract](docs/architecture/openapi.yaml).
 
-The whole slice sits behind `FEATURE_V1_PROCUREMENT`, off unless it is set to exactly `true`. Off, the `/api/v1` routes are not mounted, nothing under `backend/src` is reachable, no order can enter the `PENDING_REVIEW` workflow, and request ids and the structured error envelope stay off too — every existing route answers exactly as it did before the slice existed. What the flag does not undo is data: orders already in a v1 state stay in the database, invisible to the legacy warehouse inbox, until it is switched back on.
+The procurement workflow is enabled unless `FEATURE_V1_PROCUREMENT` is set to exactly `false`. The flag controls purchase-order review, procurement analytics, and replenishment drafts only. Fulfilment, caretaker operations, reports, exports, request IDs, and the versioned error contract remain available. Turning procurement off does not undo data: orders already awaiting review stay in the database until it is switched back on.
 
 ## Checks and releases
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: the backend tests, the `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` test suites, `eslint` at zero warnings for all four frontends, a build of all four, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: backend lint and tests, the `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` test suites, frontend lint at zero warnings, builds of all four clients, and `scripts/check-shared-files.mjs`, which guards the handful of files deliberately duplicated across the apps.
 
 What CI does not cover is the native shells: it runs on Linux and builds the web bundles only, so `frontend-parent`'s iOS and Android projects and the kiosk and warehouse Android projects are exercised only when someone builds one.
 
@@ -113,8 +114,8 @@ Shipping the parent app to the App Store or Play has its own list, including the
 
 ## Known gaps
 
-Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, refunds and voids, manual inventory adjustments, and cost/margin reporting.
+Tracked in [FIX-PLAN.md](FIX-PLAN.md). Not yet built: receipt printing, parent-initiated top-up/payments, refunds and voids, and cost/margin reporting.
 
 Native push is wired up and its credentials are in place on both platforms — see [frontend-parent/README.md](frontend-parent/README.md#setup-that-cannot-be-done-from-the-repo) for what they are and where they go. The gap that remains is testing: the Android path has been exercised end to end, the iOS path never has on a physical iPhone, and a simulator cannot register with APNs.
 
-The 601 backend tests cover the parent API surface and auth. The frontends are lightly covered — `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` each have a suite that CI runs, mostly over utilities and the shared availability rule, plus one hook and one component in the kiosk; `frontend-parent` has none. Whole screens and flows are still verified by hand.
+The backend suite covers the parent API surface, authorization boundaries and core workflows. The frontends are lightly covered — `frontend-admin`, `hungerhunt-kiosk` and `hungerhunt-warehouse` each have a suite that CI runs, mostly over utilities and the shared availability rule, plus one hook and one component in the kiosk; `frontend-parent` has none. Whole screens and flows are still verified by hand.

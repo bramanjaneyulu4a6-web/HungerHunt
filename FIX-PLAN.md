@@ -89,7 +89,7 @@ Additionally: `helmet` security headers, rate limiting on credential endpoints (
 - [x] Admin dashboard polling relaxed from every 3 seconds to every 30 seconds plus a refresh on window focus
 - [x] ESLint config for the parent app now ignores `ios/` and `android/` — it had been linting Xcode build output and bundled assets, which accounted for 418 of its 426 reported problems
 
-**Lint status:** parent 426 → 5, admin 30 → 11, kiosk 9 → 2. Everything remaining is `react-hooks/immutability`, `set-state-in-effect` and `exhaustive-deps` — strict advisory rules from eslint-plugin-react-hooks v7 that require restructuring component logic. Left alone deliberately; fixing them is a refactor, not a bug fix.
+**Lint status:** the backend and all four clients pass their configured lint checks with zero warnings, and CI enforces that result.
 
 ---
 
@@ -97,15 +97,9 @@ Additionally: `helmet` security headers, rate limiting on credential endpoints (
 
 Settings that change behaviour at a deploy boundary. All three live in the environment, never in a tracked file; `backend/.env.example` lists them with the same explanation and no values.
 
-**`PARENT_JWT_SECRET` — set, locally.** Parent tokens are signed with this key and admin tokens with `JWT_SECRET`. It falls back to `JWT_SECRET` if unset, so a deploy that omits it keeps working: the `role` claim on every token still separates the two sides, and the backend says which of the two it is doing at startup. With a second key an admin token presented on a parent route fails at the signature, before any claim is read, rather than depending on the role check being applied by whatever middleware is written next.
+**`PARENT_JWT_SECRET` — set before production.** Parent tokens are signed with this key, student kiosk sessions with `STUDENT_JWT_SECRET`, and staff tokens with `JWT_SECRET`. Development retains a shared-secret fallback for setup convenience, but production requires three distinct 32+ character secrets. Changing a signing secret invalidates the corresponding live sessions.
 
-It now holds a 64-character random value in the local gitignored `.env`, and the startup warning is gone. **It is still unset in production** — that environment needs its own value, different from both `JWT_SECRET` and the local one. Nothing tracked in this repo contains either secret.
-
-**`LEGACY_TOKEN_GRACE_UNTIL` — expires 2026-08-20.** Tokens issued before they carried a `role` claim are accepted until this date, so deploying that change does not sign every parent and admin out mid-session. After it, the whole branch in `backend/utils/tokens.js` is dead and should be deleted along with the tests that pin a grace date.
-
-The date was originally 2026-08-14, one parent-token lifetime after the change was written. That was wrong in the way these dates usually are: it has to be a lifetime past the **deploy**, because until this reaches production, production is still issuing roleless tokens and the clock has not started. It is now the 20th and should move again if the deploy does.
-
-**These two are ordered**, and the backend now says which side of the date it is on at every boot rather than leaving it to this document. Set `PARENT_JWT_SECRET` *before* the legacy window closes. While the window is open, `verifyToken` also tries `JWT_SECRET` for parent tokens, so a parent token issued before the second key existed still verifies and nobody is signed out. After the window closes that fallback is gone, and introducing the key then invalidates every live parent token at once — recoverable by logging in again, but a support morning for no reason.
+Nothing tracked in this repository contains the deployed secret values. Roleless legacy tokens are no longer accepted.
 
 **`PURCHASE_AUTH_GRACE_UNTIL` — expires 2026-08-21.** A bill must carry the single-use token `verify-payment` returns once the purchase password is accepted; bills sent without one are still charged until this date. The window exists because the backend and the three frontends deploy separately and the till is a screen that stays open all day on the bundle it loaded that morning — requiring the token immediately would fail every sale from a tab nobody had reloaded.
 
@@ -129,6 +123,6 @@ Optionally scrub history afterwards with BFG or `git filter-repo`, but rotation 
 
 ## Not done — deferred features
 
-Receipt/bill printing · parent top-up and payment gateway · native push via `@capacitor/push-notifications` (plus a production `capacitor.config.json`; it currently points native builds at `localhost:5173`) · refunds and voids · low-stock alerting (a dashboard tile, count, email, or push — nothing pushes the number at anyone yet) · cost/margin reporting from `Purchase.purchasePrice` · server-side Excel import · websocket live updates · consolidating the two near-identical admin billing screens · automated tests and CI
+Receipt/bill printing · parent top-up and payment gateway · refunds and voids · cost/margin reporting from `Purchase.purchasePrice` · server-side Excel parsing for exceptionally large files · websocket live updates · consolidating the two near-identical admin billing screens
 
-Manual inventory adjustments shipped with the admin-inventory-ordering-repair plan, along with product archiving (in place of hard delete) and purchase-order cancellation. Low-stock alerting stays deferred above; what shipped alongside it is narrower — a per-product `reorderLevel` and a ⚠︎ badge in the stock column of the Inventory and Purchase pages, visible only while an admin has one of those two screens open.
+Manual inventory adjustments, product archiving, purchase-order cancellation and an admin low-stock alert are implemented. Native push is wired on both parent platforms; physical-iPhone verification remains a release task.

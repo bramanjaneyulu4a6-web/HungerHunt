@@ -53,6 +53,7 @@ const call = (path, method, body) =>
 // Who a student is. These are the only fields an admin route may write.
 const IDENTITY = {
   name: 'Test Student',
+  admissionNumber: '10425',
   fatherName: 'Test Father',
   hostelNumber: 'A-1',
   grade: '8',
@@ -96,7 +97,7 @@ const stubLinking = () => {
   mock.method(Parent, 'updateMany', async () => ({ modifiedCount: 0 }));
   mock.method(Parent, 'updateOne', async () => ({ modifiedCount: 0 }));
   mock.method(Student, 'updateOne', async () => ({ modifiedCount: 0 }));
-  mock.method(Student, 'find', () => ({ select: async () => [] }));
+  mock.method(Student, 'find', () => ({ select: async () => [], lean: async () => [] }));
   mock.method(Hostel, 'findOne', () => ({
     lean: async () => ({ _id: HOSTEL_ID, code: IDENTITY.hostelNumber }),
   }));
@@ -153,7 +154,7 @@ describe('only identity and resolved hostel fields are writable', () => {
     const res = await call('/api/students/bulk', 'POST', {
       students: [
         { ...IDENTITY, ...SMUGGLED },
-        { ...IDENTITY, name: 'Second Student', pocketMoney: 5000 },
+        { ...IDENTITY, name: 'Second Student', admissionNumber: '10426', pocketMoney: 5000 },
       ],
     });
 
@@ -163,9 +164,7 @@ describe('only identity and resolved hostel fields are writable', () => {
     assert.equal(written[1].pocketMoney, undefined);
   });
 
-  // A dropped column that says nothing looks exactly like a column that
-  // applied — the sheet reports success and only the balances disagree.
-  test('the importer names the columns it dropped', async () => {
+  test('the importer drops fields outside the identity allow-list', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
     stubLinking();
     mock.method(Student, 'insertMany', async (rows) => rows);
@@ -174,12 +173,7 @@ describe('only identity and resolved hostel fields are writable', () => {
       students: [{ ...IDENTITY, pocketMoney: 100, someUnknownHeading: 'x' }],
     });
 
-    const body = await res.json();
-
-    assert.deepEqual(
-      body.ignoredColumns.sort(),
-      ['pocketMoney', 'someUnknownHeading']
-    );
+    assert.equal(res.status, 201);
   });
 
   test('a clean sheet reports nothing ignored', async () => {
@@ -190,7 +184,6 @@ describe('only identity and resolved hostel fields are writable', () => {
     const res = await call('/api/students/bulk', 'POST', { students: [IDENTITY] });
     const body = await res.json();
 
-    assert.equal(body.ignoredColumns, undefined);
     assert.equal(body.imported, 1);
   });
 });

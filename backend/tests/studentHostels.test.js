@@ -93,15 +93,21 @@ test('a student write refuses an unknown hostel rather than inventing one', asyn
 test('bulk import lists every unknown normalized hostel code', async () => {
   authenticate();
   mock.method(Hostel, 'find', () => ({ lean: async () => [{ _id: '507f191e810c19729de860e1', code: 'D-4' }] }));
+  mock.method(Student, 'find', () => ({ lean: async () => [] }));
   const insert = mock.method(Student, 'insertMany', async () => { throw new Error('must not insert'); });
 
-  const student = { name: 'Asha', fatherName: 'Dev', grade: '7', parentPhoneNumber: '9000000001' };
+  const student = { name: 'Asha', admissionNumber: '10425', fatherName: 'Dev', grade: '7', parentPhoneNumber: '9000000001' };
   const response = await post('/api/students/bulk', {
-    students: [{ ...student, hostelNumber: 'D-4' }, { ...student, name: 'Ben', hostelNumber: ' e-9 ' }],
+    students: [{ ...student, hostelNumber: 'D-4' }, { ...student, name: 'Ben', admissionNumber: '10426', hostelNumber: ' e-9 ' }],
   });
   const body = await response.json();
   assert.equal(response.status, 400);
-  assert.deepEqual(body.unknownHostels, ['E-9']);
+  assert.deepEqual(body.invalidCells, [{
+    row: 3,
+    column: 'hostelNumber',
+    cell: 'hostelNumber (row 3)',
+    message: 'Hostel E-9 does not exist or is inactive.',
+  }]);
   assert.equal(insert.mock.callCount(), 0);
 });
 

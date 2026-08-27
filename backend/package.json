@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "lint": "eslint . --max-warnings 0",
     "test": "node --test",
     "seed:dev-accounts": "node scripts/seedDevAccounts.js",
     "audit:wallets": "node scripts/reconcileWallets.js",
@@ -42,6 +43,9 @@
     "streamifier": "^0.1.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
     "nodemon": "^3.1.0"
   }
 }

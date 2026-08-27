@@ -4,7 +4,7 @@ import ReplenishmentDraft from '../../../../models/ReplenishmentDraft.js';
 import { GenerateInventoryAnalytics } from '../../../application/analytics/generateInventoryAnalytics.js';
 import { buildReplenishmentDraftItems } from '../../../application/replenishment/buildDraft.js';
 import { MongooseAnalyticsRepository } from '../../../infrastructure/persistence/mongoose/mongooseAnalyticsRepository.js';
-import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/applicationError.js';
+import { ConflictError, ValidationError } from '../../../shared/errors/applicationError.js';
 import { sessionOptions, withMongoTransaction } from '../../../../utils/mongoTransaction.js';
 import { businessDateAt } from '../../../../utils/businessTime.js';
 

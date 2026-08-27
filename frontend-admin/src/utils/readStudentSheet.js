@@ -2,6 +2,7 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_STUDENT_ROWS = 5_000;
 const REQUIRED_COLUMNS = [
   'name',
+  'admissionNumber',
   'fatherName',
   'hostelNumber',
   'grade',
@@ -27,6 +28,11 @@ export const studentRecordsFromRows = (rows) => {
     throw new Error(`Missing required columns: ${missing.join(', ')}.`);
   }
 
+  const unexpected = namedHeaders.filter((column) => !REQUIRED_COLUMNS.includes(column));
+  if (unexpected.length) {
+    throw new Error(`Unexpected columns: ${unexpected.join(', ')}. Use only the six documented headings.`);
+  }
+
   const dataRows = rows.slice(1).filter((row) => row.some(hasValue));
   if (!dataRows.length) {
     throw new Error('The workbook contains no student rows.');
@@ -35,20 +41,65 @@ export const studentRecordsFromRows = (rows) => {
     throw new Error(`Import at most ${MAX_STUDENT_ROWS.toLocaleString()} students at a time.`);
   }
 
-  const unnamedDataColumn = headers.findIndex(
-    (header, index) => !header && dataRows.some((row) => hasValue(row[index]))
+  const widestRow = Math.max(headers.length, ...dataRows.map((row) => row.length));
+  const unnamedDataColumn = Array.from({ length: widestRow }, (_, index) => index).find(
+    (index) => !headers[index] && dataRows.some((row) => hasValue(row[index]))
   );
-  if (unnamedDataColumn !== -1) {
+  if (unnamedDataColumn !== undefined) {
     throw new Error(`Column ${unnamedDataColumn + 1} contains data but has no heading.`);
   }
 
-  return dataRows.map((row) =>
-    Object.fromEntries(
+  const excelColumn = (index) => {
+    let value = index + 1;
+    let label = '';
+    while (value > 0) {
+      value -= 1;
+      label = String.fromCharCode(65 + (value % 26)) + label;
+      value = Math.floor(value / 26);
+    }
+    return label;
+  };
+
+  const invalidCells = [];
+  const records = dataRows.map((row) => {
+    const sheetRow = rows.indexOf(row, 1) + 1;
+    const record = Object.fromEntries(
       headers.flatMap((header, index) =>
-        header && hasValue(row[index]) ? [[header, row[index]]] : []
+        header && hasValue(row[index]) ? [[header, String(row[index]).trim()]] : []
       )
-    )
-  );
+    );
+    record.__importRow = sheetRow;
+    record.__importCells = Object.fromEntries(
+      headers.filter(Boolean).map((header) => {
+        const column = headers.indexOf(header);
+        return [header, `${excelColumn(column)}${sheetRow}`];
+      })
+    );
+
+    const check = (field, valid, message) => {
+      if (!valid) invalidCells.push({
+        row: sheetRow,
+        column: field,
+        cell: record.__importCells[field],
+        message,
+      });
+    };
+    check('name', Boolean(record.name), 'Student name is required.');
+    check('admissionNumber', /^\d{5}$/.test(record.admissionNumber || ''), 'Admission number must be exactly 5 digits.');
+    check('fatherName', Boolean(record.fatherName), "Father's name is required.");
+    check('hostelNumber', Boolean(record.hostelNumber), 'Hostel code is required.');
+    check('grade', Boolean(record.grade), 'Grade / class is required.');
+    check('parentPhoneNumber', /^\d{10}$/.test(record.parentPhoneNumber || ''), 'Parent phone number must be exactly 10 digits.');
+    return record;
+  });
+
+  if (invalidCells.length) {
+    const error = new Error('Invalid student sheet. Correct the listed cells and import it again.');
+    error.invalidCells = invalidCells;
+    throw error;
+  }
+
+  return records;
 };
 
 export const readStudentSheet = async (file) => {

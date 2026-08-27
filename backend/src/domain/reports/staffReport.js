@@ -37,10 +37,53 @@ export const ORDER_ISSUE_CATEGORIES = Object.freeze({
   MISSING_ITEM: 'Something is missing from the package',
   WRONG_ITEM: 'The package holds the wrong items',
   DAMAGED: 'The package or its contents are damaged',
+  QUALITY_ISSUE: 'A problem with the quality of an item',
   NOT_THEIR_ORDER: 'The student says this is not their order',
   CODE_NOT_WORKING: 'The student cannot enter their code',
   OTHER: 'Something else about this package',
 });
+
+/* What a student can say at the handover screen — a subset of the order-issue
+   categories, because the student is describing their own food, not the
+   caretaker's shelf. The item categories carry a list of affected items; OTHER
+   is the note alone. */
+export const STUDENT_ORDER_ISSUE_CATEGORIES = Object.freeze({
+  WRONG_ITEM: ORDER_ISSUE_CATEGORIES.WRONG_ITEM,
+  MISSING_ITEM: ORDER_ISSUE_CATEGORIES.MISSING_ITEM,
+  QUALITY_ISSUE: ORDER_ISSUE_CATEGORIES.QUALITY_ISSUE,
+  OTHER: ORDER_ISSUE_CATEGORIES.OTHER,
+});
+
+export const studentCategoryNeedsItems = (category) => category !== 'OTHER';
+
+/* The affected items a student selects, checked against the package they are
+   standing in front of. The counts are capped by what was ordered: a report
+   that claims three missing juices from an order of two is not a report the
+   office can act on, and the screen should never have offered it. */
+export const affectedItemsProblem = (category, items, orderItems) => {
+  if (!studentCategoryNeedsItems(category)) return null;
+  if (!Array.isArray(items) || items.length === 0) {
+    return 'Select at least one affected item from the order.';
+  }
+
+  const ordered = new Map(orderItems.map((item) => [String(item.productId), item]));
+  const seen = new Set();
+
+  for (const entry of items) {
+    const productId = String(entry?.productId ?? '');
+    const match = ordered.get(productId);
+    if (!match) return 'Every affected item must be one of the items in this order.';
+    if (seen.has(productId)) return 'Each item can only be listed once.';
+    seen.add(productId);
+
+    const quantity = entry?.quantity;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > match.quantity) {
+      return `Counts must be between 1 and the quantity ordered (${match.name}: ${match.quantity}).`;
+    }
+  }
+
+  return null;
+};
 
 export const COMPLAINT_CATEGORIES = Object.freeze({
   WORKING_CONDITIONS: 'Working conditions',

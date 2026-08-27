@@ -9,6 +9,7 @@ import Purchases from "./pages/Purchases";
 import Receive from "./pages/Receive";
 import CaretakerOrders from "./pages/CaretakerOrders";
 import CaretakerReports from "./pages/CaretakerReports";
+import CollectOrder from "./pages/CollectOrder";
 import { clearSession } from "./utils/session";
 
 /* Three tabs, in the order the shift runs: what students are waiting for,
@@ -171,6 +172,17 @@ const StaffRoutes = () => {
     return (
       <Routes>
         <Route path="/" element={<ProtectedRoute><CaretakerShell><CaretakerOrders /></CaretakerShell></ProtectedRoute>} />
+        {/* The handover screen is handed to the student, so the caretaker's
+            own identity card stays off it — the student's name is the one
+            that belongs at the top. */}
+        <Route
+          path="/collect/:orderId"
+          element={
+            <ProtectedRoute>
+              <CaretakerShell identity={false}><CollectOrder /></CaretakerShell>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/reports"
           element={

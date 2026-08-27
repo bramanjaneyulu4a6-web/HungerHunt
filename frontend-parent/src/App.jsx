@@ -11,13 +11,14 @@ import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/auth";
 
 import Login from "./pages/Login";
-import Register from "./pages/Register";
+import Activate from "./pages/Activate";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
 import ChildDetails from "./pages/ChildDetails";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetPurchasePassword from "./pages/SetPurchasePassword";
+import PaymentReturn from "./pages/PaymentReturn";
 
 import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -40,9 +41,10 @@ const pageTitle = (pathname) => {
   if (pathname === '/accounts') return 'Student accounts';
   if (pathname.startsWith('/purchase-password/')) return 'Purchase code';
   if (pathname === '/login') return 'Sign in';
-  if (pathname === '/register') return 'Create account';
+  if (pathname === '/activate') return 'Activate account';
   if (pathname === '/forgot-password') return 'Forgot password';
   if (pathname.startsWith('/reset-password/')) return 'Reset password';
+  if (pathname === '/payment-return') return 'Payment';
   return 'Dashboard';
 };
 
@@ -62,7 +64,7 @@ function AppContent() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Registering before login would ask for the notification permission on a
+    // Starting push before login would ask for notification permission on a
     // screen that cannot explain why, and would have no account to attach the
     // device to. This runs once a parent is signed in — on login, and on every
     // later start that restores their session.
@@ -95,7 +97,8 @@ function AppContent() {
         <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-        <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+        <Route path="/activate" element={<PublicOnlyRoute><Activate /></PublicOnlyRoute>} />
+        <Route path="/register" element={<Navigate to="/activate" replace />} />
         <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
         {/* A reset link may be opened while another session is still present;
             it must remain usable so the token can close those old sessions. */}
@@ -142,6 +145,15 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+
+        {/* Where PhonePe's checkout redirects back to — and deliberately NOT
+            protected. That redirect lands in whichever browser the parent's
+            UPI app was holding, which on a phone is a Custom Tab carrying
+            none of this app's session; behind ProtectedRoute every native
+            payment would end on a login screen. The page reads one payment's
+            verdict using the token the backend put in the redirect URL, and
+            says so plainly when it has neither that nor a session. */}
+        <Route path="/payment-return" element={<PaymentReturn />} />
 
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />

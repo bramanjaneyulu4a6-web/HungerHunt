@@ -9,6 +9,7 @@ import morgan from 'morgan';
 import mongoose from 'mongoose';
 
 import adminRoutes from './routes/adminRoutes.js';
+import adminUserRoutes from './routes/adminUserRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import productRoutes from './routes/productRoutes.js';
@@ -29,18 +30,14 @@ import caretakerReportRoutes from './src/interfaces/http/routes/caretakerReportR
 import staffReportRoutes from './src/interfaces/http/routes/staffReportRoutes.js';
 import accountingExportRoutes from './src/interfaces/http/routes/accountingExportRoutes.js';
 import replenishmentDraftRoutes from './src/interfaces/http/routes/replenishmentDraftRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
-import { parentSecretChangeover, studentSecretIsShared } from './utils/tokens.js';
+import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 
 const app = express();
-
-// Request ids and the structured error envelope travel with the v1 slice: they
-// change what *every* route logs and returns, so leaving them on with the flag
-// off would mean "deactivated" still differed from the behaviour before it.
-if (v1ProcurementEnabled) app.use(requestContext);
 
 // Behind a hosting proxy, req.ip is the proxy's own address unless Express is
 // told how many hops to trust — which would put every client in a single
@@ -61,26 +58,15 @@ if (trustProxy === 'true') {
   app.set('trust proxy', Number.isInteger(hops) ? hops : trustProxy);
 }
 
-const parentSecret = parentSecretChangeover();
-
-if (parentSecret.pending) {
+if (parentSecretIsShared()) {
   console.warn(
     'PARENT_JWT_SECRET is not set, so parent tokens are signed with JWT_SECRET.' +
     ' The role claim still separates them; setting a second secret makes an' +
     ' admin token unusable on a parent route at the signature instead.'
   );
-
-  // Which of these two it is decides whether setting the key is free or costs
-  // every parent their session. See parentSecretChangeover in utils/tokens.js.
   console.warn(
-    parentSecret.free
-      ? `Set it before ${parentSecret.deadline.toISOString()}. Until then parent tokens` +
-        ' signed with the old key are still accepted, so the changeover signs nobody' +
-        ' out. After that date it invalidates every parent token in circulation.'
-      : `The window that would have carried that changeover closed on` +
-        ` ${parentSecret.deadline.toISOString()}, so setting it now signs out every` +
-        ' parent holding a live token — up to seven days of them. Still worth doing;' +
-        ' pick a quiet hour rather than a lunch service.'
+    'Set PARENT_JWT_SECRET before issuing production accounts. Adding it later' +
+    ' invalidates parent sessions signed with the shared key, for up to seven days.'
   );
 }
 
@@ -111,6 +97,30 @@ if (unverifiedBillsAccepted()) {
     ' so tills running a build from before verify-payment issued one keep working.' +
     ' Each such bill is logged; once none appear, close the window early with' +
     ' PURCHASE_AUTH_GRACE_UNTIL.'
+  );
+}
+
+/* UPI payment env that fails quietly, not loudly, when it is missing. Unset
+   client credentials at least fail every payment create with an error a
+   parent sees; the two below never announce themselves at all, so they get
+   the same treatment as the JWT secrets above: say it at boot. PHONEPE_ENV
+   and PHONEPE_CLIENT_VERSION are omitted on purpose — both have safe
+   defaults (sandbox, "1"). The full set is listed in .env.example. */
+const missingPaymentEnv = [
+  'PHONEPE_CLIENT_ID',
+  'PHONEPE_CLIENT_SECRET',
+  'PHONEPE_WEBHOOK_USERNAME',
+  'PHONEPE_WEBHOOK_PASSWORD',
+  'PHONEPE_REDIRECT_BASE_URL',
+].filter((name) => !process.env[name]?.trim());
+
+if (missingPaymentEnv.length) {
+  console.warn(
+    `PhonePe payment env is incomplete (${missingPaymentEnv.join(', ')} unset), and the failures` +
+    ' are quiet ones: missing webhook credentials 401 every PhonePe webhook so money only lands' +
+    ' via the app\'s poll and the reconcile sweep, and a missing PHONEPE_REDIRECT_BASE_URL' +
+    ' registers the literal string "undefined/payment-return?..." with PhonePe as the return URL.' +
+    ' The full PHONEPE_* set is documented in .env.example.'
   );
 }
 
@@ -227,6 +237,7 @@ app.get('/health/ready', readiness);
 
 // API Routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/products', productRoutes);
@@ -239,23 +250,28 @@ app.use('/api/hostels', hostelRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/receipts', receiptRoutes);
+app.use('/api/payments', paymentRoutes);
 
-// Versioned enterprise contracts. The routes above remain compatibility
-// adapters until all existing clients have migrated.
-//
-// This is the only door into backend/src, and creating an order is the only way
-// one enters the PENDING_REVIEW workflow — so not mounting these leaves the
-// whole slice unreachable rather than half-live.
+// Request ids and the structured error envelope belong to the versioned HTTP
+// contract, not to procurement. Keeping the middleware scoped here means a
+// procurement kill switch cannot silently change unrelated legacy responses.
+const v1 = (path, routes) => app.use(path, requestContext, routes);
+
+// Procurement-specific routes may be withdrawn together. Orders already in
+// PENDING_REVIEW remain stored and become reachable when the flag returns.
 if (v1ProcurementEnabled) {
-  app.use('/api/v1/purchase-orders', purchaseOrderRoutes);
-  app.use('/api/v1/analytics', analyticsRoutes);
-  app.use('/api/v1/fulfillment-orders', fulfillmentOrderRoutes);
-  app.use('/api/v1/caretaker/fulfillment-orders', caretakerFulfillmentOrderRoutes);
-  app.use('/api/v1/caretaker/reports', caretakerReportRoutes);
-  app.use('/api/v1/reports', staffReportRoutes);
-  app.use('/api/v1/accounting-exports', accountingExportRoutes);
-  app.use('/api/v1/replenishment-drafts', replenishmentDraftRoutes);
+  v1('/api/v1/purchase-orders', purchaseOrderRoutes);
+  v1('/api/v1/analytics', analyticsRoutes);
+  v1('/api/v1/replenishment-drafts', replenishmentDraftRoutes);
 }
+
+// These are independent operational contracts. They remain available if the
+// school pauses procurement review, which is the central promise of the flag.
+v1('/api/v1/fulfillment-orders', fulfillmentOrderRoutes);
+v1('/api/v1/caretaker/fulfillment-orders', caretakerFulfillmentOrderRoutes);
+v1('/api/v1/caretaker/reports', caretakerReportRoutes);
+v1('/api/v1/reports', staffReportRoutes);
+v1('/api/v1/accounting-exports', accountingExportRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
@@ -263,12 +279,12 @@ app.use((req, res) => {
 
 // The pre-slice handler, kept whole rather than reconstructed from the new one:
 // it echoes the real message at every status and prints the raw stack.
-const legacyErrorHandler = (err, req, res, next) => {
+const legacyErrorHandler = (err, req, res, _next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
 };
 
-const v1ErrorHandler = (err, req, res, next) => {
+const v1ErrorHandler = (err, req, res, _next) => {
   const status = err.status || 500;
   const message = status >= 500 ? 'Internal Server Error' : err.message;
   const logFailure = status >= 500 ? logger.error : logger.warn;
@@ -293,6 +309,10 @@ const v1ErrorHandler = (err, req, res, next) => {
   });
 };
 
-app.use(v1ProcurementEnabled ? v1ErrorHandler : legacyErrorHandler);
+app.use((err, req, res, next) => (
+  req.originalUrl.startsWith('/api/v1/')
+    ? v1ErrorHandler(err, req, res, next)
+    : legacyErrorHandler(err, req, res, next)
+));
 
 export default app;

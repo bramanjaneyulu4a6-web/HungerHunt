@@ -5,6 +5,7 @@ import WalletReversal from '../models/WalletReversal.js';
 import Parent from "../models/Parent.js";
 
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { isOverdue, OPEN_STATUSES } from "../src/domain/fulfillment/overdue.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
@@ -14,74 +15,61 @@ import { flushQueuedPushes } from "../utils/sendNotification.js";
 import {
   passwordProblem,
   phoneProblem,
-  emailProblem,
   purchaseCodeProblem,
 } from "../utils/validation.js";
 
-/* =========================================================
-   ✅ REGISTER PARENT
-========================================================= */
-export const registerParent = async (req, res) => {
+const ACTIVATION_CODE_PATTERN = /^\d{6}$/;
+
+const activationCodeHash = (phone, code) =>
+  crypto.createHash('sha256').update(`${String(phone).trim()}:${String(code).trim()}`).digest('hex');
+
+const parentSessionView = (parent) => ({
+  id: parent._id,
+  fatherName: parent.fatherName,
+  phone: parent.phone,
+  email: parent.email,
+  studentIds: parent.studentIds,
+});
+
+/* The office creates the account. The parent uses its one-time code to choose
+   the permanent password; the successful activation is also the first login. */
+export const activateParent = async (req, res) => {
   try {
-    const { fatherName, parentPhoneNumber, password, email } = req.body;
+    const phone = String(req.body?.parentPhoneNumber ?? '').trim();
+    const code = String(req.body?.activationCode ?? '').trim();
+    const problem = phoneProblem(phone) ||
+      (!ACTIVATION_CODE_PATTERN.test(code) ? 'Activation code must be 6 digits.' : null) ||
+      passwordProblem(req.body?.password);
+    if (problem) return res.status(400).json({ message: problem });
 
-    if (!fatherName?.trim()) {
-      return res.status(400).json({ message: "Father's name is required" });
-    }
-
-    const problem =
-      phoneProblem(parentPhoneNumber) ||
-      emailProblem(email) ||
-      passwordProblem(password);
-
-    if (problem) {
-      return res.status(400).json({ message: problem });
-    }
-
-    const phone = String(parentPhoneNumber).trim();
-
-    // Find students (initial linking step)
-    const kids = await Student.find({
-      fatherName,
-      parentPhoneNumber: phone,
-      active: { $ne: false },
-    });
-
-    if (kids.length === 0) {
-      return res.status(400).json({
-        message: "No matching student found",
-      });
-    }
-
-    const existingParent = await Parent.findOne({ phone });
-
-    if (existingParent) {
-      return res.status(400).json({
-        message: "Parent already registered",
-      });
-    }
-
-    const hashedPwd = await bcrypt.hash(password, 10);
-
-    await Parent.create({
-      fatherName,
+    const parent = await Parent.findOne({
       phone,
-      email: email.toLowerCase().trim(),
-      password: hashedPwd,
-      studentIds: kids.map((k) => k._id),
-    });
+      active: { $ne: false },
+      activationRequired: true,
+      activationCodeHash: activationCodeHash(phone, code),
+      activationCodeExpire: { $gt: new Date() },
+    }).select('+activationCodeHash');
 
-    await Student.updateMany(
-      { fatherName, parentPhoneNumber: phone, active: { $ne: false } },
-      { isParentRegistered: true }
-    );
+    if (!parent) {
+      return res.status(400).json({
+        message: 'Activation details are invalid or the code has expired. Ask the school office for a new code.',
+      });
+    }
 
-    res.status(201).json({
-      message: "Parent registered successfully",
-    });
+    parent.password = await bcrypt.hash(req.body.password, 10);
+    parent.activationRequired = false;
+    parent.activationCodeHash = undefined;
+    parent.activationCodeExpire = undefined;
+    parent.activatedAt = new Date();
+    parent.resetPasswordToken = undefined;
+    parent.resetPasswordExpire = undefined;
+    parent.tokenVersion = (parent.tokenVersion ?? 0) + 1;
+    await parent.save();
 
+    const token = signParentToken(parent._id, parent.phone, parent.tokenVersion);
+    res.json({ token, parent: parentSessionView(parent), message: 'Account activated.' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -101,7 +89,7 @@ export const loginParent = async (req, res) => {
     const invalid = () =>
       res.status(401).json({ message: "Invalid phone number or password" });
 
-    if (!parent) return invalid();
+    if (!parent || parent.active === false || parent.activationRequired || !parent.password) return invalid();
 
     const isMatch = password && await bcrypt.compare(password, parent.password);
 
@@ -111,13 +99,7 @@ export const loginParent = async (req, res) => {
 
     res.json({
       token,
-      parent: {
-        id: parent._id,
-        fatherName: parent.fatherName,
-        phone: parent.phone,
-        email: parent.email,
-        studentIds: parent.studentIds,
-      },
+      parent: parentSessionView(parent),
     });
 
   } catch (error) {
@@ -178,6 +160,8 @@ export const forgotPassword = async (req, res) => {
 
     const parent = await Parent.findOne({
       email: email.toLowerCase().trim(),
+      active: { $ne: false },
+      activationRequired: { $ne: true },
     });
 
     // Always report success so this endpoint cannot be used to enumerate accounts.
@@ -201,7 +185,7 @@ export const forgotPassword = async (req, res) => {
         to: parent.email,
         resetUrl: `${baseUrl}/reset-password/${raw}`,
       });
-    } catch (mailError) {
+    } catch (_mailError) {
       parent.resetPasswordToken = undefined;
       parent.resetPasswordExpire = undefined;
       await parent.save();
@@ -229,6 +213,8 @@ export const resetPassword = async (req, res) => {
     const parent = await Parent.findOne({
       resetPasswordToken: hashResetToken(req.params.token),
       resetPasswordExpire: { $gt: new Date() },
+      active: { $ne: false },
+      activationRequired: { $ne: true },
     });
 
     if (!parent) {

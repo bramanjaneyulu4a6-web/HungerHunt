@@ -195,10 +195,10 @@ rather than fixes:
 - The session route is rate-limited hard.
 - Its response carries the minimum fields the screen needs.
 
-The option that closes this properly is one-time device enrollment: an admin
-signs the kiosk in once at setup and the device keeps a long-lived token, with
-no staff involvement afterward. It was offered and declined. It remains the
-upgrade path if enumeration ever shows up in the logs.
+One-time device enrollment was considered and declined. The public-device
+choice was reaffirmed on 2026-08-27: there is no kiosk credential, staff login,
+or enrollment flow to add. Enumeration remains an accepted, monitored risk;
+checkout authorization continues to come from the student's purchase code.
 
 ## Testing
 

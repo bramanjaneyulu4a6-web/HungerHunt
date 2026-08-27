@@ -8,7 +8,6 @@ import { mock } from 'node:test';
 process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
 process.env.NODE_ENV = 'test';
-process.env.LEGACY_TOKEN_GRACE_UNTIL = '2999-01-01T00:00:00Z';
 
 const jwt = (await import('jsonwebtoken')).default;
 const mongoose = (await import('mongoose')).default;
@@ -178,9 +177,7 @@ describe('and nothing else', () => {
 
      So what is worth pinning is the removal itself, at the HTTP layer: a token
      from before the role was withdrawn opens nothing at all, shared surface
-     included. The legacy grace window is wide open in this file, which makes
-     it the sharper version of the test — the leniency that carries roleless
-     tokens across a deploy must not carry a withdrawn role with it. */
+     included. */
   test('a token from the retired cashier role opens nothing', async () => {
     accountIs('cashier');
 

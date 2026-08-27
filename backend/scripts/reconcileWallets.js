@@ -108,7 +108,7 @@ try {
   }
   finishStudent(currentStudentId, currentEvents);
 
-  for (const [studentId, student] of students) {
+  for (const [_studentId, student] of students) {
     const result = reconcileWallet(student, []);
     checkedStudents += 1;
     if (result.issues.length) {

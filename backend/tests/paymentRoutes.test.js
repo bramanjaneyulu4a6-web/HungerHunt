@@ -64,7 +64,7 @@ test('a topup intent is created and returns the checkout url', async () => {
   });
   mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
     ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
-  mock.method(phonepe, 'createPayment', async ({ merchantOrderId, amountPaise, redirectUrl }) => {
+  mock.method(phonepe, 'createPayment', async ({ merchantOrderId: _merchantOrderId, amountPaise, redirectUrl }) => {
     assert.equal(amountPaise, 50000);
     assert.ok(redirectUrl.startsWith('https://parent.example/payment-return?intent='));
     return { providerOrderId: 'OMO1', redirectUrl: 'https://pg.example/co', state: 'PENDING' };
@@ -231,7 +231,7 @@ const publicIntentDoc = (over = {}) => ({
 // model, so the route has to ask for it by name; this stub pins that chain.
 const stubFindById = (doc) => {
   let selected;
-  mock.method(PaymentIntent, 'findById', (id) => ({
+  mock.method(PaymentIntent, 'findById', (_id) => ({
     select: async (fields) => {
       selected = fields;
       return doc;

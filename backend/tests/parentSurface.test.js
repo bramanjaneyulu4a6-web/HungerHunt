@@ -220,12 +220,11 @@ describe('child history comes a page at a time', () => {
   });
 });
 
-describe('registration holds passwords to the same rule as the reset', () => {
+describe('activation holds passwords to the same rule as the reset', () => {
   test('a short password is refused before any lookup', async () => {
-    const res = await post('/api/parent/register', {
-      fatherName: 'Test Father',
+    const res = await post('/api/parent/activate', {
       parentPhoneNumber: '9876543210',
-      email: 'parent@example.com',
+      activationCode: '123456',
       password: 'abc',
     });
 
@@ -235,20 +234,18 @@ describe('registration holds passwords to the same rule as the reset', () => {
 
   test('a missing password does not reach bcrypt', async () => {
     // bcrypt.hash(undefined) threw, and the parent saw a 500.
-    const res = await post('/api/parent/register', {
-      fatherName: 'Test Father',
+    const res = await post('/api/parent/activate', {
       parentPhoneNumber: '9876543210',
-      email: 'parent@example.com',
+      activationCode: '123456',
     });
 
     assert.equal(res.status, 400);
   });
 
   test('a number that cannot match the school records is refused', async () => {
-    const res = await post('/api/parent/register', {
-      fatherName: 'Test Father',
+    const res = await post('/api/parent/activate', {
       parentPhoneNumber: '+91 98765 43210',
-      email: 'parent@example.com',
+      activationCode: '123456',
       password: 'longenough',
     });
 

@@ -13,30 +13,14 @@ const headers = [
 ];
 
 test('maps the first worksheet row to the backend student field names', () => {
-  assert.deepEqual(
-    studentRecordsFromRows([
-      headers,
-      ['Asha', 'A-10', 'Ravi', 'D-4', '8', '9876543210'],
-      ['Neel', null, 'Ravi', 'D-4', '6', '9876543210'],
-    ]),
-    [
-      {
-        name: 'Asha',
-        admissionNumber: 'A-10',
-        fatherName: 'Ravi',
-        hostelNumber: 'D-4',
-        grade: '8',
-        parentPhoneNumber: '9876543210',
-      },
-      {
-        name: 'Neel',
-        fatherName: 'Ravi',
-        hostelNumber: 'D-4',
-        grade: '6',
-        parentPhoneNumber: '9876543210',
-      },
-    ]
-  );
+  const [record] = studentRecordsFromRows([
+    headers,
+    ['Asha', '10425', 'Ravi', 'D-4', '8', '9876543210'],
+  ]);
+  assert.equal(record.name, 'Asha');
+  assert.equal(record.admissionNumber, '10425');
+  assert.equal(record.__importRow, 2);
+  assert.equal(record.__importCells.parentPhoneNumber, 'F2');
 });
 
 test('requires the core student columns', () => {
@@ -62,5 +46,19 @@ test('rejects empty and excessively large sheets', () => {
   assert.throws(
     () => studentRecordsFromRows([headers, ...Array.from({ length: 5_001 }, () => ['Asha'])]),
     /Import at most 5,000 students/
+  );
+});
+
+test('reports every invalid student cell by spreadsheet coordinate', () => {
+  assert.throws(
+    () => studentRecordsFromRows([
+      headers,
+      ['', '12', 'Ravi', 'D-4', '', 'phone'],
+    ]),
+    (error) => {
+      assert.equal(error.invalidCells.length, 4);
+      assert.deepEqual(error.invalidCells.map((item) => item.cell), ['A2', 'B2', 'E2', 'F2']);
+      return true;
+    }
   );
 });

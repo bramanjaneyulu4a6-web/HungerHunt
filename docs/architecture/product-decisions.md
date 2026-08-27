@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Date: 2026-08-13
+Date: 2026-08-13 (delivery-proof contact policy amended 2026-08-27)
 
 These decisions apply to the current HungerHunt product: a school counter,
 student wallet, parent-control, warehouse, and Accounts workflow. They should be
@@ -58,27 +58,21 @@ between the two separately.
 ### Proof of delivery
 
 Delivery is the one transition that asserts something about a person outside
-the system, so it is the one that must be proved. The proof is the smallest
-thing that answers "who took it": a short receiver note naming the caretaker
-who took the package at the hostel, plus the authenticated staff account that
-recorded it and the server timestamp. The account and the time come from the
-session and the clock, never from the request body, so neither can be typed
-in.
+the system, so it is the one that must be proved. The proof records the name
+and 10-digit callback number of the caretaker who took the package, plus the
+authenticated staff account and server timestamp. The account and time come
+from the session and clock; the receiver details come from the warehouse's
+dedicated handoff form.
 
 The note is written by the warehouse, not the hostel: the person handing a
 package over names who they handed it to, and the person receiving it does not
 get to name themselves.
 
-The receiver note is required to record a delivery, is capped at 60
-characters, and is rejected if it contains six or more consecutive digits, an
-`@`, or a URL — the shapes an admission number, an ID card, a phone number, or
-a contact address arrives in. Room numbers are shorter than that, so
-`Asha, room 214` is accepted.
-
-Identity-document images, signatures, photographs, phone numbers, addresses,
-and any other personal data about the receiver are explicitly not collected,
-here or anywhere else. The free-text validation above is what keeps the note
-from quietly becoming the place such data is stored regardless.
+The receiver name is capped at 60 characters; phone digits must go into the
+separate validated phone field, which normalizes an optional `+91` prefix to a
+10-digit value. Identity-document images or numbers, signatures, photographs,
+addresses and free-form contact handles are not collected. The owning parent's
+package response deliberately omits the receiver phone number.
 
 ### Proof of collection
 

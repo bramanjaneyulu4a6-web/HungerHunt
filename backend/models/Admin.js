@@ -6,6 +6,7 @@ const adminSchema = new mongoose.Schema({
   phone: { type: String, required: true, trim: true, maxlength: 30 },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  active: { type: Boolean, default: true, index: true },
 
   // What this account may reach. 'warehouse' receives deliveries and raises
   // purchase orders — no students, no wallets, no prices. Everything else —
@@ -39,17 +40,13 @@ const adminSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 adminSchema.pre('save', async function () {
-  try {
-    if (!this.isModified('password')) return;
+  if (!this.isModified('password')) return;
 
-    if (!this.password) {
-      throw new Error("Password is required");
-    }
-
-    this.password = await bcrypt.hash(this.password, 10);
-  } catch (err) {
-    throw err;
+  if (!this.password) {
+    throw new Error("Password is required");
   }
+
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 // Every account created before cashiers existed has no role field at all, and

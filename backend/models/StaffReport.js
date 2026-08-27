@@ -58,11 +58,31 @@ const handlingSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* The items a student pointed at when reporting, copied with their names the
+   way the order snapshot copies the student's. Quantities here are how many of
+   that item the report is about, never more than the order held. */
+const affectedItemSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    name: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1 },
+  },
+  { _id: false }
+);
+
 const staffReportSchema = new mongoose.Schema(
   {
     kind: { type: String, enum: reportKinds, required: true },
     category: { type: String, required: true },
     note: { type: String, required: true, maxlength: NOTE_MAX_LENGTH },
+
+    /* A short number a student can read off a screen and an office can quote
+       back. Only reports filed from the handover screen carry one so far, so
+       the unique index is sparse rather than required. */
+    reportNumber: { type: Number },
+
+    // Present only on student-raised order issues with an item category.
+    affectedItems: { type: [affectedItemSchema], default: undefined },
 
     raisedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -109,6 +129,9 @@ staffReportSchema.index({ raisedBy: 1, createdAt: -1 });
 // Every report raised about one package, for the rare "what happened to this
 // order" question. Sparse: complaints carry no order at all.
 staffReportSchema.index({ 'order.orderId': 1 }, { sparse: true });
+
+// Quotable and unique where present; older reports never carried one.
+staffReportSchema.index({ reportNumber: 1 }, { unique: true, sparse: true });
 
 export const REPORT_KINDS = ReportKind;
 

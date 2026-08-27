@@ -19,7 +19,9 @@ import {
 } from '../../../domain/fulfillment/overdue.js';
 import {
   buildProofOfDelivery,
+  normalizeReceiverPhone,
   proofOfDeliveryProblem,
+  receiverPhoneProblem,
 } from '../../../domain/fulfillment/proofOfDelivery.js';
 import { checkPurchaseCode } from '../../../domain/students/purchaseCodeCheck.js';
 import {
@@ -70,6 +72,7 @@ const serialize = (order, { includeMoney = true } = {}) => ({
   proofOfDelivery: order.proofOfDelivery
     ? {
         receivedBy: order.proofOfDelivery.receivedBy,
+        receiverPhone: order.proofOfDelivery.receiverPhone || '',
         recordedBy: String(order.proofOfDelivery.recordedBy),
         recordedAt: order.proofOfDelivery.recordedAt,
       }
@@ -429,6 +432,25 @@ export const transition = async (req, res) => {
       { status: 403, code: 'FORBIDDEN' }
     );
   }
+
+  let deliveryProofInput = null;
+  if (to === OrderStatus.DELIVERED) {
+    const receivedBy = String(req.body.receivedBy ?? '').trim();
+    const receiverPhone = String(req.body.receiverPhone ?? '').trim();
+    const details = [
+      ['receivedBy', proofOfDeliveryProblem(receivedBy)],
+      ['receiverPhone', receiverPhoneProblem(receiverPhone)],
+    ]
+      .filter(([, message]) => message)
+      .map(([field, message]) => ({ field, message }));
+
+    if (details.length) throw new ValidationError(details);
+    deliveryProofInput = {
+      receivedBy,
+      receiverPhone: normalizeReceiverPhone(receiverPhone),
+    };
+  }
+
   if (to === OrderStatus.CANCELLED) {
     const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
     const reason = String(req.body.reason || req.body.note || '').trim();
@@ -474,20 +496,12 @@ export const transition = async (req, res) => {
   const note = String(req.body.note || '').trim().slice(0, 200);
   const set = { status: to, [timestampField]: now, [actorField]: req.staff.id };
 
-  /* Delivery is the warehouse handing the package over at the hostel, and the
-     one fact only the person handing it over knows is who took it. So that
-     name comes from the body — and it is the sole part of this record that
-     does: the account recording it and the time are taken from the session and
-     the clock, so a mistyped or invented name still sits beside a staff member
-     and a minute that can be asked about. */
+  /* Delivery is the warehouse handing the package over at the hostel. The
+     receiver name and callback number come from the handoff form; the staff
+     account and time come from the authenticated session and server clock. */
   if (to === OrderStatus.DELIVERED) {
-    const receivedBy = String(req.body.receivedBy ?? '').trim();
-    const problem = proofOfDeliveryProblem(receivedBy);
-
-    if (problem) throw new ValidationError([{ field: 'receivedBy', message: problem }]);
-
     set.proofOfDelivery = buildProofOfDelivery({
-      receivedBy,
+      ...deliveryProofInput,
       recordedBy: req.staff.id,
       recordedAt: now,
     });

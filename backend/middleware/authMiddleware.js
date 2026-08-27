@@ -24,6 +24,7 @@ const forbidden = (res, message) => res.status(403).json({ message });
 // admin, which outranks every gate — so the missing field is accepted
 // everywhere, spelled out because Mongo will not infer it.
 const roleFilter = (allowed) => ({
+  active: { $ne: false },
   $or: [{ role: { $in: allowed } }, { role: { $exists: false } }],
 });
 
@@ -55,7 +56,7 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
       req.staff.hostelId = String(account.hostelId);
     }
     next();
-  } catch (error) {
+  } catch (_error) {
     denied(res, 'Token failed, invalid authorization');
   }
 };
@@ -120,7 +121,7 @@ export const protectStudent = async (req, res, next) => {
     if (!(await Student.exists({ _id: payload.id, active: { $ne: false } }))) {
       return denied(res, 'Not authorized');
     }
-  } catch (error) {
+  } catch (_error) {
     return denied(res, 'Token failed, invalid authorization');
   }
 
@@ -183,8 +184,13 @@ const atTokenVersion = ({ id, v }) => {
   const version = v ?? 0;
 
   return version === 0
-    ? { _id: id, $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
-    : { _id: id, tokenVersion: version };
+    ? {
+        _id: id,
+        active: { $ne: false },
+        activationRequired: { $ne: true },
+        $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }],
+      }
+    : { _id: id, active: { $ne: false }, activationRequired: { $ne: true }, tokenVersion: version };
 };
 
 export const protectParent = async (req, res, next) => {
@@ -201,7 +207,7 @@ export const protectParent = async (req, res, next) => {
     if (!(await Parent.exists(atTokenVersion(payload)))) {
       return denied(res, 'Not authorized');
     }
-  } catch (error) {
+  } catch (_error) {
     return denied(res, 'Token failed, invalid authorization');
   }
 

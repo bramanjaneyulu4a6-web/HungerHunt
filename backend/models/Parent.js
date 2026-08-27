@@ -18,6 +18,19 @@ const parentSchema = new mongoose.Schema(
 
   password: String,
 
+  // Parent accounts are provisioned by the office. Until the one-time code is
+  // used there is deliberately no usable password, and an archived account is
+  // retained so old approvals and notifications keep a resolvable parent id.
+  active: { type: Boolean, default: true, index: true },
+  // False preserves already-existing password accounts during deployment.
+  // Every account created by the new admin flow explicitly sets this true.
+  activationRequired: { type: Boolean, default: false },
+  activationCodeHash: { type: String, select: false },
+  activationCodeExpire: Date,
+  activatedAt: Date,
+  archivedAt: Date,
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+
   studentIds: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -70,5 +83,6 @@ const parentSchema = new mongoose.Schema(
 );
 
 parentSchema.index({ studentIds: 1 });
+parentSchema.index({ active: 1, fatherName: 1 });
 
 export default mongoose.model("Parent", parentSchema);

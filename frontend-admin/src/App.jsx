@@ -10,7 +10,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Register = lazy(() => import('./pages/Register'));
 const Layout = lazy(() => import('./components/Layout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Students = lazy(() => import('./pages/Students'));
+const Users = lazy(() => import('./pages/Users'));
 const Hostels = lazy(() => import('./pages/Hostels'));
 const Billing = lazy(() => import('./pages/Billing'));
 const RechargeHistory = lazy(() => import('./pages/RechargeHistory'));
@@ -44,7 +44,8 @@ function App() {
 
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/students" element={<Students />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/students" element={<Navigate to="/users" replace />} />
             <Route path="/hostels" element={<Hostels />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/recharge-history" element={<RechargeHistory />} />

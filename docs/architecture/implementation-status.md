@@ -1,6 +1,6 @@
 # Enterprise hardening status
 
-Updated: 2026-08-13
+Updated: 2026-08-27
 
 ## Implemented and wired
 
@@ -26,8 +26,16 @@ Updated: 2026-08-13
 - Runtime validation, database-before-listen startup, graceful shutdown,
   liveness/readiness probes, environment-driven CORS, business-timezone
   spending periods, bounded list reads, and query indexes are present.
-- CI tests the backend, builds all four clients, checks shared files, and lints
-  all four clients with zero warnings.
+- CI tests and lints the backend, builds all four clients, checks shared files,
+  and lints all four clients with zero warnings.
+- Admin's Users workspace has paginated Students, Parents, Staff and Archived
+  tabs. It supports parent provisioning and one-time activation, parent and
+  staff lifecycle management, linked-parent status, atomic spreadsheet import
+  with exact invalid-cell reporting, and archived-student restoration.
+- The student self-service kiosk is intentionally public at the device level:
+  it has no staff login, device credential or enrollment flow. Admission number
+  creates a short session; the student's four-digit purchase code remains the
+  authorization required before checkout can move money.
 - Admin pages and the shared layout are route-level lazy loaded. The spreadsheet
   parser is loaded only when a bulk student import is submitted; the production
   build now keeps the initial JavaScript chunk at about 249 KB before gzip and
@@ -46,9 +54,10 @@ Updated: 2026-08-13
   Warehouse app can record packing, dispatch, and delivery with staff audit
   history. Parents can track package state and the stored deadline; Warehouse
   has snoozed, auditable overdue alerts plus bounded history and aggregate
-  delivery reports. Delivery requires a privacy-minimized receiver note tied to
-  the authenticated staff account and server time, naming the caretaker the
-  package was handed to at the hostel. A package is finished only when the
+  delivery reports. Delivery records the caretaker's name and callback number
+  in a dedicated warehouse handoff form, tied to the authenticated staff
+  account and server time. The parent view does not expose that phone number.
+  A package is finished only when the
   student takes it: `COLLECTED` is reached by that student entering their own
   purchase code on the caretaker's screen, checked against the same miss
   counter and lock as checkout, and no staff route can set it. Pre-dispatch
@@ -137,7 +146,8 @@ Updated: 2026-08-13
 5. Confirm the deployment health check uses `/health/ready`; `/health/live`
    intentionally does not test MongoDB.
 6. Leave `FEATURE_V1_PROCUREMENT` unset or `true`. `false` is an emergency kill
-   switch and temporarily hides review-workflow orders from the clients.
+   switch for purchase-order review, procurement analytics, and replenishment
+   drafts. Fulfilment, caretaker operations, reports, and exports stay online.
 7. Schedule `npm run reconcile:payments` on a cron (Render cron job or
    equivalent), not just run it by hand. The webhook and the parent's own
    status poll cover the common case, but a dropped webhook is only ever

@@ -732,6 +732,59 @@ paths:
                   intent: { $ref: '#/components/schemas/PaymentIntentView' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /payments/public/intents/{id}:
+    servers:
+      - url: /api/payments
+    get:
+      security: []
+      summary: Read one payment's verdict with its return token, no session required
+      description: >-
+        What PhonePe's redirect target polls. Deliberately unauthenticated: the redirect lands in
+        whichever browser the parent's UPI app was holding — on a phone a Custom Tab carrying none
+        of the app's session — so a protected route would end every native payment on a login
+        screen. The credential is the intent's own `returnToken`, 32 random bytes minted at
+        creation and carried only in the redirect URL the backend hands PhonePe; it is never
+        returned by any other route and is `select: false` on the model. Compared with a
+        constant-time check after a byte-length guard.
+
+        Answers a deliberately narrower body than the authenticated read — status, purpose and
+        `degradedToTopup`, with no amount, student or order — so a shoulder-surfed or shared URL
+        cannot become a statement of how much, for whom. Like that read, it settles first: a
+        stored status of CREATED, PENDING or APPLYING triggers `settlePaymentIntent`, so this is a
+        recovery path for a dropped webhook rather than a stale echo. It still decides nothing
+        about money. Carries `Cache-Control: no-store`.
+
+        Every rejection — wrong token, absent token, unknown id, malformed id, an intent created
+        before tokens existed — answers an identical 404, so the route never confirms that an
+        intent id exists. Rate limited at 120/minute keyed on the intent id (falling back to IP
+        for a malformed id), so one payment's poll can never throttle another's.
+      operationId: getPublicPaymentIntent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
+        - name: t
+          in: query
+          required: true
+          description: The intent's returnToken, as placed in the redirect URL by createPaymentIntent.
+          schema: { type: string, pattern: '^[a-f0-9]{64}$' }
+      responses:
+        '200':
+          description: Current intent verdict
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [intent]
+                properties:
+                  intent: { $ref: '#/components/schemas/PaymentIntentPublicView' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429':
+          description: Too many status checks for this intent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
   /payments/phonepe/webhook:
     servers:
       - url: /api/payments
@@ -1117,6 +1170,21 @@ components:
             to the wallet instead of buying anything, because v1 has no refund API.
         pendingOrderId: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
+    PaymentIntentPublicView:
+      type: object
+      description: >-
+        The return page's view, readable with the intent's returnToken and no session. A verdict
+        and nothing more — deliberately without the amount, student and order that
+        PaymentIntentView carries, because that page renders none of them and the URL this is
+        reached through is easier to leak than a session.
+      required: [id, purpose, status, degradedToTopup]
+      properties:
+        id: { type: string }
+        purpose: { $ref: '#/components/schemas/PaymentIntentPurpose' }
+        status: { $ref: '#/components/schemas/PaymentIntentStatus' }
+        degradedToTopup:
+          type: boolean
+          description: Same meaning as on PaymentIntentView — the money became wallet credit rather than buying the order.
     ErrorEnvelope:
       type: object
       description: >-

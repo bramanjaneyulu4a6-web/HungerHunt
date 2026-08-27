@@ -400,6 +400,53 @@ of rather than guess about. The reconcile sweep (`npm run reconcile:payments`)
 surfaces the standing count of these on every run, so a human at the school
 picks it up rather than a parent's money sitting silently unresolved.
 
+### The return page answers without a session, on a per-payment token
+
+PhonePe's redirect does not come back to the app. It comes back to whichever
+browser the parent's UPI app was holding, and on a phone that is a Custom Tab
+carrying none of the app's storage. A protected return page therefore ends
+every native payment on a login screen — technically correct, and the worst
+possible last impression at the end of paying for something.
+
+So `/payment-return` is deliberately public, and each `PaymentIntent` carries
+a `returnToken`: 32 random bytes, minted at creation, placed only in the
+redirect URL handed to PhonePe, `select: false` on the model and returned by
+no route. Possession of it is the credential for exactly one payment.
+
+The intent id alone could not have played that part. ObjectIds are part
+timestamp and part counter, so a public route keyed on the id would be a
+payment-status oracle anyone could walk. And what the token buys is
+deliberately thin: status, purpose, and whether the money degraded to a
+top-up — no amount, no student, no order. That is everything the screen
+renders, so a URL caught over a shoulder or shared in a screenshot says "a
+payment succeeded", never how much or for whom. Every rejection answers the
+same 404, so the route also never confirms which intent ids exist.
+
+It still decides nothing. Like the authenticated poll, it calls
+`settlePaymentIntent` first, which asks PhonePe's own server — the Golden
+Rule holds on a page with no session exactly as it does everywhere else.
+
+### "No such order" is PhonePe's word for it, not an HTTP status
+
+The reconcile sweep may retire an intent to `FAILED` after seven days of
+PhonePe answering that it has never heard of the order. What counts as that
+answer is `isProviderOrderMissing`, and it reads PhonePe's documented error
+code — `INVALID_MERCHANT_ORDER_ID`, "No entry found for given merchant order
+id" — never the HTTP status alone.
+
+The distinction is the whole safety property. PhonePe documents 400 as its
+catch-all for a request it could not parse and 404 as "check the endpoint or
+resource is correct", so a rotated credential, a wrong base URL or a
+sandbox/production mixup all produce a 4xx for orders that exist and have
+real money captured against them. A status-based reading would write those
+off a week later, silently, in the one direction this code must never be
+wrong in.
+
+Reading the code instead fails the safe way round: an unknown-order answer
+that arrives without that code is simply not recognised, so the row keeps
+retrying and keeps appearing in the sweep's failure lines until a person
+looks at it. That costs noise. The other reading would have cost a payment.
+
 ## Implementation order
 
 1. Operational accounting export (implemented for TallyPrime XML).
@@ -410,4 +457,9 @@ picks it up rather than a parent's money sitting silently unresolved.
 5. Revisit LLM only in response to an approved business need.
 6. UPI payments via PhonePe (implemented; see decision 6 above). Production
    cutover — live PhonePe Business credentials, a registered webhook URL, and
-   a scheduled reconcile sweep — remains outstanding.
+   a scheduled reconcile sweep — remains outstanding. The first sandbox run
+   should also capture, verbatim, what the status API answers for a
+   merchantOrderId that was never registered: the code that decides whether
+   to retire such a row expects `INVALID_MERCHANT_ORDER_ID` from PhonePe's
+   published docs, and a live response carrying some other code belongs in
+   `ORDER_NOT_FOUND_CODES` next to the one already there.

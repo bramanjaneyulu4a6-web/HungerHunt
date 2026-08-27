@@ -40,6 +40,19 @@ const paymentIntentSchema = new mongoose.Schema(
     provider: { type: String, enum: ['PHONEPE'], default: 'PHONEPE', required: true },
     providerOrderId: { type: String, default: null },
 
+    /* A bearer secret for one intent, carried only in the redirect URL we
+     * hand PhonePe. It exists because of where that redirect lands: whatever
+     * browser the parent's UPI app handed control to, which on a phone is a
+     * Custom Tab holding none of the app's session. The page that greets
+     * them there cannot be an authenticated one, and the intent id alone
+     * cannot stand in for authentication — ObjectIds are part timestamp and
+     * part counter, so a public route keyed on the id would be a status
+     * oracle anyone could walk.
+     *
+     * select: false so it can never ride along on an ordinary read; the one
+     * route that checks it asks for it by name. */
+    returnToken: { type: String, default: null, select: false },
+
     status: {
       type: String,
       enum: ['CREATED', 'PENDING', 'APPLYING', 'APPLIED', 'FAILED', 'EXPIRED', 'AMOUNT_MISMATCH'],

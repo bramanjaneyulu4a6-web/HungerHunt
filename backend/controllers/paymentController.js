@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import PaymentIntent from '../models/PaymentIntent.js';
 import PendingOrder from '../models/PendingOrder.js';
@@ -18,6 +19,30 @@ import { rupeesToPaise, paiseToRupees } from '../src/domain/payments/money.js';
  * named imports off a module namespace — mock.method() cannot redefine a
  * namespace property on this repo's Node, so this is also what lets the
  * tests stub them. */
+
+/* What the return page is allowed to see without a session. Deliberately
+ * narrower than intentView: no amount, no student, no order, no timestamps.
+ * A verdict is all that screen renders, so a verdict is all this hands out —
+ * and if the token ever leaks (a shoulder-surfed URL, a shared screenshot),
+ * what leaks with it is "a payment succeeded", not how much or for whom. */
+const publicIntentView = (intent) => ({
+  id: String(intent._id),
+  purpose: intent.purpose,
+  status: intent.status,
+  degradedToTopup: Boolean(intent.degradedToTopup),
+});
+
+/* Same lesson as the webhook's auth check in providers/phonepe.js: compare
+ * BYTE length before timingSafeEqual, which throws on a length mismatch
+ * rather than returning false. The query string is attacker-controlled and
+ * can carry multi-byte characters. */
+const tokenMatches = (presented, expected) => {
+  if (typeof presented !== 'string' || typeof expected !== 'string' || !expected) return false;
+  const a = Buffer.from(presented);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
 
 const intentView = (intent) => ({
   id: String(intent._id),
@@ -83,6 +108,7 @@ export const createPaymentIntent = async (req, res) => {
       pendingOrderId,
       amountPaise,
       merchantOrderId: `HH-${new mongoose.Types.ObjectId()}`,
+      returnToken: crypto.randomBytes(32).toString('hex'),
     });
 
     let created;
@@ -90,7 +116,10 @@ export const createPaymentIntent = async (req, res) => {
       created = await phonepe.createPayment({
         merchantOrderId: intent.merchantOrderId,
         amountPaise,
-        redirectUrl: `${process.env.PHONEPE_REDIRECT_BASE_URL}/payment-return?intent=${intent._id}`,
+        // The token travels only here, in the URL PhonePe redirects to. It
+        // is what lets that page report a verdict in a browser with no
+        // session — see returnToken on the model.
+        redirectUrl: `${process.env.PHONEPE_REDIRECT_BASE_URL}/payment-return?intent=${intent._id}&t=${intent.returnToken}`,
       });
     } catch (err) {
       await PaymentIntent.findOneAndUpdate(
@@ -125,6 +154,37 @@ export const getPaymentIntent = async (req, res) => {
       : intent;
 
     res.set('Cache-Control', 'no-store').json({ intent: intentView(fresh) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* The return page's read, for the browser PhonePe redirected into — which
+ * on native shares no session with the app that started the payment. No auth
+ * middleware; possession of the intent's returnToken is the whole credential,
+ * and it only ever answers for that one payment.
+ *
+ * It settles exactly as the authenticated poll does, and for the same
+ * reason: this is a recovery path, so it has to be able to discover a
+ * dropped webhook rather than parrot a stale row. It still cannot decide
+ * anything about money — settlePaymentIntent asks PhonePe's server. Every
+ * rejection answers 404 with the same body, so the route never confirms that
+ * an intent id exists to someone holding the wrong token. */
+export const getPublicPaymentIntent = async (req, res) => {
+  const notFound = () => res.status(404).json({ message: 'Payment not found.' });
+
+  try {
+    const presented = typeof req.query.t === 'string' ? req.query.t : '';
+    if (!presented || !mongoose.isValidObjectId(req.params.id)) return notFound();
+
+    const intent = await PaymentIntent.findById(req.params.id).select('+returnToken');
+    if (!intent || !tokenMatches(presented, intent.returnToken)) return notFound();
+
+    const fresh = ['PENDING', 'APPLYING', 'CREATED'].includes(intent.status)
+      ? (await settle.settlePaymentIntent(intent._id).catch(() => intent)) || intent
+      : intent;
+
+    res.set('Cache-Control', 'no-store').json({ intent: publicIntentView(fresh) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

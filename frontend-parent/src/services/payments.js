@@ -36,6 +36,23 @@ export const getIntent = (intentId, { signal } = {}) =>
     (r) => r.data.intent
   );
 
+/* The same verdict, for the browser PhonePe redirects into. That browser is
+ * whichever one the parent's UPI app was holding — on a phone a Custom Tab
+ * carrying none of the app's localStorage — so there is no session to poll
+ * with, and the authenticated read above would bounce it to a login screen
+ * at the end of a payment. The token comes from the redirect URL the backend
+ * built; possession of it is the credential.
+ *
+ * It answers with a verdict and nothing else: no amount, no student. That is
+ * all this screen renders, and it keeps a shoulder-surfed URL from being a
+ * statement of how much, for whom. */
+export const getPublicIntent = (intentId, token, { signal } = {}) =>
+  API.get(`/payments/public/intents/${intentId}`, {
+    params: { t: token },
+    signal,
+    timeout: POLL_TIMEOUT_MS,
+  }).then((r) => r.data.intent);
+
 /* Opens PhonePe's hosted checkout. On a phone this is the system browser,
  * where upi:// intent links actually resolve to installed UPI apps; inside
  * the webview they would dead-end. */
@@ -128,10 +145,14 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 4;
  * row is treated as something the caller needs to know about. An expired
  * session (401 AUTH_REQUIRED) is not transient — the shared axios instance
  * is already logging the parent out and redirecting to /login, so that error
- * is rethrown immediately instead of being retried into a dead token. */
+ * is rethrown immediately instead of being retried into a dead token.
+ *
+ * `fetcher` is how the return page swaps in the public, token-scoped read
+ * without duplicating any of the loop's timing, backoff or give-up rules —
+ * the two reads differ only in what proves the caller may see the verdict. */
 export const pollIntent = async (
   intentId,
-  { onUpdate, intervalMs = 3000, timeoutMs = 300000, signal } = {}
+  { onUpdate, intervalMs = 3000, timeoutMs = 300000, signal, fetcher = getIntent } = {}
 ) => {
   const deadline = Date.now() + timeoutMs;
   let failures = 0;
@@ -141,7 +162,7 @@ export const pollIntent = async (
 
     let intent;
     try {
-      intent = await getIntent(intentId, { signal });
+      intent = await fetcher(intentId, { signal });
     } catch (err) {
       if (signal?.aborted) return null;
       if (isAuthRequiredError(err)) throw err;

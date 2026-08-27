@@ -86,3 +86,30 @@ export const paymentStatusLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many status checks. Please wait a moment and try again." },
 });
+
+/* The public return-page read has no account to key on, and IP is the wrong
+   bucket here: this route is reached from whatever browser a UPI app handed
+   control to, so a school's parents on one mobile carrier NAT would share a
+   bucket and throttle each other mid-payment. The intent id is the natural
+   bucket instead — one payment's poll cannot starve another's — and it is
+   safe to key on because the request still has to present that intent's
+   token before anything happens. A caller varying the id to spread load is
+   also varying the thing they must hold a 256-bit secret for.
+
+   The IP fallback catches a malformed id, so a flood of junk paths shares
+   one bucket rather than minting a store entry each.
+
+   Same 120/minute as the authenticated poll, sized the same way: the page
+   polls every 3 seconds, so only a loop gone wrong reaches it. */
+const returnKeyGenerator = (req) =>
+  (/^[a-f\d]{24}$/i.test(req.params.id || "") ? `intent:${req.params.id}` : ipKeyGenerator(req.ip));
+
+export const paymentReturnLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: returnKeyGenerator,
+  skip: skipAuthLimitsInDevelopment,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many status checks. Please wait a moment and try again." },
+});

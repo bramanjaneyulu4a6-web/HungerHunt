@@ -204,3 +204,158 @@ test('a webhook whose lookup rejects still answers instead of crashing the proce
   });
   assert.equal(res.status, 500);
 });
+
+/* ---- the public return-page read --------------------------------------- */
+
+const RETURN_TOKEN = 'a'.repeat(64);
+
+// No Authorization header anywhere: the browser PhonePe redirects into does
+// not have one, which is the entire reason this route exists.
+const publicGet = (id, query = '') => fetch(`${base}/api/payments/public/intents/${id}${query}`);
+
+const publicIntentDoc = (over = {}) => ({
+  _id: INTENT_ID,
+  parentId: PARENT_ID,
+  studentId: STUDENT_ID,
+  purpose: 'TOPUP',
+  status: 'PENDING',
+  amountPaise: 50000,
+  degradedToTopup: false,
+  pendingOrderId: null,
+  returnToken: RETURN_TOKEN,
+  createdAt: new Date(),
+  ...over,
+});
+
+// findById(...).select('+returnToken') — the token is select:false on the
+// model, so the route has to ask for it by name; this stub pins that chain.
+const stubFindById = (doc) => {
+  let selected;
+  mock.method(PaymentIntent, 'findById', (id) => ({
+    select: async (fields) => {
+      selected = fields;
+      return doc;
+    },
+  }));
+  return () => selected;
+};
+
+test('the checkout redirect url carries the intent return token', async () => {
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (f, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  let capturedRedirect;
+  mock.method(phonepe, 'createPayment', async ({ redirectUrl }) => {
+    capturedRedirect = redirectUrl;
+    return { providerOrderId: 'OMO1', redirectUrl: 'https://pg.example/co', state: 'PENDING' };
+  });
+
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 500 });
+  assert.equal(res.status, 201);
+
+  // 32 random bytes as hex. A short or predictable token would turn the
+  // public route into a status oracle for anyone who can guess an ObjectId.
+  assert.match(createdDoc.returnToken, /^[a-f\d]{64}$/);
+  const url = new URL(capturedRedirect);
+  assert.equal(url.searchParams.get('intent'), INTENT_ID);
+  assert.equal(url.searchParams.get('t'), createdDoc.returnToken);
+  // The token must never come back to the app that started the payment; it
+  // belongs only in the URL handed to PhonePe.
+  assert.equal((await res.json()).intent.returnToken, undefined);
+});
+
+test('the return page reads a verdict with the token and no session', async () => {
+  const readSelect = stubFindById(publicIntentDoc());
+  const settled = mock.method(settle, 'settlePaymentIntent', async () =>
+    publicIntentDoc({ status: 'APPLIED' }));
+
+  const res = await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`);
+
+  assert.equal(res.status, 200);
+  const { intent } = await res.json();
+  assert.equal(intent.status, 'APPLIED');
+  assert.equal(intent.purpose, 'TOPUP');
+  assert.equal(intent.degradedToTopup, false);
+  // Polling is the recovery path here too — an unfinished intent gets
+  // re-asked of PhonePe rather than read stale off the row.
+  assert.equal(settled.mock.callCount(), 1);
+  assert.equal(readSelect(), '+returnToken');
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+});
+
+test('the public verdict carries no amount, student or order', async () => {
+  stubFindById(publicIntentDoc({ status: 'APPLIED' }));
+
+  const { intent } = await (await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`)).json();
+
+  // A leaked URL must not become a statement of how much, for whom.
+  assert.deepEqual(Object.keys(intent).sort(), ['degradedToTopup', 'id', 'purpose', 'status']);
+});
+
+test('a wrong, absent or malformed token is answered 404 and never settles', async () => {
+  const settled = mock.method(settle, 'settlePaymentIntent', async () => null);
+  stubFindById(publicIntentDoc());
+
+  const wrong = await publicGet(INTENT_ID, `?t=${'b'.repeat(64)}`);
+  const none = await publicGet(INTENT_ID);
+  const empty = await publicGet(INTENT_ID, '?t=');
+  // Different byte length from the stored token: timingSafeEqual throws on
+  // a length mismatch, so this must be rejected before it is reached.
+  const shortTok = await publicGet(INTENT_ID, '?t=abc');
+  // Multi-byte characters — same trap, arriving through the query string.
+  const wide = await publicGet(INTENT_ID, `?t=${encodeURIComponent('é'.repeat(64))}`);
+  // Repeated ?t= makes Express parse the value as an array, not a string.
+  const arrayTok = await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}&t=${RETURN_TOKEN}`);
+
+  for (const res of [wrong, none, empty, shortTok, wide, arrayTok]) {
+    assert.equal(res.status, 404);
+    // One body for every rejection: the route never confirms an id exists.
+    assert.equal((await res.json()).message, 'Payment not found.');
+  }
+  assert.equal(settled.mock.callCount(), 0);
+});
+
+test('an unknown or malformed intent id is answered 404', async () => {
+  stubFindById(null);
+  assert.equal((await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`)).status, 404);
+  // Not an ObjectId — rejected before any query, so a flood of junk paths
+  // cannot make Mongoose throw a CastError per request.
+  assert.equal((await publicGet('not-an-id', `?t=${RETURN_TOKEN}`)).status, 404);
+});
+
+test('an intent with no stored token can never be read publicly', async () => {
+  // Rows created before returnToken existed. They must fall back to the
+  // authenticated route, not answer to an empty-string token.
+  stubFindById(publicIntentDoc({ returnToken: null }));
+  assert.equal((await publicGet(INTENT_ID, '?t=null')).status, 404);
+  assert.equal((await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`)).status, 404);
+});
+
+test('a settled-terminal intent is returned without asking the provider again', async () => {
+  stubFindById(publicIntentDoc({ status: 'FAILED' }));
+  const settled = mock.method(settle, 'settlePaymentIntent', async () => null);
+
+  const res = await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`);
+
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).intent.status, 'FAILED');
+  assert.equal(settled.mock.callCount(), 0);
+});
+
+test('a settle failure still answers with the row rather than an error', async () => {
+  stubFindById(publicIntentDoc());
+  mock.method(settle, 'settlePaymentIntent', async () => { throw new Error('PhonePe down'); });
+
+  const res = await publicGet(INTENT_ID, `?t=${RETURN_TOKEN}`);
+
+  // The parent is standing at the end of a payment; a provider hiccup shows
+  // them "still checking", never a 500.
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).intent.status, 'PENDING');
+});

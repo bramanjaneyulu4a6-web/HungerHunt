@@ -16,7 +16,7 @@ import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
-import { createTopup, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { createTopup, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
@@ -817,6 +817,7 @@ export default function ChildDetails() {
 
       {activeTab === 'recharges' && (
         <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
+          {PAYMENTS_ENABLED && (
           <Card style={{ marginBottom: 24 }}>
             <h2 className="section-title" style={{ fontSize: 20 }}>
               Add money
@@ -877,6 +878,7 @@ export default function ChildDetails() {
               </Button>
             )}
           </Card>
+          )}
 
           <h2 className="section-title">Recharge History</h2>
 

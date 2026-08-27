@@ -6,7 +6,7 @@ import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
-import { createOrderPayment, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { createOrderPayment, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -540,6 +540,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                 </Button>
                 {/* Not gated on `insufficient` — a wallet that can't cover
                     the order is exactly when a parent reaches for this. */}
+                {PAYMENTS_ENABLED && (
                 <Button
                   variant="ghost"
                   disabled={busy || empty}
@@ -547,6 +548,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                 >
                   {payBusy ? 'Waiting for the bank…' : 'Pay by UPI'}
                 </Button>
+                )}
                 <Button
                   variant="alert"
                   className="btn--cancel-order"
@@ -739,11 +741,13 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           </div>
           {/* Not gated on `insufficient` — a wallet that can't cover the order
               is exactly when a parent reaches for this button. */}
+          {PAYMENTS_ENABLED && (
           <div className="pending-actions">
             <Button variant="ghost" block disabled={busy || edited} onClick={payByUpi}>
               {payBusy ? 'Waiting for the bank…' : 'Pay by UPI'}
             </Button>
           </div>
+          )}
         </>
       )}
 

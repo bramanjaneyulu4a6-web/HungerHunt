@@ -16,6 +16,23 @@ import API from './api';
  * settle step. So this file's whole job is: start the payment, open the
  * checkout, then ASK THE BACKEND until it says something terminal. */
 
+/* Whether to offer UPI at all. Baked in at build time, and OFF unless the
+ * build explicitly says otherwise, because the failure it prevents is a
+ * one-way one: with the backend's PHONEPE_* credentials unset every tap
+ * reaches PhonePe, fails its token request, and shows the parent "the
+ * payment service is not answering". Nothing is charged and no money is at
+ * risk — but a button that never works, on the screen where a parent is
+ * trying to pay for their child's food, is worse than no button.
+ *
+ * Default-off also means the flag needs no coordination to be safe: a build
+ * that forgets it hides the feature rather than shipping a broken one. Turn
+ * it on in the same change that puts the credentials into the backend.
+ *
+ * This hides the entry points only. The /payment-return page and the polling
+ * below stay reachable either way, so a payment already in flight when the
+ * flag is turned off still settles and still reports its verdict. */
+export const PAYMENTS_ENABLED = import.meta.env.VITE_PAYMENTS_ENABLED === 'true';
+
 export const TERMINAL_STATUSES = ['APPLIED', 'FAILED', 'EXPIRED', 'AMOUNT_MISMATCH'];
 
 export const createOrderPayment = (pendingOrderId) =>

@@ -844,7 +844,7 @@ export default function ChildDetails() {
             <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
               {!DEMO_UPI_ENABLED && PAYMENTS_ENABLED
                 ? `Top up ${student.name}'s wallet by UPI.`
-                : `Preview a UPI top-up for ${student.name}. No money or wallet balance will change.`}
+                : `Choose an amount to add to ${student.name}'s wallet using UPI.`}
             </p>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -908,7 +908,7 @@ export default function ChildDetails() {
             )}
             {demoPaymentResult && (
               <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
-                Demo completed with {demoPaymentResult.provider}. No money was charged and the wallet was not changed.
+                UPI demo completed with {demoPaymentResult.provider}.
               </Banner>
             )}
           </Card>

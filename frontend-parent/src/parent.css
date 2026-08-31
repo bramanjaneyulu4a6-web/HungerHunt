@@ -56,20 +56,12 @@ body {
 
 .payment-choice-sheet {
   width: min(100%, 470px);
-  padding: 8px 24px 24px;
+  padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 28px;
   background: #fff;
   box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
   animation: upi-demo-rise 340ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
-}
-
-.payment-choice-handle {
-  width: 42px;
-  height: 4px;
-  margin: 2px auto 16px;
-  border-radius: 999px;
-  background: #ddd5cb;
 }
 
 .payment-choice-header {
@@ -201,20 +193,12 @@ body {
   width: min(100%, 480px);
   max-height: min(760px, calc(100svh - 36px));
   overflow: auto;
-  padding: 8px 26px calc(24px + env(safe-area-inset-bottom));
+  padding: 24px 26px calc(24px + env(safe-area-inset-bottom));
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 28px;
   background: #fff;
   box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
   animation: upi-demo-rise 360ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
-}
-
-.upi-demo-handle {
-  width: 42px;
-  height: 4px;
-  margin: 2px auto 16px;
-  border-radius: 999px;
-  background: #ddd5cb;
 }
 
 .upi-demo-header {
@@ -455,13 +439,6 @@ body {
   transform: scale(0.99);
 }
 
-.upi-demo-disclaimer {
-  margin-top: 9px;
-  color: #9a8f84;
-  font-size: 10px;
-  text-align: center;
-}
-
 .upi-demo-state {
   display: flex;
   min-height: 470px;
@@ -559,18 +536,6 @@ body {
   color: #493e34;
   font-size: 12px;
   letter-spacing: 0.04em;
-}
-
-.upi-demo-no-charge {
-  width: 100%;
-  margin-bottom: 18px;
-  padding: 11px 13px;
-  border: 1px solid #bfe9cc;
-  border-radius: 13px;
-  background: #effaf2;
-  color: #176b39;
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 @keyframes upi-demo-fade {
@@ -2052,18 +2017,17 @@ body {
 
 @media (max-width: 520px) {
   .payment-choice-overlay {
-    align-items: end;
-    padding: 0;
+    place-items: center;
+    padding: 16px;
   }
 
   .payment-choice-sheet {
-    width: 100%;
-    padding: 8px 18px calc(18px + env(safe-area-inset-bottom));
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 26px 26px 0 0;
-    animation-name: upi-demo-rise-mobile;
+    width: min(100%, 460px);
+    height: 80svh;
+    max-height: 80svh;
+    overflow: auto;
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 24px;
   }
 
   .payment-choice-option {
@@ -2080,19 +2044,16 @@ body {
   }
 
   .upi-demo-overlay {
-    align-items: end;
-    padding: 0;
+    place-items: center;
+    padding: 16px;
   }
 
   .upi-demo-sheet {
-    width: 100%;
-    max-height: calc(100svh - env(safe-area-inset-top));
-    padding: 8px 18px calc(18px + env(safe-area-inset-bottom));
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 26px 26px 0 0;
-    animation-name: upi-demo-rise-mobile;
+    width: min(100%, 470px);
+    height: 80svh;
+    max-height: 80svh;
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 24px;
   }
 
   .upi-demo-header h2,
@@ -2101,7 +2062,7 @@ body {
   }
 
   .upi-demo-state {
-    min-height: min(510px, calc(100svh - 70px));
+    min-height: calc(80svh - 64px);
   }
 
   .auth-page {
@@ -2237,14 +2198,17 @@ body {
   }
 
   .parent-modal-backdrop {
-    align-items: end;
-    padding: 12px;
+    place-items: center;
+    padding: 16px;
   }
 
   .parent-modal {
-    padding: 24px 20px calc(22px + env(safe-area-inset-bottom));
-    border-radius: 24px 24px 18px 18px;
-    transform-origin: center bottom;
+    width: min(calc(100vw - 32px), 420px);
+    max-height: 80svh;
+    overflow: auto;
+    padding: 24px 20px;
+    border-radius: 24px;
+    transform-origin: center;
   }
 
   .auth-input,
@@ -2274,8 +2238,4 @@ body {
     animation: none;
   }
 
-}
-
-@keyframes upi-demo-rise-mobile {
-  from { opacity: 0; transform: translateY(100%); }
 }

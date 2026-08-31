@@ -45,7 +45,6 @@ export default function PaymentMethodChooser({
         aria-modal="true"
         aria-labelledby="payment-choice-title"
       >
-        <div className="payment-choice-handle" aria-hidden="true" />
         <header className="payment-choice-header">
           <div>
             <span className="payment-choice-eyebrow">Choose payment method</span>
@@ -85,11 +84,8 @@ export default function PaymentMethodChooser({
 
         {walletDisabled && (
           <p className="payment-choice-note">
-            The school wallet does not have enough balance for this order. You can still preview payment by UPI.
+            The school wallet does not have enough balance for this order. Choose UPI instead.
           </p>
-        )}
-        {isDemo && (
-          <p className="upi-demo-disclaimer">UPI is a frontend demonstration only and will not charge you.</p>
         )}
       </section>
     </div>,

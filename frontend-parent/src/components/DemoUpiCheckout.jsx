@@ -8,7 +8,6 @@ export default function DemoUpiCheckout({
   amount,
   studentName,
   purposeLabel = 'Wallet top-up',
-  noChargeMessage = 'No money was charged and the wallet balance was not changed.',
   onClose,
   onComplete,
 }) {
@@ -55,15 +54,13 @@ export default function DemoUpiCheckout({
         aria-modal="true"
         aria-labelledby="upi-demo-title"
       >
-        <div className="upi-demo-handle" aria-hidden="true" />
-
         {stage === 'choose' && (
           <>
             <header className="upi-demo-header">
               <div>
                 <span className="upi-demo-badge">Demo checkout</span>
                 <h2 id="upi-demo-title">Pay securely with UPI</h2>
-                <p>No money will be charged in this preview.</p>
+                <p>Complete your payment using your preferred UPI app.</p>
               </div>
               <button
                 ref={closeButtonRef}
@@ -129,7 +126,6 @@ export default function DemoUpiCheckout({
             >
               Pay {formatINR(amount)} with {provider.name}
             </button>
-            <p className="upi-demo-disclaimer">Demo only · No backend request will be made</p>
           </>
         )}
 
@@ -161,7 +157,6 @@ export default function DemoUpiCheckout({
               <span>Reference</span>
               <strong>{reference}</strong>
             </div>
-            <div className="upi-demo-no-charge">{noChargeMessage}</div>
             <button type="button" className="upi-demo-pay" onClick={finish}>
               Done
             </button>

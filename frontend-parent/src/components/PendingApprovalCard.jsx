@@ -427,7 +427,6 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           amount={total}
           studentName={student.name || 'Your child'}
           purposeLabel="Order payment"
-          noChargeMessage="No money was charged and this order is still awaiting approval."
           onClose={() => setDemoOrderCheckoutOpen(false)}
           onComplete={completeDemoOrderPayment}
         />
@@ -565,7 +564,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Review latest order', onClick: () => onResolved?.() } : undefined} />}
             {demoOrderResult && (
               <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
-                Demo UPI payment completed with {demoOrderResult.provider}. The order is still awaiting approval.
+                UPI demo completed with {demoOrderResult.provider}.
               </Banner>
             )}
             {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
@@ -641,7 +640,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Refresh order', onClick: () => onResolved?.() } : undefined} />}
           {demoOrderResult && (
             <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
-              Demo UPI payment completed with {demoOrderResult.provider}. The order is still awaiting approval.
+              UPI demo completed with {demoOrderResult.provider}.
             </Banner>
           )}
           {confirming === 'decline' ? (
@@ -767,7 +766,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
       {demoOrderResult && (
         <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
-          Demo UPI payment completed with {demoOrderResult.provider}. No money was charged and the order is still awaiting approval.
+          UPI demo completed with {demoOrderResult.provider}.
         </Banner>
       )}
 

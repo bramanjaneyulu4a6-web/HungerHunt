@@ -110,14 +110,13 @@ These are open items, not formalities. Each one is a real gap today.
       a package handed over asks for the caretaker's name at the hostel door;
       a name only, no ID or phone numbers, which the server refuses.
 
-- [ ] **Tell the admins that caretaker reports are everyone's.** Caretakers can
-      now raise a package issue at handover and a professional complaint about
-      anything; both land in the admin console under *Caretaker reports* and
-      nowhere else. Every admin sees the same queue, any of them may answer any
-      report, and the answer is recorded and shown to the caretaker **under the
-      name of the admin who wrote it**. An undismissable banner counts what is
-      unanswered on every screen — nothing else notifies anyone, because staff
-      accounts have no email or push channel.
+- [ ] **Tell the admins that Reports is the shared issue queue.** The admin
+      console separates reports into *Students*, *Caretakers*, *Warehouse* and
+      *Parents*. Every admin sees the same queue, any of them may answer any
+      report, and the answer is recorded under the name of the admin who wrote
+      it. An undismissable banner counts what is unanswered on every screen —
+      nothing else notifies anyone, because staff accounts have no email or
+      push channel.
 
 - [ ] **Tell the counter staff that admin billing no longer charges.** An order
       raised from the admin console now always goes to the parent to approve —
@@ -157,7 +156,10 @@ These are open items, not formalities. Each one is a real gap today.
       - Account deletion. Apple requires an in-app route to delete the account
         for any app that lets you create one. Parent accounts here are created
         by the school, which is the argument for exemption — make that
-        argument deliberately.
+        argument deliberately and explain the activation flow in review notes.
+      - Build with Xcode 26 / the iOS 26 SDK. This is required for submissions
+        after 28 April 2026. The local unsigned Release build has been checked
+        with Xcode 26; the signed archive still needs the distribution profile.
 
       *Google, in Play Console:*
       - App record, and Play App Signing enrolled at creation (it cannot be
@@ -174,6 +176,17 @@ These are open items, not formalities. Each one is a real gap today.
       - Ship to the internal testing track first and install from it. It is
         the only way to find out that the signed bundle behaves before
         production does.
+      - Target Android 16 / API 36 for submissions from 31 August 2026. The
+        project already targets API 36.
+      - If this is a new personal developer account created after 13 November
+        2023, complete Google's closed test with at least 12 opted-in testers
+        for 14 continuous days before applying for production access.
+
+      Official references: [Apple submission requirements](https://developer.apple.com/app-store/submitting/),
+      [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app/),
+      [Google target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878),
+      [Google testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465),
+      and [Google account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111).
 
 ---
 
@@ -181,14 +194,14 @@ These are open items, not formalities. Each one is a real gap today.
 
 ### 1. Set the version in all three places
 
-They are separate files and nothing keeps them in step, so a mismatch ships
-quietly.
+They are separate files. `npm run check:native` now fails when they drift, but
+the build numbers still have to be incremented deliberately for each upload.
 
 | Where | Field | Currently |
 |---|---|---|
 | `frontend-parent/package.json` | `version` | `1.0.0` |
-| `frontend-parent/android/app/build.gradle` | `versionCode`, `versionName` | `1`, `"1.0"` |
-| Xcode → target *App* → General | Version, Build (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` in `project.pbxproj`) | `1.0`, `1` |
+| `frontend-parent/android/app/build.gradle` | `versionCode`, `versionName` | `1`, `"1.0.0"` |
+| Xcode → target *App* → General | Version, Build (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` in `project.pbxproj`) | `1.0.0`, `1` |
 
 - [ ] `versionCode` is an integer and **must increase for every single upload**
       to Play, including one that replaces a build rejected an hour earlier.
@@ -213,20 +226,20 @@ quietly.
 
 ### 3. Verify
 
-CI runs the first four of these on every push and pull request
-([.github/workflows/ci.yml](.github/workflows/ci.yml)). Run them locally before
-tagging anyway — CI does not build the native shells.
+CI runs the web tests, lints, builds and the parent native-configuration check
+on every push and pull request ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+Run these locally before tagging anyway — CI does not compile the native shells.
 
 ```bash
 npm test            --prefix backend            # 458 tests, all mocked; no database is touched
+npm test            --prefix frontend-parent    # validation and formatting unit tests
 npm run lint        --prefix frontend-parent    # must be 0 errors, 0 warnings
 npm run lint        --prefix hungerhunt-kiosk
 npm run build       --prefix frontend-parent
 npm run build       --prefix frontend-admin
 npm run build       --prefix hungerhunt-kiosk
 node scripts/check-shared-files.mjs             # the files duplicated across apps still match
-
-cd frontend-parent && npx cap sync              # copies dist/ into ios/ and android/
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run sync:release --prefix frontend-parent
 ```
 
 - [ ] All of the above pass.
@@ -268,25 +281,21 @@ need a human in a GUI are marked; nothing else is interactive.
 ```bash
 cd frontend-parent
 
-# 1. The bundle. .env must already hold the production https API URL — this is
-#    the step that bakes it in, and no later step can change it. build:release
-#    is `build` with scripts/validate-frontend-release-env.mjs in front of it:
-#    it refuses http and a local host, so a misaimed
-#    build fails here in a second rather than on a tester's phone in a week.
-npm run build:release
-npx cap sync
-
-# 2. Android. Needs android/app/google-services.json and a release keystore
+# 1. Android. Validate versions, native/Firebase files, the production API and
+#    signing; then build, sync both native shells, and create the Play bundle.
+#    Set the URL in .env or supply it for this command as shown. It needs
+#    android/app/google-services.json and a release keystore
 #    (see "Signing", below). With no keystore configured this now refuses to
 #    start, in about a second, naming the values it could not find — rather
 #    than building an unsigned .aab that Play rejects at the end of the upload.
-cd android && ./gradlew :app:bundleRelease
-#    → app/build/outputs/bundle/release/app-release.aab
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run bundle:android
+#    → android/app/build/outputs/bundle/release/app-release.aab
 
-# 3. iOS. Archiving is done from Xcode: the signing certificate and the Push
+# 2. iOS. The command above has already synced its production bundle. Archiving
+#    is done from Xcode: the signing certificate and the Push
 #    Notifications capability both live in the Signing & Capabilities tab, and
 #    a command-line archive would need them configured there first anyway.
-cd .. && npx cap open ios
+npx cap open ios
 #    Xcode → destination "Any iOS Device (arm64)" → Product → Archive
 #           → Distribute App → App Store Connect
 ```
@@ -348,10 +357,10 @@ On a real device, against production, signed in as a real parent:
 
 Worth knowing when deciding how much the green checkmarks are worth.
 
-- **The parent app has no frontend tests.** The backend tests cover its API
-  surface and auth, and the other three apps each have a small suite CI runs,
-  but nothing exercises a parent-app screen; every one of them is verified by
-  hand, which is what section 5 is for.
+- **The parent app has utility tests, not screen-level tests.** Validation and
+  formatting behaviour now run in CI, and backend tests cover the API surface
+  and auth, but no automated test drives a parent workflow through the UI;
+  those are still verified by hand in section 5.
 - **Nothing tests the native shells.** CI runs on Linux and builds the web
   bundle only; iOS and Android are exercised only by an actual release.
 - **`npm run build` still has a silent fallback.** `src/services/api.js`

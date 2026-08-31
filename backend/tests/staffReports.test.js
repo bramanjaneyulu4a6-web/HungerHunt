@@ -284,6 +284,48 @@ describe('the order the office works in', () => {
     assert.deepEqual(seen.sort, { createdAt: -1 });
   });
 
+  test('the office can separate reports by who initiated them', async () => {
+    asAdmin();
+    let seenFilter;
+    mock.method(StaffReport, 'find', (filter) => {
+      seenFilter = filter;
+      const chain = {
+        sort: () => chain,
+        skip: () => chain,
+        limit: () => chain,
+        lean: async () => [],
+      };
+      return chain;
+    });
+    mock.method(StaffReport, 'countDocuments', async () => 0);
+
+    const response = await send(
+      'GET',
+      '/api/v1/reports?source=student&status=OUTSTANDING',
+      undefined,
+      adminToken
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(seenFilter['raiser.role'], 'student');
+    assert.deepEqual(seenFilter.status, { $in: ['OPEN', 'ACKNOWLEDGED'] });
+  });
+
+  test('an unknown report source is rejected', async () => {
+    asAdmin();
+    const find = mock.method(StaffReport, 'find', () => { throw new Error('must not run'); });
+
+    const response = await send(
+      'GET',
+      '/api/v1/reports?source=somebody',
+      undefined,
+      adminToken
+    );
+
+    assert.equal(response.status, 400);
+    assert.equal(find.mock.callCount(), 0);
+  });
+
   test('every admin account reaches the same queue', async () => {
     // No ownership, no assignment: the queue belongs to all of them, which is
     // why the answer has to carry a name.

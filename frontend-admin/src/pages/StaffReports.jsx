@@ -23,6 +23,20 @@ const VIEWS = [
   ['ALL', 'Everything'],
 ];
 
+const SOURCES = [
+  ['student', 'Students'],
+  ['caretaker', 'Caretakers'],
+  ['warehouse', 'Warehouse'],
+  ['parent', 'Parents'],
+];
+
+const SOURCE_COPY = {
+  student: 'Reports raised by students while collecting a package.',
+  caretaker: 'Package issues and complaints raised by hostel caretakers.',
+  warehouse: 'Reports raised by warehouse staff.',
+  parent: 'Reports raised by parents.',
+};
+
 const STATUS_VARIANT = {
   OPEN: 'alert',
   ACKNOWLEDGED: 'warn',
@@ -35,10 +49,11 @@ const STATUS_LABEL = {
   RESOLVED: 'Answered',
 };
 
-const queryFor = (view) => {
-  if (view === 'OUTSTANDING') return '?status=OUTSTANDING';
-  if (view === 'ALL') return '';
-  return `?kind=${view}`;
+const queryFor = (source, view) => {
+  const query = new URLSearchParams({ source });
+  if (view === 'OUTSTANDING') query.set('status', 'OUTSTANDING');
+  else if (view !== 'ALL') query.set('kind', view);
+  return `?${query.toString()}`;
 };
 
 const formatWhen = (value) =>
@@ -50,6 +65,7 @@ const formatWhen = (value) =>
   }).format(new Date(value));
 
 export default function StaffReports() {
+  const [source, setSource] = useState('student');
   const [view, setView] = useState('OUTSTANDING');
   const [reports, setReports] = useState([]);
   const [outstanding, setOutstanding] = useState(0);
@@ -63,7 +79,7 @@ export default function StaffReports() {
     setLoading(true);
     setError(false);
     try {
-      const response = await api.get(`/v1/reports${queryFor(view)}`);
+      const response = await api.get(`/v1/reports${queryFor(source, view)}`);
       setReports(response.data.data || []);
       setOutstanding(response.data.meta?.outstanding || 0);
     } catch (err) {
@@ -72,7 +88,7 @@ export default function StaffReports() {
     } finally {
       setLoading(false);
     }
-  }, [view]);
+  }, [source, view]);
 
   useEffect(() => {
     const initial = setTimeout(load, 0);
@@ -85,7 +101,7 @@ export default function StaffReports() {
       await api.post(`/v1/reports/${report.id}/status`, { status, note });
       setResolving(null);
       setAnswer('');
-      toast.success(status === 'RESOLVED' ? 'Answer sent to the caretaker' : 'Marked as being looked at');
+      toast.success(status === 'RESOLVED' ? 'Answer sent to the reporter' : 'Marked as being looked at');
       await load();
     } catch (err) {
       console.error(err);
@@ -96,19 +112,41 @@ export default function StaffReports() {
     }
   };
 
+  const selectSource = (nextSource) => {
+    setSource(nextSource);
+    setView('OUTSTANDING');
+    setResolving(null);
+    setAnswer('');
+  };
+
   return (
     <div className="page">
       <PageHeader
-        title="Caretaker reports"
+        title="Reports"
         subtitle={
           outstanding > 0
-            ? `${outstanding} report${outstanding === 1 ? '' : 's'} waiting on the office. Any admin can answer any of them, and the answer carries their name.`
-            : 'Package issues and complaints raised from the hostels. Only this console can read them.'
+            ? `${outstanding} ${source}-initiated report${outstanding === 1 ? '' : 's'} waiting on the office.`
+            : SOURCE_COPY[source]
         }
         actions={<Button variant="ghost" onClick={load}>Refresh</Button>}
       />
 
-      <div className="warehouse-filterbar" role="tablist" aria-label="Report views">
+      <div className="tabs users-tabs" role="tablist" aria-label="Report sources">
+        {SOURCES.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={source === id}
+            className={`tab${source === id ? ' tab--active' : ''}`}
+            onClick={() => selectSource(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="warehouse-filterbar" role="tablist" aria-label="Report status and type">
         {VIEWS.map(([id, label]) => (
           <button
             key={id}
@@ -135,8 +173,8 @@ export default function StaffReports() {
           title={view === 'OUTSTANDING' ? 'Nothing is waiting on the office' : 'No reports here yet'}
         >
           {view === 'OUTSTANDING'
-            ? 'Every report from every hostel has been answered.'
-            : 'Caretakers raise these from the packages screen and from the reports button in their app.'}
+            ? `No ${source}-initiated reports are waiting for the office.`
+            : `No ${source}-initiated reports match this view.`}
         </EmptyState>
       ) : (
         reports.map((report) => (
@@ -146,7 +184,7 @@ export default function StaffReports() {
                 <h2 className="report-card__title">{report.categoryLabel}</h2>
                 <p className="report-card__meta">
                   {report.reportNumber ? `Report #${report.reportNumber} · ` : ''}
-                  {report.raisedBy?.name || 'Unknown caretaker'}
+                  {report.raisedBy?.name || 'Unknown reporter'}
                   {report.raisedBy?.role === 'student' ? ' (student, from the handover screen)' : ''}
                   {report.raisedBy?.hostelNumber ? ` · Hostel ${report.raisedBy.hostelNumber}` : ''}
                   {' · '}
@@ -206,7 +244,7 @@ export default function StaffReports() {
               resolving === report.id ? (
                 <div className="report-card__resolve">
                   <label htmlFor={`answer-${report.id}`}>
-                    What was done? The caretaker who raised this reads exactly these words,
+                    What was done? The person who raised this reads exactly these words,
                     with your name on them.
                   </label>
                   <textarea

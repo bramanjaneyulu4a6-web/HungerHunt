@@ -42,12 +42,12 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
   };
 
   const setActive = async (account, active) => {
-    if (!active && !window.confirm(`Deactivate ${account.name}? Their current session will stop working immediately.`)) return;
+    if (!active && !window.confirm(`Archive ${account.name}? Their current session will stop working immediately.`)) return;
     setWorkingId(account.id);
     try {
       if (active) await api.put(`/admin/users/staff/${account.id}`, { active: true, role: account.role, hostelId: account.hostel?.id || '' });
       else await api.delete(`/admin/users/staff/${account.id}`);
-      toast.success(active ? 'Staff account reactivated' : 'Staff account deactivated');
+      toast.success(active ? 'Staff account restored' : 'Staff account archived');
       await onChanged();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not update staff account');
@@ -75,9 +75,7 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
               <td data-label="Status"><Badge variant={account.active ? 'success' : 'neutral'}>{account.active ? 'Active' : 'Inactive'}</Badge></td>
               <td data-label="Actions"><div className="cell-actions">
                 <Button className="btn--sm" variant="ghost" onClick={() => openEdit(account)}>Edit</Button>
-                <Button className="btn--sm" variant={account.active ? 'danger' : 'primary'} disabled={workingId === account.id} onClick={() => setActive(account, !account.active)}>
-                  {account.active ? 'Deactivate' : 'Reactivate'}
-                </Button>
+                <Button className="btn--sm" variant="danger" disabled={workingId === account.id} onClick={() => setActive(account, false)}>Archive</Button>
               </div></td>
             </tr>
           ))}</tbody>

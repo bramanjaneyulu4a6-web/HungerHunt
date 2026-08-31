@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
+        app: [frontend-parent, frontend-admin, hungerhunt-kiosk, hungerhunt-warehouse]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -63,6 +63,17 @@ jobs:
         working-directory: ${{ matrix.app }}
       - run: npm test
         working-directory: ${{ matrix.app }}
+
+  parent-native-config:
+    name: Parent native configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/check-native-config.mjs
+        working-directory: frontend-parent
 
   lint:
     name: Lint ${{ matrix.app }}

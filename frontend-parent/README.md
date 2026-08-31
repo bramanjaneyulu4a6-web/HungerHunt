@@ -59,21 +59,19 @@ alias; release builds and the iOS shell retain their HTTPS-only policy.
 ### Building one to give someone
 
 ```bash
-# .env must already hold the production https API URL. This is the step that
-# bakes it in; nothing downstream can change it. build:release is `build` with
-# a check in front of it that refuses http or a local host — use it rather than
-# `build` for anything leaving this machine.
-npm run build:release
-npx cap sync
+# Validates the production API, matching native versions, Firebase files and
+# signing credentials; then builds, syncs and creates the signed Play bundle.
+# Set VITE_API_BASE_URL in .env or supply it for this command as shown.
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run bundle:android
+# → android/app/build/outputs/bundle/release/app-release.aab
 
-# Neither of these should print anything. Each is a bundle that reaches nothing
-# from a phone if it does.
-grep -roE 'https?://(localhost|127\.0\.0\.1|192\.168\.[0-9.]+)(:[0-9]+)?' \
-  dist android/app/src/main/assets/public ios/App/App/public
-
-cd android && ./gradlew :app:bundleRelease   # unsigned without a keystore
-cd .. && npx cap open ios                    # Xcode → Archive → Distribute
+# The production bundle was synced to iOS by the same command.
+npx cap open ios                    # Xcode → Archive → Distribute
 ```
+
+`npm run check:release` performs the preflight without building. Release
+commands refuse local/plaintext API URLs, missing Firebase files and missing
+Android signing instead of producing an artifact that cannot be shipped.
 
 The full release sequence, including signing and the store paperwork, is in
 [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md).

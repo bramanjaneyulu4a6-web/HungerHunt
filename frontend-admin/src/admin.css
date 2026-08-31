@@ -1732,7 +1732,7 @@
   }
 }
 
-/* Caretaker reports. The note a caretaker wrote is the content of the card and
+/* Reports. The note a reporter wrote is the content of the card and
    is set at reading size, not at metadata size — somebody described a problem
    in their own words and the screen should treat that as the point. */
 .report-card { margin-bottom: 16px; }

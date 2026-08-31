@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "vite build && node ../scripts/build-version.mjs",
     "build:release": "node ../scripts/validate-frontend-release-env.mjs && vite build && node ../scripts/build-version.mjs",
+    "check:native": "node scripts/check-native-config.mjs",
+    "check:release": "node ../scripts/validate-frontend-release-env.mjs && node scripts/check-native-config.mjs --credentials",
+    "sync:release": "npm run check:release && vite build && node ../scripts/build-version.mjs && npx cap sync",
+    "bundle:android": "npm run sync:release && cd android && ./gradlew :app:bundleRelease",
     "lint": "eslint .",
+    "test": "node --test",
     "preview": "vite preview"
   },
   "dependencies": {

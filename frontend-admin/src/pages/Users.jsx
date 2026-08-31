@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate, useParams } from 'react-router-dom';
 
 import api from '../utils/api';
 import { Banner, PageHeader } from '../components/ui';
 import Students from './Students';
 import ParentsTab from './users/ParentsTab';
 import StaffTab from './users/StaffTab';
-import ArchivedStudentsTab from './users/ArchivedStudentsTab';
+import ArchivedUsersTab from './users/ArchivedUsersTab';
 
-const TABS = [
-  ['students', 'Students'],
-  ['parents', 'Parents'],
-  ['staff', 'Staff'],
-  ['archived', 'Archived students'],
-];
+const SECTIONS = new Set(['students', 'parents', 'staff', 'archived']);
 
 export default function Users() {
-  const [tab, setTab] = useState('students');
+  const { section } = useParams();
   const [parents, setParents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [hostels, setHostels] = useState([]);
@@ -58,6 +54,11 @@ export default function Users() {
     return map;
   }, [parents]);
 
+  if (!SECTIONS.has(section)) return <Navigate to="/users/students" replace />;
+
+  const activeParents = parents.filter((parent) => parent.active);
+  const activeStaff = staff.filter((account) => account.active);
+
   return (
     <div className="page users-page">
       <PageHeader
@@ -65,25 +66,16 @@ export default function Users() {
         subtitle="Manage students, their parent access, and every staff account from one place."
       />
 
-      <div className="tabs users-tabs" role="tablist" aria-label="User types">
-        {TABS.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id}
-            className={`tab${tab === id ? ' tab--active' : ''}`} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
-
       {error && <Banner variant="alert">Some user records could not be loaded. Try refreshing.</Banner>}
-      {tab === 'students' && <Students embedded parentByStudent={parentByStudent} onUsersChanged={load} />}
-      {tab === 'parents' && (
-        <ParentsTab parents={parents} loading={loading} onChanged={load} />
+      {section === 'students' && <Students embedded parentByStudent={parentByStudent} onUsersChanged={load} />}
+      {section === 'parents' && (
+        <ParentsTab parents={activeParents} loading={loading} onChanged={load} />
       )}
-      {tab === 'staff' && (
-        <StaffTab staff={staff} hostels={hostels} loading={loading} onChanged={load} />
+      {section === 'staff' && (
+        <StaffTab staff={activeStaff} hostels={hostels} loading={loading} onChanged={load} />
       )}
-      {tab === 'archived' && (
-        <ArchivedStudentsTab onChanged={load} />
+      {section === 'archived' && (
+        <ArchivedUsersTab parents={parents} staff={staff} loadingAccounts={loading} onChanged={load} />
       )}
     </div>
   );

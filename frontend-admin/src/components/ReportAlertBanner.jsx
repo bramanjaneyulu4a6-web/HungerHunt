@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../utils/api";
 import { Banner } from "./ui";
 
-/* Unanswered caretaker reports, in front of every admin on every screen.
+/* Unanswered reports, in front of every admin on every screen.
  *
  * There is no owner and no assignment: the queue belongs to all of them, and
  * any one of them can answer anything in it. That only works if nobody has to
@@ -64,8 +64,8 @@ export default function ReportAlertBanner() {
       <Banner variant="warn" icon="✎">
         <strong>
           {queue.outstanding === 1
-            ? "1 caretaker report is waiting for an answer"
-            : `${queue.outstanding} caretaker reports are waiting for an answer`}
+            ? "1 report is waiting for an answer"
+            : `${queue.outstanding} reports are waiting for an answer`}
         </strong>
         {queue.oldest ? ` — ${waitingFor(queue.oldest.raisedAt)}` : ""} —{" "}
         <Link to="/reports">read and reply</Link>

@@ -29,6 +29,7 @@ import {
 
 const PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+const REPORT_SOURCES = Object.freeze(['student', 'caretaker', 'warehouse', 'parent']);
 
 /* One caretaker may have this many reports outstanding before they are asked to
    wait for an answer. Not a rate limit by the clock — a caretaker having a bad
@@ -340,6 +341,7 @@ export const list = async (req, res) => {
 
   const status = req.query.status?.toUpperCase();
   const kind = req.query.kind?.toUpperCase();
+  const source = req.query.source?.toLowerCase();
   const details = [];
   if (status && status !== 'OUTSTANDING' && !reportStatuses.includes(status)) {
     details.push({ field: 'status', message: 'Unknown report status.' });
@@ -347,7 +349,12 @@ export const list = async (req, res) => {
   if (kind && !reportKinds.includes(kind)) {
     details.push({ field: 'kind', message: 'Unknown report type.' });
   }
+  if (source && !REPORT_SOURCES.includes(source)) {
+    details.push({ field: 'source', message: 'Unknown report source.' });
+  }
   if (details.length) throw new ValidationError(details);
+
+  const sourceFilter = source ? { 'raiser.role': source } : {};
 
   const filter = {
     ...(status === 'OUTSTANDING'
@@ -356,6 +363,7 @@ export const list = async (req, res) => {
         ? { status }
         : {}),
     ...(kind ? { kind } : {}),
+    ...sourceFilter,
   };
 
   /* Oldest first while looking at what is still owed, newest first when
@@ -376,7 +384,7 @@ export const list = async (req, res) => {
       .limit(limit)
       .lean(),
     StaffReport.countDocuments(filter),
-    StaffReport.countDocuments({ status: { $in: OPEN_REPORT_STATUSES } }),
+    StaffReport.countDocuments({ ...sourceFilter, status: { $in: OPEN_REPORT_STATUSES } }),
   ]);
 
   res.json({

@@ -67,8 +67,14 @@ const asStudent = () =>
     headers: { Authorization: `Bearer ${signStudentToken(STUDENT_ID, 'ADM-1042')}` },
   });
 
-const asStaff = () =>
-  fetch(`${base}/api/inventory`, {
+/* Each staff read passes its own query string. Staff reads of the shelf are
+   cached per URL until a write moves the data revision, and these subtests
+   swap the shelf under the server without performing one — so without a
+   distinct URL the second read would be served the first one's answer. The
+   student reads below need no such marker: the cache always steps aside for
+   them. */
+const asStaff = (marker) =>
+  fetch(`${base}/api/inventory?case=${marker}`, {
     headers: { Authorization: `Bearer ${signStaffToken(STAFF_ID, 'admin')}` },
   });
 
@@ -88,7 +94,7 @@ describe('a product disabled for the kiosk', () => {
     accountIs('admin');
     shelfOf(row('Oreo'), row('Pepsi', { kioskVisible: false }));
 
-    assert.deepEqual(await namesIn(await asStaff()), ['Oreo', 'Pepsi']);
+    assert.deepEqual(await namesIn(await asStaff('disabled')), ['Oreo', 'Pepsi']);
   });
 
   // Absent is not false. Every product written before this field has no flag
@@ -123,7 +129,7 @@ describe('a product disabled for the kiosk', () => {
     accountIs('admin');
     shelfOf(row('Oreo'), row('Marie Gold', { active: false }));
 
-    assert.deepEqual(await namesIn(await asStaff()), ['Marie Gold', 'Oreo']);
+    assert.deepEqual(await namesIn(await asStaff('archived')), ['Marie Gold', 'Oreo']);
   });
 
   // Belt and braces on the same point: a product that is both archived and

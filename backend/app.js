@@ -33,6 +33,7 @@ import accountingExportRoutes from './src/interfaces/http/routes/accountingExpor
 import replenishmentDraftRoutes from './src/interfaces/http/routes/replenishmentDraftRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
+import { trackDataRevision } from './middleware/dataRevision.js';
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
@@ -228,6 +229,11 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/* Above every route, including the /api/v1 surface mounted through v1() below,
+   because the read caches downstream are only safe while nothing can write
+   without being counted. A route added later inherits this by existing. */
+app.use(trackDataRevision);
 
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
 

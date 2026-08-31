@@ -14,8 +14,10 @@ import {
 import Icon from '../components/Icon';
 import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
+import DemoUpiCheckout from '../components/DemoUpiCheckout';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
+import { demoAmountProblem } from '../utils/demoUpi';
 import { createTopup, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const BASE_TABS = [
@@ -26,6 +28,12 @@ const BASE_TABS = [
 ];
 
 const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
+
+// The preview checkout is intentionally on while the live gateway remains
+// behind PAYMENTS_ENABLED. It never creates an intent or changes a wallet;
+// every surface labels that distinction so a parent cannot mistake the
+// interaction for money having moved.
+const DEMO_UPI_ENABLED = import.meta.env.VITE_DEMO_UPI_ENABLED !== 'false';
 
 // Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
 // same language wherever a payment lands.
@@ -239,6 +247,8 @@ export default function ChildDetails() {
   const [approvalBanner, setApprovalBanner] = useState({ type: '', message: '' });
 
   const [topupAmount, setTopupAmount] = useState('');
+  const [demoCheckoutOpen, setDemoCheckoutOpen] = useState(false);
+  const [demoPaymentResult, setDemoPaymentResult] = useState(null);
   // null | the intent itself (mid-poll or terminal, from pollIntent) | a
   // client-made { synthetic: true, status, message } for a validation
   // failure, a start failure, or a poll failure.
@@ -518,6 +528,18 @@ export default function ChildDetails() {
   const setQuickTopupAmount = (amount) => {
     setTopupAmount(String(amount));
     setTopupState(null);
+    setDemoPaymentResult(null);
+  };
+
+  const openDemoTopup = () => {
+    const problem = demoAmountProblem(topupAmount);
+    if (problem) {
+      setTopupState({ status: 'INVALID', synthetic: true, message: problem });
+      return;
+    }
+    setTopupState(null);
+    setDemoPaymentResult(null);
+    setDemoCheckoutOpen(true);
   };
 
   const isAuthRequiredError = (err) =>
@@ -817,13 +839,18 @@ export default function ChildDetails() {
 
       {activeTab === 'recharges' && (
         <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
-          {PAYMENTS_ENABLED && (
+          {(PAYMENTS_ENABLED || DEMO_UPI_ENABLED) && (
           <Card style={{ marginBottom: 24 }}>
-            <h2 className="section-title" style={{ fontSize: 20 }}>
-              Add money
-            </h2>
+            <div className="demo-topup-heading">
+              <h2 className="section-title" style={{ fontSize: 20 }}>
+                Add money
+              </h2>
+              {!PAYMENTS_ENABLED && <span className="upi-demo-badge">Demo</span>}
+            </div>
             <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-              Top up {student.name}&apos;s wallet by UPI.
+              {PAYMENTS_ENABLED
+                ? `Top up ${student.name}'s wallet by UPI.`
+                : `Preview a UPI top-up for ${student.name}. No money or wallet balance will change.`}
             </p>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -832,7 +859,7 @@ export default function ChildDetails() {
                   key={amount}
                   variant="ghost"
                   className="btn--sm"
-                  disabled={topupBusy}
+                  disabled={topupBusy || demoCheckoutOpen}
                   onClick={() => setQuickTopupAmount(amount)}
                 >
                   {formatINR(amount)}
@@ -854,16 +881,24 @@ export default function ChildDetails() {
                   max="20000"
                   step="1"
                   value={topupAmount}
-                  disabled={topupBusy}
+                  disabled={topupBusy || demoCheckoutOpen}
                   onChange={(e) => {
                     setTopupAmount(e.target.value);
                     setTopupState(null);
+                    setDemoPaymentResult(null);
                   }}
                   placeholder="Enter amount"
                 />
               </div>
-              <Button disabled={topupBusy} onClick={addMoney}>
-                {topupBusy ? 'Waiting for the bank…' : 'Add money by UPI'}
+              <Button
+                disabled={topupBusy || demoCheckoutOpen}
+                onClick={PAYMENTS_ENABLED ? addMoney : openDemoTopup}
+              >
+                {topupBusy
+                  ? 'Waiting for the bank…'
+                  : PAYMENTS_ENABLED
+                    ? 'Add money by UPI'
+                    : 'Preview UPI payment'}
               </Button>
             </div>
 
@@ -877,7 +912,21 @@ export default function ChildDetails() {
                 Try again
               </Button>
             )}
+            {demoPaymentResult && (
+              <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
+                Demo completed with {demoPaymentResult.provider}. No money was charged and the wallet was not changed.
+              </Banner>
+            )}
           </Card>
+          )}
+
+          {demoCheckoutOpen && (
+            <DemoUpiCheckout
+              amount={Number(topupAmount)}
+              studentName={student.name}
+              onClose={() => setDemoCheckoutOpen(false)}
+              onComplete={setDemoPaymentResult}
+            />
           )}
 
           <h2 className="section-title">Recharge History</h2>

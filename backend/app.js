@@ -5,6 +5,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 
@@ -125,6 +126,12 @@ if (missingPaymentEnv.length) {
 }
 
 app.use(helmet());
+
+// Gzip every compressible response above the default 1KB threshold. The
+// catalogue and order lists are the payloads that matter; tiny health checks
+// stay uncompressed on purpose.
+app.use(compression());
+
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 /* A dev-server origin arriving through configuration rather than the list below.

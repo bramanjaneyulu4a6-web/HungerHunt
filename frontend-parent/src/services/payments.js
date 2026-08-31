@@ -33,6 +33,12 @@ import API from './api';
  * flag is turned off still settles and still reports its verdict. */
 export const PAYMENTS_ENABLED = import.meta.env.VITE_PAYMENTS_ENABLED === 'true';
 
+// The presentation-only checkout takes priority over the live gateway while
+// it is enabled. That makes a demo build safe even if live gateway variables
+// happen to exist in its environment: no intent is created until this flag is
+// explicitly turned off.
+export const DEMO_UPI_ENABLED = import.meta.env.VITE_DEMO_UPI_ENABLED !== 'false';
+
 export const TERMINAL_STATUSES = ['APPLIED', 'FAILED', 'EXPIRED', 'AMOUNT_MISMATCH'];
 
 export const createOrderPayment = (pendingOrderId) =>

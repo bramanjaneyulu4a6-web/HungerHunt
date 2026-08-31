@@ -4,9 +4,11 @@ import API from '../services/api';
 import { formatINR } from '../utils/format';
 import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
+import DemoUpiCheckout from './DemoUpiCheckout';
+import PaymentMethodChooser from './PaymentMethodChooser';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
-import { createOrderPayment, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { createOrderPayment, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -82,6 +84,9 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(null);
   const [reviewing, setReviewing] = useState(false);
+  const [paymentChooserOpen, setPaymentChooserOpen] = useState(false);
+  const [demoOrderCheckoutOpen, setDemoOrderCheckoutOpen] = useState(false);
+  const [demoOrderResult, setDemoOrderResult] = useState(null);
   const [error, setError] = useState(null);
   const [constraint, setConstraint] = useState(null);
   // null | the intent (mid-poll or terminal) | a client-made
@@ -374,6 +379,62 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     }
   };
 
+  const openPaymentChooser = () => {
+    setError(null);
+    setDemoOrderResult(null);
+    setPaymentChooserOpen(true);
+  };
+
+  const payThroughWallet = () => {
+    setPaymentChooserOpen(false);
+    if (compact) placeOrder();
+    else approve();
+  };
+
+  const chooseUpi = () => {
+    setPaymentChooserOpen(false);
+    if (!DEMO_UPI_ENABLED && PAYMENTS_ENABLED) {
+      if (compact) payByUpiFromReview();
+      else payByUpi();
+      return;
+    }
+    setDemoOrderCheckoutOpen(true);
+  };
+
+  const completeDemoOrderPayment = (result) => {
+    setDemoOrderResult(result);
+    setReviewing(false);
+    setConfirming(null);
+  };
+
+  const paymentOverlays = (
+    <>
+      {paymentChooserOpen && (
+        <PaymentMethodChooser
+          amount={total}
+          walletBalance={Number(student.pocketMoney || 0)}
+          studentName={student.name || 'your child'}
+          walletDisabled={insufficient || empty}
+          isDemo={DEMO_UPI_ENABLED}
+          busy={busy}
+          onWallet={payThroughWallet}
+          onUpi={chooseUpi}
+          onClose={() => setPaymentChooserOpen(false)}
+        />
+      )}
+      {demoOrderCheckoutOpen && (
+        <DemoUpiCheckout
+          amount={total}
+          studentName={student.name || 'Your child'}
+          purposeLabel="Order payment"
+          noChargeMessage="No money was charged and this order is still awaiting approval."
+          onClose={() => setDemoOrderCheckoutOpen(false)}
+          onComplete={completeDemoOrderPayment}
+        />
+      )}
+    </>
+  );
+
   useEffect(() => {
     if (!reviewing) return undefined;
 
@@ -502,6 +563,11 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             </ul>
 
             {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Review latest order', onClick: () => onResolved?.() } : undefined} />}
+            {demoOrderResult && (
+              <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
+                Demo UPI payment completed with {demoOrderResult.provider}. The order is still awaiting approval.
+              </Banner>
+            )}
             {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
             {constraint?.type === 'final' && <ErrorFeedback issue={{ presentation: 'blocked', title: 'Keep one item in the order', message: 'Want to decline the entire request instead?' }} action={{ label: 'Decline Order', onClick: () => { setReviewing(false); setConfirming('decline'); } }} />}
             {insufficient && !empty && (
@@ -533,22 +599,11 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                 </div>
                 <Button
                   variant="dark"
-                  disabled={busy || empty || insufficient}
-                  onClick={placeOrder}
-                >
-                  {busy && !payBusy ? 'Placing order…' : 'Place Order'}
-                </Button>
-                {/* Not gated on `insufficient` — a wallet that can't cover
-                    the order is exactly when a parent reaches for this. */}
-                {PAYMENTS_ENABLED && (
-                <Button
-                  variant="ghost"
                   disabled={busy || empty}
-                  onClick={payByUpiFromReview}
+                  onClick={openPaymentChooser}
                 >
-                  {payBusy ? 'Waiting for the bank…' : 'Pay by UPI'}
+                  {busy && !payBusy ? 'Placing order…' : 'Accept order'}
                 </Button>
-                )}
                 <Button
                   variant="alert"
                   className="btn--cancel-order"
@@ -584,6 +639,11 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           </div>
 
           {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Refresh order', onClick: () => onResolved?.() } : undefined} />}
+          {demoOrderResult && (
+            <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
+              Demo UPI payment completed with {demoOrderResult.provider}. The order is still awaiting approval.
+            </Banner>
+          )}
           {confirming === 'decline' ? (
             <div className="pending-confirm-copy">
               <p>Cancel this order request?</p>
@@ -617,11 +677,13 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           )}
         </Card>
         {reviewModal}
+        {paymentOverlays}
       </>
     );
   }
 
   return (
+    <>
     <Card className={`pending-card${busy ? ' pending-card--busy' : ''}`} aria-busy={busy}>
       <div className="pending-head">
         {onStudentClick ? (
@@ -700,7 +762,13 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
       {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
       {constraint?.type === 'final' && <ErrorFeedback issue={{ presentation: 'blocked', title: 'Keep one item in the order', message: 'Want to decline the entire request instead?' }} action={{ label: 'Decline Order', onClick: () => setConfirming('decline') }} />}
       {insufficient && !empty && (
-        <ErrorFeedback issue={{ presentation: 'insufficientFunds', title: 'Not quite enough', message: 'Reduce the order or add money before approving it.' }} available={Number(student.pocketMoney || 0)} required={total} className="insufficient-note" />
+        <ErrorFeedback issue={{ presentation: 'insufficientFunds', title: 'Not quite enough', message: 'The school wallet cannot cover this order, but you can choose UPI after accepting it.' }} available={Number(student.pocketMoney || 0)} required={total} className="insufficient-note" />
+      )}
+
+      {demoOrderResult && (
+        <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
+          Demo UPI payment completed with {demoOrderResult.provider}. No money was charged and the order is still awaiting approval.
+        </Banner>
       )}
 
       {edited && !empty && (
@@ -710,44 +778,22 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         </div>
       )}
 
-      {confirming ? (
+      {confirming === 'decline' ? (
         <div className="pending-confirm-copy">
-          <p>
-            {confirming === 'approve'
-              ? `Charge ${formatINR(total)} from ${student.name || 'this student'}'s wallet now?`
-              : 'Decline this request? The kiosk order will be cancelled.'}
-          </p>
+          <p>Decline this request? The kiosk order will be cancelled.</p>
           <div className="pending-actions">
-            {confirming === 'approve' ? (
-              <>
-                <Button variant="dark" block disabled={busy} onClick={approve}>Yes, approve</Button>
-                <Button variant="ghost" block disabled={busy} onClick={() => setConfirming(null)}>Cancel</Button>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" block disabled={busy} onClick={() => setConfirming(null)}>Keep order</Button>
-                <Button variant="alert" className="btn--cancel-order" block disabled={busy} onClick={decline}>Yes, decline</Button>
-              </>
-            )}
+            <Button variant="ghost" block disabled={busy} onClick={() => setConfirming(null)}>Keep order</Button>
+            <Button variant="alert" className="btn--cancel-order" block disabled={busy} onClick={decline}>Yes, decline</Button>
           </div>
         </div>
       ) : degradedResolving ? null : (
         <>
           <div className="pending-actions">
-            <Button variant="dark" block disabled={busy || edited || empty || insufficient} onClick={() => setConfirming('approve')}>
-              {busy && !payBusy ? 'Working…' : `Approve ${formatINR(total)}`}
+            <Button variant="dark" block disabled={busy || edited || empty} onClick={openPaymentChooser}>
+              {busy && !payBusy ? 'Working…' : `Accept ${formatINR(total)}`}
             </Button>
             <Button variant="alert" className="btn--cancel-order" block disabled={busy} onClick={() => setConfirming('decline')}>Decline</Button>
           </div>
-          {/* Not gated on `insufficient` — a wallet that can't cover the order
-              is exactly when a parent reaches for this button. */}
-          {PAYMENTS_ENABLED && (
-          <div className="pending-actions">
-            <Button variant="ghost" block disabled={busy || edited} onClick={payByUpi}>
-              {payBusy ? 'Waiting for the bank…' : 'Pay by UPI'}
-            </Button>
-          </div>
-          )}
         </>
       )}
 
@@ -767,5 +813,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         </Button>
       )}
     </Card>
+    {paymentOverlays}
+    </>
   );
 }

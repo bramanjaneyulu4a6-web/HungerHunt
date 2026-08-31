@@ -41,6 +41,162 @@ body {
   animation: upi-demo-fade 180ms ease-out both;
 }
 
+.payment-choice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 490;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 18, 13, 0.56);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: upi-demo-fade 180ms ease-out both;
+}
+
+.payment-choice-sheet {
+  width: min(100%, 470px);
+  padding: 8px 24px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
+  animation: upi-demo-rise 340ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.payment-choice-handle {
+  width: 42px;
+  height: 4px;
+  margin: 2px auto 16px;
+  border-radius: 999px;
+  background: #ddd5cb;
+}
+
+.payment-choice-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.payment-choice-header h2 {
+  margin-top: 7px;
+  color: var(--parent-ink);
+  font-size: 23px;
+  line-height: 1.2;
+  letter-spacing: -0.6px;
+}
+
+.payment-choice-header p {
+  margin-top: 6px;
+  color: var(--parent-muted);
+  font-size: 13px;
+}
+
+.payment-choice-eyebrow {
+  color: var(--parent-brand-deep);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.payment-choice-options {
+  display: grid;
+  gap: 11px;
+  margin-top: 24px;
+}
+
+.payment-choice-option {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--parent-line);
+  border-radius: 17px;
+  background: #fff;
+  color: var(--parent-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease,
+    box-shadow 150ms ease, transform 120ms ease;
+}
+
+.payment-choice-option:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #e0ae97;
+  background: #fffaf7;
+  box-shadow: 0 10px 24px -20px rgba(55, 35, 20, 0.6);
+}
+
+.payment-choice-option:disabled {
+  background: #f6f3ef;
+  color: #988d82;
+  cursor: not-allowed;
+}
+
+.payment-choice-option > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.payment-choice-option strong {
+  font-size: 14px;
+}
+
+.payment-choice-option small {
+  margin-top: 3px;
+  color: var(--parent-muted);
+  font-size: 11px;
+}
+
+.payment-choice-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.payment-choice-icon--upi {
+  background: #f3edff;
+  color: #6540a4;
+}
+
+.payment-choice-icon--wallet {
+  background: #edf8f1;
+  color: #187744;
+}
+
+.payment-choice-option:disabled .payment-choice-icon--wallet {
+  filter: grayscale(1);
+  opacity: 0.62;
+}
+
+.payment-choice-chevron {
+  color: #aa9e92;
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.payment-choice-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #f2d8a4;
+  border-radius: 12px;
+  background: #fff9eb;
+  color: #7f5a17;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .upi-demo-sheet {
   width: min(100%, 480px);
   max-height: min(760px, calc(100svh - 36px));
@@ -1895,6 +2051,34 @@ body {
 }
 
 @media (max-width: 520px) {
+  .payment-choice-overlay {
+    align-items: end;
+    padding: 0;
+  }
+
+  .payment-choice-sheet {
+    width: 100%;
+    padding: 8px 18px calc(18px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 26px 26px 0 0;
+    animation-name: upi-demo-rise-mobile;
+  }
+
+  .payment-choice-option {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .payment-choice-option .upi-demo-badge {
+    display: none;
+  }
+
+  .payment-choice-icon {
+    width: 44px;
+    height: 44px;
+  }
+
   .upi-demo-overlay {
     align-items: end;
     padding: 0;
@@ -2082,6 +2266,8 @@ body {
   .banner,
   .upi-demo-overlay,
   .upi-demo-sheet,
+  .payment-choice-overlay,
+  .payment-choice-sheet,
   .upi-demo-spinner,
   .upi-demo-success-mark,
   .upi-demo-success-mark i {

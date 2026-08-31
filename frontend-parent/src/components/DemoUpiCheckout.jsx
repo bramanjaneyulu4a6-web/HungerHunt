@@ -7,6 +7,8 @@ const PROCESSING_MS = 1700;
 export default function DemoUpiCheckout({
   amount,
   studentName,
+  purposeLabel = 'Wallet top-up',
+  noChargeMessage = 'No money was charged and the wallet balance was not changed.',
   onClose,
   onComplete,
 }) {
@@ -76,7 +78,7 @@ export default function DemoUpiCheckout({
 
             <div className="upi-demo-summary">
               <div>
-                <span>Wallet top-up</span>
+                <span>{purposeLabel}</span>
                 <strong>{studentName}</strong>
               </div>
               <strong className="upi-demo-amount">{formatINR(amount)}</strong>
@@ -154,12 +156,12 @@ export default function DemoUpiCheckout({
             </div>
             <span className="upi-demo-badge upi-demo-badge--success">Demo complete</span>
             <h2 id="upi-demo-title">Payment successful</h2>
-            <p>A demo payment of {formatINR(amount)} was completed with {provider.name}.</p>
+            <p>A demo {purposeLabel.toLowerCase()} of {formatINR(amount)} was completed with {provider.name}.</p>
             <div className="upi-demo-receipt">
               <span>Reference</span>
               <strong>{reference}</strong>
             </div>
-            <div className="upi-demo-no-charge">No money was charged and the wallet balance was not changed.</div>
+            <div className="upi-demo-no-charge">{noChargeMessage}</div>
             <button type="button" className="upi-demo-pay" onClick={finish}>
               Done
             </button>

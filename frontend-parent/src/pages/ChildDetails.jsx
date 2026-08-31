@@ -18,7 +18,7 @@ import DemoUpiCheckout from '../components/DemoUpiCheckout';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
 import { demoAmountProblem } from '../utils/demoUpi';
-import { createTopup, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { createTopup, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
@@ -28,12 +28,6 @@ const BASE_TABS = [
 ];
 
 const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
-
-// The preview checkout is intentionally on while the live gateway remains
-// behind PAYMENTS_ENABLED. It never creates an intent or changes a wallet;
-// every surface labels that distinction so a parent cannot mistake the
-// interaction for money having moved.
-const DEMO_UPI_ENABLED = import.meta.env.VITE_DEMO_UPI_ENABLED !== 'false';
 
 // Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
 // same language wherever a payment lands.
@@ -845,10 +839,10 @@ export default function ChildDetails() {
               <h2 className="section-title" style={{ fontSize: 20 }}>
                 Add money
               </h2>
-              {!PAYMENTS_ENABLED && <span className="upi-demo-badge">Demo</span>}
+              {DEMO_UPI_ENABLED && <span className="upi-demo-badge">Demo</span>}
             </div>
             <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-              {PAYMENTS_ENABLED
+              {!DEMO_UPI_ENABLED && PAYMENTS_ENABLED
                 ? `Top up ${student.name}'s wallet by UPI.`
                 : `Preview a UPI top-up for ${student.name}. No money or wallet balance will change.`}
             </p>
@@ -892,13 +886,13 @@ export default function ChildDetails() {
               </div>
               <Button
                 disabled={topupBusy || demoCheckoutOpen}
-                onClick={PAYMENTS_ENABLED ? addMoney : openDemoTopup}
+                onClick={DEMO_UPI_ENABLED ? openDemoTopup : addMoney}
               >
                 {topupBusy
                   ? 'Waiting for the bank…'
-                  : PAYMENTS_ENABLED
+                  : !DEMO_UPI_ENABLED && PAYMENTS_ENABLED
                     ? 'Add money by UPI'
-                    : 'Preview UPI payment'}
+                    : 'Add money to wallet'}
               </Button>
             </div>
 

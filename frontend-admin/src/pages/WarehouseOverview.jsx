@@ -139,6 +139,7 @@ export default function WarehouseOverview() {
         <section className="warehouse-section">
           <div className="warehouse-section__head"><div><p className="warehouse-eyebrow">Quick access</p><h2>Manage warehouse data</h2></div></div>
           <div className="warehouse-quicklinks">
+            <Button to="/warehouse/student-orders" variant="primary">View active student orders</Button>
             <Button to="/warehouse/review" variant="primary">Review requests {metrics.review > 0 && `(${metrics.review})`}</Button>
             <Button to="/warehouse/inventory" variant="ghost">Check inventory</Button>
             <Button to="/warehouse/products" variant="ghost">Manage catalogue</Button>

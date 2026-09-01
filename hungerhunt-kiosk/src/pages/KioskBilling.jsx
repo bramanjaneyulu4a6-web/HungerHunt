@@ -4,6 +4,7 @@ import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
+import { useVisualViewportBox } from "../hooks/useVisualViewportBox";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
 import SessionClock from "../components/SessionClock";
@@ -561,16 +562,11 @@ const KioskBilling = ({ student, onLogout }) => {
   };
 
   const categories = stockGroupNames(products);
-  const categoryCards = categories.map((category) => {
-    const items = sortProductsByName(products.filter(
-      (product) => product.stockGroup?.name === category
-    ));
-    return {
-      name: category,
-      count: items.length,
-      image: items.find((item) => item.image)?.image || "",
-    };
-  });
+  const categoryCards = categories.map((category) => ({
+    name: category,
+    count: products.filter((product) => product.stockGroup?.name === category)
+      .length,
+  }));
 
   const openCategory = (category) => {
     if (openingCategory) return;
@@ -633,6 +629,10 @@ const KioskBilling = ({ student, onLogout }) => {
       onExpire: onLogout,
       isBusy: () => payingRef.current,
     });
+
+  /* Keeps the pay sheet above the on-screen keyboard while the purchase code
+     is being typed — see the hook for which browsers need it. */
+  const keyboardBox = useVisualViewportBox(showVerifyModal);
 
   // A session always has its student, so none of this is conditional any more.
   const itemCount = cart.length;
@@ -737,12 +737,10 @@ const KioskBilling = ({ student, onLogout }) => {
                   aria-selected={openingCategory === category.name}
                   onClick={() => openCategory(category.name)}
                 >
+                  {/* The group's initial, never a product photo — one item's
+                      packaging shouldn't front the whole shelf. */}
                   <span className="kiosk-category-card__image">
-                    {category.image ? (
-                      <img src={category.image} alt="" />
-                    ) : (
-                      <b aria-hidden="true">{titleCase(category.name).charAt(0)}</b>
-                    )}
+                    <b aria-hidden="true">{titleCase(category.name).charAt(0)}</b>
                   </span>
                   <span className="kiosk-category-card__copy">
                     <strong>{titleCase(category.name)}</strong>
@@ -1155,25 +1153,36 @@ const KioskBilling = ({ student, onLogout }) => {
                       </span>
 
                       <div className="tile-body">
-                        <h3 className="tile-name">{p.name}</h3>
+                        <h3 className="tile-name" title={p.name}>{p.name}</h3>
 
-                        {p.packSize && <p className="tile-size">{p.packSize}</p>}
+                        <p
+                          className={`tile-size${p.packSize ? "" : " tile-slot--empty"}`}
+                          aria-hidden={p.packSize ? undefined : true}
+                        >
+                          {p.packSize || BLANK}
+                        </p>
 
-                        {p.stockGroup?.name && (
-                          <p className="tile-meta">
-                            {titleCase(p.stockGroup.name)}
-                          </p>
-                        )}
+                        <p
+                          className={`tile-meta${p.stockGroup?.name ? "" : " tile-slot--empty"}`}
+                          aria-hidden={p.stockGroup?.name ? undefined : true}
+                        >
+                          {p.stockGroup?.name
+                            ? titleCase(p.stockGroup.name)
+                            : BLANK}
+                        </p>
 
-                        {p.purchaseAllowance?.enabled && (
-                          <p className={`tile-limit${limitReached ? " tile-limit--reached" : ""}`}>
-                            {limitReached
+                        <p
+                          className={`tile-limit${limitReached ? " tile-limit--reached" : ""}${p.purchaseAllowance?.enabled ? "" : " tile-slot--empty"}`}
+                          aria-hidden={p.purchaseAllowance?.enabled ? undefined : true}
+                        >
+                          {p.purchaseAllowance?.enabled
+                            ? limitReached
                               ? `${allowancePeriod(p.purchaseAllowance.period)} limit reached`
-                              : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`}
-                          </p>
-                        )}
+                              : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`
+                            : BLANK}
+                        </p>
 
-                        {p.nutrition && (
+                        {p.nutrition ? (
                           <div className="tile-macros">
                             <div className="tile-macro">
                               <b className="money">
@@ -1208,6 +1217,11 @@ const KioskBilling = ({ student, onLogout }) => {
                               <span>Fat</span>
                             </div>
                           </div>
+                        ) : (
+                          <div
+                            className="tile-macros tile-slot--empty"
+                            aria-hidden="true"
+                          />
                         )}
 
                         {line ? (
@@ -1446,7 +1460,14 @@ const KioskBilling = ({ student, onLogout }) => {
 
       {showVerifyModal && (
         <div
-          className="modal-backdrop till-modal-backdrop"
+          className={`modal-backdrop till-modal-backdrop${
+            keyboardBox ? " modal-backdrop--keyboard" : ""
+          }`}
+          style={
+            keyboardBox
+              ? { top: keyboardBox.top, height: keyboardBox.height }
+              : undefined
+          }
           onClick={closeVerify}
         >
           <div
@@ -1524,7 +1545,7 @@ const KioskBilling = ({ student, onLogout }) => {
                   className="btn--confirm"
                   disabled={paying || purchasePassword.length < PURCHASE_CODE_LENGTH}
                 >
-                  {paying ? "Processing…" : "Verify & Pay"}
+                  {paying ? "Processing…" : "Place Order"}
                 </Button>
                 <Button
                   className="btn--quiet"

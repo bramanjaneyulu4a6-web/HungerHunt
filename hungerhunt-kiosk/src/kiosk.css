@@ -1498,6 +1498,7 @@
 }
 
 .wall-grid--rail .tile {
+  height: 100%;
   min-width: 0;
   scroll-snap-align: start;
 }
@@ -1665,37 +1666,62 @@
 }
 
 .tile-name {
+  display: -webkit-box;
+  min-height: 2.5em;
+  overflow: hidden;
   font-size: 16px;
   font-weight: 750;
   letter-spacing: -0.01em;
+  line-height: 1.25;
   color: #241c13;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* What is in the packet, under the name. Deliberately not styled like
    .tile-meta: the category is a label, this is a measurement, and a student
    comparing two drinks is reading this one. */
 .tile-size {
+  min-height: 1.25em;
   margin-top: 3px;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--dim);
 }
 
 .tile-meta {
+  min-height: 1.3em;
   margin-top: 2px;
+  overflow: hidden;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--dim);
 }
 
 .tile-limit {
+  display: -webkit-box;
+  min-height: 2.6em;
   margin: 7px 0 9px;
+  overflow: hidden;
   color: #7a5a12;
   font-size: 11px;
   font-weight: 750;
   line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tile-slot--empty {
+  visibility: hidden;
 }
 
 .tile-limit--reached {
@@ -1717,6 +1743,8 @@
 .tile-macros {
   display: grid;
   grid-template-columns: 1.15fr 1fr 1fr 1fr;
+  height: 48px;
+  min-height: 48px;
   margin: 9px 0 10px;
   overflow: hidden;
   border: 1px solid var(--line-soft);
@@ -2157,7 +2185,8 @@
 }
 
 .nutrition-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 44px;
   align-items: flex-start;
   gap: 16px;
   padding: 20px 22px 16px;
@@ -2175,7 +2204,6 @@
 }
 
 .nutrition-head-t {
-  flex: 1;
   min-width: 0;
 }
 
@@ -2188,11 +2216,15 @@
 }
 
 .nutrition-head h3 {
+  display: -webkit-box;
   margin: 2px 0 0;
+  overflow: hidden;
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.025em;
   color: #17110a;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .nutrition-serving {
@@ -2239,6 +2271,9 @@
 }
 
 .nutrition-row {
+  display: grid;
+  align-items: center;
+  min-height: 46px;
   padding: 11px 0;
   border-bottom: 1px dotted #eee7db;
 }
@@ -2248,14 +2283,17 @@
 }
 
 .nutrition-row-t {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  justify-content: space-between;
+  gap: 16px;
   font-size: 14.5px;
   color: #2c2318;
 }
 
 .nutrition-row-t b {
+  min-width: 64px;
+  text-align: right;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -2990,13 +3028,6 @@
    the tinted panel behind it takes up whatever the picture does not. The card
    itself already lifts on hover, so the image does not need to grow into its
    own edges to say so. */
-.kiosk-category-card__image img {
-  max-width: 100%;
-  max-height: 100%;
-  padding: 8px;
-  object-fit: contain;
-}
-
 .kiosk-category-card__image b {
   color: var(--brand-deep);
   font-size: 40px;
@@ -4378,6 +4409,20 @@
 .kiosk-pin-feedback .error-visual {
   width: 42px;
   height: 42px;
+}
+
+/* The pay sheet, pinned to the visual viewport while the on-screen keyboard
+   is up (browsers that keep the layout viewport at full height would
+   otherwise sink a centered modal behind the keys). The inline style carries
+   the measured top/height; this keeps the sheet inside that box. */
+.modal-backdrop--keyboard.till-modal-backdrop {
+  bottom: auto;
+  align-items: flex-end;
+}
+
+.modal-backdrop--keyboard .till-modal.modal {
+  max-height: calc(100% - 4px);
+  overflow-y: auto;
 }
 
 /* Tighter than the name can survive: the identity gives way and the card

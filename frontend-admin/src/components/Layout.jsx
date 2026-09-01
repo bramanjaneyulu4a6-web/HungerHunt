@@ -20,6 +20,7 @@ const USERS_NAV = [
 
 const WAREHOUSE_NAV = [
   { path: "/warehouse", label: "Overview", icon: "⌂", end: true },
+  { path: "/warehouse/student-orders", label: "Student orders", icon: "□" },
   { path: "/warehouse/review", label: "Review requests", icon: "✓" },
   { path: "/warehouse/orders", label: "Order ledger", icon: "≡" },
   { path: "/warehouse/inventory", label: "Inventory", icon: "▤" },

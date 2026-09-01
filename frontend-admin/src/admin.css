@@ -608,6 +608,97 @@
 .warehouse-ledger-detail__grid strong { color: var(--ink); font-size: 13px; }
 .warehouse-ledger-detail__grid span { color: var(--muted); font-size: 12px; }
 
+/* Individual student fulfilment orders. Kept separate from the supplier PO
+   ledger because cancelling one moves student money and warehouse stock. */
+.fulfillment-ledger__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--slate-50);
+}
+
+.fulfillment-ledger__summary > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.fulfillment-ledger__summary strong { color: var(--ink); font-size: 22px; }
+
+.fulfillment-ledger__summary span,
+.fulfillment-ledger__summary p,
+.fulfillment-locked,
+.fulfillment-cancel-copy,
+.fulfillment-cancel-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fulfillment-student { display: flex; flex-direction: column; }
+.fulfillment-student strong { color: var(--ink); font-size: 13px; }
+.fulfillment-student small { margin-top: 2px; color: var(--muted); font-size: 11px; }
+
+.fulfillment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.fulfillment-locked { white-space: nowrap; }
+
+.fulfillment-order-detail {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 28px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.fulfillment-order-detail > div > small {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fulfillment-order-detail p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fulfillment-order-detail p strong {
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.fulfillment-cancel-modal { max-width: 520px; }
+.fulfillment-cancel-copy { margin: -5px 0 18px; line-height: 1.6; }
+
+.fulfillment-cancel-label {
+  display: block;
+  margin: 18px 0 7px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fulfillment-cancel-modal textarea { width: 100%; resize: vertical; }
+.fulfillment-cancel-count { margin-top: 5px; text-align: right; }
+.fulfillment-cancel-actions { justify-content: flex-end; }
+
 /* Product catalogue: the detailed table remains the default, while this
    alternate view mirrors the grouped, touch-friendly shape of the kiosk. */
 .catalogue-controls,
@@ -1248,6 +1339,7 @@
   .warehouse-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
   .warehouse-flow__step:nth-child(2) i { display: none; }
   .warehouse-overview-grid { grid-template-columns: 1fr; }
+  .fulfillment-order-detail { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 700px) {
@@ -1297,6 +1389,8 @@
   .warehouse-flow { grid-template-columns: 1fr; }
   .warehouse-flow__step i { display: none; }
   .warehouse-ledger-detail__grid { grid-template-columns: 1fr; }
+  .fulfillment-ledger__summary { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .fulfillment-actions { flex-wrap: wrap; }
 }
 
 /* ---- student directory ------------------------------------------------- */

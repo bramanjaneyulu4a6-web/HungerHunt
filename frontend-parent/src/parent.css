@@ -42,12 +42,16 @@ body {
 }
 
 /* Order-demo confirmation is a compact card over the dashboard, not another
-   full-screen surface. The overlay contributes blur only—no tint or fill. */
+   full-screen surface. Do not put backdrop-filter on this ancestor: some
+   WebViews composite that filter through the child card as well. #root below
+   owns the blur, while this portaled subtree stays entirely unfiltered. */
 .upi-demo-overlay.upi-demo-overlay--confirmation {
   z-index: 1000;
   background: transparent;
-  -webkit-backdrop-filter: blur(12px) saturate(0.86);
-  backdrop-filter: blur(12px) saturate(0.86);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  -webkit-filter: none;
+  filter: none;
 }
 
 /* Backdrop filters alone do not consistently include fixed/sticky compositing

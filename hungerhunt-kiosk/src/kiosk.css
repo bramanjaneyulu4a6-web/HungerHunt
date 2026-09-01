@@ -2547,7 +2547,12 @@
   min-height: 100svh;
   min-height: 100dvh;
   padding: 26px clamp(24px, 5vw, 72px);
-  overflow: hidden;
+  /* Scrollable, because a keyboard over a phone leaves the digit boxes
+     somewhere the page has to be able to reach. This was `overflow: hidden`,
+     which is why nothing — not the browser's own scroll-into-view, not
+     useKeepFocusedInView — could bring them back: there was nowhere to go. */
+  overflow-x: hidden;
+  overflow-y: auto;
   isolation: isolate;
   background: linear-gradient(145deg, #fffdf8 0%, #fff7e7 58%, #ffefd6 100%);
   color: #17110a;
@@ -2565,8 +2570,13 @@
   mask-image: linear-gradient(100deg, #000, transparent 62%);
 }
 
+/* Fixed rather than absolute now that the screen scrolls. These sit at
+   top: -190px and bottom: -220px, which the old `overflow: hidden` clipped;
+   in a scrolling box they would instead become 200-odd pixels of empty scroll
+   below the footer. Fixed keeps them where they were and out of the scroll
+   height. */
 .kiosk-login-glow {
-  position: absolute;
+  position: fixed;
   z-index: -1;
   border-radius: 999px;
   filter: blur(2px);

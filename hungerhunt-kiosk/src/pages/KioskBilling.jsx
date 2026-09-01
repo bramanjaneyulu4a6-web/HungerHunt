@@ -3,10 +3,12 @@ import api from "../utils/api";
 import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
 import { cloudinaryThumb } from "../utils/cloudinaryThumb";
+import { cloudinaryTile } from "../utils/cloudinaryTile";
 import { loadMenuSnapshot, saveMenuSnapshot } from "../utils/menuSnapshot";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import { useVisualViewportBox } from "../hooks/useVisualViewportBox";
+import { useKeepFocusedInView } from "../hooks/useKeepFocusedInView";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
 import SessionClock from "../components/SessionClock";
@@ -658,6 +660,11 @@ const KioskBilling = ({ student, onLogout }) => {
   /* Keeps the pay sheet above the on-screen keyboard while the purchase code
      is being typed — see the hook for which browsers need it. */
   const keyboardBox = useVisualViewportBox(showVerifyModal);
+  /* Covers all three fields this screen can put a keyboard under: the item
+     search, a tile's quantity box, and the purchase code in the verify sheet.
+     The pin above keeps that sheet off the keys; this keeps the field inside
+     it, and the two on the wall behind it, reachable. */
+  useKeepFocusedInView();
 
   // A session always has its student, so none of this is conditional any more.
   const itemCount = cart.length;

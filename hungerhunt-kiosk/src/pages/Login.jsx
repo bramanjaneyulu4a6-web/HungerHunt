@@ -6,6 +6,7 @@ import KioskResultScreen from "../components/KioskResultScreen";
 import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { ErrorFeedback } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
+import { useKeepFocusedInView } from "../hooks/useKeepFocusedInView";
 
 /* The kiosk's resting state, and the whole of what it asks for: the number the
    school already gave the student. No secret here — the four-digit code is
@@ -15,6 +16,10 @@ import { presentError } from "../utils/errorPresentation";
    Nobody signs in to this terminal any more, staff included. It stopped being
    a counter somebody stands behind. */
 const Login = () => {
+  // The five digit boxes are the only thing on this screen, and on a phone the
+  // keyboard can sit over them.
+  useKeepFocusedInView();
+
   const navigate = useNavigate();
   const [digits, setDigits] = useState(["", "", "", "", ""]);
   const [error, setError] = useState("");

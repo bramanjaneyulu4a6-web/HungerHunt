@@ -6,6 +6,7 @@ import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
 import DemoUpiCheckout from './DemoUpiCheckout';
 import PaymentMethodChooser from './PaymentMethodChooser';
+import { DEMO_UPI_PROVIDERS } from '../utils/demoUpi';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
 import { createOrderPayment, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
@@ -86,6 +87,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   const [reviewing, setReviewing] = useState(false);
   const [paymentChooserOpen, setPaymentChooserOpen] = useState(false);
   const [demoOrderCheckoutOpen, setDemoOrderCheckoutOpen] = useState(false);
+  const [demoProviderId, setDemoProviderId] = useState(null);
   const [demoOrderResult, setDemoOrderResult] = useState(null);
   const [error, setError] = useState(null);
   const [constraint, setConstraint] = useState(null);
@@ -391,14 +393,31 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     else approve();
   };
 
+  /* Exactly the condition under which the demo sheet is what opens, so the
+     chooser lists UPI apps only when picking one here is what actually
+     decides the payment. On the live gateway it stays a single UPI row that
+     hands off, because the app is chosen in PhonePe's own screen, not ours. */
+  const demoCheckout = DEMO_UPI_ENABLED || !PAYMENTS_ENABLED;
+
   const chooseUpi = () => {
     setPaymentChooserOpen(false);
-    if (!DEMO_UPI_ENABLED && PAYMENTS_ENABLED) {
+    if (!demoCheckout) {
       if (compact) payByUpiFromReview();
       else payByUpi();
       return;
     }
     setDemoOrderCheckoutOpen(true);
+  };
+
+  const chooseUpiProvider = (providerId) => {
+    setPaymentChooserOpen(false);
+    setDemoProviderId(providerId);
+    setDemoOrderCheckoutOpen(true);
+  };
+
+  const closeDemoOrderCheckout = () => {
+    setDemoOrderCheckoutOpen(false);
+    setDemoProviderId(null);
   };
 
   const completeDemoOrderPayment = (result) => {
@@ -416,8 +435,10 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           studentName={student.name || 'your child'}
           walletDisabled={insufficient || empty}
           busy={busy}
+          upiProviders={demoCheckout ? DEMO_UPI_PROVIDERS : null}
           onWallet={payThroughWallet}
           onUpi={chooseUpi}
+          onUpiProvider={chooseUpiProvider}
           onClose={() => setPaymentChooserOpen(false)}
         />
       )}
@@ -426,7 +447,8 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           amount={total}
           studentName={student.name || 'Your child'}
           purposeLabel="Order payment"
-          onClose={() => setDemoOrderCheckoutOpen(false)}
+          providerId={demoProviderId}
+          onClose={closeDemoOrderCheckout}
           onComplete={completeDemoOrderPayment}
         />
       )}

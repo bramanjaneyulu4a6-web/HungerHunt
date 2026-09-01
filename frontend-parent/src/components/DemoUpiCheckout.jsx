@@ -4,15 +4,21 @@ import { DEMO_UPI_PROVIDERS, makeUpiReference } from '../utils/demoUpi';
 
 const PROCESSING_MS = 1700;
 
+/* `providerId` is for the caller that has already asked which UPI app to use —
+   the order chooser lists them itself, so arriving here to be asked a second
+   time would be the same question twice. Given one, this opens straight into
+   processing. Left out, it opens on its own picker, which is what the wallet
+   top-up does: there is no earlier sheet in that flow to have chosen in. */
 export default function DemoUpiCheckout({
   amount,
   studentName,
   purposeLabel = 'Wallet top-up',
+  providerId: chosenProviderId = null,
   onClose,
   onComplete,
 }) {
-  const [providerId, setProviderId] = useState('gpay');
-  const [stage, setStage] = useState('choose');
+  const [providerId, setProviderId] = useState(chosenProviderId || 'gpay');
+  const [stage, setStage] = useState(chosenProviderId ? 'processing' : 'choose');
   const [reference] = useState(makeUpiReference);
   const closeButtonRef = useRef(null);
   const provider = DEMO_UPI_PROVIDERS.find(({ id }) => id === providerId);

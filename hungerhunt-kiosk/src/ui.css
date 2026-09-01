@@ -803,7 +803,7 @@ select.auth-input {
 /* ---- data table -------------------------------------------------------- */
 
 .table-wrap {
-  overflow-x: hidden;
+  overflow-x: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

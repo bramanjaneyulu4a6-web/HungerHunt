@@ -94,8 +94,10 @@ const OrderReviewSheet = ({
               <div className="wh-tile-main">
                 <div className="wh-product">{line.name}</div>
                 <div className="wh-remaining">
-                  on the shelf now <span className="wh-num">{line.stock}</span>
-                  {line.unit ? ` ${line.unit}` : ""}
+                  {line.itemSize ? `Each item · ${line.itemSize}` : "Item size not recorded"}
+                  {" · on the shelf now "}
+                  <span className="wh-num">{line.stock}</span>{" "}
+                  unit{line.stock === 1 ? "" : "s"}
                 </div>
               </div>
               <button
@@ -119,7 +121,7 @@ const OrderReviewSheet = ({
                   <input
                     inputMode="numeric"
                     value={line.quantity}
-                    aria-label={`How many ${line.name}`}
+                    aria-label={`How many units of ${line.name}`}
                     onChange={(event) =>
                       onQuantity(line.id, Number(event.target.value.replace(/\D/g, "")) || 0)
                     }

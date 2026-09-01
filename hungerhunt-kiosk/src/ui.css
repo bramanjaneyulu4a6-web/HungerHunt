@@ -803,7 +803,7 @@ select.auth-input {
 /* ---- data table -------------------------------------------------------- */
 
 .table-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -999,15 +999,6 @@ select.auth-input {
   display: flex;
   gap: 10px;
   margin-top: 20px;
-}
-
-/* Refresh control pinned to the corner of list pages. */
-.refresh-fab {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 50;
-  box-shadow: var(--shadow-raised);
 }
 
 /* ---- admin sidebar ----------------------------------------------------- */

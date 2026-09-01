@@ -1,9 +1,18 @@
 import { useEffect } from "react";
 
-const ORDER_STATUS_LABELS = {
-  PENDING: "Order received",
-  PACKED: "Packed",
-  OUT_FOR_DELIVERY: "On the way",
+const ORDER_STEPS = [
+  ["PENDING", "Order confirmed"],
+  ["PACKED", "Packed"],
+  ["OUT_FOR_DELIVERY", "Out for delivery"],
+  ["DELIVERED", "Delivered"],
+];
+
+const ORDER_STATUS_LABELS = Object.fromEntries(ORDER_STEPS);
+ORDER_STATUS_LABELS.COLLECTED = "Delivered";
+
+const progressIndex = (status) => {
+  if (status === "COLLECTED") return ORDER_STEPS.length - 1;
+  return ORDER_STEPS.findIndex(([value]) => value === status);
 };
 
 const formatDeliveryDate = (value) => {
@@ -35,6 +44,7 @@ const KioskResultScreen = ({
   estimatedDeliveryDate,
 }) => {
   const statusLabel = ORDER_STATUS_LABELS[orderStatus] || orderStatus;
+  const activeStep = progressIndex(orderStatus);
   const deliveryDate = formatDeliveryDate(estimatedDeliveryDate);
   useEffect(() => {
     const exit = window.setTimeout(onDone, seconds * 1000);
@@ -77,6 +87,20 @@ const KioskResultScreen = ({
               </div>
             )}
           </dl>
+        )}
+        {activeStep >= 0 && (
+          <ol className="kiosk-result-progress" aria-label="Order status">
+            {ORDER_STEPS.map(([value, label], stepIndex) => (
+              <li
+                key={value}
+                className={stepIndex <= activeStep ? "reached" : ""}
+                aria-current={stepIndex === activeStep ? "step" : undefined}
+              >
+                <span aria-hidden="true">{stepIndex < activeStep ? "✓" : stepIndex + 1}</span>
+                <small>{label}</small>
+              </li>
+            ))}
+          </ol>
         )}
         <span className="kiosk-result-skip">{tapLabel}</span>
       </div>

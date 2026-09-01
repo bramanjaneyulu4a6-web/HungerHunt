@@ -9,6 +9,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "node --test",
     "seed:dev-accounts": "node scripts/seedDevAccounts.js",
+    "seed:warehouse-orders": "node scripts/seedWarehouseOrders.js",
     "audit:wallets": "node scripts/reconcileWallets.js",
     "reconcile:payments": "node scripts/reconcilePaymentIntents.js",
     "load:test": "node scripts/loadTest.js",

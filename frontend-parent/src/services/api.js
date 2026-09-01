@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Capacitor } from '@capacitor/core';
+import { observeMutationRevision } from '../utils/dataAutoRefresh';
 
 const configuredApiUrl =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
@@ -48,7 +49,7 @@ API.interceptors.request.use((config) => {
    someone out for a typo would be its own bug. The backend marks the difference
    with code: 'AUTH_REQUIRED'. */
 API.interceptors.response.use(
-  (response) => response,
+  observeMutationRevision,
   (error) => {
     if (
       error.response?.status === 401 &&

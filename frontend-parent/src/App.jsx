@@ -24,6 +24,8 @@ import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
+import API from "./services/api";
+import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
 const ProtectedRoute = ({ children }) => {
   const { parent } = useAuth();
@@ -62,6 +64,10 @@ function RouteEffects() {
 function AppContent() {
   const { parent } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => startDataAutoRefresh(API, {
+    enabled: () => Boolean(localStorage.getItem('parentToken')),
+  }), []);
 
   useEffect(() => {
     // Starting push before login would ask for notification permission on a

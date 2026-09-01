@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { Banner, Skeleton } from "../components/ui";
+import { formatPackSize } from "../utils/format";
 
 /* One order, one delivery. Each line starts prefilled with everything still
    outstanding — the common case is "it all arrived" and should be one tap.
@@ -178,17 +179,22 @@ const Receive = () => {
           const key = lineKey(item);
           const remaining = Math.max(0, item.quantity - (item.received || 0));
           const line = clamp(item, lines[key] || { received: 0, damaged: 0 });
+          const itemSize = formatPackSize(
+            item.productId?.packSize,
+            item.productId?.unit?.symbol
+          );
 
           return (
             <div key={key} className="wh-line-item">
               <div>
                 <div className="wh-product">{item.productId?.name || "Deleted product"}</div>
                 <div className="wh-remaining">
-                  ordered <span className="wh-num">{item.quantity}</span>
+                  {itemSize ? `Each item · ${itemSize}` : "Item size not recorded"}
+                  {" · ordered "}<span className="wh-num">{item.quantity}</span>{" units"}
                   {item.received > 0 && (
-                    <> · already in <span className="wh-num">{item.received}</span></>
+                    <> · already in <span className="wh-num">{item.received}</span> units</>
                   )}
-                  {" "}· expecting <span className="wh-num">{remaining}</span>
+                  {" "}· expecting <span className="wh-num">{remaining}</span> units
                 </div>
 
                 {/* The invoice is in hand now and nowhere else in the system

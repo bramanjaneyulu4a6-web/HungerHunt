@@ -60,7 +60,6 @@ export default function ProcurementReview() {
         actions={
           <div className="warehouse-page-actions">
             <Badge variant={orders.length ? "warn" : "success"}>{orders.length} awaiting decision</Badge>
-            <Button variant="ghost" onClick={load}>Refresh</Button>
           </div>
         }
       />

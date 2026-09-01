@@ -1,23 +1,17 @@
-import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/api";
-import RefreshButton from "../components/RefreshButton";
 import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
+import SessionClock from "../components/SessionClock";
 import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
-
-const formatSessionTime = (seconds) => {
-  const safeSeconds = Math.max(0, seconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
-};
 
 // Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
 // actually enforces it. Here it only shapes the field.
@@ -53,6 +47,19 @@ const stockGroupNames = (products) => {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name))
     .map((group) => group.name);
 };
+
+const StudentSummary = ({ student, walletBalance, className = "" }) => (
+  <div className={`kiosk-student-card${className ? ` ${className}` : ""}`}>
+    <div className="kiosk-student-card__identity">
+      <strong>{student.name}</strong>
+      <span>{student.admissionNumber}</span>
+    </div>
+    <div className="kiosk-student-card__wallet">
+      <small>Wallet balance</small>
+      <strong className="money">{formatINR(walletBalance)}</strong>
+    </div>
+  </div>
+);
 
 // Nutrition is transcribed off a packet by hand, so it is routinely partial.
 // Whatever the office entered is shown and the rest reads as a dash; only a
@@ -214,7 +221,7 @@ const KioskBilling = ({ student, onLogout }) => {
       if (!Array.isArray(res.data)) {
         return {
           products: [],
-          error: "Inventory data could not be loaded. Please try refreshing.",
+          error: "Inventory data could not be loaded. Check the connection and try again.",
         };
       }
 
@@ -229,7 +236,7 @@ const KioskBilling = ({ student, onLogout }) => {
       console.error(err);
       return {
         products: [],
-        error: "Failed to load inventory. Please try refreshing.",
+        error: "Failed to load inventory. Check the connection and try again.",
       };
     }
   }, []);
@@ -602,29 +609,6 @@ const KioskBilling = ({ student, onLogout }) => {
     products: filteredProducts.filter((product) => (product.subCategory || "Others") === name),
   }));
 
-  // The segmented lens is measured from the live segment rather than hardcoded,
-  // so it stays correct whatever the categories turn out to be called.
-  const segRef = useRef(null);
-  const [lens, setLens] = useState({ x: 0, w: 0 });
-  const categoryKey = categories.join("|");
-
-  useLayoutEffect(() => {
-    const seat = () => {
-      const active = segRef.current?.querySelector('[data-on="true"]');
-      if (!active) return;
-      setLens({ x: active.offsetLeft, w: active.offsetWidth });
-    };
-
-    seat();
-    const observer = new ResizeObserver(seat);
-    if (segRef.current) observer.observe(segRef.current);
-    window.addEventListener("resize", seat);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", seat);
-    };
-  }, [selectedCategory, categoryKey, showCategoryWelcome]);
-
   useEffect(() => {
     if (!searchOpen) return undefined;
     const focus = window.requestAnimationFrame(() => searchInputRef.current?.focus());
@@ -714,26 +698,21 @@ const KioskBilling = ({ student, onLogout }) => {
           <div className="kiosk-category-ambient kiosk-category-ambient--two" aria-hidden="true" />
 
           <header className="kiosk-category-topbar">
+            <StudentSummary
+              student={student}
+              walletBalance={walletBalance}
+              className="kiosk-student-card--category"
+            />
             <div className="kiosk-wordmark kiosk-wordmark--category">Hunger Hunt</div>
-            <div className="kiosk-category-student">
-              <span aria-hidden="true">{student.name?.charAt(0).toUpperCase()}</span>
-              <div><small>Ordering for</small><strong>{student.name}</strong></div>
-            </div>
-            <div className="kiosk-category-wallet">
-              <small>Wallet balance</small>
-              <strong className="money">{formatINR(walletBalance)}</strong>
-            </div>
-            <button type="button" className="kiosk-category-exit" onClick={onLogout}>
-              End session
-            </button>
-            <div
-              className="kiosk-session-clock kiosk-session-clock--category"
-              role="timer"
-              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
+            <SessionClock remaining={capRemaining} />
+            <button
+              type="button"
+              className="kiosk-exit"
+              onClick={onLogout}
+              aria-label="End session"
             >
-              <small>Session</small>
-              <strong>{formatSessionTime(capRemaining)}</strong>
-            </div>
+              <span className="kiosk-exit__mark" aria-hidden="true">×</span>
+            </button>
           </header>
 
           <section className="kiosk-category-hero">
@@ -1014,23 +993,15 @@ const KioskBilling = ({ student, onLogout }) => {
           >
             <div className="wall-fixed">
               <div className="wall-top">
+            <StudentSummary
+              student={student}
+              walletBalance={walletBalance}
+              className="kiosk-student-card--wall glass"
+            />
+
             <div className="kiosk-wordmark kiosk-wordmark--wall">Hunger Hunt</div>
 
-            {/* Where the student search used to be. Nobody is looked up here
-                any more — the session already knows who this is, so the bar
-                reports it instead of asking. */}
-            <div className="serving glass">
-              <span className="serving-avatar" aria-hidden="true">
-                {student.name?.charAt(0).toUpperCase()}
-              </span>
-
-              <div className="serving-who">
-                <div className="serving-label">Ordering for</div>
-                <div className="serving-name">{student.name}</div>
-                <div className="serving-meta">Admission no. {student.admissionNumber}</div>
-              </div>
-
-            </div>
+            <SessionClock remaining={capRemaining} />
 
             <button
               type="button"
@@ -1038,16 +1009,8 @@ const KioskBilling = ({ student, onLogout }) => {
               onClick={() => setConfirmExit(true)}
               aria-label="Cancel order and end session"
             >
-              <span aria-hidden="true">×</span>
+              <span className="kiosk-exit__mark" aria-hidden="true">×</span>
             </button>
-            <div
-              className="kiosk-session-clock"
-              role="timer"
-              aria-label={`${formatSessionTime(capRemaining)} remaining in this session`}
-            >
-              <small>Session</small>
-              <strong>{formatSessionTime(capRemaining)}</strong>
-            </div>
               </div>
 
               {inventoryError && (
@@ -1062,16 +1025,9 @@ const KioskBilling = ({ student, onLogout }) => {
               <div className="filterbar-groups">
                 <div
                   className="seg"
-                  ref={segRef}
                   role="tablist"
                   aria-hidden={searchOpen}
                 >
-                  <span
-                    className="seg-lens"
-                    aria-hidden="true"
-                    style={{ "--x": `${lens.x}px`, "--w": `${lens.w}px` }}
-                  />
-
                   {categories.map((category) => (
                     <button
                       type="button"
@@ -1095,7 +1051,7 @@ const KioskBilling = ({ student, onLogout }) => {
                   tabIndex={searchOpen ? 0 : -1}
                   onClick={closeSearch}
                 >
-                  <img src={hungerLogo} alt="" />
+                  <span className="filterbar-group-logo__mark" aria-hidden="true">←</span>
                 </button>
               </div>
 
@@ -1374,9 +1330,6 @@ const KioskBilling = ({ student, onLogout }) => {
               ))}
             </div>
 
-            <p className="nutrition-foot">
-              As printed on the pack. A dash means the figure was not supplied.
-            </p>
           </div>
         </div>
       )}
@@ -1609,7 +1562,6 @@ const KioskBilling = ({ student, onLogout }) => {
         </ErrorFeedback>
       )}
 
-      <RefreshButton onRefresh={refreshPage} loading={loadingProducts} />
     </>
   );
 };

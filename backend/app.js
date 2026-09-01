@@ -36,6 +36,7 @@ import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
+import { currentDataRevision, dataRevision } from './middleware/dataRevision.js';
 
 const app = express();
 
@@ -217,10 +218,12 @@ app.use(
       return callback(err);
     },
     credentials: true,
+    exposedHeaders: ['X-Data-Revision'],
   })
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(dataRevision);
 
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));
 
@@ -234,6 +237,10 @@ const readiness = (req, res) => {
 
 app.get('/health', readiness);
 app.get('/health/ready', readiness);
+app.get('/api/data-revision', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ revision: currentDataRevision() });
+});
 
 // API Routes
 app.use('/api/admin', adminRoutes);

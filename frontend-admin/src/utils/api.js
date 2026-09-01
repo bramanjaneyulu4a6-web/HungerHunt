@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { clearSession } from './session';
+import { observeMutationRevision } from './dataAutoRefresh';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -29,7 +30,7 @@ api.interceptors.request.use((config) => {
    Nor does a 403, which is a signed-in account reaching past its role and no
    reason at all to sign it out. */
 api.interceptors.response.use(
-  (response) => response,
+  observeMutationRevision,
   (error) => {
     if (
       error.response?.status === 401 &&

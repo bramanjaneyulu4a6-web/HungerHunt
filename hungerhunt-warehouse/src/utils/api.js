@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { clearSession } from "./session";
+import { observeMutationRevision } from "./dataAutoRefresh";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -23,7 +24,7 @@ api.interceptors.request.use((config) => {
    password with a bare 401 that means only that. Ejecting on that one would
    clear the form's own error on the way past. */
 api.interceptors.response.use(
-  (response) => response,
+  observeMutationRevision,
   (error) => {
     if (
       error.response?.status === 401 &&

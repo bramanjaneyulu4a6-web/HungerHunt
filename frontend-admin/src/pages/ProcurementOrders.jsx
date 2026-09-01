@@ -83,7 +83,6 @@ export default function ProcurementOrders() {
       <PageHeader
         title="Purchase Order Ledger"
         subtitle="Track every warehouse request from Accounts review through supplier receipt."
-        actions={<Button variant="ghost" onClick={load}>Refresh</Button>}
       />
 
       <div className="warehouse-filterbar" role="tablist" aria-label="Filter purchase orders">

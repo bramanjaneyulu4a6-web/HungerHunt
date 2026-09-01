@@ -1001,15 +1001,6 @@ select.auth-input {
   margin-top: 20px;
 }
 
-/* Refresh control pinned to the corner of list pages. */
-.refresh-fab {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 50;
-  box-shadow: var(--shadow-raised);
-}
-
 /* ---- admin sidebar ----------------------------------------------------- */
 
 /* The admin console frames every page with a dark rail — the one dark surface

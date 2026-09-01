@@ -6,9 +6,9 @@ import api from "../utils/api";
 import { availabilityOf } from "../utils/availability";
 import Icon from "../components/Icon";
 import ProductThumb from "../components/ProductThumb";
-import RefreshButton from "../components/RefreshButton";
 import OrderReviewSheet from "../components/OrderReviewSheet";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
+import { formatPackSize } from "../utils/format";
 
 /* The shelf, and the order raised off it.
    Ordering used to be its own screen, which meant deciding what was short in
@@ -103,7 +103,7 @@ const Inventory = () => {
             id,
             name: product.name,
             image: product.image || "",
-            unit: product.unit?.name || "",
+            itemSize: formatPackSize(product.packSize, product.unit?.symbol),
             group: product.stockGroup?.name || "",
             stock: onShelf,
             low: availability === "LOW",
@@ -155,7 +155,7 @@ const Inventory = () => {
           id,
           name: row?.name || "Product",
           image: row?.image || "",
-          unit: row?.unit || "",
+          itemSize: row?.itemSize || "",
           stock: row?.stock ?? 0,
           quantity: cart[id],
           estimatedUnitCost: suggestion?.estimatedUnitCost,
@@ -296,11 +296,10 @@ const Inventory = () => {
           <h1 className="wh-title">Inventory</h1>
           <p className="wh-subtitle">
             {orderMode
-              ? "Type how many you need, then press Add"
-              : "What is on the shelf right now"}
+              ? "Order whole items; each product's individual size is shown below"
+              : "Individual item size and number of units on the shelf"}
           </p>
         </div>
-        <RefreshButton onRefresh={load} />
       </div>
 
       <div className="wh-modebar">
@@ -353,7 +352,7 @@ const Inventory = () => {
       )}
 
       {loadError && (
-        <Banner variant="alert" icon="⚠️">Could not load the shelf. Refresh to try again.</Banner>
+        <Banner variant="alert" icon="⚠️">Could not load the shelf. Check the connection and try again.</Banner>
       )}
 
       {loading ? (
@@ -376,6 +375,8 @@ const Inventory = () => {
                 <div className="wh-tile-main">
                   <div className="wh-product">{row.name}</div>
                   <div className="wh-remaining">
+                    {row.itemSize ? `Each item · ${row.itemSize}` : "Item size not recorded"}
+                    {" · "}
                     {row.empty
                       ? "none on the shelf"
                       : row.low
@@ -383,7 +384,8 @@ const Inventory = () => {
                         : row.group || "in stock"}
                     {cart[row.id] != null && (
                       <span className="wh-in-cart">
-                        · <span className="wh-num">{cart[row.id]}</span> in the cart
+                        · <span className="wh-num">{cart[row.id]}</span>{" "}
+                        unit{cart[row.id] === 1 ? "" : "s"} in the cart
                       </span>
                     )}
                   </div>
@@ -393,7 +395,7 @@ const Inventory = () => {
                   className={`wh-count${row.empty ? " wh-count--zero" : row.low ? " wh-count--low" : ""}`}
                 >
                   <span className="wh-num">{row.stock}</span>
-                  <small>{row.unit || "on shelf"}</small>
+                  <small>{row.stock === 1 ? "unit" : "units"}</small>
                 </div>
 
                 {orderMode && (
@@ -411,7 +413,7 @@ const Inventory = () => {
                         inputMode="numeric"
                         placeholder="0"
                         value={fieldValue(row)}
-                        aria-label={`How many ${row.name} to order`}
+                        aria-label={`How many units of ${row.name} to order`}
                         onChange={(event) => setField(row.id, event.target.value)}
                       />
                       <button

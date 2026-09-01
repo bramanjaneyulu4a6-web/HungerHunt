@@ -7,7 +7,6 @@ export default function PaymentMethodChooser({
   walletBalance,
   studentName,
   walletDisabled,
-  isDemo,
   busy,
   onWallet,
   onUpi,
@@ -63,7 +62,6 @@ export default function PaymentMethodChooser({
               <strong>Pay by UPI</strong>
               <small>PhonePe, Google Pay or Paytm</small>
             </span>
-            {isDemo && <span className="upi-demo-badge">Demo</span>}
             <span className="payment-choice-chevron" aria-hidden="true">›</span>
           </button>
 

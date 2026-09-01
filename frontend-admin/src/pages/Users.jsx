@@ -66,7 +66,7 @@ export default function Users() {
         subtitle="Manage students, their parent access, and every staff account from one place."
       />
 
-      {error && <Banner variant="alert">Some user records could not be loaded. Try refreshing.</Banner>}
+      {error && <Banner variant="alert">Some user records could not be loaded. Check the connection and try again.</Banner>}
       {section === 'students' && <Students embedded parentByStudent={parentByStudent} onUsersChanged={load} />}
       {section === 'parents' && (
         <ParentsTab parents={activeParents} loading={loading} onChanged={load} />

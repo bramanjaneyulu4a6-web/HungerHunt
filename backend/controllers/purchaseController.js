@@ -392,7 +392,10 @@ export const getPurchase = async (req, res) => {
     }
 
     const purchase = await Purchase.findById(req.params.id)
-      .populate("items.productId")
+      .populate({
+        path: "items.productId",
+        populate: { path: "unit" },
+      })
       .populate("supplierId");
 
     if (!purchase) return res.status(404).json({ message: "Purchase not found" });

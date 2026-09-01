@@ -128,7 +128,6 @@ export default function StaffReports() {
             ? `${outstanding} ${source}-initiated report${outstanding === 1 ? '' : 's'} waiting on the office.`
             : SOURCE_COPY[source]
         }
-        actions={<Button variant="ghost" onClick={load}>Refresh</Button>}
       />
 
       <div className="tabs users-tabs" role="tablist" aria-label="Report sources">
@@ -162,7 +161,7 @@ export default function StaffReports() {
         ))}
       </div>
 
-      {error && <Banner variant="alert">Could not load reports. Try refreshing.</Banner>}
+      {error && <Banner variant="alert">Could not load reports. Check the connection and try again.</Banner>}
 
       {loading ? (
         <Skeleton height={220} radius={16} />

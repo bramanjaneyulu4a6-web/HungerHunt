@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import RefreshButton from '../components/RefreshButton';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
@@ -177,7 +176,6 @@ const CaretakerOrders = () => {
     if (nextView === 'history' && !historyLoaded) await loadHistory(1, true);
   };
 
-  const refresh = () => view === 'history' ? loadHistory(1, true) : loadArrivals();
   const currentOrders = [...orders].sort((a, b) =>
     STATUS_STEPS.indexOf(b.status) - STATUS_STEPS.indexOf(a.status) ||
     new Date(a.deliverBy).getTime() - new Date(b.deliverBy).getTime()
@@ -194,7 +192,6 @@ const CaretakerOrders = () => {
               : 'Track every paid order from the warehouse to the student it belongs to'}
           </p>
         </div>
-        <RefreshButton onRefresh={refresh} />
       </div>
 
       <div className="wh-view-tabs" aria-label="Package view">

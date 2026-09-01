@@ -41,3 +41,6 @@ frontend-parent/android/app/build/
 
 .DS_Store
 *.log
+
+# Claude Code local state — settings and nested feature worktrees.
+.claude/

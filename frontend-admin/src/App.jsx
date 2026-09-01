@@ -1,8 +1,10 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 import ProtectedRoute from './components/ProtectedRoute';
+import api from './utils/api';
+import { startDataAutoRefresh } from './utils/dataAutoRefresh';
 
 const Login = lazy(() => import('./pages/Login'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -30,6 +32,10 @@ const RouteFallback = () => (
 );
 
 function App() {
+  useEffect(() => startDataAutoRefresh(api, {
+    enabled: () => Boolean(localStorage.getItem('adminToken')),
+  }), []);
+
   return (
     <Router>
       <Toaster position="top-center" />

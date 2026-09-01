@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import api from "../utils/api";
 import Icon from "../components/Icon";
-import RefreshButton from "../components/RefreshButton";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 
 /* The supplier side of the storeroom, which used to be two tabs: what has been
@@ -143,7 +142,6 @@ const Purchases = () => {
               : "The last deliveries booked, newest first"}
           </p>
         </div>
-        <RefreshButton onRefresh={load} />
       </div>
 
       <div className="wh-view-tabs" role="tablist" aria-label="Purchase views">
@@ -163,7 +161,7 @@ const Purchases = () => {
 
       {loadError && (
         <Banner variant="alert" icon="⚠️">
-          Could not load {view === "coming" ? "orders" : "the logbook"}. Refresh to try again.
+          Could not load {view === "coming" ? "orders" : "the logbook"}. Check the connection and try again.
         </Banner>
       )}
 

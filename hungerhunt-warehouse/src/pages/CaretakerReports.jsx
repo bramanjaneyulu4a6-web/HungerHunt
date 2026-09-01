@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
-import RefreshButton from '../components/RefreshButton';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
 import {
@@ -60,7 +59,6 @@ const CaretakerReports = () => {
               : 'Anything you raise with the office appears here, with its answer'}
           </p>
         </div>
-        <RefreshButton onRefresh={load} />
       </div>
 
       {composing ? (

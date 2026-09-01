@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -7,19 +8,21 @@ import Orders from "./pages/Orders";
 import Inventory from "./pages/Inventory";
 import Purchases from "./pages/Purchases";
 import Receive from "./pages/Receive";
+import Records from "./pages/Records";
 import CaretakerOrders from "./pages/CaretakerOrders";
 import CaretakerReports from "./pages/CaretakerReports";
 import CollectOrder from "./pages/CollectOrder";
 import { clearSession } from "./utils/session";
+import api from "./utils/api";
+import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
-/* Three tabs, in the order the shift runs: what students are waiting for,
-   what is on the shelf to serve them with, and what has been ordered to keep
-   the shelf full. Six tabs used to split that into six 62-pixel targets;
-   three leaves room for a thumb and for the label to be read at a glance. */
+/* Active work stays together; completed work and reports have their own
+   destination so the live queue never has to compete with record keeping. */
 const TABS = [
-  { to: "/", icon: "package", label: "Orders" },
+  { to: "/", icon: "package", label: "Active" },
   { to: "/inventory", icon: "shelf", label: "Inventory" },
   { to: "/purchases", icon: "truck", label: "Purchases" },
+  { to: "/records", icon: "receipt", label: "Records" },
 ];
 
 const TabBar = () => (
@@ -202,26 +205,33 @@ const StaffRoutes = () => {
       <Route path="/inventory" element={guarded(<Inventory />)} />
       <Route path="/purchases" element={guarded(<Purchases />)} />
       <Route path="/purchases/receive/:id" element={guarded(<Receive />)} />
+      <Route path="/records" element={guarded(<Records />)} />
 
       <Route path="/packages" element={<Navigate to="/" replace />} />
       <Route path="/stock" element={<Navigate to="/inventory" replace />} />
       <Route path="/new-order" element={<Navigate to="/inventory" replace />} />
       <Route path="/insights" element={<Navigate to="/inventory" replace />} />
-      <Route path="/history" element={<Navigate to="/purchases" replace />} />
+      <Route path="/history" element={<Navigate to="/records" replace />} />
       <Route path="/receive/:id" element={<ReceiveRedirect />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
-const App = () => (
-  <BrowserRouter>
-    <Toaster position="top-center" />
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="*" element={<StaffRoutes />} />
-    </Routes>
-  </BrowserRouter>
-);
+const App = () => {
+  useEffect(() => startDataAutoRefresh(api, {
+    enabled: () => Boolean(localStorage.getItem("warehouseToken")),
+  }), []);
+
+  return (
+    <BrowserRouter>
+      <Toaster position="top-center" />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<StaffRoutes />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
 export default App;

@@ -22,8 +22,6 @@ import { createTopup, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayme
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
-  { id: 'purchases', icon: '🛒', label: 'Purchases' },
-  { id: 'recharges', icon: '⚡', label: 'Recharges' },
   { id: 'wallet', icon: '💳', label: 'Wallet' },
 ];
 
@@ -105,9 +103,9 @@ const ListSkeleton = () => (
   </>
 );
 
-/* Both history tabs page the same way, so they share one hook: fetch page one,
-   append each further page, and reload from the top when a push says the data
-   changed. Nothing is requested until its tab is opened. */
+/* Long account lists page the same way: fetch page one, append each further
+   page, and reload from the top when a push says the data changed. Nothing is
+   requested until its tab is opened. */
 const usePagedList = (path, key, enabled) => {
   const [items, setItems] = useState([]);
   const [hasMore, setHasMore] = useState(false);
@@ -225,7 +223,7 @@ export default function ChildDetails() {
   const [loadError, setLoadError] = useState('');
 
   const [activeTab, setActiveTab] = useState(
-    searchParams.get('tab') === 'orders' ? 'orders' : 'purchases'
+    searchParams.get('tab') === 'wallet' ? 'wallet' : 'orders'
   );
   const [pendingOrders, setPendingOrders] = useState([]);
   const [pendingNotice, setPendingNotice] = useState('');
@@ -317,9 +315,6 @@ export default function ChildDetails() {
               (order) => String(order.studentId?._id) === id
             );
             setPendingOrders(childOrders);
-            if (childOrders.length === 0) {
-              setActiveTab((tab) => (tab === 'pending' ? 'purchases' : tab));
-            }
           }
         } catch {
           // Keep the last known pending list.
@@ -355,16 +350,10 @@ export default function ChildDetails() {
     };
   }, [id, attempt]);
 
-  const bills = usePagedList(
-    `/parent/child/${id}/bills`,
-    'bills',
-    activeTab === 'purchases'
-  );
-
   const recharges = usePagedList(
     `/parent/child/${id}/recharges`,
     'recharges',
-    activeTab === 'recharges'
+    activeTab === 'wallet'
   );
 
   const fulfillmentOrders = usePagedList(
@@ -471,12 +460,11 @@ export default function ChildDetails() {
   }
 
   const student = data.student;
-  const tabs = pendingOrders.length
-    ? [
-        { id: 'pending', icon: '⏳', label: `Pending (${pendingOrders.length})` },
-        ...BASE_TABS,
-      ]
-    : BASE_TABS;
+  const tabs = BASE_TABS.map((tab) =>
+    tab.id === 'orders' && pendingOrders.length
+      ? { ...tab, label: `Orders (${pendingOrders.length})` }
+      : tab
+  );
 
   const refreshPending = async (message, { degradedToTopup = false } = {}) => {
     setPendingNotice(message || 'Approval updated.');
@@ -490,7 +478,6 @@ export default function ChildDetails() {
         (order) => String(order.studentId?._id) === id
       );
       setPendingOrders(childOrders);
-      if (childOrders.length === 0) setActiveTab('purchases');
     } catch {
       // The action succeeded. A foreground refresh or push will reconcile the
       // list if this follow-up read happens to fail.
@@ -721,92 +708,33 @@ export default function ChildDetails() {
         ))}
       </div>
 
-      {activeTab === 'pending' && pendingOrders.length > 0 && (
-        <div role="tabpanel" id="panel-pending" aria-labelledby="tab-pending" tabIndex={0}>
-          <div className="section-heading-row">
-            <div>
-              <h2 className="section-title">Pending approval</h2>
-              <p className="section-copy">Review this kiosk order before it expires.</p>
-            </div>
-          </div>
-
-          {pendingNotice && (
-            <Banner variant="success" icon="✅" style={{ marginBottom: 18 }}>
-              {pendingNotice}
-            </Banner>
-          )}
-
-          {pendingOrders.map((order) => (
-            <PendingApprovalCard
-              key={order._id}
-              order={order}
-              onResolved={refreshPending}
-            />
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'purchases' && (
-        <div role="tabpanel" id="panel-purchases" aria-labelledby="tab-purchases" tabIndex={0}>
-          <h2 className="section-title">Purchase History</h2>
-
-          {renderList(bills, {
-            empty: (
-              <EmptyState icon="🧾" title="No purchase history yet">
-                Completed kiosk purchases will appear here.
-              </EmptyState>
-            ),
-            children: bills.items.map((bill, i) => (
-              <AnimateIn key={bill._id} index={i}>
-                <Card className="card--tight" style={{ marginBottom: 16 }}>
-                  <div className="ledger-head">
-                    <span>
-                      Invoice:{' '}
-                      <span style={{ color: 'var(--ink)', fontWeight: 600 }}>
-                        #{bill._id.slice(-6).toUpperCase()}
-                      </span>
-                    </span>
-                    <span>{formatDate(bill.createdAt)}</span>
-                  </div>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
-                    {(bill.items || bill.products || []).map((item, idx) => (
-                      <li key={idx} className="ledger-row">
-                        <span>
-                          {item.name || item.productName}
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: 'var(--muted-soft)',
-                            }}
-                          >
-                            x{item.quantity}
-                          </span>
-                        </span>
-                        <span style={{ fontWeight: 500, color: 'var(--ink)' }}>
-                          {formatINR((item.price || 0) * (item.quantity || 0))}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="ledger-total">
-                    <span>Total Deducted</span>
-                    <span className="amount-out">
-                      −{formatINR(bill.totalAmount)}
-                    </span>
-                  </div>
-                </Card>
-              </AnimateIn>
-            )),
-          })}
-        </div>
-      )}
-
       {activeTab === 'orders' && (
         <div role="tabpanel" id="panel-orders" aria-labelledby="tab-orders" tabIndex={0}>
+          {pendingOrders.length > 0 && (
+            <section style={{ marginBottom: 28 }}>
+              <div className="section-heading-row">
+                <div>
+                  <h2 className="section-title">Pending approval</h2>
+                  <p className="section-copy">Review kiosk orders before they expire.</p>
+                </div>
+              </div>
+
+              {pendingNotice && (
+                <Banner variant="success" icon="✅" style={{ marginBottom: 18 }}>
+                  {pendingNotice}
+                </Banner>
+              )}
+
+              {pendingOrders.map((order) => (
+                <PendingApprovalCard
+                  key={order._id}
+                  order={order}
+                  onResolved={refreshPending}
+                />
+              ))}
+            </section>
+          )}
+
           <div className="section-heading-row">
             <div>
               <h2 className="section-title">Orders</h2>
@@ -831,15 +759,14 @@ export default function ChildDetails() {
         </div>
       )}
 
-      {activeTab === 'recharges' && (
-        <div role="tabpanel" id="panel-recharges" aria-labelledby="tab-recharges" tabIndex={0}>
+      {activeTab === 'wallet' && (
+        <div role="tabpanel" id="panel-wallet" aria-labelledby="tab-wallet" tabIndex={0}>
           {(PAYMENTS_ENABLED || DEMO_UPI_ENABLED) && (
           <Card style={{ marginBottom: 24 }}>
             <div className="demo-topup-heading">
               <h2 className="section-title" style={{ fontSize: 20 }}>
                 Add money
               </h2>
-              {DEMO_UPI_ENABLED && <span className="upi-demo-badge">Demo</span>}
             </div>
             <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
               {!DEMO_UPI_ENABLED && PAYMENTS_ENABLED
@@ -908,7 +835,7 @@ export default function ChildDetails() {
             )}
             {demoPaymentResult && (
               <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
-                UPI demo completed with {demoPaymentResult.provider}.
+                Payment completed with {demoPaymentResult.provider}.
               </Banner>
             )}
           </Card>
@@ -923,7 +850,7 @@ export default function ChildDetails() {
             />
           )}
 
-          <h2 className="section-title">Recharge History</h2>
+          <h2 className="section-title">Wallet activity</h2>
 
           {renderList(recharges, {
             empty: (
@@ -940,14 +867,14 @@ export default function ChildDetails() {
                     <span>
                       {r.kind === 'ORDER_CANCELLATION_REFUND'
                         ? 'Cancelled Order Refund'
-                        : 'Wallet Recharge'}
+                        : 'Money added'}
                     </span>
                     <span>{formatDate(r.date)}</span>
                   </div>
 
                   <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
                     <span>
-                      {r.kind === 'ORDER_CANCELLATION_REFUND' ? 'Refund Amount' : 'Recharge Amount'}
+                      {r.kind === 'ORDER_CANCELLATION_REFUND' ? 'Refund amount' : 'Amount added'}
                     </span>
                     <span className="amount-in">+{formatINR(r.amount)}</span>
                   </div>
@@ -972,11 +899,7 @@ export default function ChildDetails() {
               </AnimateIn>
             )),
           })}
-        </div>
-      )}
-
-      {activeTab === 'wallet' && (
-        <div role="tabpanel" id="panel-wallet" aria-labelledby="tab-wallet" tabIndex={0} className="settings-grid">
+          <div className="settings-grid wallet-settings-grid">
           <Card className="settings-card">
             <h2 className="section-title" style={{ fontSize: 20 }}>
               Purchase Approval
@@ -1086,6 +1009,7 @@ export default function ChildDetails() {
               {saving ? 'Saving…' : 'Save Wallet Control'}
             </Button>
           </Card>
+          </div>
         </div>
       )}
     </div>

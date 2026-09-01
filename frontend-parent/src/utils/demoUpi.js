@@ -30,6 +30,5 @@ export const demoAmountProblem = (value) => {
   return '';
 };
 
-export const makeDemoReference = (now = Date.now()) =>
-  `DEMO${String(now).slice(-8)}`;
-
+export const makeUpiReference = (now = Date.now()) =>
+  String(now).padStart(12, '0').slice(-12);

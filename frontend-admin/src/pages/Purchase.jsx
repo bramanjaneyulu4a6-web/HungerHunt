@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
-import RefreshButton from "../components/RefreshButton";
 import { Badge, Banner, Button, EmptyState, PageHeader, Skeleton } from "../components/ui";
 
 const Purchase = () => {
@@ -260,7 +259,6 @@ const Purchase = () => {
         </div>
       )}
 
-      <RefreshButton onRefresh={fetchProducts} loading={loading} />
     </div>
   );
 };

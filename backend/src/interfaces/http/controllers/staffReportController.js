@@ -31,14 +31,15 @@ const PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const REPORT_SOURCES = Object.freeze(['student', 'caretaker', 'warehouse', 'parent']);
 
-/* One caretaker may have this many reports outstanding before they are asked to
-   wait for an answer. Not a rate limit by the clock — a caretaker having a bad
+/* One staff account may have this many reports outstanding before they are asked to
+   wait for an answer. Not a rate limit by the clock — a staff member having a bad
    week may legitimately file several in an hour, and a limiter that punished
    that would teach them to stop reporting. This bounds the collection instead:
    a stuck client or a jammed button cannot grow it without limit, and a
-   caretaker with twenty-five unanswered reports has a problem that one more
+   account with twenty-five unanswered reports has a problem that one more
    report will not solve. */
-const MAX_OPEN_PER_CARETAKER = 25;
+const MAX_OPEN_PER_RAISER = 25;
+const MAX_WAREHOUSE_GROUP_ORDERS = 500;
 
 const serialize = (report, { forRaiser = false } = {}) => ({
   id: String(report._id),
@@ -124,7 +125,7 @@ export const create = async (req, res) => {
     status: { $in: OPEN_REPORT_STATUSES },
   });
 
-  if (outstanding >= MAX_OPEN_PER_CARETAKER) {
+  if (outstanding >= MAX_OPEN_PER_RAISER) {
     throw new ApplicationError(
       `You have ${outstanding} reports still being handled. Wait for those to be answered before raising another.`,
       { status: 429, code: 'TOO_MANY_OPEN_REPORTS' }
@@ -186,6 +187,86 @@ export const create = async (req, res) => {
   });
 };
 
+/* A warehouse report belongs to a hostel work tile, not to one student's
+ * package. The client sends the underlying ids only as proof of that scope;
+ * the server resolves their shared hostel and refuses a mixed group. No
+ * student is named in the report, preserving the block/hostel workflow while
+ * keeping the office's existing Warehouse report channel and audit trail. */
+export const createWarehouseOrderIssue = async (req, res) => {
+  const category = String(req.body.category || '').toUpperCase();
+  const note = String(req.body.note ?? '').trim();
+  const orderIds = [...new Set(Array.isArray(req.body.orderIds) ? req.body.orderIds.map(String) : [])];
+  const details = [];
+
+  const categoryError = categoryProblem(ReportKind.ORDER_ISSUE, category);
+  if (categoryError) details.push({ field: 'category', message: categoryError });
+  const noteError = reportNoteProblem(note);
+  if (noteError) details.push({ field: 'note', message: noteError });
+  if (!orderIds.length || orderIds.length > MAX_WAREHOUSE_GROUP_ORDERS) {
+    details.push({
+      field: 'orderIds',
+      message: `Choose between 1 and ${MAX_WAREHOUSE_GROUP_ORDERS} orders from one hostel.`,
+    });
+  } else if (orderIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+    details.push({ field: 'orderIds', message: 'Every order must have a valid identifier.' });
+  }
+  if (details.length) throw new ValidationError(details);
+
+  const orders = await FulfillmentOrder.find({
+    _id: { $in: orderIds },
+    status: 'PENDING',
+  })
+    .select('studentSnapshot.hostelId studentSnapshot.hostelNumber')
+    .lean();
+
+  if (orders.length !== orderIds.length) {
+    throw new ConflictError('One or more orders have moved. Refresh the New orders tab and try again.');
+  }
+
+  const hostelIds = new Set(orders.map((order) => String(order.studentSnapshot?.hostelId || '')));
+  const hostelNumbers = new Set(orders.map((order) => order.studentSnapshot?.hostelNumber || ''));
+  if (hostelIds.size !== 1 || hostelNumbers.size !== 1 || hostelIds.has('')) {
+    throw new ValidationError([{ field: 'orderIds', message: 'Every order in a report must belong to the same hostel.' }]);
+  }
+
+  const outstanding = await StaffReport.countDocuments({
+    raisedBy: req.staff.id,
+    status: { $in: OPEN_REPORT_STATUSES },
+  });
+  if (outstanding >= MAX_OPEN_PER_RAISER) {
+    throw new ApplicationError(
+      `You have ${outstanding} reports still being handled. Wait for those to be answered before raising another.`,
+      { status: 429, code: 'TOO_MANY_OPEN_REPORTS' }
+    );
+  }
+
+  const account = await Admin.findById(req.staff.id).select('name email').lean();
+  const hostelId = orders[0].studentSnapshot.hostelId;
+  const hostelNumber = orders[0].studentSnapshot.hostelNumber;
+  const created = await StaffReport.create({
+    kind: ReportKind.ORDER_ISSUE,
+    category,
+    note,
+    raisedBy: req.staff.id,
+    raiser: {
+      name: account?.name || account?.email || 'Warehouse',
+      role: 'warehouse',
+      hostelNumber,
+    },
+    hostelId,
+    status: ReportStatus.OPEN,
+  });
+
+  res.status(201).json({
+    data: serialize(created.toObject(), { forRaiser: true }),
+    meta: {
+      requestId: req.context.requestId,
+      hostelNumber,
+      groupedOrders: orders.length,
+    },
+  });
+};
+
 /* Raised by the student, at the handover screen, through the caretaker's
  * session. The caretaker's account carries it — students have no staff
  * accounts — but the raiser on the record is the student the package belongs
@@ -212,7 +293,7 @@ export const createStudentOrderIssue = async (req, res) => {
     status: { $in: OPEN_REPORT_STATUSES },
   });
 
-  if (outstanding >= MAX_OPEN_PER_CARETAKER) {
+  if (outstanding >= MAX_OPEN_PER_RAISER) {
     throw new ApplicationError(
       'This hostel has too many reports still being handled. Ask your caretaker to wait for answers before sending more.',
       { status: 429, code: 'TOO_MANY_OPEN_REPORTS' }

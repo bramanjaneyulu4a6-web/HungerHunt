@@ -810,6 +810,10 @@
 
 /* ---- right column: the product wall ------------------------------------ */
 
+/* The side gutters live on the scroller, not the wall: the sticky header's
+   negative-margin bleed then paints inside the scroller's own padding, so it
+   reaches the screen edge without widening the scrollable area — no sideways
+   pan, nothing clipped. */
 .wall {
   --wall-gutter-left: 46px;
   --wall-gutter-right: 26px;
@@ -817,30 +821,87 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 22px 26px 24px 46px;
+  padding: 22px 0 24px;
   transition: padding 460ms cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 
 .till--bare .wall {
   --wall-gutter-left: 26px;
-  padding: 22px 26px;
+  padding: 22px 0;
 }
 
+/* One flex row, no wrapping: the student card is pinned to the top left, the
+   session clock and the × that ends the session hold the top right, and the
+   wordmark floats centered between them. The card shrinks first — its name
+   ellipsizes, and below 480px the identity gives way to the balance alone. */
 .wall-top {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  min-height: 68px;
+  gap: 14px;
+  min-height: 84px;
+  padding: 6px 0;
   margin-bottom: 0;
 }
 
+.kiosk-student-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 9px 18px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid #ebe2d6;
+  border-radius: 20px;
+  box-shadow: 0 8px 22px rgba(76, 58, 37, 0.06);
+}
+
+.kiosk-student-card__identity {
+  min-width: 0;
+}
+
+.kiosk-student-card__identity strong,
+.kiosk-student-card__identity span,
+.kiosk-student-card__wallet small,
+.kiosk-student-card__wallet strong {
+  display: block;
+}
+
+.kiosk-student-card__identity strong {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kiosk-student-card__identity span {
+  margin-top: 4px;
+  color: var(--muted-warm);
+  font-size: 11px;
+}
+
+.kiosk-student-card__wallet {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.kiosk-student-card__wallet small {
+  color: #8a7d6c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kiosk-student-card__wallet strong {
+  margin-top: 2px;
+  color: #7a5a12;
+  font-size: 16px;
+}
+
 .kiosk-wordmark--wall {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  margin-inline: auto;
 }
 
 .kiosk-wordmark {
@@ -854,7 +915,7 @@
 }
 
 .kiosk-wordmark--category {
-  margin-right: auto;
+  margin-inline: auto;
 }
 
 /* ---- glass ------------------------------------------------------------- */
@@ -923,74 +984,14 @@
   font-weight: 700;
 }
 
-/* The student, once chosen, stays visible in the bar — the ticket only exists
-   once something is on it, so the bar is what carries them until then. */
-.serving {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 0 1 auto;
-  width: max-content;
-  max-width: calc(100% - 350px);
-  min-width: 0;
-  min-height: 64px;
-  padding: 8px 22px 8px 9px;
-  border-radius: 22px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 8px 24px rgba(76, 58, 37, 0.08);
-}
-
-.serving-avatar {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: linear-gradient(160deg, var(--brand-amber), var(--brand));
-  color: #4a2208;
-  font-size: 19px;
-  font-weight: 850;
-}
-
-.serving-who {
-  min-width: 0;
-  line-height: 1.15;
-}
-
-.serving-label {
-  margin-bottom: 3px;
-  color: #8a7d6c;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.serving-name {
-  font-size: 16px;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.serving-meta {
-  margin-top: 3px;
-  font-size: 11px;
-  color: var(--muted-warm);
-}
-
+/* Always the ×, always the last thing on the right, in both headers. */
 .kiosk-exit {
-  position: absolute;
-  top: 50%;
-  right: 106px;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
   padding: 0;
-  transform: translateY(-50%);
   border: 1px solid #f3b7ae;
   border-radius: 50%;
   background: #fff0ed;
@@ -1001,7 +1002,7 @@
     transform 120ms ease, box-shadow 160ms ease;
 }
 
-.kiosk-exit span {
+.kiosk-exit__mark {
   margin-top: -2px;
   font-size: 28px;
   font-weight: 500;
@@ -1016,24 +1017,21 @@
 }
 
 .kiosk-exit:active {
-  transform: translateY(-50%) scale(0.92);
+  transform: scale(0.94);
 }
 
 .kiosk-session-clock {
-  position: absolute;
-  top: 50%;
-  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  width: 94px;
-  height: 46px;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  width: 104px;
+  height: 52px;
   color: #fff8ee;
   background: #17110a;
   border: 1px solid #2d251c;
-  border-radius: 13px;
+  border-radius: 14px;
   box-shadow: 0 9px 20px -14px rgba(23, 17, 10, 0.72);
 }
 
@@ -1048,10 +1046,102 @@
 
 .kiosk-session-clock strong {
   margin-top: 3px;
-  font-size: 17px;
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   line-height: 1;
+}
+
+/* On a phone the pill folds into a round clock face whose arc and hand wind
+   down with the session. A tap morphs the circle open into the pill for two
+   seconds — width and radius transition, the two faces crossfade. */
+.kiosk-session-clock--morph {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: width 340ms cubic-bezier(0.22, 0.8, 0.2, 1),
+    border-radius 340ms cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.kiosk-session-clock__face {
+  position: absolute;
+  inset: 0;
+  width: 34px;
+  height: 34px;
+  margin: auto;
+  transition: opacity 200ms ease 110ms,
+    transform 340ms cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.kiosk-session-clock__track {
+  fill: none;
+  stroke: #3b3125;
+  stroke-width: 2.5;
+}
+
+.kiosk-session-clock__arc {
+  fill: none;
+  stroke: var(--brand-amber, #f5a623);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 1s linear, stroke 300ms ease;
+}
+
+.kiosk-session-clock__hand {
+  stroke: #fff8ee;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transform-origin: 18px 18px;
+  transition: transform 1s linear, stroke 300ms ease;
+}
+
+.kiosk-session-clock__pin {
+  fill: #fff8ee;
+}
+
+.kiosk-session-clock__time {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 200ms ease,
+    transform 340ms cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.kiosk-session-clock--peek {
+  width: 104px;
+  border-radius: 14px;
+}
+
+.kiosk-session-clock--peek .kiosk-session-clock__face {
+  opacity: 0;
+  transform: scale(0.55);
+  transition-delay: 0ms;
+}
+
+.kiosk-session-clock--peek .kiosk-session-clock__time {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: 90ms;
+}
+
+.kiosk-session-clock--warning .kiosk-session-clock__arc,
+.kiosk-session-clock--warning .kiosk-session-clock__hand {
+  stroke: #ff7a5c;
+}
+
+.kiosk-session-clock--warning strong {
+  color: #ffb3a1;
 }
 
 /* ---- floating filter bar ----------------------------------------------- */
@@ -1107,24 +1197,33 @@
 .filterbar-groups {
   position: relative;
   flex: 0 1 auto;
-  width: fit-content;
+  width: calc(100% - 66px);
   max-width: calc(100% - 66px);
   min-width: 0;
-  height: 54px;
+  min-height: 54px;
+  max-height: none;
+  overflow: visible;
   transition: flex-basis 420ms cubic-bezier(0.32, 0.72, 0, 1),
     flex-grow 420ms cubic-bezier(0.32, 0.72, 0, 1),
     width 420ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* One line always: extra stock groups scroll sideways behind a hidden
+   scrollbar rather than wrapping the bar taller. */
 .seg {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  width: max-content;
+  width: 100%;
   max-width: 100%;
-  height: 54px;
+  min-height: 54px;
+  max-height: none;
   padding: 5px;
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   border-radius: var(--r-pill);
   background: linear-gradient(
@@ -1151,29 +1250,12 @@
   display: none;
 }
 
-/* the travelling lens */
-.seg-lens {
-  position: absolute;
-  top: 5px;
-  bottom: 5px;
-  left: 0;
-  width: var(--w, 0px);
-  transform: translateX(var(--x, 0px));
-  pointer-events: none;
-  border-radius: var(--r-pill);
-  background: linear-gradient(180deg, #ffffff, #fdfaf5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1),
-    inset 0 -1px 1px rgba(120, 95, 65, 0.07), 0 1px 2px rgba(90, 70, 45, 0.2),
-    0 7px 16px -7px rgba(90, 70, 45, 0.5);
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1),
-    width 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
 .till .seg-item {
   position: relative;
   z-index: 1;
   min-height: 44px;
-  padding: 0 21px;
+  flex: 1 0 auto;
+  padding: 0 14px;
   border: 0;
   border-radius: var(--r-pill);
   background: transparent;
@@ -1188,6 +1270,8 @@
 .till .seg-item[data-on='true'] {
   color: var(--ink);
   font-weight: 800;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(120, 95, 65, .08), 0 3px 10px -6px rgba(90, 70, 45, .5);
 }
 
 /* Hairlines between the segments the lens is not sitting on — the detail that
@@ -1227,10 +1311,10 @@
   place-items: center;
 }
 
-.filterbar-group-logo img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
+.filterbar-group-logo__mark {
+  color: #5f5142;
+  font-size: 25px;
+  line-height: 1;
 }
 
 .wall-search {
@@ -1332,8 +1416,12 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Wide children (the stock group bar, product rails) scroll inside their
+     own boxes; the page itself never pans sideways. */
+  overflow-x: hidden;
   margin-top: 0;
-  padding-top: 0;
+  padding: 0 var(--wall-gutter-right) 0 var(--wall-gutter-left);
+  transition: padding 460ms cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 
 .wall-grid {
@@ -2172,34 +2260,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.nutrition-foot {
-  padding: 12px 22px 18px;
-  border-top: 1px solid #eee7db;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: #a1937f;
-}
-
-/* ---- refresh control ---------------------------------------------------- */
-
-/* Styled from here rather than by editing RefreshButton.jsx, which the admin
-   console builds from the same copy of. */
-.till + .refresh-fab,
-.refresh-fab {
-  min-height: 48px;
-  padding: 0 20px;
-  border: 1px solid #eae3d8;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  backdrop-filter: blur(18px) saturate(180%);
-  color: #6d6152;
-  font-size: 13.5px;
-  font-weight: 700;
-  box-shadow: 0 2px 6px rgba(90, 70, 45, 0.1),
-    0 14px 30px -14px rgba(90, 70, 45, 0.5);
-}
-
 /* ---- welcome ------------------------------------------------------------ */
 
 .kiosk-welcome {
@@ -2811,8 +2871,6 @@
 }
 
 .kiosk-category-topbar,
-.kiosk-category-student,
-.kiosk-category-wallet,
 .kiosk-category-card,
 .kiosk-category-card__copy {
   display: flex;
@@ -2822,83 +2880,14 @@
 .kiosk-category-topbar {
   position: relative;
   z-index: 5;
-  gap: 18px;
+  gap: 16px;
   max-width: 1320px;
-  min-height: 64px;
+  min-height: 76px;
   margin: 0 auto;
 }
 
-.kiosk-session-clock--category {
-  position: static;
-  flex: 0 0 94px;
-  transform: none;
-}
-
-.kiosk-category-student {
-  gap: 12px;
-  padding: 9px 18px 9px 9px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid #ebe2d6;
+.kiosk-student-card--category {
   border-radius: 999px;
-  box-shadow: 0 8px 22px rgba(76, 58, 37, 0.06);
-}
-
-.kiosk-category-student > span {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  color: #552406;
-  background: linear-gradient(145deg, var(--brand-amber), var(--brand));
-  border-radius: 50%;
-  font-size: 17px;
-  font-weight: 900;
-  place-items: center;
-}
-
-.kiosk-category-student small,
-.kiosk-category-student strong,
-.kiosk-category-wallet small,
-.kiosk-category-wallet strong {
-  display: block;
-}
-
-.kiosk-category-student small,
-.kiosk-category-wallet small {
-  color: #8a7d6c;
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.kiosk-category-student strong {
-  max-width: 190px;
-  overflow: hidden;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kiosk-category-wallet {
-  align-items: flex-end;
-  flex-direction: column;
-}
-
-.kiosk-category-wallet strong {
-  color: #7a5a12;
-  font-size: 17px;
-}
-
-.kiosk-category-exit {
-  min-height: 42px;
-  padding: 0 15px;
-  color: #9f2d22;
-  background: #fff2ef;
-  border: 1px solid #f0c9c3;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .kiosk-category-hero {
@@ -3337,6 +3326,53 @@
   animation: result-status-pulse 700ms 620ms ease-out both;
 }
 
+.kiosk-result-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(560px, calc(100vw - 48px));
+  padding: 0;
+  margin: 5px 0 0;
+  list-style: none;
+}
+.kiosk-result-progress li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #887d70;
+  text-align: center;
+}
+.kiosk-result-progress li::before {
+  position: absolute;
+  top: 14px;
+  right: 50%;
+  width: 100%;
+  height: 3px;
+  background: #d8e0e8;
+  content: "";
+}
+.kiosk-result-progress li:first-child::before { display: none; }
+.kiosk-result-progress li.reached::before { background: #2763a8; }
+.kiosk-result-progress li > span {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: #766b5d;
+  background: #fff;
+  border: 2px solid #d8e0e8;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 900;
+}
+.kiosk-result-progress li.reached { color: #203e63; }
+.kiosk-result-progress li.reached > span { color: white; background: #2763a8; border-color: #2763a8; }
+.kiosk-result-progress small { max-width: 110px; font-size: 11px; font-weight: 850; line-height: 1.2; }
+
 @keyframes result-order-detail-in {
   from { opacity: 0; transform: translateY(8px) scale(.98); }
 }
@@ -3507,8 +3543,7 @@
 /* Scoped to the till's own scroll areas. This used to be an injected global
    <style> block that repainted every scrollbar in the app. */
 .wall-scroll,
-.ticket-lines,
-.seg {
+.ticket-lines {
   scrollbar-width: thin;
   scrollbar-color: #ded4c5 transparent;
 }
@@ -3555,12 +3590,18 @@
   .wall {
     --wall-gutter-left: 40px;
     --wall-gutter-right: 18px;
-    padding: 18px 18px 22px 40px;
+    padding: 18px 0 22px;
+  }
+
+  /* An empty-cart till has no ticket column; without this the later .till
+     override above would squeeze the whole wall into the 330px slot. */
+  .till--bare {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .till--bare .wall {
     --wall-gutter-left: 18px;
-    padding: 18px;
+    padding: 18px 0;
   }
 
   .wall-grid {
@@ -3581,6 +3622,18 @@
    The full receipt is an animated bottom sheet, so reviewing an order never
    sends the student to the bottom of a long product page. */
 @media (max-width: 900px) {
+  .kiosk-wordmark--category,
+  .kiosk-wordmark--wall {
+    display: none;
+  }
+
+  /* With the wordmark's centering margins gone, this is what keeps the clock
+     and the × pinned to the right while the student card holds the left. */
+  .kiosk-category-topbar > .kiosk-session-clock,
+  .wall-top > .kiosk-session-clock {
+    margin-left: auto;
+  }
+
   .kiosk-login {
     padding: max(22px, env(safe-area-inset-top)) 24px max(20px, env(safe-area-inset-bottom));
     overflow-y: auto;
@@ -3638,7 +3691,7 @@
     --wall-gutter-left: 18px;
     --wall-gutter-right: 18px;
     height: 100%;
-    padding: max(14px, env(safe-area-inset-top)) 18px 0;
+    padding: max(14px, env(safe-area-inset-top)) 0 0;
   }
 
   .ticket-col {
@@ -3862,10 +3915,6 @@
     animation-name: mobile-ticket-open;
   }
 
-  .refresh-fab {
-    bottom: calc(92px + env(safe-area-inset-bottom));
-  }
-
   @keyframes mobile-ticket-open {
     from { opacity: 0; transform: translateY(100%); }
     to { opacity: 1; transform: none; }
@@ -3958,32 +4007,22 @@
   }
 
   .kiosk-category-topbar {
-    gap: 8px;
+    gap: 10px;
+    row-gap: 10px;
   }
 
-  .kiosk-wordmark {
-    font-size: 18px;
+  .kiosk-student-card {
+    gap: 12px;
+    min-height: 48px;
+    padding: 6px 12px;
   }
 
-  .kiosk-category-student {
-    margin-left: auto;
-    padding-right: 8px;
+  .kiosk-student-card__identity strong {
+    font-size: 13px;
   }
 
-  .kiosk-category-student > span {
-    width: 32px;
-    height: 32px;
-  }
-
-  .kiosk-category-student div,
-  .kiosk-category-wallet {
-    display: none;
-  }
-
-  .kiosk-category-exit {
-    min-height: 38px;
-    padding: 0 11px;
-    font-size: 10px;
+  .kiosk-student-card__wallet strong {
+    font-size: 15px;
   }
 
   .kiosk-category-hero {
@@ -4028,67 +4067,24 @@
   .till--bare .wall {
     --wall-gutter-left: 12px;
     --wall-gutter-right: 12px;
-    padding-inline: 12px;
+    padding-inline: 0;
   }
 
   .wall-top {
-    min-height: 48px;
+    gap: 10px;
+    row-gap: 10px;
+    min-height: 64px;
     margin-bottom: 10px;
-  }
-
-  .kiosk-wordmark--wall {
-    max-width: 76px;
-    font-size: 16px;
-    line-height: 0.92;
-    white-space: normal;
-  }
-
-  .serving {
-    max-width: calc(100% - 220px);
-    min-height: 54px;
-    padding: 6px 11px 6px 6px;
-  }
-
-  .serving-avatar {
-    width: 40px;
-    height: 40px;
-    font-size: 15px;
-  }
-
-  .serving-name {
-    font-size: 14px;
-  }
-
-  .serving-label {
-    display: none;
-  }
-
-  .serving-meta {
-    font-size: 10px;
+    padding: 4px 0;
   }
 
   .kiosk-exit {
-    right: 80px;
     width: 44px;
     height: 44px;
   }
 
-  .kiosk-session-clock {
-    width: 72px;
-    height: 44px;
-  }
-
-  .kiosk-session-clock small {
-    display: none;
-  }
-
-  .kiosk-session-clock strong {
-    margin: 0;
-    font-size: 15px;
-  }
-
-  .kiosk-session-clock--category {
-    flex-basis: 72px;
+  .kiosk-exit__mark {
+    font-size: 25px;
   }
 
   .filterbar {
@@ -4097,17 +4093,18 @@
   }
 
   .seg {
-    width: max-content;
+    width: 100%;
     max-width: 100%;
   }
 
   .filterbar-groups,
-  .seg,
-  .wall-search {
-    height: 48px;
+  .seg {
+    height: auto;
+    min-height: 48px;
   }
 
   .wall-search {
+    height: 48px;
     flex-basis: 48px;
     width: 48px;
     min-width: 48px;
@@ -4125,7 +4122,6 @@
     padding: 3px;
   }
 
-  .filterbar-group-logo img,
   .wall-search-toggle {
     width: 42px;
     height: 42px;
@@ -4338,12 +4334,16 @@
     animation: none;
   }
 
-  .seg-lens,
   .till,
   .wall,
   .tile,
   .ticket-handle,
-  .kiosk-exit {
+  .kiosk-exit,
+  .kiosk-session-clock--morph,
+  .kiosk-session-clock__face,
+  .kiosk-session-clock__time,
+  .kiosk-session-clock__arc,
+  .kiosk-session-clock__hand {
     transition: none;
   }
 
@@ -4378,4 +4378,20 @@
 .kiosk-pin-feedback .error-visual {
   width: 42px;
   height: 42px;
+}
+
+/* Tighter than the name can survive: the identity gives way and the card
+   keeps only the wallet balance, still pinned to the top left. */
+@media (max-width: 480px) {
+  .kiosk-student-card__identity {
+    display: none;
+  }
+
+  .kiosk-student-card {
+    gap: 0;
+  }
+
+  .kiosk-student-card__wallet {
+    text-align: left;
+  }
 }

@@ -10,10 +10,13 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
@@ -30,7 +33,9 @@ body {
 
 #root {
   width: 100%;
+  max-width: 100%;
   min-height: 100svh;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -54,4 +59,23 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* Phones keep touch scrolling, but browser and native WebView scrollbars stay
+   out of the interface. */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  html,
+  body,
+  body * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  body *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }

@@ -226,7 +226,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           // taken. onResolved refreshes the pending list, which would
           // remove this card — give the parent a few seconds to actually
           // read the note below before that happens. The wallet balance
-          // still needs refreshing right away, which onResolved also does.
+          // still needs the latest server state right away, which onResolved also loads.
           setDegradedResolving(true);
           degradedNoticeTimeoutRef.current = setTimeout(() => {
             if (!mountedRef.current) return;
@@ -415,7 +415,6 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           walletBalance={Number(student.pocketMoney || 0)}
           studentName={student.name || 'your child'}
           walletDisabled={insufficient || empty}
-          isDemo={DEMO_UPI_ENABLED}
           busy={busy}
           onWallet={payThroughWallet}
           onUpi={chooseUpi}
@@ -564,7 +563,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Review latest order', onClick: () => onResolved?.() } : undefined} />}
             {demoOrderResult && (
               <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
-                UPI demo completed with {demoOrderResult.provider}.
+                Payment completed with {demoOrderResult.provider}.
               </Banner>
             )}
             {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
@@ -637,10 +636,10 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             <div><span>Wallet balance</span><strong>{formatINR(student.pocketMoney || 0)}</strong></div>
           </div>
 
-          {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Refresh order', onClick: () => onResolved?.() } : undefined} />}
+          {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'View latest order', onClick: () => onResolved?.() } : undefined} />}
           {demoOrderResult && (
             <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
-              UPI demo completed with {demoOrderResult.provider}.
+              Payment completed with {demoOrderResult.provider}.
             </Banner>
           )}
           {confirming === 'decline' ? (
@@ -757,7 +756,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         <span className="amount-out">{formatINR(total)}</span>
       </div>
 
-      {error && <ErrorFeedback issue={error} className="pending-error" action={error.presentation === 'staleData' ? { label: 'Refresh order', onClick: () => onResolved?.() } : undefined} />}
+      {error && <ErrorFeedback issue={error} className="pending-error" action={error.presentation === 'staleData' ? { label: 'View latest order', onClick: () => onResolved?.() } : undefined} />}
       {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
       {constraint?.type === 'final' && <ErrorFeedback issue={{ presentation: 'blocked', title: 'Keep one item in the order', message: 'Want to decline the entire request instead?' }} action={{ label: 'Decline Order', onClick: () => setConfirming('decline') }} />}
       {insufficient && !empty && (
@@ -766,7 +765,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
       {demoOrderResult && (
         <Banner variant="success" icon="✓" style={{ marginTop: 12 }}>
-          UPI demo completed with {demoOrderResult.provider}.
+          Payment completed with {demoOrderResult.provider}.
         </Banner>
       )}
 

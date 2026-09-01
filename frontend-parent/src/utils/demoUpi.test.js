@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEMO_UPI_PROVIDERS,
   demoAmountProblem,
-  makeDemoReference,
+  makeUpiReference,
 } from './demoUpi.js';
 
 test('the demo offers the three requested UPI apps', () => {
@@ -21,7 +21,6 @@ test('demo payments accept only whole rupees in the supported range', () => {
   assert.match(demoAmountProblem('1.5'), /between 1 and 20,000/);
 });
 
-test('demo references are recognisably non-production', () => {
-  assert.equal(makeDemoReference(1234567890123), 'DEMO67890123');
+test('UPI references use a conventional twelve-digit format', () => {
+  assert.equal(makeUpiReference(1234567890123), '234567890123');
 });
-

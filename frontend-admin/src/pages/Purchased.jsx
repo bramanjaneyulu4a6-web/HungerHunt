@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
-import RefreshButton from "../components/RefreshButton";
 import {
   Badge,
   Banner,
@@ -570,7 +569,6 @@ const Purchased = () => {
         })
       )}
 
-      <RefreshButton onRefresh={loadData} loading={loading} />
     </div>
   );
 };

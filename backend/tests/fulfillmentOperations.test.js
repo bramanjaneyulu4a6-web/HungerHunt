@@ -18,6 +18,7 @@ const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const StaffReport = (await import('../models/StaffReport.js')).default;
 const { signStaffToken, signParentToken } = await import('../utils/tokens.js');
 const {
   ALERT_SNOOZE_MS,
@@ -327,6 +328,51 @@ describe('warehouse-to-caretaker handoff', () => {
 
     assert.equal(response.status, 400);
     assert.equal(update.mock.callCount(), 0);
+  });
+});
+
+describe('warehouse hostel reports', () => {
+  test('files one warehouse report for a grouped pending hostel tile', async () => {
+    const secondOrderId = '507f191e810c19729de860f0';
+    const hostelId = '507f191e810c19729de860e1';
+    mock.method(FulfillmentOrder, 'find', () => query([
+      orderFixture({ studentSnapshot: { hostelId, hostelNumber: 'D-4' } }),
+      orderFixture({
+        _id: secondOrderId,
+        studentSnapshot: { hostelId, hostelNumber: 'D-4' },
+      }),
+    ]));
+    mock.method(StaffReport, 'countDocuments', async () => 0);
+    mock.method(Admin, 'findById', () => query({ name: 'Warehouse One', email: 'wh@example.test' }));
+    let stored;
+    mock.method(StaffReport, 'create', async (document) => {
+      stored = document;
+      return {
+        toObject: () => ({
+          _id: '507f191e810c19729de860f1',
+          createdAt: new Date(),
+          handling: [],
+          ...document,
+        }),
+      };
+    });
+
+    const response = await asStaff('/api/v1/fulfillment-orders/warehouse-reports', {
+      method: 'POST',
+      body: JSON.stringify({
+        orderIds: [ORDER_ID, secondOrderId],
+        category: 'MISSING_ITEM',
+        note: 'Two bottles are unavailable on the shelf.',
+      }),
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(stored.raiser.role, 'warehouse');
+    assert.equal(stored.raiser.hostelNumber, 'D-4');
+    assert.equal(String(stored.hostelId), hostelId);
+    const body = await response.json();
+    assert.equal(body.meta.groupedOrders, 2);
+    assert.equal(body.meta.hostelNumber, 'D-4');
   });
 });
 

@@ -57,7 +57,6 @@ export default function WarehouseOverview() {
       <PageHeader
         title="Warehouse Control Centre"
         subtitle="A single view of procurement approvals, inbound orders, stock health, and supplier operations."
-        actions={<Button variant="ghost" onClick={load} disabled={loading}>Refresh data</Button>}
       />
 
       {error && <Banner variant="alert" icon="⚠️">Warehouse data could not be loaded. Existing records have not been changed.</Banner>}

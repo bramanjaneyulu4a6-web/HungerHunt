@@ -1,4 +1,5 @@
 import axios from "axios";
+import { observeMutationRevision } from "./dataAutoRefresh";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -15,7 +16,7 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  observeMutationRevision,
   (error) => {
     // A 401 out here is the session's own token reaching its 450 seconds, or a
     // student removed from the roll mid-order. Either way the session is over

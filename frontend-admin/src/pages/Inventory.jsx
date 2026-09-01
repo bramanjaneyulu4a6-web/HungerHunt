@@ -5,7 +5,6 @@ import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import { resolveAvailability } from "../utils/availability";
 import { chargedPrice } from "../constants/productWizard";
-import RefreshButton from "../components/RefreshButton";
 import {
   Badge,
   Banner,
@@ -207,7 +206,6 @@ const Inventory = () => {
       <PageHeader
         title="Inventory Control"
         subtitle="Monitor on-hand stock, thresholds, pricing, and audited manual adjustments."
-        actions={<RefreshButton onRefresh={fetchInventory} loading={loading} />}
       />
 
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>

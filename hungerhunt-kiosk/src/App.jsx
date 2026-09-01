@@ -5,11 +5,14 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
+import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 
 import KioskBilling from "./pages/KioskBilling";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
+import api from "./utils/api";
+import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
 /* The kiosk owns the end of a session, and there are four ways to reach it:
    the student taps Done, the idle prompt runs out, the hard cap arrives, or
@@ -44,6 +47,12 @@ function KioskScreen() {
 }
 
 function App() {
+  useEffect(() => startDataAutoRefresh(api, {
+    // Never interrupt a student's basket. Inventory is read again at checkout,
+    // and the pending revision reloads as soon as that short session ends.
+    pauseWhen: () => Boolean(localStorage.getItem("kioskToken")),
+  }), []);
+
   return (
     <Router>
       <Toaster position="top-center" />

@@ -3,18 +3,27 @@ import { Link } from 'react-router-dom';
 import { Card } from './ui';
 import { formatINR } from '../utils/format';
 
-/* Two endings, not one. DELIVERED is the warehouse having handed the package
-   to the hostel's caretaker; COLLECTED is the child having taken it from
-   them, which only their own purchase code can record. A parent reading
-   "Delivered" should understand the package is at the dorm and not yet in
-   their child's hands, so it is not the word "Delivered" on its own. */
+const ORDER_STEPS = [
+  ['PENDING', 'Order confirmed'],
+  ['PACKED', 'Packed'],
+  ['OUT_FOR_DELIVERY', 'Out for delivery'],
+  ['DELIVERED', 'Delivered'],
+];
+
 const ORDER_STATUS_LABELS = {
-  PENDING: 'Order received',
+  PENDING: 'Order confirmed',
   PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'On the way',
-  DELIVERED: 'At the hostel',
-  COLLECTED: 'Collected',
+  OUT_FOR_DELIVERY: 'Out for delivery',
+  DELIVERED: 'Delivered',
+  // Collection happens after the four delivery steps and does not create a
+  // fifth customer-facing warehouse status.
+  COLLECTED: 'Delivered',
   CANCELLED: 'Cancelled and refunded',
+};
+
+const progressIndex = (status) => {
+  if (status === 'COLLECTED') return ORDER_STEPS.length - 1;
+  return ORDER_STEPS.findIndex(([value]) => value === status);
 };
 
 const formatDate = (value) =>
@@ -37,6 +46,7 @@ const statusClass = (status) =>
 
 export default function OrderCard({ order, index = 0, showStudent = false }) {
   const status = ORDER_STATUS_LABELS[order.status] || order.status;
+  const activeStep = progressIndex(order.status);
   const destination = order.studentId
     ? `/child/${order.studentId}?tab=orders`
     : null;
@@ -62,6 +72,21 @@ export default function OrderCard({ order, index = 0, showStudent = false }) {
         </div>
       </div>
 
+      {activeStep >= 0 && (
+        <ol className="order-card__progress" aria-label="Order status">
+          {ORDER_STEPS.map(([value, label], stepIndex) => {
+            const reached = stepIndex <= activeStep;
+            const current = stepIndex === activeStep;
+            return (
+              <li key={value} className={reached ? 'reached' : ''} aria-current={current ? 'step' : undefined}>
+                <span aria-hidden="true">{stepIndex < activeStep ? '✓' : stepIndex + 1}</span>
+                <small>{label}</small>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
       <ul className="order-card__items">
         {(order.items || []).map((item, itemIndex) => (
           <li key={`${item.name}-${itemIndex}`}>
@@ -77,7 +102,7 @@ export default function OrderCard({ order, index = 0, showStudent = false }) {
             {order.collectedAt
               ? 'Collected'
               : order.deliveredAt
-                ? 'At the hostel since'
+                ? 'Delivered'
                 : order.overdue ? 'Overdue since' : 'Expected by'}
           </span>
           <strong className={order.overdue ? 'order-card__overdue' : ''}>

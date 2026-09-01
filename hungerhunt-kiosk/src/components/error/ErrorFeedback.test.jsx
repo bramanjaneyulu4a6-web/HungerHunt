@@ -42,7 +42,10 @@ describe('error feedback components', () => {
       />
     );
 
-    expect(screen.getByText('Packed')).toBeTruthy();
+    expect(screen.getAllByText('Packed').length).toBeGreaterThan(0);
+    for (const step of ['Order confirmed', 'Packed', 'Out for delivery', 'Delivered']) {
+      expect(screen.getAllByText(step).length).toBeGreaterThan(0);
+    }
     expect(screen.getByText('16 August 2026')).toBeTruthy();
     expect(screen.queryByText(/10:00/)).toBeNull();
   });

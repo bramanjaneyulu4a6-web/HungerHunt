@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatINR } from '../utils/format';
-import { DEMO_UPI_PROVIDERS, makeDemoReference } from '../utils/demoUpi';
+import { DEMO_UPI_PROVIDERS, makeUpiReference } from '../utils/demoUpi';
 
 const PROCESSING_MS = 1700;
 
@@ -13,7 +13,7 @@ export default function DemoUpiCheckout({
 }) {
   const [providerId, setProviderId] = useState('gpay');
   const [stage, setStage] = useState('choose');
-  const [reference] = useState(makeDemoReference);
+  const [reference] = useState(makeUpiReference);
   const closeButtonRef = useRef(null);
   const provider = DEMO_UPI_PROVIDERS.find(({ id }) => id === providerId);
 
@@ -58,7 +58,7 @@ export default function DemoUpiCheckout({
           <>
             <header className="upi-demo-header">
               <div>
-                <span className="upi-demo-badge">Demo checkout</span>
+                <span className="upi-demo-badge">Secure UPI</span>
                 <h2 id="upi-demo-title">Pay securely with UPI</h2>
                 <p>Complete your payment using your preferred UPI app.</p>
               </div>
@@ -67,7 +67,7 @@ export default function DemoUpiCheckout({
                 type="button"
                 className="upi-demo-close"
                 onClick={onClose}
-                aria-label="Close demo checkout"
+                aria-label="Close UPI checkout"
               >
                 ×
               </button>
@@ -137,9 +137,9 @@ export default function DemoUpiCheckout({
               </span>
               <span className="upi-demo-spinner" />
             </div>
-            <span className="upi-demo-badge">Demo payment</span>
+            <span className="upi-demo-badge">Payment in progress</span>
             <h2 id="upi-demo-title">Opening {provider.name}…</h2>
-            <p>Simulating approval from your UPI app. Please wait.</p>
+            <p>Waiting for confirmation from your UPI app. Please wait.</p>
             <strong className="upi-demo-state-amount">{formatINR(amount)}</strong>
           </div>
         )}
@@ -150,11 +150,11 @@ export default function DemoUpiCheckout({
               <span>✓</span>
               {[0, 1, 2, 3, 4, 5].map((dot) => <i key={dot} style={{ '--dot': dot }} />)}
             </div>
-            <span className="upi-demo-badge upi-demo-badge--success">Demo complete</span>
+            <span className="upi-demo-badge upi-demo-badge--success">Payment complete</span>
             <h2 id="upi-demo-title">Payment successful</h2>
-            <p>A demo {purposeLabel.toLowerCase()} of {formatINR(amount)} was completed with {provider.name}.</p>
+            <p>Your {purposeLabel.toLowerCase()} of {formatINR(amount)} was completed with {provider.name}.</p>
             <div className="upi-demo-receipt">
-              <span>Reference</span>
+              <span>UPI reference number</span>
               <strong>{reference}</strong>
             </div>
             <button type="button" className="upi-demo-pay" onClick={finish}>

@@ -1,6 +1,7 @@
 import express from "express";
 import { getInventory, adjustStock, getAdjustments, getStockAlerts } from "../controllers/inventoryController.js";
 import { orStudent, protectAdmin, protectAnyStaff, protectWarehouse } from "../middleware/authMiddleware.js";
+import { readCache } from "../middleware/readCache.js";
 
 const router = express.Router();
 
@@ -8,7 +9,9 @@ const router = express.Router();
 // kind of staff reads it, and so does a student at the kiosk, who is drawing
 // the same tiles from it. Changing stock is done through products and
 // purchases, which keep their own narrower gates.
-router.get("/", orStudent(protectAnyStaff), getInventory);
+// Cached for staff only — a student's payload carries their own purchase
+// allowances and must be computed fresh; readCache steps aside for them.
+router.get("/", orStudent(protectAnyStaff), readCache(), getInventory);
 
 // What is out of stock (and so off sale) and what is running low — the feed
 // behind the admin warehouse banner. Warehouse staff may read it too; they

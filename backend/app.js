@@ -5,6 +5,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 
@@ -126,6 +127,12 @@ if (missingPaymentEnv.length) {
 }
 
 app.use(helmet());
+
+// Gzip every compressible response above the default 1KB threshold. The
+// catalogue and order lists are the payloads that matter; tiny health checks
+// stay uncompressed on purpose.
+app.use(compression());
+
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 /* A dev-server origin arriving through configuration rather than the list below.
@@ -223,6 +230,9 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+/* Above every route, including the /api/v1 surface mounted through v1() below,
+   because the read caches downstream are only safe while nothing can write
+   without being counted. A route added later inherits this by existing. */
 app.use(dataRevision);
 
 app.get('/health/live', (req, res) => res.json({ status: 'ok' }));

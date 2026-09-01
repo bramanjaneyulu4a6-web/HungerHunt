@@ -1,38 +1,70 @@
+import test, { after, before, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
-import { currentDataRevision, dataRevision } from '../middleware/dataRevision.js';
+const express = (await import('express')).default;
+const { currentDataRevision, dataRevision } = await import('../middleware/dataRevision.js');
 
-const response = (statusCode = 200) => {
-  const headers = {};
-  return {
-    statusCode,
-    headers,
-    set(name, value) { headers[name] = value; },
-    end(body) { return body; },
-  };
-};
+/* A throwaway app rather than the real one: the counter's whole contract is
+   "which finished responses count as a change", and that is a property of real
+   Express responses, not of any route this repo happens to have. */
+const app = express();
+app.use(dataRevision);
+app.get('/read', (req, res) => res.json({ ok: true }));
+app.post('/write', (req, res) => res.json({ ok: true }));
+app.post('/refused', (req, res) => res.status(403).json({ ok: false }));
+app.post('/broken', (req, res) => res.status(500).json({ ok: false }));
 
-test('a successful backend write advances the shared data revision', () => {
-  const before = currentDataRevision();
-  const res = response(201);
-  dataRevision({ method: 'POST' }, res, () => {});
-  res.end();
+let server;
+let base;
 
-  assert.equal(currentDataRevision(), before + 1);
-  assert.equal(res.headers['X-Data-Revision'], String(before + 1));
+before(async () => {
+  server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  base = `http://127.0.0.1:${server.address().port}`;
 });
 
-test('reads and failed writes do not announce a data change', () => {
-  const before = currentDataRevision();
-  const read = response(200);
-  dataRevision({ method: 'GET' }, read, () => {});
-  read.end();
+after(() => new Promise((resolve) => server.close(resolve)));
 
-  const failed = response(400);
-  dataRevision({ method: 'PATCH' }, failed, () => {});
-  failed.end();
+/* The bump rides on the response being ended, which the server may complete a
+   tick after the client has the body. Every assertion below therefore lets the
+   socket settle first rather than racing it. */
+const call = async (method, path) => {
+  const response = await fetch(`${base}${path}`, { method });
+  await response.arrayBuffer();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  return response;
+};
 
-  assert.equal(currentDataRevision(), before);
-  assert.equal(failed.headers['X-Data-Revision'], undefined);
+describe('the data revision counter', () => {
+  test('a write that succeeded moves it on, and says so in the header', async () => {
+    const before = currentDataRevision();
+    const response = await call('POST', '/write');
+
+    assert.equal(currentDataRevision(), before + 1);
+    assert.equal(response.headers.get('x-data-revision'), String(before + 1));
+  });
+
+  test('a read leaves it alone', async () => {
+    const before = currentDataRevision();
+    const response = await call('GET', '/read');
+
+    assert.equal(currentDataRevision(), before);
+    assert.equal(response.headers.get('x-data-revision'), null);
+  });
+
+  test('a refused write leaves it alone', async () => {
+    const before = currentDataRevision();
+    const response = await call('POST', '/refused');
+
+    assert.equal(currentDataRevision(), before, 'a rejected write invalidated the caches');
+    assert.equal(response.headers.get('x-data-revision'), null);
+  });
+
+  test('a write that blew up leaves it alone', async () => {
+    const before = currentDataRevision();
+    const response = await call('POST', '/broken');
+
+    assert.equal(currentDataRevision(), before, 'a failed write invalidated the caches');
+    assert.equal(response.headers.get('x-data-revision'), null);
+  });
 });

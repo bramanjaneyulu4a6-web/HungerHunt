@@ -44,7 +44,18 @@ const formatDateTime = (value) =>
 const statusClass = (status) =>
   String(status || 'PENDING').toLowerCase().replaceAll('_', '-');
 
-export default function OrderCard({ order, index = 0, showStudent = false }) {
+/* `showAllOrdersLink` is for the caller that is already the destination. The
+   link goes to the child's orders tab, so on the dashboard it is a way through
+   to the full list, and on that tab itself it is a link to the page you are
+   standing on. Deliberately its own prop rather than reusing showStudent,
+   which happens to split the same two callers today but answers a different
+   question — whose order this is, not where the link would take you. */
+export default function OrderCard({
+  order,
+  index = 0,
+  showStudent = false,
+  showAllOrdersLink = true,
+}) {
   const status = ORDER_STATUS_LABELS[order.status] || order.status;
   const activeStep = progressIndex(order.status);
   const destination = order.studentId
@@ -124,7 +135,7 @@ export default function OrderCard({ order, index = 0, showStudent = false }) {
       <div className="order-card__footer">
         <span>Total</span>
         <strong>{formatINR(order.totalAmount)}</strong>
-        {destination && <Link to={destination}>View all orders</Link>}
+        {showAllOrdersLink && destination && <Link to={destination}>View all orders</Link>}
       </div>
     </Card>
   );

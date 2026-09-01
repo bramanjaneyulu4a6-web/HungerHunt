@@ -752,7 +752,7 @@ export default function ChildDetails() {
             ),
             children: fulfillmentOrders.items.map((item, i) => (
               <AnimateIn key={item.id} index={i}>
-                <OrderCard order={item} index={i} />
+                <OrderCard order={item} index={i} showAllOrdersLink={false} />
               </AnimateIn>
             )),
           })}

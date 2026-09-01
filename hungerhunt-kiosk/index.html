@@ -7,6 +7,12 @@
          so fixed overlays (the pay sheet) stay above the keys. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#fffaf0" />
+    <!-- Open the TLS connections the app will need before the JS asks for
+         them. %VITE_API_BASE_URL% is substituted by Vite at build time; in a
+         build without the variable it stays literal and the browser simply
+         ignores an unparseable preconnect — harmless by design. -->
+    <link rel="preconnect" href="%VITE_API_BASE_URL%" crossorigin />
+    <link rel="preconnect" href="https://res.cloudinary.com" />
     <title>Hunger Hunt Kiosk</title>
   </head>
   <body>

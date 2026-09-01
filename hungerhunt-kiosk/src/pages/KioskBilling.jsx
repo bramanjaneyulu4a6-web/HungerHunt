@@ -1184,7 +1184,7 @@ const KioskBilling = ({ student, onLogout }) => {
                       role="listitem"
                     >
                       <figure>
-                        <img src={cloudinaryThumb(p.image || PLACEHOLDER, 320)} alt="" />
+                        <img src={cloudinaryTile(p.image || PLACEHOLDER)} alt="" />
                       </figure>
 
                       {p.nutrition && (
@@ -1193,7 +1193,13 @@ const KioskBilling = ({ student, onLogout }) => {
                           onClick={() => setNutritionFor(p)}
                           aria-label={`Nutrition information for ${p.name}`}
                         >
-                          i
+                          <span className="tile-info-calories money">
+                            {p.nutrition.calories !== null &&
+                            p.nutrition.calories !== undefined
+                              ? `${p.nutrition.calories} kcal`
+                              : "Nutrition"}
+                          </span>
+                          <span className="tile-info-mark" aria-hidden="true">i</span>
                         </Button>
                       )}
 
@@ -1221,48 +1227,6 @@ const KioskBilling = ({ student, onLogout }) => {
                               : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`
                             : BLANK}
                         </p>
-
-                        {p.nutrition ? (
-                          <div className="tile-macros">
-                            <div className="tile-macro">
-                              <b className="money">
-                                {p.nutrition.calories === null
-                                  ? BLANK
-                                  : p.nutrition.calories}
-                              </b>
-                              <span>kcal</span>
-                            </div>
-                            <div className="tile-macro">
-                              <b className="money">
-                                {p.nutrition.protein === null
-                                  ? BLANK
-                                  : `${p.nutrition.protein}g`}
-                              </b>
-                              <span>Prot</span>
-                            </div>
-                            <div className="tile-macro">
-                              <b className="money">
-                                {p.nutrition.carbs === null
-                                  ? BLANK
-                                  : `${p.nutrition.carbs}g`}
-                              </b>
-                              <span>Carb</span>
-                            </div>
-                            <div className="tile-macro">
-                              <b className="money">
-                                {p.nutrition.fat === null
-                                  ? BLANK
-                                  : `${p.nutrition.fat}g`}
-                              </b>
-                              <span>Fat</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="tile-macros tile-slot--empty"
-                            aria-hidden="true"
-                          />
-                        )}
 
                         {line ? (
                           <div className="tile-step">

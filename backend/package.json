@@ -21,6 +21,7 @@
     "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js",
     "backfill:collected-packages": "node scripts/backfillCollectedPackages.js",
     "seed:catalogue": "node scripts/seedCatalogue.js",
+    "sync:live-product-images": "node scripts/syncLiveProductImagesToLocal.js",
     "archive:retired-catalogue": "node scripts/archiveRetiredCatalogue.js",
     "assign:product-images": "node scripts/assignProductImages.js",
     "stock:opening": "node scripts/setOpeningStock.js",

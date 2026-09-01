@@ -1510,7 +1510,7 @@
 }
 
 .wall-grid--rail .tile {
-  height: 100%;
+  height: 390px;
   min-width: 0;
   scroll-snap-align: start;
 }
@@ -1553,6 +1553,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  height: 390px;
+  overflow: hidden;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r-tile);
@@ -1585,24 +1587,16 @@
   }
 }
 
-/* Rounded on the figure rather than clipping the tile, so the price sticker
-   keeps its shadow.
-
-   The image area is a ratio, not a fixed height, because the tiles are a
-   `1fr` auto-fill grid — their width changes with the screen, and a fixed
-   height meant the shape of this box changed with it. Under `cover` that made
-   the crop itself move: the same packet lost its cap on one screen and its
-   base on another. A ratio keeps the box the same shape at every width, and
-   `contain` below means nothing is cut off whatever shape the photo is.
-
-   Clamped at both ends so a wide terminal cannot turn the picture into the
-   whole tile, and a narrow one cannot squeeze it into a strip. */
+/* The picture owns 68% of the card. Cloudinary has already placed the complete
+   product on a consistent canvas, and contain protects that framing here. */
 .tile figure {
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 3;
-  min-height: 132px;
-  max-height: 210px;
+  flex: 0 0 68%;
+  width: 100%;
+  height: 68%;
+  min-height: 0;
+  max-height: none;
   margin: 0;
   padding: 6px;
   overflow: hidden;
@@ -1651,35 +1645,55 @@
    other's tap target. */
 .till .tile-info {
   position: absolute;
+  z-index: 3;
   top: 8px;
+  bottom: auto;
   left: 8px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 1.5px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: 34px;
+  min-height: 34px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid rgba(122, 90, 18, 0.24);
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--ink);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic;
-  font-size: 20px;
-  font-weight: 750;
+  background: rgba(255, 250, 242, 0.96);
+  color: #6f5110;
   box-shadow: 0 2px 6px -2px rgba(60, 45, 25, 0.4);
 }
 
+.tile-info-calories {
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.tile-info-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 7px;
+  border-left: 1px solid rgba(122, 90, 18, 0.2);
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 750;
+}
+
 .tile-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 12px 13px 13px;
+  display: grid;
+  grid-template-rows: 36px 22px 44px;
+  flex: 0 0 32%;
+  gap: 2px;
+  height: 32%;
+  padding: 10px 9px 6px;
 }
 
 .tile-name {
   display: -webkit-box;
-  min-height: 2.5em;
+  height: 36px;
   overflow: hidden;
   font-size: 16px;
   font-weight: 750;
@@ -1693,8 +1707,9 @@
 /* What is in the packet, under the name — a measurement a student comparing
    two drinks is actually reading. */
 .tile-size {
-  min-height: 1.25em;
-  margin-top: 2px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
@@ -1705,9 +1720,18 @@
 }
 
 .tile-limit {
+  position: absolute;
+  z-index: 2;
+  bottom: calc(32% + 6px);
+  left: 9px;
+  max-width: calc(100% - 18px);
+  min-height: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(122, 90, 18, 0.16);
+  border-radius: var(--r-pill);
+  background: rgba(255, 250, 242, 0.94);
   display: -webkit-box;
-  min-height: 1.3em;
-  margin: 5px 0 6px;
+  margin: 0;
   overflow: hidden;
   color: #7a5a12;
   font-size: 11px;
@@ -1732,62 +1756,14 @@
   cursor: not-allowed;
 }
 
-/* Set like the panel on the back of a pack: hairline cells, tabular figures,
-   the energy cell tinted so it reads first. The gap below belongs to the strip
-   rather than the button — a margin-top on the button would beat the
-   `margin-top: auto` that pins it, and tiles with no strip would float their
-   Add mid-tile, out of line with the rest of the row. */
-.tile-macros {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr 1fr 1fr;
-  height: 42px;
-  min-height: 42px;
-  margin: 7px 0 8px;
-  overflow: hidden;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-xs);
-}
-
-.tile-macro {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  padding: 5px 2px;
-  border-left: 1px dotted var(--dot);
-}
-
-.tile-macro:first-child {
-  border-left: 0;
-  background: #fdf6e7;
-}
-
-.tile-macro b {
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--ink);
-}
-
-.tile-macro:first-child b {
-  color: #7a5a12;
-}
-
-.tile-macro span {
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
-
 /* Add and the stepper occupy the same 48px box, so a tile never changes height
    when it joins the ticket and the grid cannot reflow under a moving finger. */
 .till .btn--add {
   width: 100%;
-  height: 48px;
-  min-height: 48px;
-  margin-top: auto;
+  height: 44px;
+  min-height: 44px;
+  margin-top: 0;
+  align-self: end;
   border: 1px solid var(--ink);
   border-radius: var(--r-ctrl);
   background: transparent;
@@ -1819,8 +1795,9 @@
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) 48px;
   width: 100%;
-  height: 48px;
-  margin-top: auto;
+  height: 44px;
+  margin-top: 0;
+  align-self: end;
   overflow: hidden;
   background: var(--ink);
   border: 1px solid var(--ink);
@@ -1840,7 +1817,7 @@
 }
 
 .till .tile-step-btn {
-  min-height: 48px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -3622,32 +3599,40 @@
 
 /* Scoped to the till's own scroll areas. This used to be an injected global
    <style> block that repainted every scrollbar in the app. */
-.wall-scroll,
-.ticket-lines {
+.wall-scroll {
   scrollbar-width: thin;
   scrollbar-color: #ded4c5 transparent;
 }
 
-.wall-scroll::-webkit-scrollbar,
-.ticket-lines::-webkit-scrollbar {
+.wall-scroll::-webkit-scrollbar {
   width: 10px;
 }
 
-.wall-scroll::-webkit-scrollbar-track,
-.ticket-lines::-webkit-scrollbar-track {
+.wall-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.wall-scroll::-webkit-scrollbar-thumb,
-.ticket-lines::-webkit-scrollbar-thumb {
+.wall-scroll::-webkit-scrollbar-thumb {
   background: #ded4c5;
   border: 3px solid #fff;
   border-radius: 999px;
 }
 
-.wall-scroll::-webkit-scrollbar-thumb:hover,
-.ticket-lines::-webkit-scrollbar-thumb:hover {
+.wall-scroll::-webkit-scrollbar-thumb:hover {
   background: #c9bda9;
+}
+
+/* The receipt still scrolls normally, but its narrow paper column should not
+   lose content width to browser chrome. */
+.ticket-lines {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ticket-lines::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* ---- responsive layouts ------------------------------------------------- */
@@ -4217,49 +4202,56 @@
     font-size: 11px;
   }
 
-  /* Same 4:3 box, just allowed to be smaller — an explicit height here would
-     override the ratio and bring the moving crop back on small screens. */
+  .tile,
+  .wall-grid--rail .tile {
+    height: 360px;
+  }
+
   .tile figure {
-    min-height: 104px;
-    max-height: 138px;
+    flex-basis: 68%;
+    height: 68%;
+    min-height: 0;
+    max-height: none;
   }
 
   .tile-body {
-    padding: 9px;
+    grid-template-rows: 32px 20px 42px;
+    flex-basis: 32%;
+    gap: 2px;
+    height: 32%;
+    padding: 10px 7px 6px;
   }
 
   .tile-name {
-    min-height: 2.5em;
+    height: 32px;
     font-size: 13.5px;
     line-height: 1.25;
   }
 
-  /* Never hidden — the panel just tightens. Two tiles share a phone row, so
-     each macro cell gets ~35px; the figures stay legible, the labels shrink. */
-  .tile-macros {
-    height: 42px;
-    min-height: 42px;
-    margin: 7px 0 8px;
+  .till .tile-info {
+    top: 7px;
+    bottom: auto;
+    height: 32px;
+    min-height: 32px;
+    padding-left: 9px;
   }
 
-  .tile-macro {
-    padding: 4px 1px;
+  .tile-info-calories {
+    font-size: 10px;
   }
 
-  .tile-macro b {
-    font-size: 11.5px;
-  }
-
-  .tile-macro span {
-    font-size: 7px;
-    letter-spacing: 0.05em;
+  .tile-info-mark {
+    width: 22px;
+    height: 22px;
+    margin-left: 6px;
+    font-size: 14px;
   }
 
   .till .btn--add,
   .tile-step {
-    height: 46px;
-    min-height: 46px;
-    margin-top: 9px;
+    height: 42px;
+    min-height: 42px;
+    margin-top: 0;
   }
 
   .tile-step {
@@ -4267,7 +4259,7 @@
   }
 
   .till .tile-step-btn {
-    min-height: 44px;
+    min-height: 42px;
   }
 
   .tile-price {
@@ -4489,10 +4481,35 @@
   }
 
   .kiosk-student-card {
+    justify-content: center;
     gap: 0;
+    min-width: 112px;
+    padding: 7px 14px;
+    border-radius: 999px;
   }
 
   .kiosk-student-card__wallet {
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 34px;
+    text-align: center;
+  }
+
+  .kiosk-student-card__wallet small,
+  .kiosk-student-card__wallet strong {
+    width: 100%;
+    text-align: center;
+  }
+
+  .kiosk-student-card__wallet small {
+    line-height: 1;
+  }
+
+  .kiosk-student-card__wallet strong {
+    margin-top: 4px;
+    line-height: 1;
   }
 }

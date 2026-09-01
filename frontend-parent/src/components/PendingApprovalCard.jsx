@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { formatINR } from '../utils/format';
 import { Banner, Button, Card } from './ui';
@@ -77,6 +78,7 @@ const initialQuantities = (order) =>
   );
 
 export default function PendingApprovalCard({ order, onResolved, onStudentClick, compact = false }) {
+  const navigate = useNavigate();
   const approvalKey = useRef(null);
   const reviewDialogRef = useRef(null);
   const reviewTriggerRef = useRef(null);
@@ -411,6 +413,8 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
   const chooseUpiProvider = (providerId) => {
     setPaymentChooserOpen(false);
+    setReviewing(false);
+    setConfirming(null);
     setDemoProviderId(providerId);
     setDemoOrderCheckoutOpen(true);
   };
@@ -422,8 +426,11 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
   const completeDemoOrderPayment = (result) => {
     setDemoOrderResult(result);
+    setDemoOrderCheckoutOpen(false);
+    setDemoProviderId(null);
     setReviewing(false);
     setConfirming(null);
+    navigate('/', { replace: true });
   };
 
   const paymentOverlays = (
@@ -448,6 +455,9 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           studentName={student.name || 'Your child'}
           purposeLabel="Order payment"
           providerId={demoProviderId}
+          instantConfirm
+          autoFinishMs={2000}
+          successTitle="Payment confirmed"
           onClose={closeDemoOrderCheckout}
           onComplete={completeDemoOrderPayment}
         />

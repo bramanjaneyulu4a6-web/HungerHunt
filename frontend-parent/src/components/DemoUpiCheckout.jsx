@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatINR } from '../utils/format';
 import { DEMO_UPI_PROVIDERS, makeUpiReference } from '../utils/demoUpi';
 
@@ -14,24 +14,32 @@ export default function DemoUpiCheckout({
   studentName,
   purposeLabel = 'Wallet top-up',
   providerId: chosenProviderId = null,
+  instantConfirm = false,
+  autoFinishMs = null,
+  successTitle = 'Payment successful',
   onClose,
   onComplete,
 }) {
   const [providerId, setProviderId] = useState(chosenProviderId || 'gpay');
-  const [stage, setStage] = useState(chosenProviderId ? 'processing' : 'choose');
+  const [stage, setStage] = useState(
+    instantConfirm ? 'success' : chosenProviderId ? 'processing' : 'choose'
+  );
   const [reference] = useState(makeUpiReference);
   const closeButtonRef = useRef(null);
+  const finishedRef = useRef(false);
   const provider = DEMO_UPI_PROVIDERS.find(({ id }) => id === providerId);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    if (instantConfirm) document.body.classList.add('upi-confirmation-open');
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      if (instantConfirm) document.body.classList.remove('upi-confirmation-open');
     };
-  }, []);
+  }, [instantConfirm]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -47,15 +55,26 @@ export default function DemoUpiCheckout({
     return () => window.clearTimeout(timer);
   }, [stage]);
 
-  const finish = () => {
-    onComplete({ provider: provider.name, reference });
+  const finish = useCallback(() => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     onClose();
-  };
+    onComplete({ provider: provider.name, reference });
+  }, [onClose, onComplete, provider.name, reference]);
+
+  useEffect(() => {
+    if (stage !== 'success' || !autoFinishMs) return undefined;
+    const timer = window.setTimeout(finish, autoFinishMs);
+    return () => window.clearTimeout(timer);
+  }, [autoFinishMs, finish, stage]);
 
   return (
-    <div className="upi-demo-overlay" role="presentation">
+    <div
+      className={`upi-demo-overlay${instantConfirm ? ' upi-demo-overlay--confirmation' : ''}`}
+      role="presentation"
+    >
       <section
-        className="upi-demo-sheet"
+        className={`upi-demo-sheet${instantConfirm ? ' upi-demo-sheet--confirmation' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="upi-demo-title"
@@ -157,15 +176,17 @@ export default function DemoUpiCheckout({
               {[0, 1, 2, 3, 4, 5].map((dot) => <i key={dot} style={{ '--dot': dot }} />)}
             </div>
             <span className="upi-demo-badge upi-demo-badge--success">Payment complete</span>
-            <h2 id="upi-demo-title">Payment successful</h2>
+            <h2 id="upi-demo-title">{successTitle}</h2>
             <p>Your {purposeLabel.toLowerCase()} of {formatINR(amount)} was completed with {provider.name}.</p>
             <div className="upi-demo-receipt">
               <span>UPI reference number</span>
               <strong>{reference}</strong>
             </div>
-            <button type="button" className="upi-demo-pay" onClick={finish}>
-              Done
-            </button>
+            {!autoFinishMs && (
+              <button type="button" className="upi-demo-pay" onClick={finish}>
+                Done
+              </button>
+            )}
           </div>
         )}
       </section>

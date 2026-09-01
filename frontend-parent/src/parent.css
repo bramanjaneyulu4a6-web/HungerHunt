@@ -41,6 +41,25 @@ body {
   animation: upi-demo-fade 180ms ease-out both;
 }
 
+/* Order-demo confirmation is a compact card over the dashboard, not another
+   full-screen surface. The overlay contributes blur only—no tint or fill. */
+.upi-demo-overlay.upi-demo-overlay--confirmation {
+  z-index: 1000;
+  background: transparent;
+  -webkit-backdrop-filter: blur(12px) saturate(0.86);
+  backdrop-filter: blur(12px) saturate(0.86);
+}
+
+/* Backdrop filters alone do not consistently include fixed/sticky compositing
+   layers in every WebView. The checkout is portaled beside #root, so filtering
+   the app root guarantees that navigation, selectors and page content all blur
+   while the confirmation itself stays crisp. */
+body.upi-confirmation-open #root {
+  filter: blur(12px) saturate(0.86);
+  pointer-events: none;
+  user-select: none;
+}
+
 .payment-choice-overlay {
   position: fixed;
   inset: 0;
@@ -211,6 +230,22 @@ body {
   background: #fff;
   box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
   animation: upi-demo-rise 360ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.upi-demo-sheet.upi-demo-sheet--confirmation {
+  isolation: isolate;
+  width: min(100%, 420px);
+  height: auto;
+  max-height: calc(100svh - 40px);
+  padding: 22px 24px;
+  overflow: hidden;
+  -webkit-filter: none;
+  filter: none;
+}
+
+.upi-demo-sheet--confirmation .upi-demo-state--success {
+  min-height: 0;
+  padding: 24px 8px 12px;
 }
 
 .upi-demo-header {

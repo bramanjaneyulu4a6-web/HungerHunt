@@ -3,6 +3,7 @@ import api from "../utils/api";
 import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
 import { cloudinaryThumb } from "../utils/cloudinaryThumb";
+import { loadMenuSnapshot, saveMenuSnapshot } from "../utils/menuSnapshot";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import { useVisualViewportBox } from "../hooks/useVisualViewportBox";
@@ -144,8 +145,16 @@ const KioskBilling = ({ student, onLogout }) => {
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [productWallScrolled, setProductWallScrolled] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
+  /* The menu this till last showed, read once at mount. Seeding the rows
+     alone would not paint anything: the grid is gated on a chosen category
+     and on loadingProducts below, so all three start from the snapshot or the
+     first paint is the same empty skeleton it always was. The fetch on mount
+     still runs and still replaces all of it. */
+  const [initialMenu] = useState(loadMenuSnapshot);
+  const [products, setProducts] = useState(initialMenu);
+  const [selectedCategory, setSelectedCategory] = useState(
+    () => stockGroupNames(initialMenu)[0] || ""
+  );
   const [showCategoryWelcome, setShowCategoryWelcome] = useState(true);
   const [openingCategory, setOpeningCategory] = useState("");
   const [cart, setCart] = useState([]);
@@ -164,7 +173,7 @@ const KioskBilling = ({ student, onLogout }) => {
 
   // Starts true: the catalogue is fetched on mount, and seeding the flag here
   // keeps that effect free of a synchronous setState.
-  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(initialMenu.length === 0);
   const [inventoryError, setInventoryError] = useState("");
 
   const [ticketFolded, setTicketFolded] = useState(false);
@@ -248,6 +257,7 @@ const KioskBilling = ({ student, onLogout }) => {
     // Preserve the last good catalogue until a successful refresh replaces it;
     // the availability guard below keeps stale products off screen meanwhile.
     if (!error) {
+      saveMenuSnapshot(next);
       setProducts(next);
       const nextCategories = stockGroupNames(next);
       setSelectedCategory((current) =>

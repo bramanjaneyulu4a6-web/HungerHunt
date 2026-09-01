@@ -18,4 +18,13 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // The Vite config is Node code, not browser code: it reads
+    // VITE_DEV_PROXY_TARGET off process.env to point the dev server at a
+    // backend. Linting it with browser globals only reports that as no-undef.
+    files: ['vite.config.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

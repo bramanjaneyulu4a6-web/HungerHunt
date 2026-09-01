@@ -1252,10 +1252,18 @@
   display: none;
 }
 
+/* No height of its own. It had one — 44px, with a 46px override further down
+   — while .seg is only as tall as --filterbar-control-height less its own
+   padding and border: 42px normally and 36px under 600px. The pill was
+   therefore taller than the box clipping it, and `overflow-y: hidden` cut the
+   selected pill's rounded ends off top and bottom, so it read as a rectangle
+   bleeding out of the container. Stretching to the content box keeps the two
+   in step wherever that variable changes. */
 .till .seg-item {
   position: relative;
   z-index: 1;
-  min-height: 44px;
+  align-self: stretch;
+  min-height: 0;
   flex: 1 0 auto;
   padding: 0 14px;
   border: 0;
@@ -3951,10 +3959,6 @@
     min-width: 0;
   }
 
-  .till .seg-item {
-    min-height: 46px;
-  }
-
   .kiosk-cap-banner {
     top: max(8px, env(safe-area-inset-top));
     width: min(calc(100% - 28px), 520px);
@@ -4158,6 +4162,7 @@
   .seg {
     width: 100%;
     max-width: 100%;
+    padding: 3px;
   }
 
   .filterbar-groups,

@@ -44,7 +44,7 @@
 
 Render's free tier spins the service down after ~15 idle minutes; a ping every 10 minutes keeps it up. GitHub Actions cron is in UTC: 08:00 IST = 02:30 UTC, 22:00 IST = 16:30 UTC, so the window needs three cron lines (the half-hour edges can't ride the `*/10` line).
 
-- [ ] **Step 1: Write the workflow**
+- [x] **Step 1: Write the workflow**
 
 ```yaml
 # .github/workflows/keep-warm.yml
@@ -81,11 +81,11 @@ jobs:
           curl --fail --silent --show-error --max-time 90 --retry 2 --retry-delay 5 "$HEALTH_URL"
 ```
 
-- [ ] **Step 2: Verify the cron window math**
+- [x] **Step 2: Verify the cron window math**
 
 Read the three cron lines and confirm against IST (UTC+5:30): first firing 02:30 UTC = 08:00 IST, last firing 16:30 UTC = 22:00 IST, and no gap between consecutive pings ever exceeds 10 minutes inside the window. (This is a review step — cron has no local test harness.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/keep-warm.yml
@@ -111,7 +111,7 @@ Trigger once by hand: GitHub → Actions → keep-warm → Run workflow. Expecte
 - Consumes: `GET /api/inventory` (staff branch of `getInventory` in `backend/controllers/inventoryController.js`) as the big-payload test target.
 - Produces: nothing other tasks call; every JSON response > 1KB ships gzipped from here on.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/tests/compression.test.js
@@ -191,12 +191,12 @@ describe('response compression', () => {
 
 **Note for the implementer:** `Inventory.find(...)` in `getInventory` is called as `Inventory.find().populate({...})` and the result is awaited — check the exact call chain in `backend/controllers/inventoryController.js` and shape the mock so the awaited value is the array above. If the controller `await`s the populate chain differently (e.g. a thenable query), adapt the mock, not the controller.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend && node --test tests/compression.test.js`
 Expected: FAIL — `content-encoding` is `null` because nothing compresses yet. If it fails on the mock shape instead (500 from the route), fix the mock until the only failure is the missing header.
 
-- [ ] **Step 3: Install and register compression**
+- [x] **Step 3: Install and register compression**
 
 Run: `cd backend && npm install compression`
 
@@ -215,17 +215,17 @@ Register it with the other early global middleware — immediately after the `he
 app.use(compression());
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && node --test tests/compression.test.js`
 Expected: PASS
 
-- [ ] **Step 5: Run the full backend suite**
+- [x] **Step 5: Run the full backend suite**
 
 Run: `cd backend && npm test`
 Expected: all pass (compression must not disturb any existing body/header assertion).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/package.json backend/package-lock.json backend/app.js backend/tests/compression.test.js
@@ -250,7 +250,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 Safety model, in order: (1) GET only; (2) any request with `req.student` bypasses everything — student inventory payloads embed per-student purchase allowances; (3) entries are keyed by `req.originalUrl` (covers `?all=` variants) and are valid only while the data revision is unchanged, so any successful write anywhere invalidates the whole cache at once. `revisionSource` is injectable purely so tests can drive invalidation without making HTTP writes.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 // backend/tests/readCache.test.js
@@ -407,12 +407,12 @@ describe('readCache wired onto the inventory route', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && node --test tests/readCache.test.js`
 Expected: FAIL at the import — `../middleware/readCache.js` does not exist.
 
-- [ ] **Step 3: Write the middleware**
+- [x] **Step 3: Write the middleware**
 
 ```js
 // backend/middleware/readCache.js
@@ -471,7 +471,7 @@ export const readCache = ({
 };
 ```
 
-- [ ] **Step 4: Mount it on the two routes**
+- [x] **Step 4: Mount it on the two routes**
 
 In `backend/routes/inventoryRoutes.js`:
 
@@ -499,17 +499,17 @@ and change the GET line to:
 router.get('/', protectWarehouse, readCache(), getProducts);
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd backend && node --test tests/readCache.test.js`
 Expected: PASS (all five).
 
-- [ ] **Step 6: Run the full backend suite**
+- [x] **Step 6: Run the full backend suite**
 
 Run: `cd backend && npm test`
 Expected: all pass. Watch specifically for existing tests that GET `/api/inventory` or `/api/products` twice with different mocks in one process — if one fails on stale cached data, that test now needs a revision bump between reads; prefer adjusting the test's expectations to reality (e.g. perform the reads in separate subtests with distinct URLs) over weakening the middleware.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/middleware/readCache.js backend/routes/inventoryRoutes.js backend/routes/productRoutes.js backend/tests/readCache.test.js
@@ -536,7 +536,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: `Product.image` values — full Cloudinary `secure_url` strings like `https://res.cloudinary.com/<cloud>/image/upload/v169.../products/x.jpg` (see `uploadImage` in `backend/controllers/productController.js`). The stored URL is untouched; only rendering changes.
 - Produces: `cloudinaryThumb(url, width = 144)` → string. Inserts `f_auto,q_auto,c_limit,w_<width>/` after `/image/upload/`; returns any non-Cloudinary, empty, or already-transformed URL unchanged.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // hungerhunt-warehouse/src/utils/cloudinaryThumb.test.js
@@ -577,12 +577,12 @@ describe('sizing a Cloudinary image for delivery', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd hungerhunt-warehouse && npm run test`
 Expected: FAIL — module `./cloudinaryThumb.js` not found. The 16 existing util tests keep passing.
 
-- [ ] **Step 3: Write the util**
+- [x] **Step 3: Write the util**
 
 ```js
 // hungerhunt-warehouse/src/utils/cloudinaryThumb.js
@@ -608,12 +608,12 @@ export const cloudinaryThumb = (url, width = 144) => {
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd hungerhunt-warehouse && npm run test`
 Expected: PASS (all suites).
 
-- [ ] **Step 5: Copy the util to the other two apps and register it as shared**
+- [x] **Step 5: Copy the util to the other two apps and register it as shared**
 
 ```bash
 cp hungerhunt-warehouse/src/utils/cloudinaryThumb.js hungerhunt-kiosk/src/utils/cloudinaryThumb.js
@@ -634,7 +634,7 @@ In `scripts/check-shared-files.mjs`, append to the `SHARED` array (after the `av
 
 Run: `node scripts/check-shared-files.mjs` — expected: all in sync, including the new entry.
 
-- [ ] **Step 6: Wire it into the three rendering sites**
+- [x] **Step 6: Wire it into the three rendering sites**
 
 Warehouse — `hungerhunt-warehouse/src/components/ProductThumb.jsx`: import the util and request 2× the display size for sharp rendering on high-DPR phones. Change the `<img ... src={src} ...>` to:
 
@@ -669,12 +669,12 @@ import { cloudinaryThumb } from "../utils/cloudinaryThumb";
 
 Admin — `frontend-admin/src/pages/Products.jsx`: find the product `<img>` (search `<img`), import the util, and wrap its `src` the same way with width 320. Match whatever fallback expression is already there — wrap the whole expression, do not restructure it.
 
-- [ ] **Step 7: Lint and build all three apps**
+- [x] **Step 7: Lint and build all three apps**
 
 Run in each of `hungerhunt-warehouse`, `hungerhunt-kiosk`, `frontend-admin`: `npm run lint && npx vite build`
 Expected: clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add hungerhunt-warehouse/src/utils/cloudinaryThumb.js hungerhunt-warehouse/src/utils/cloudinaryThumb.test.js hungerhunt-kiosk/src/utils/cloudinaryThumb.js frontend-admin/src/utils/cloudinaryThumb.js scripts/check-shared-files.mjs hungerhunt-warehouse/src/components/ProductThumb.jsx hungerhunt-kiosk/src/pages/KioskBilling.jsx frontend-admin/src/pages/Products.jsx
@@ -695,7 +695,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: nothing from other tasks.
 - Produces: nothing other tasks depend on. `frontend-admin` is already fully lazy (see its `App.jsx`) — do not touch it. The kiosk is one page — do not touch it.
 
-- [ ] **Step 1: Convert warehouse page imports to lazy**
+- [x] **Step 1: Convert warehouse page imports to lazy**
 
 In `hungerhunt-warehouse/src/App.jsx`, replace the eager page imports (`Login`, `Orders`, `Inventory`, `Purchases`, `Receive`, `Records`, `CaretakerOrders`, `CaretakerReports`, `CollectOrder` — match the import list actually present in the file) with:
 
@@ -728,11 +728,11 @@ In the `App` component, wrap the top-level `<Routes>` in one Suspense boundary s
     </Suspense>
 ```
 
-- [ ] **Step 2: Convert parent app page imports the same way**
+- [x] **Step 2: Convert parent app page imports the same way**
 
 In `frontend-parent/src/App.jsx`, apply the same pattern to its page imports (`Login`, `Activate`, `Dashboard`, `Accounts`, `ChildDetails`, `ForgotPassword`, `ResetPassword`, `SetPurchasePassword`, plus any other `./pages/*` imports present — enumerate from the file, not from this list). Keep context providers (`AuthProvider`) and hooks eager. Wrap the router's `<Routes>` in `<Suspense fallback={null}>`.
 
-- [ ] **Step 3: Verify the split in the build output**
+- [x] **Step 3: Verify the split in the build output**
 
 Run in both apps: `npm run lint && npx vite build`
 Expected: lint clean; the build output lists one JS chunk per lazy page (e.g. `CaretakerOrders-<hash>.js`) instead of a single `index-<hash>.js` carrying everything, and the main chunk shrinks accordingly. If the warehouse main chunk is not meaningfully smaller than the ~354 KB it was, something is still eagerly imported — check for a stray static import of a page.
@@ -741,7 +741,7 @@ Expected: lint clean; the build output lists one JS chunk per lazy page (e.g. `C
 
 Run: `cd hungerhunt-warehouse && npm run dev`, sign in as a caretaker (dev seed accounts: `backend/scripts/seedDevAccounts.js` against local Mongo), and click through packages → collect screen → reports. Expected: no blank screens, no chunk-load errors in the console. Repeat briefly for a warehouse-role login.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hungerhunt-warehouse/src/App.jsx frontend-parent/src/App.jsx
@@ -765,7 +765,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 The kiosk already keeps the last good catalogue *in memory*; this persists the same rows to localStorage so the very first paint after an app launch shows the menu instead of an empty grid. The fetch still runs on mount and replaces the snapshot; the existing availability guard already tolerates stale rows in the window between paint and refresh.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // hungerhunt-kiosk/src/utils/menuSnapshot.test.js
@@ -820,12 +820,12 @@ describe('the kiosk menu snapshot', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd hungerhunt-kiosk && npx vitest run src/utils/menuSnapshot.test.js`
 Expected: FAIL — module `./menuSnapshot` not found.
 
-- [ ] **Step 3: Write the util**
+- [x] **Step 3: Write the util**
 
 ```js
 // hungerhunt-kiosk/src/utils/menuSnapshot.js
@@ -858,12 +858,12 @@ export const saveMenuSnapshot = (rows) => {
 };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd hungerhunt-kiosk && npx vitest run`
 Expected: PASS (this file and any pre-existing vitest suites).
 
-- [ ] **Step 5: Wire it into KioskBilling**
+- [x] **Step 5: Wire it into KioskBilling**
 
 In `hungerhunt-kiosk/src/pages/KioskBilling.jsx`:
 
@@ -891,7 +891,7 @@ Change it to:
 
 Do not touch the error branch — a failed refresh must neither clear the snapshot nor the in-memory menu (that is the existing "last good catalogue" behaviour, now extended across restarts).
 
-- [ ] **Step 6: Lint, test, build**
+- [x] **Step 6: Lint, test, build**
 
 Run: `cd hungerhunt-kiosk && npm run lint && npx vitest run && npx vite build`
 Expected: all clean.
@@ -900,7 +900,7 @@ Expected: all clean.
 
 Run the kiosk dev server against the local backend, load the menu once, stop the backend, hard-reload the kiosk. Expected: the menu grid paints from the snapshot immediately (with the existing connection-error banner appearing for the failed refresh), instead of an empty screen.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add hungerhunt-kiosk/src/utils/menuSnapshot.js hungerhunt-kiosk/src/utils/menuSnapshot.test.js hungerhunt-kiosk/src/pages/KioskBilling.jsx
@@ -923,7 +923,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: `VITE_API_BASE_URL` — the same build-time variable every app's `src/utils/api.js` already requires (release builds enforce it via `scripts/validate-frontend-release-env.mjs`). Vite substitutes `%VITE_API_BASE_URL%` in `index.html` natively.
 - Produces: nothing other tasks depend on.
 
-- [ ] **Step 1: Add the hints to all four index.html files**
+- [x] **Step 1: Add the hints to all four index.html files**
 
 In each app's `index.html`, inside `<head>` after the `theme-color` meta tag, add:
 
@@ -938,7 +938,7 @@ In each app's `index.html`, inside `<head>` after the `theme-color` meta tag, ad
 
 (The parent app does not currently render Cloudinary images; include the Cloudinary line anyway — it costs one idle connection and saves a divergent template. If the owner objects, dropping it from `frontend-parent` alone is fine.)
 
-- [ ] **Step 2: Verify substitution in a build**
+- [x] **Step 2: Verify substitution in a build**
 
 Run in one app (repeat spot-check in the others):
 
@@ -952,7 +952,7 @@ Expected: the grep prints the substituted host, proving Vite replaced the placeh
 
 Run `npm run dev` briefly in one app and load it. Expected: no console errors from the new link tags (a literal `%VITE_API_BASE_URL%` in dev, if the var is unset there, is ignored by the browser).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add hungerhunt-kiosk/index.html hungerhunt-warehouse/index.html frontend-admin/index.html frontend-parent/index.html
@@ -965,13 +965,29 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ## Final verification (after all tasks)
 
-- [ ] `cd backend && npm test` — full suite green.
-- [ ] `cd hungerhunt-warehouse && npm run lint && npm run test && npx vite build` — green, chunked output.
-- [ ] `cd hungerhunt-kiosk && npm run lint && npx vitest run && npx vite build` — green.
-- [ ] `cd frontend-admin && npm run lint && npx vite build` — green.
-- [ ] `cd frontend-parent && npm run lint && npx vite build` — green.
-- [ ] `node scripts/check-shared-files.mjs` — all shared files in sync, including `cloudinaryThumb.js`.
-- [ ] Remind the owner of the two manual follow-ups: set the `BACKEND_HEALTH_URL` Actions variable if the Render URL differs from `hungerhunt-dbat.onrender.com`, and remember the keep-warm schedule pauses after ~60 days of repo inactivity. Deploys remain manual (`render.yaml`: autoDeploy off) — the backend changes reach production only when the owner triggers a deploy, and the frontends when Vercel rebuilds.
+- [x] `cd backend && npm test` — full suite green.
+- [x] `cd hungerhunt-warehouse && npm run lint && npm run test && npx vite build` — green, chunked output.
+- [x] `cd hungerhunt-kiosk && npm run lint && npx vitest run && npx vite build` — green.
+- [x] `cd frontend-admin && npm run lint && npx vite build` — green.
+- [x] `cd frontend-parent && npm run lint && npx vite build` — green.
+- [x] `node scripts/check-shared-files.mjs` — all shared files in sync, including `cloudinaryThumb.js`.
+- [x] Remind the owner of the two manual follow-ups: set the `BACKEND_HEALTH_URL` Actions variable if the Render URL differs from `hungerhunt-dbat.onrender.com`, and remember the keep-warm schedule pauses after ~60 days of repo inactivity. Deploys remain manual (`render.yaml`: autoDeploy off) — the backend changes reach production only when the owner triggers a deploy, and the frontends when Vercel rebuilds.
+
+## Outstanding
+
+Everything above is implemented, verified and committed except four steps
+that need a person in front of a running app, left open deliberately:
+
+- **Task 1 Step 4** — verify the keep-warm ping live. Deferred by the owner;
+  the workflow only starts running once this is on the default branch anyway.
+- **Task 5 Step 4** — click through the warehouse app as a caretaker and as
+  warehouse staff, checking for chunk-load errors now that pages are lazy.
+- **Task 6 Step 7** — confirm the kiosk paints its snapshot menu at launch.
+  Note the plan's stated expectation is wrong: a failed refresh takes the till
+  to the technical-difficulties screen by design, so the smoke is "the menu
+  appears instantly on a normal launch", not "a stale menu behind a banner".
+- **Task 7 Step 3** — load a dev server and confirm the new link tags log
+  nothing. Substitution itself was verified against a build (Step 2).
 
 ## Deliberately out of scope
 

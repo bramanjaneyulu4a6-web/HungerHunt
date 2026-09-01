@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/api";
 import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
+import { cloudinaryThumb } from "../utils/cloudinaryThumb";
 import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import { useVisualViewportBox } from "../hooks/useVisualViewportBox";
@@ -895,7 +896,7 @@ const KioskBilling = ({ student, onLogout }) => {
                         <i /><i /><i /><i /><i /><i /><i /><i />
                       </span>
                     )}
-                    <img src={item.image || PLACEHOLDER} alt="" />
+                    <img src={cloudinaryThumb(item.image || PLACEHOLDER, 320)} alt="" />
 
                     <div className="ticket-line-name">
                       {item.name}
@@ -1166,7 +1167,7 @@ const KioskBilling = ({ student, onLogout }) => {
                       role="listitem"
                     >
                       <figure>
-                        <img src={p.image || PLACEHOLDER} alt="" />
+                        <img src={cloudinaryThumb(p.image || PLACEHOLDER, 320)} alt="" />
                       </figure>
 
                       {p.nutrition && (
@@ -1316,7 +1317,7 @@ const KioskBilling = ({ student, onLogout }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="nutrition-head">
-              <img src={nutritionFor.image || PLACEHOLDER} alt="" />
+              <img src={cloudinaryThumb(nutritionFor.image || PLACEHOLDER, 640)} alt="" />
 
               <div className="nutrition-head-t">
                 <div className="nutrition-kicker">Nutrition</div>

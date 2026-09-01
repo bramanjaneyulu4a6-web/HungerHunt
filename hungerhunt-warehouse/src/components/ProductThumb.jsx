@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cloudinaryThumb } from "../utils/cloudinaryThumb";
 
 /* A picture of the thing, at the front of every row.
    The storeroom recognises stock by sight long before it reads a name, so the
@@ -21,7 +22,7 @@ const ProductThumb = ({ src, name, size = 56 }) => {
     <img
       className="wh-thumb"
       style={box}
-      src={src}
+      src={cloudinaryThumb(src, size * 2)}
       alt=""
       loading="lazy"
       onError={() => setFailed(true)}

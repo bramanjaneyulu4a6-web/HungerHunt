@@ -10,6 +10,7 @@ import {
   Skeleton,
 } from '../components/ui';
 import { formatINR, formatPackSize } from '../utils/format';
+import { cloudinaryThumb } from '../utils/cloudinaryThumb';
 import { resolveAvailability } from '../utils/availability';
 import { unitsForCategory } from '../constants/units';
 import {
@@ -687,7 +688,7 @@ const Products = () => {
               <article className="catalogue-product-card catalogue-product-card--archived" key={product._id}>
                 <div className="catalogue-product-image">
                   {product.image ? (
-                    <img src={product.image} alt="" />
+                    <img src={cloudinaryThumb(product.image, 320)} alt="" />
                   ) : (
                     <span aria-hidden="true">📦</span>
                   )}
@@ -751,7 +752,7 @@ const Products = () => {
                     <td data-label="Image">
                       {p.image ? (
                         <img
-                          src={p.image}
+                          src={cloudinaryThumb(p.image, 320)}
                           alt={p.name}
                           style={{
                             width: 60,
@@ -902,7 +903,7 @@ const Products = () => {
                               >
                                 <div className="catalogue-product-image">
                                   {product.image ? (
-                                    <img src={product.image} alt="" />
+                                    <img src={cloudinaryThumb(product.image, 320)} alt="" />
                                   ) : (
                                     <span aria-hidden="true">📦</span>
                                   )}

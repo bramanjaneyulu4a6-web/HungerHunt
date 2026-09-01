@@ -76,6 +76,13 @@ const SHARED = [
     file: 'src/utils/availability.js',
     apps: ['frontend-admin', 'hungerhunt-warehouse'],
   },
+  // Read-side Cloudinary sizing for product images. Three apps render the
+  // same stored secure_urls; the transformation rule must not drift or the
+  // same product renders at different quality per app.
+  {
+    file: 'src/utils/cloudinaryThumb.js',
+    apps: ['frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
+  },
 ];
 
 const digest = (path) =>

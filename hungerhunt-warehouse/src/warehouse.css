@@ -1380,6 +1380,14 @@
 .wh-history-statuses { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .wh-history-statuses span { padding: 6px 8px; color: var(--wh-muted); background: var(--wh-bg); border-radius: 8px; font-size: 11px; }
 .wh-history-statuses strong { color: var(--wh-ink); }
+.wh-history-orders { display: grid; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--wh-line); }
+.wh-history-orders > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.wh-history-orders span { display: grid; min-width: 0; }
+.wh-history-orders span:last-child { flex: 0 0 auto; text-align: right; }
+.wh-history-orders strong { overflow-wrap: anywhere; color: var(--wh-ink); font-size: 12px; }
+.wh-history-orders small { color: var(--wh-muted); font-size: 10px; }
+.wh-history-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
+.wh-history-pagination span { color: var(--wh-muted); font-size: 12px; font-weight: 700; }
 
 .wh-dialog-backdrop {
   position: fixed;

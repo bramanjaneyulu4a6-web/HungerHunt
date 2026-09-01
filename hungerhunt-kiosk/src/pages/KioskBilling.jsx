@@ -174,6 +174,7 @@ const KioskBilling = ({ student, onLogout }) => {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [purchasePassword, setPurchasePassword] = useState("");
   const [paying, setPaying] = useState(false);
+  const [checkoutPhase, setCheckoutPhase] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [pinIssue, setPinIssue] = useState(null);
   const [lockoutIssue, setLockoutIssue] = useState(null);
@@ -475,11 +476,13 @@ const KioskBilling = ({ student, onLogout }) => {
       });
 
       setResult("paid");
+      return true;
     } catch (err) {
       console.error("Checkout Error:", err);
       const issue = presentError(err, { message: err.response?.data?.message || err.response?.data?.error || "Checkout failed" });
       showFeedback(err, issue);
       if (['staleData', 'insufficientStock'].includes(issue.presentation)) refreshPage();
+      return false;
     }
   };
 
@@ -492,9 +495,11 @@ const KioskBilling = ({ student, onLogout }) => {
       await api.post("/pending-orders", { items, purchaseToken });
 
       setResult("pending");
+      return true;
     } catch (err) {
       console.error("Approval request error:", err);
       showFeedback(err, { message: err.response?.data?.message || "Could not send the order for approval" });
+      return false;
     }
   };
 
@@ -517,21 +522,30 @@ const KioskBilling = ({ student, onLogout }) => {
         items,
       });
 
+      /* Verification and order creation are two server requests, but they are
+         one action to the student. Replace the till immediately after the
+         first succeeds so the unchanged ticket and Place Order button cannot
+         flash back into view while the second request is still running. */
+      const nextPhase = data?.requiresApproval ? "approval" : "payment";
       setShowVerifyModal(false);
       setPurchasePassword("");
+      setCheckoutPhase(nextPhase);
 
       // The code was right either way. Which of the two endings follows is the
       // parent's standing choice, reported by verify-payment so the till does
       // not have to look the student up a second time to find out.
       if (data?.requiresApproval) {
-        await requestApproval(items, data?.purchaseToken);
+        const completed = await requestApproval(items, data?.purchaseToken);
+        if (!completed) setCheckoutPhase(null);
       } else {
         const liveBalance = await refreshWallet();
         if (invoiceTotal > liveBalance) {
+          setCheckoutPhase(null);
           showFeedback({ message: "Not enough in your wallet for this." }, { available: liveBalance, required: invoiceTotal });
           return;
         }
-        await handleCheckout(items, data?.purchaseToken);
+        const completed = await handleCheckout(items, data?.purchaseToken);
+        if (!completed) setCheckoutPhase(null);
       }
     } catch (err) {
       /* Locked out. Five wrong codes closes checkout for fifteen minutes, and
@@ -625,7 +639,7 @@ const KioskBilling = ({ student, onLogout }) => {
      about. */
   const { capRemaining, capWarning, idlePrompt, idleRemaining, dismissIdle } =
     useSessionTimers({
-      active: !result,
+      active: !result && !checkoutPhase,
       onExpire: onLogout,
       isBusy: () => payingRef.current,
     });
@@ -657,6 +671,18 @@ const KioskBilling = ({ student, onLogout }) => {
         onDone={onLogout}
         tapLabel="Tap anywhere for next order"
       />
+    );
+  }
+
+  if (checkoutPhase) {
+    const awaitingParent = checkoutPhase === "approval";
+    return (
+      <main className="kiosk-submit-screen" role="status" aria-live="polite">
+        <div className="kiosk-submit-spinner" aria-hidden="true" />
+        <p>{awaitingParent ? "Requesting approval" : "Placing order"}</p>
+        <h1>{awaitingParent ? "Sending to your parent…" : "Confirming your order…"}</h1>
+        <span>Please wait. Your order is being securely recorded.</span>
+      </main>
     );
   }
 
@@ -1049,7 +1075,12 @@ const KioskBilling = ({ student, onLogout }) => {
                   tabIndex={searchOpen ? 0 : -1}
                   onClick={closeSearch}
                 >
-                  <span className="filterbar-group-logo__mark" aria-hidden="true">←</span>
+                  <img
+                    className="filterbar-group-logo__image"
+                    src={hungerLogo}
+                    alt=""
+                    aria-hidden="true"
+                  />
                 </button>
               </div>
 
@@ -1160,15 +1191,6 @@ const KioskBilling = ({ student, onLogout }) => {
                           aria-hidden={p.packSize ? undefined : true}
                         >
                           {p.packSize || BLANK}
-                        </p>
-
-                        <p
-                          className={`tile-meta${p.stockGroup?.name ? "" : " tile-slot--empty"}`}
-                          aria-hidden={p.stockGroup?.name ? undefined : true}
-                        >
-                          {p.stockGroup?.name
-                            ? titleCase(p.stockGroup.name)
-                            : BLANK}
                         </p>
 
                         <p

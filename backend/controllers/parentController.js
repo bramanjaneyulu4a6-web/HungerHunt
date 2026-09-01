@@ -336,10 +336,36 @@ export const getChildRecharges = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const refunds = await WalletReversal.find({ studentId: req.params.id })
-      .sort({ createdAt: -1 })
-      .limit(500)
-      .lean();
+    const [refunds, charges] = await Promise.all([
+      WalletReversal.find({ studentId: req.params.id })
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+      // The wallet's outgoings. UPI-funded orders are excluded because that
+      // money never touched the wallet — its balance snapshots are equal and
+      // a "deduction" of it would be a lie.
+      Transaction.find({
+        studentId: req.params.id,
+        sourceType: { $ne: 'UPI_ORDER_PAYMENT' },
+      })
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean(),
+    ]);
+
+    // The order each charge paid for, so the ledger line can name it the way
+    // the orders tab does.
+    const orders = charges.length
+      ? await FulfillmentOrder.find({
+          transactionId: { $in: charges.map((charge) => charge._id) },
+        })
+          .select('transactionId')
+          .lean()
+      : [];
+    const orderIdByTransaction = new Map(
+      orders.map((order) => [String(order.transactionId), String(order._id)])
+    );
+
     const all = [
       ...(student.rechargeHistory || []).slice().reverse().map((entry) => ({
         ...(entry.toObject?.() || entry),
@@ -354,6 +380,20 @@ export const getChildRecharges = async (req, res) => {
         date: entry.createdAt,
         reason: entry.reason,
       })),
+      ...charges.map((entry) => {
+        const orderId = orderIdByTransaction.get(String(entry._id));
+        return {
+          _id: entry._id,
+          kind: 'ORDER_PAYMENT',
+          amount: entry.totalAmount,
+          previousBalance: entry.previousBalance,
+          newBalance: entry.remainingBalance,
+          date: entry.createdAt,
+          reason: orderId
+            ? `Order: #${orderId.slice(-6).toUpperCase()}`
+            : 'Order',
+        };
+      }),
     ].sort((left, right) => new Date(right.date) - new Date(left.date));
 
     res.json({

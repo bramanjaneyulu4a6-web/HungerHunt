@@ -9,6 +9,7 @@ import {
 } from '../../../domain/fulfillment/orderState.js';
 import {
   ALERT_SNOOZE_MS,
+  CLOSED_STATUSES,
   MAX_ACKNOWLEDGEMENTS,
   OPEN_STATUSES,
   isOpenOrder,
@@ -363,16 +364,26 @@ export const acknowledgeAlert = async (req, res) => {
   });
 };
 
-/* Delivery history over a bounded business-date range, one page at a time.
-   Keyed on orderedAt rather than deliveredAt: every package has an order time,
-   so a range never silently drops the packages that were never delivered —
-   which are the ones a history is most often opened to find. */
+/* Delivery history, one bounded page at a time. Reporting callers use a
+   business-date range; the operational history screens explicitly request
+   scope=all and receive terminal orders only. Keyed on orderedAt rather than
+   deliveredAt because cancelled packages never have a delivery time. */
 export const history = async (req, res) => {
-  const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
+  const allTime = req.query.scope === 'all';
+  const range = allTime
+    ? null
+    : parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
   const status = readStatus(req.query);
   const { page, limit, skip } = readPaging(req.query);
 
-  const filter = { orderedAt: { $gte: from, $lt: to }, ...(status ? { status } : {}) };
+  const filter = {
+    ...(range ? { orderedAt: { $gte: range.from, $lt: range.to } } : {}),
+    ...(status
+      ? { status }
+      : allTime
+        ? { status: { $in: CLOSED_STATUSES } }
+        : {}),
+  };
 
   const [orders, total] = await Promise.all([
     FulfillmentOrder.find(filter).sort({ orderedAt: -1 }).skip(skip).limit(limit).lean(),
@@ -388,7 +399,9 @@ export const history = async (req, res) => {
       page,
       pages: Math.ceil(total / limit) || 1,
       hasMore: page * limit < total,
-      range: { from, to, timeZone },
+      ...(range
+        ? { range: { from: range.from, to: range.to, timeZone: range.timeZone } }
+        : { allTime: true }),
     },
   });
 };

@@ -567,6 +567,24 @@ describe('delivery history and operational reports', () => {
     assert.equal(response.status, 400);
   });
 
+  test('offers a paged all-time history containing terminal orders only', async () => {
+    let filter;
+    mock.method(FulfillmentOrder, 'find', (requested) => {
+      filter = requested;
+      return query([orderFixture({ status: 'COLLECTED' })]);
+    });
+    mock.method(FulfillmentOrder, 'countDocuments', async () => 1);
+
+    const response = await asStaff('/api/v1/fulfillment-orders/history?scope=all&page=1&limit=50');
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(filter.status.$in, ['DELIVERED', 'COLLECTED', 'CANCELLED']);
+    assert.equal(filter.orderedAt, undefined);
+    assert.equal(body.meta.allTime, true);
+    assert.equal(body.data[0].status, 'COLLECTED');
+  });
+
   test('rejects an unknown status filter', async () => {
     const response = await asStaff(
       '/api/v1/fulfillment-orders/history?from=2026-08-01&to=2026-08-12&status=LOST'

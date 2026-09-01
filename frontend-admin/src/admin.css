@@ -1513,6 +1513,25 @@
   color: var(--muted-soft);
 }
 
+.user-relationship-link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 2px;
+}
+
+.user-relationship-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.user-row--focused {
+  scroll-margin-block: 120px;
+  background: var(--warn-bg);
+  outline: 2px solid color-mix(in srgb, var(--primary) 38%, transparent);
+  outline-offset: -2px;
+}
+
 .cell-right {
   text-align: right;
 }

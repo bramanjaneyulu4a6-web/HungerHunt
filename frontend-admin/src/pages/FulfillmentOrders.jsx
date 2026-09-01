@@ -6,10 +6,11 @@ import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '.
 import { formatINR } from '../utils/format';
 
 const CANCELLABLE = new Set(['PENDING', 'PACKED']);
+const HISTORY_PAGE_SIZE = 50;
 
 const badgeFor = (status) => {
   if (status === 'PENDING') return 'warn';
-  if (status === 'OUT_FOR_DELIVERY') return 'success';
+  if (['OUT_FOR_DELIVERY', 'DELIVERED', 'COLLECTED'].includes(status)) return 'success';
   return 'neutral';
 };
 
@@ -23,8 +24,104 @@ const cancellationKey = (orderId) => {
   return `admin-cancel-${orderId}-${nonce}`;
 };
 
+const OrdersLedger = ({ orders, expanded, onExpand, onCancel, history = false }) => (
+  <Card className="warehouse-ledger-card fulfillment-ledger">
+    <div className="fulfillment-ledger__summary">
+      <div><strong>{orders.length}</strong><span>{history ? 'orders on this page' : 'active orders'}</span></div>
+      <p>{history
+        ? 'Completed and cancelled packages are listed newest first.'
+        : 'Only pending and packed orders can be cancelled. Dispatched packages must complete delivery.'}</p>
+    </div>
+    <div className="table-wrap">
+      <table className="table table--stack table--hover">
+        <thead>
+          <tr>
+            <th>Order</th><th>Student</th><th>Hostel</th><th>Items</th>
+            <th>Placed</th><th>Total</th><th>Status</th>
+            <th><span className="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((order) => (
+            <Fragment key={order.id}>
+              <tr>
+                <td data-label="Order"><strong>{orderNumber(order)}</strong></td>
+                <td data-label="Student">
+                  <span className="fulfillment-student">
+                    <strong>{order.student?.name || 'Unknown student'}</strong>
+                    <small>{order.student?.admissionNumber || 'No admission number'}</small>
+                  </span>
+                </td>
+                <td data-label="Hostel">{order.student?.hostelNumber || '—'}</td>
+                <td data-label="Items">{itemCount(order)}</td>
+                <td data-label="Placed">{new Date(order.orderedAt).toLocaleString()}</td>
+                <td data-label="Total"><strong>{formatINR(order.totalAmount)}</strong></td>
+                <td data-label="Status">
+                  <Badge variant={badgeFor(order.status)}>{order.status.replaceAll('_', ' ')}</Badge>
+                </td>
+                <td data-label="Actions">
+                  <div className="fulfillment-actions">
+                    <Button
+                      variant="ghost"
+                      className="btn--sm"
+                      aria-expanded={expanded === order.id}
+                      onClick={() => onExpand(expanded === order.id ? null : order.id)}
+                    >
+                      {expanded === order.id ? 'Hide' : 'Details'}
+                    </Button>
+                    {!history && (CANCELLABLE.has(order.status) ? (
+                      <Button variant="danger" className="btn--sm" onClick={() => onCancel(order)}>
+                        Cancel
+                      </Button>
+                    ) : (
+                      <span className="fulfillment-locked">Already dispatched</span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+              {expanded === order.id && (
+                <tr className="warehouse-ledger-detail">
+                  <td colSpan="8">
+                    <div className="fulfillment-order-detail">
+                      <div>
+                        <small>Ordered items</small>
+                        {order.items.map((item, index) => (
+                          <p key={`${item.productId}-${index}`}>
+                            <strong>{item.name || 'Unnamed product'}</strong>
+                            <span>{item.quantity} × {formatINR(item.price)}</span>
+                          </p>
+                        ))}
+                      </div>
+                      <div>
+                        <small>{history ? 'Order record' : 'Delivery window'}</small>
+                        <p><strong>Due {new Date(order.deliverBy).toLocaleString()}</strong></p>
+                        <p><span>Order ID</span><strong>{order.id}</strong></p>
+                        {history && order.transitions?.at(-1) && (
+                          <p>
+                            <span>Last updated</span>
+                            <strong>{new Date(order.transitions.at(-1).at).toLocaleString()}</strong>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </Card>
+);
+
 export default function FulfillmentOrders() {
+  const [view, setView] = useState('active');
   const [orders, setOrders] = useState([]);
+  const [historyOrders, setHistoryOrders] = useState([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPages, setHistoryPages] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [expanded, setExpanded] = useState(null);
@@ -34,7 +131,7 @@ export default function FulfillmentOrders() {
   const [cancelError, setCancelError] = useState('');
   const cancellationKeyRef = useRef('');
 
-  const load = useCallback(async () => {
+  const loadActive = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
@@ -48,10 +145,32 @@ export default function FulfillmentOrders() {
     }
   }, []);
 
+  const loadHistory = useCallback(async (page = 1) => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const response = await api.get('/v1/fulfillment-orders/history', {
+        params: { scope: 'all', page, limit: HISTORY_PAGE_SIZE },
+      });
+      setHistoryOrders(response.data.data || []);
+      setHistoryPage(response.data.meta?.page || page);
+      setHistoryPages(response.data.meta?.pages || 1);
+      setHistoryTotal(response.data.meta?.total || 0);
+    } catch (error) {
+      console.error(error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const initial = setTimeout(load, 0);
+    const initial = setTimeout(
+      () => view === 'active' ? loadActive() : loadHistory(historyPage),
+      0
+    );
     return () => clearTimeout(initial);
-  }, [load]);
+  }, [historyPage, loadActive, loadHistory, view]);
 
   const openCancellation = (order) => {
     cancellationKeyRef.current = cancellationKey(order.id);
@@ -107,103 +226,50 @@ export default function FulfillmentOrders() {
   return (
     <div className="page warehouse-page">
       <PageHeader
-        title="Active Student Orders"
-        subtitle="Review every individual package still being handled by Warehouse and cancel eligible orders before dispatch."
+        title="Student Orders"
+        subtitle="Review active warehouse packages and the complete history of delivered, collected, and cancelled orders."
       />
+
+      <div className="tabs users-tabs" role="tablist" aria-label="Student order views">
+        <button type="button" role="tab" aria-selected={view === 'active'} className={`tab${view === 'active' ? ' tab--active' : ''}`} onClick={() => { setView('active'); setExpanded(null); }}>
+          Active Orders
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'history'} className={`tab${view === 'history' ? ' tab--active' : ''}`} onClick={() => { setView('history'); setExpanded(null); }}>
+          Order History
+        </button>
+      </div>
 
       {loadError && (
         <Banner variant="alert" icon="⚠️">
-          Active student orders could not be loaded. No orders have been changed.
+          {view === 'active' ? 'Active student orders' : 'Order history'} could not be loaded. No orders have been changed.
         </Banner>
       )}
 
       {loading ? (
         <Skeleton height={280} radius={16} />
-      ) : orders.length === 0 && !loadError ? (
-        <EmptyState icon="✓" title="No active student orders" variant="success">
-          Every warehouse package has been delivered, collected, or cancelled.
+      ) : (view === 'active' ? orders : historyOrders).length === 0 && !loadError ? (
+        <EmptyState icon="✓" title={view === 'active' ? 'No active student orders' : 'No order history yet'} variant="success">
+          {view === 'active'
+            ? 'Every warehouse package has been delivered, collected, or cancelled.'
+            : 'Delivered, collected, and cancelled orders will appear here.'}
         </EmptyState>
-      ) : orders.length > 0 ? (
-        <Card className="warehouse-ledger-card fulfillment-ledger">
-          <div className="fulfillment-ledger__summary">
-            <div><strong>{orders.length}</strong><span>active orders</span></div>
-            <p>Only pending and packed orders can be cancelled. Dispatched packages must complete delivery.</p>
-          </div>
-          <div className="table-wrap">
-            <table className="table table--stack table--hover">
-              <thead>
-                <tr>
-                  <th>Order</th><th>Student</th><th>Hostel</th><th>Items</th>
-                  <th>Placed</th><th>Total</th><th>Status</th>
-                  <th><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <Fragment key={order.id}>
-                    <tr>
-                      <td data-label="Order"><strong>{orderNumber(order)}</strong></td>
-                      <td data-label="Student">
-                        <span className="fulfillment-student">
-                          <strong>{order.student?.name || 'Unknown student'}</strong>
-                          <small>{order.student?.admissionNumber || 'No admission number'}</small>
-                        </span>
-                      </td>
-                      <td data-label="Hostel">{order.student?.hostelNumber || '—'}</td>
-                      <td data-label="Items">{itemCount(order)}</td>
-                      <td data-label="Placed">{new Date(order.orderedAt).toLocaleString()}</td>
-                      <td data-label="Total"><strong>{formatINR(order.totalAmount)}</strong></td>
-                      <td data-label="Status">
-                        <Badge variant={badgeFor(order.status)}>{order.status.replaceAll('_', ' ')}</Badge>
-                      </td>
-                      <td data-label="Actions">
-                        <div className="fulfillment-actions">
-                          <Button
-                            variant="ghost"
-                            className="btn--sm"
-                            aria-expanded={expanded === order.id}
-                            onClick={() => setExpanded(expanded === order.id ? null : order.id)}
-                          >
-                            {expanded === order.id ? 'Hide' : 'Details'}
-                          </Button>
-                          {CANCELLABLE.has(order.status) ? (
-                            <Button variant="danger" className="btn--sm" onClick={() => openCancellation(order)}>
-                              Cancel
-                            </Button>
-                          ) : (
-                            <span className="fulfillment-locked">Already dispatched</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {expanded === order.id && (
-                      <tr className="warehouse-ledger-detail">
-                        <td colSpan="8">
-                          <div className="fulfillment-order-detail">
-                            <div>
-                              <small>Ordered items</small>
-                              {order.items.map((item, index) => (
-                                <p key={`${item.productId}-${index}`}>
-                                  <strong>{item.name || 'Unnamed product'}</strong>
-                                  <span>{item.quantity} × {formatINR(item.price)}</span>
-                                </p>
-                              ))}
-                            </div>
-                            <div>
-                              <small>Delivery window</small>
-                              <p><strong>Due {new Date(order.deliverBy).toLocaleString()}</strong></p>
-                              <p><span>Order ID</span><strong>{order.id}</strong></p>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      ) : (view === 'active' ? orders : historyOrders).length > 0 ? (
+        <>
+          <OrdersLedger
+            orders={view === 'active' ? orders : historyOrders}
+            expanded={expanded}
+            onExpand={setExpanded}
+            onCancel={openCancellation}
+            history={view === 'history'}
+          />
+          {view === 'history' && historyPages > 1 && (
+            <nav className="table-pagination" aria-label="Order history pages">
+              <Button variant="ghost" className="btn--sm" disabled={historyPage <= 1} onClick={() => setHistoryPage((page) => page - 1)}>Previous</Button>
+              <span>Page {historyPage} of {historyPages} · {historyTotal} orders</span>
+              <Button variant="ghost" className="btn--sm" disabled={historyPage >= historyPages} onClick={() => setHistoryPage((page) => page + 1)}>Next</Button>
+            </nav>
+          )}
+        </>
       ) : null}
 
       {cancelling && (

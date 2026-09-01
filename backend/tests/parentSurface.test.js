@@ -188,11 +188,20 @@ describe('child history comes a page at a time', () => {
     assert.equal(asked, 100);
   });
 
-  test('recharges come newest first', async () => {
-    ownsTheStudent();
+  const noReversals = () =>
     mock.method(WalletReversal, 'find', () => ({
       sort: () => ({ limit: () => ({ lean: async () => [] }) }),
     }));
+
+  const noCharges = () =>
+    mock.method(Transaction, 'find', () => ({
+      sort: () => ({ limit: () => ({ lean: async () => [] }) }),
+    }));
+
+  test('recharges come newest first', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
     mock.method(Student, 'findById', () => ({
       select: async () => ({
         rechargeHistory: [{ amount: 1 }, { amount: 2 }, { amount: 3 }],
@@ -207,6 +216,53 @@ describe('child history comes a page at a time', () => {
     );
     assert.equal(body.total, 3);
     assert.equal(body.hasMore, false);
+  });
+
+  test('order payments appear as deductions naming their order', async () => {
+    ownsTheStudent();
+    noReversals();
+    mock.method(Student, 'findById', () => ({
+      select: async () => ({ rechargeHistory: [] }),
+    }));
+
+    let chargeFilter;
+    mock.method(Transaction, 'find', (filter) => {
+      chargeFilter = filter;
+      return {
+        sort: () => ({
+          limit: () => ({
+            lean: async () => [{
+              _id: '507f191e810c19729de860aa',
+              totalAmount: 60,
+              previousBalance: 500,
+              remainingBalance: 440,
+              createdAt: new Date('2026-08-20T08:00:00.000Z'),
+            }],
+          }),
+        }),
+      };
+    });
+    mock.method(FulfillmentOrder, 'find', () => ({
+      select: () => ({
+        lean: async () => [{
+          _id: '507f191e810c19729de860ab',
+          transactionId: '507f191e810c19729de860aa',
+        }],
+      }),
+    }));
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    // A UPI-funded charge never moved the wallet, so it has no place here.
+    assert.equal(chargeFilter.sourceType.$ne, 'UPI_ORDER_PAYMENT');
+
+    const [entry] = body.recharges;
+    assert.equal(entry.kind, 'ORDER_PAYMENT');
+    assert.equal(entry.amount, 60);
+    assert.equal(entry.previousBalance, 500);
+    assert.equal(entry.newBalance, 440);
+    // Named the way the orders tab names it: # plus the id's last six.
+    assert.equal(entry.reason, 'Order: #E860AB');
   });
 
   test('a student belonging to someone else is refused', async () => {

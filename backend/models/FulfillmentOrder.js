@@ -138,9 +138,10 @@ fulfillmentOrderSchema.index(
   }
 );
 
-// The two bounded reads. History and the operational report scan a date range
-// of orders; the parent's own list is that range narrowed to one student.
+// History is always paged (and may be all-time); reports scan a bounded date
+// range. The parent's own list is that ordered-time index narrowed to one child.
 fulfillmentOrderSchema.index({ orderedAt: -1 });
+fulfillmentOrderSchema.index({ status: 1, orderedAt: -1 });
 fulfillmentOrderSchema.index({ studentId: 1, orderedAt: -1 });
 fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliverBy: 1 });
 fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliveredAt: -1 });

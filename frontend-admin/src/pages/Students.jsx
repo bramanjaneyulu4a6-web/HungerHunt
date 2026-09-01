@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
 import Icon from '../components/Icon';
 import { formatINR } from '../utils/format';
@@ -93,6 +94,8 @@ const ModalHead = ({ title, subtitle, onClose }) => (
 );
 
 const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChanged }) => {
+  const [searchParams] = useSearchParams();
+  const focusedStudentId = searchParams.get('focus') || '';
   const [students, setStudents] = useState([]);
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +104,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [hostelFilter, setHostelFilter] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
@@ -165,6 +168,14 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (loading || !focusedStudentId) return;
+    document.getElementById(`user-student-${focusedStudentId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [focusedStudentId, loading, students]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -521,7 +532,11 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             </thead>
             <tbody>
               {visible.map((student) => (
-                <tr key={student._id}>
+                <tr
+                  id={`user-student-${student._id}`}
+                  key={student._id}
+                  className={String(student._id) === focusedStudentId ? 'user-row--focused' : undefined}
+                >
                   <td data-label="Admission No.">
                     {student.admissionNumber
                       ? <span className="cell-mono">{student.admissionNumber}</span>
@@ -544,9 +559,19 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                   <td data-label="Linked parent">{(() => {
                     const parent = parentByStudent.get(String(student._id));
                     if (!parent) return <span className="cell-unset">Not linked</span>;
-                    if (!parent.active) return <Badge variant="neutral">Inactive · {parent.fatherName}</Badge>;
-                    if (parent.activationRequired) return <Badge variant="warn">Awaiting activation · {parent.fatherName}</Badge>;
-                    return <Badge variant="success">Active · {parent.fatherName}</Badge>;
+                    const variant = !parent.active ? 'neutral' : parent.activationRequired ? 'warn' : 'success';
+                    const status = !parent.active ? 'Inactive' : parent.activationRequired ? 'Awaiting activation' : 'Active';
+                    return (
+                      <Badge variant={variant}>
+                        {status} ·{' '}
+                        <Link
+                          className="user-relationship-link"
+                          to={`/users/parents?focus=${encodeURIComponent(parent.id)}`}
+                        >
+                          {parent.fatherName}
+                        </Link>
+                      </Badge>
+                    );
                   })()}</td>
                   <td data-label="Actions">
                     <div className="cell-actions">

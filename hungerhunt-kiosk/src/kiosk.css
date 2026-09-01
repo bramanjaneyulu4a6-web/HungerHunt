@@ -1149,8 +1149,10 @@
 /* It floats rather than sitting in the wall's flow: sticky to the top of the
    scroll area, tiles passing underneath. That is what the blur is for. */
 .filterbar {
+  --filterbar-control-height: 54px;
   position: relative;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 12px;
   width: auto;
@@ -1200,8 +1202,8 @@
   width: calc(100% - 66px);
   max-width: calc(100% - 66px);
   min-width: 0;
-  min-height: 54px;
-  max-height: none;
+  height: var(--filterbar-control-height);
+  min-height: var(--filterbar-control-height);
   overflow: visible;
   transition: flex-basis 420ms cubic-bezier(0.32, 0.72, 0, 1),
     flex-grow 420ms cubic-bezier(0.32, 0.72, 0, 1),
@@ -1217,8 +1219,8 @@
   align-items: center;
   width: 100%;
   max-width: 100%;
-  min-height: 54px;
-  max-height: none;
+  height: var(--filterbar-control-height);
+  min-height: var(--filterbar-control-height);
   padding: 5px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1297,9 +1299,9 @@
   top: 0;
   left: 0;
   display: grid;
-  width: 54px;
-  height: 54px;
-  padding: 5px;
+  width: var(--filterbar-control-height);
+  height: var(--filterbar-control-height);
+  padding: 4px;
   opacity: 0;
   pointer-events: none;
   background: #fffaf2;
@@ -1311,20 +1313,22 @@
   place-items: center;
 }
 
-.filterbar-group-logo__mark {
-  color: #5f5142;
-  font-size: 25px;
-  line-height: 1;
+.filterbar-group-logo__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: contain;
 }
 
 .wall-search {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 54px;
-  width: 54px;
-  min-width: 54px;
-  height: 54px;
+  flex: 0 0 var(--filterbar-control-height);
+  width: var(--filterbar-control-height);
+  min-width: var(--filterbar-control-height);
+  height: var(--filterbar-control-height);
   margin-left: auto;
   padding: 4px;
   overflow: hidden;
@@ -1383,8 +1387,8 @@
 }
 
 .filterbar--searching .filterbar-groups {
-  flex: 0 0 54px;
-  width: 54px;
+  flex: 0 0 var(--filterbar-control-height);
+  width: var(--filterbar-control-height);
 }
 
 .filterbar--searching .seg {
@@ -1678,9 +1682,8 @@
   -webkit-line-clamp: 2;
 }
 
-/* What is in the packet, under the name. Deliberately not styled like
-   .tile-meta: the category is a label, this is a measurement, and a student
-   comparing two drinks is reading this one. */
+/* What is in the packet, under the name — a measurement a student comparing
+   two drinks is actually reading. */
 .tile-size {
   min-height: 1.25em;
   margin-top: 3px;
@@ -1689,20 +1692,6 @@
   font-weight: 600;
   line-height: 1.25;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dim);
-}
-
-.tile-meta {
-  min-height: 1.3em;
-  margin-top: 2px;
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
   color: var(--dim);
 }
@@ -3242,6 +3231,48 @@
    On the till's white rather than the gate's brand ground: this is the end of
    the order, still part of the till, not a return to the front door. */
 
+.kiosk-submit-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  min-height: 100dvh;
+  padding: 32px;
+  text-align: center;
+  background: radial-gradient(circle at 50% 42%, #fff 0, #fffdf8 52%, #fff7e8 100%);
+  color: #17110a;
+}
+
+.kiosk-submit-screen p {
+  margin: 22px 0 5px;
+  color: #b06a10;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.kiosk-submit-screen h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.kiosk-submit-screen > span {
+  margin-top: 12px;
+  color: #6d6152;
+  font-size: 16px;
+}
+
+.kiosk-submit-spinner {
+  width: 58px;
+  height: 58px;
+  border: 5px solid #f4dfbd;
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: kiosk-spin 720ms linear infinite;
+}
+
 .kiosk-result {
   position: relative;
   display: flex;
@@ -4119,6 +4150,7 @@
   }
 
   .filterbar {
+    --filterbar-control-height: 48px;
     gap: 8px;
     margin-bottom: 10px;
   }
@@ -4130,26 +4162,20 @@
 
   .filterbar-groups,
   .seg {
-    height: auto;
-    min-height: 48px;
+    height: var(--filterbar-control-height);
+    min-height: var(--filterbar-control-height);
   }
 
   .wall-search {
-    height: 48px;
-    flex-basis: 48px;
-    width: 48px;
-    min-width: 48px;
     padding: 2px;
   }
 
   .filterbar--searching .filterbar-groups {
-    flex-basis: 48px;
-    width: 48px;
+    flex-basis: var(--filterbar-control-height);
+    width: var(--filterbar-control-height);
   }
 
   .filterbar-group-logo {
-    width: 48px;
-    height: 48px;
     padding: 3px;
   }
 
@@ -4193,12 +4219,25 @@
     line-height: 1.25;
   }
 
-  .tile-meta {
-    font-size: 9px;
+  /* Never hidden — the panel just tightens. Two tiles share a phone row, so
+     each macro cell gets ~35px; the figures stay legible, the labels shrink. */
+  .tile-macros {
+    height: 42px;
+    min-height: 42px;
+    margin: 7px 0 8px;
   }
 
-  .tile-macros {
-    display: none;
+  .tile-macro {
+    padding: 4px 1px;
+  }
+
+  .tile-macro b {
+    font-size: 11.5px;
+  }
+
+  .tile-macro span {
+    font-size: 7px;
+    letter-spacing: 0.05em;
   }
 
   .till .btn--add,
@@ -4290,6 +4329,7 @@
   }
 
   .kiosk-idle-veil,
+  .kiosk-submit-screen,
   .kiosk-result {
     padding: 20px;
   }
@@ -4338,6 +4378,7 @@
   .kiosk-gate .kiosk-welcome-logo,
   .kiosk-gate-orb,
   .kiosk-button-spinner,
+  .kiosk-submit-spinner,
   .kiosk-ready-check,
   .kiosk-result-card,
   .kiosk-result-order > div,

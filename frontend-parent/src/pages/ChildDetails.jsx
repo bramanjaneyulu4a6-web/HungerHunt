@@ -855,7 +855,7 @@ export default function ChildDetails() {
           {renderList(recharges, {
             empty: (
               <EmptyState icon="⚡" title="No wallet activity yet">
-                Top-ups and cancellation refunds will appear here.
+                Top-ups, order payments and cancellation refunds will appear here.
               </EmptyState>
             ),
             // Already newest-first from the server, which is what the reversed
@@ -865,18 +865,26 @@ export default function ChildDetails() {
                 <Card className="card--tight" style={{ marginBottom: 16 }}>
                   <div className="ledger-head">
                     <span>
-                      {r.kind === 'ORDER_CANCELLATION_REFUND'
-                        ? 'Cancelled Order Refund'
-                        : 'Money added'}
+                      {r.kind === 'ORDER_PAYMENT'
+                        ? 'Order payment'
+                        : r.kind === 'ORDER_CANCELLATION_REFUND'
+                          ? 'Cancelled Order Refund'
+                          : 'Money added'}
                     </span>
                     <span>{formatDate(r.date)}</span>
                   </div>
 
                   <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
                     <span>
-                      {r.kind === 'ORDER_CANCELLATION_REFUND' ? 'Refund amount' : 'Amount added'}
+                      {r.kind === 'ORDER_PAYMENT'
+                        ? 'Amount deducted'
+                        : r.kind === 'ORDER_CANCELLATION_REFUND'
+                          ? 'Refund amount'
+                          : 'Amount added'}
                     </span>
-                    <span className="amount-in">+{formatINR(r.amount)}</span>
+                    <span className={r.kind === 'ORDER_PAYMENT' ? 'amount-out' : 'amount-in'}>
+                      {r.kind === 'ORDER_PAYMENT' ? '-' : '+'}{formatINR(r.amount)}
+                    </span>
                   </div>
 
                   <div className="ledger-row">
@@ -884,7 +892,9 @@ export default function ChildDetails() {
                     <span>{formatINR(r.previousBalance)}</span>
                   </div>
 
-                  {r.kind === 'ORDER_CANCELLATION_REFUND' && r.reason && (
+                  {/* Top-ups carry no reason; a payment names its order and a
+                      refund carries what the storeroom wrote. */}
+                  {r.reason && (
                     <div className="ledger-row">
                       <span>Reason</span>
                       <span>{r.reason}</span>

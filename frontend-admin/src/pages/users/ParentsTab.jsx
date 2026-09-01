@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
 import { Badge, Banner, Button, EmptyState, Skeleton } from '../../components/ui';
@@ -13,6 +14,8 @@ const statusOf = (parent) => {
 };
 
 export default function ParentsTab({ parents, loading, onChanged }) {
+  const [searchParams] = useSearchParams();
+  const focusedParentId = searchParams.get('focus') || '';
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -68,6 +71,14 @@ export default function ParentsTab({ parents, loading, onChanged }) {
     const timer = window.setTimeout(loadStudentOptions, 250);
     return () => window.clearTimeout(timer);
   }, [formOpen, loadStudentOptions]);
+
+  useEffect(() => {
+    if (loading || !focusedParentId) return;
+    document.getElementById(`user-parent-${focusedParentId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [focusedParentId, loading, parents]);
 
   const visibleStudentOptions = useMemo(() => {
     const combined = new Map(chosenStudents);
@@ -170,10 +181,26 @@ export default function ParentsTab({ parents, loading, onChanged }) {
             <tbody>{parents.map((parent) => {
               const [status, variant] = statusOf(parent);
               return (
-                <tr key={parent.id}>
+                <tr
+                  id={`user-parent-${parent.id}`}
+                  key={parent.id}
+                  className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
+                >
                   <td data-label="Parent"><strong>{parent.fatherName}</strong></td>
                   <td data-label="Contact"><div>{parent.phone}</div><small>{parent.email}</small></td>
-                  <td data-label="Students">{(parent.students || []).map((student) => student.name).join(', ') || 'None'}</td>
+                  <td data-label="Students">
+                    {(parent.students || []).length ? (parent.students || []).map((student, index) => (
+                      <Fragment key={student.id}>
+                        {index > 0 && ', '}
+                        <Link
+                          className="user-relationship-link"
+                          to={`/users/students?focus=${encodeURIComponent(student.id)}&q=${encodeURIComponent(student.admissionNumber || student.name)}`}
+                        >
+                          {student.name}
+                        </Link>
+                      </Fragment>
+                    )) : 'None'}
+                  </td>
                   <td data-label="Status"><Badge variant={variant}>{status}</Badge></td>
                   <td data-label="Actions"><div className="cell-actions">
                     <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>

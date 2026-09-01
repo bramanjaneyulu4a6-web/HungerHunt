@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -10,15 +10,19 @@ import {
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth } from "./context/auth";
 
-import Login from "./pages/Login";
-import Activate from "./pages/Activate";
-import Dashboard from "./pages/Dashboard";
-import Accounts from "./pages/Accounts";
-import ChildDetails from "./pages/ChildDetails";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import SetPurchasePassword from "./pages/SetPurchasePassword";
-import PaymentReturn from "./pages/PaymentReturn";
+/* One chunk per screen. A parent signing in downloads the login screen and
+   nothing else; the pages behind the session arrive as they are opened. The
+   auth context, navbar and error boundary stay eager — they wrap every route
+   and there is no route that does not need them. */
+const Login = lazy(() => import("./pages/Login"));
+const Activate = lazy(() => import("./pages/Activate"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Accounts = lazy(() => import("./pages/Accounts"));
+const ChildDetails = lazy(() => import("./pages/ChildDetails"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const SetPurchasePassword = lazy(() => import("./pages/SetPurchasePassword"));
+const PaymentReturn = lazy(() => import("./pages/PaymentReturn"));
 
 import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -100,6 +104,7 @@ function AppContent() {
       {parent && <Navbar />}
 
       <main id="main-content" className="parent-main">
+        <Suspense fallback={null}>
         <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
@@ -164,6 +169,7 @@ function AppContent() {
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </main>
     </>
   );

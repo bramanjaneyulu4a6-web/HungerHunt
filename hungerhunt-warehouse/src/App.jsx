@@ -1,20 +1,25 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Icon from "./components/Icon";
-import Login from "./pages/Login";
-import Orders from "./pages/Orders";
-import Inventory from "./pages/Inventory";
-import Purchases from "./pages/Purchases";
-import Receive from "./pages/Receive";
-import Records from "./pages/Records";
-import CaretakerOrders from "./pages/CaretakerOrders";
-import CaretakerReports from "./pages/CaretakerReports";
-import CollectOrder from "./pages/CollectOrder";
 import { clearSession } from "./utils/session";
 import api from "./utils/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
+
+/* One chunk per screen, fetched when that screen is opened. A caretaker only
+   ever reaches three of these and never downloads the storeroom's; the
+   storeroom never downloads the caretaker's. ProtectedRoute, Icon and the
+   utils below stay eager — every route needs them, and they are small. */
+const Login = lazy(() => import("./pages/Login"));
+const Orders = lazy(() => import("./pages/Orders"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Purchases = lazy(() => import("./pages/Purchases"));
+const Receive = lazy(() => import("./pages/Receive"));
+const Records = lazy(() => import("./pages/Records"));
+const CaretakerOrders = lazy(() => import("./pages/CaretakerOrders"));
+const CaretakerReports = lazy(() => import("./pages/CaretakerReports"));
+const CollectOrder = lazy(() => import("./pages/CollectOrder"));
 
 /* Active work stays together; completed work and reports have their own
    destination so the live queue never has to compete with record keeping. */
@@ -226,10 +231,16 @@ const App = () => {
   return (
     <BrowserRouter>
       <Toaster position="top-center" />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<StaffRoutes />} />
-      </Routes>
+      {/* One boundary for the whole tree, including the nested routes inside
+          StaffRoutes. The fallback is a bare themed shell rather than a
+          spinner: these chunks come off the same LAN as the app itself, and a
+          flash of spinner reads worse than a beat of background. */}
+      <Suspense fallback={<div className="wh-app wh-app--single" />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<StaffRoutes />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };

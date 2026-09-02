@@ -28,6 +28,21 @@ const transitions = Object.freeze({
 
 export const canTransitionOrder = (from, to) => transitions[from]?.has(to) ?? false;
 
+// The back office may correct a package that was put in the wrong active
+// column. This is deliberately separate from the warehouse state machine:
+// storeroom accounts still advance work in sequence, while a full admin can
+// move a paid order between the three live operational states.
+export const ADMIN_EDITABLE_ORDER_STATUSES = Object.freeze([
+  OrderStatus.PENDING,
+  OrderStatus.PACKED,
+  OrderStatus.OUT_FOR_DELIVERY,
+]);
+
+export const canAdminEditOrderStatus = (from, to) =>
+  from !== to &&
+  ADMIN_EDITABLE_ORDER_STATUSES.includes(from) &&
+  ADMIN_EDITABLE_ORDER_STATUSES.includes(to);
+
 export const orderStatuses = Object.freeze(Object.values(OrderStatus));
 
 export const assertOrderTransition = (from, to) => {

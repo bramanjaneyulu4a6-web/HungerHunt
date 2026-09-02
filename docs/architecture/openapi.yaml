@@ -362,8 +362,12 @@ paths:
         '409': { description: Draft expired or was already submitted }
   /fulfillment-orders/{id}/transition:
     post:
-      summary: Advance a dorm package through packing, dispatch, or delivery
-      description: Uses an expected-state update. Cancellation is allowed only before dispatch and atomically restores wallet and stock.
+      summary: Update a dorm package through packing, dispatch, or delivery
+      description: >-
+        Uses an expected-state update. Warehouse accounts advance packages in sequence. Full
+        admins may correct a paid order between PENDING, PACKED, and OUT_FOR_DELIVERY; a rollback
+        clears timestamps for steps that are no longer reached. Cancellation is allowed only
+        before dispatch and atomically restores wallet and stock.
       operationId: transitionFulfillmentOrder
       parameters:
         - name: id
@@ -384,7 +388,7 @@ paths:
               additionalProperties: false
               required: [status]
               properties:
-                status: { type: string, enum: [PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED] }
+                status: { type: string, enum: [PENDING, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED] }
                 note: { type: string, maxLength: 200 }
                 reason: { type: string, maxLength: 200, description: Required for CANCELLED. }
                 receivedBy:

@@ -10,18 +10,25 @@ test('the paid order state is presented to admins as Confirmed, not Pending', ()
   assert.equal(fulfillmentStatusLabel('PENDING'), 'Confirmed');
 });
 
-test('a paid active order can advance through each operational status', () => {
+test('an admin can move a paid order between any active operational status', () => {
   assert.deepEqual(
     availableFulfillmentStatuses({ status: 'PENDING', paymentProcessed: true }),
-    ['PACKED']
+    ['PACKED', 'OUT_FOR_DELIVERY']
   );
   assert.deepEqual(
     availableFulfillmentStatuses({ status: 'PACKED', paymentProcessed: true }),
-    ['OUT_FOR_DELIVERY']
+    ['PENDING', 'OUT_FOR_DELIVERY']
   );
   assert.deepEqual(
     availableFulfillmentStatuses({ status: 'OUT_FOR_DELIVERY', paymentProcessed: true }),
-    ['DELIVERED']
+    ['PENDING', 'PACKED', 'DELIVERED']
+  );
+});
+
+test('the chevron remains available with an older API response that has no payment hint', () => {
+  assert.deepEqual(
+    availableFulfillmentStatuses({ status: 'PACKED' }),
+    ['PENDING', 'OUT_FOR_DELIVERY']
   );
 });
 

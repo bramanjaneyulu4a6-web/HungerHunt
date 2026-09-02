@@ -5,7 +5,7 @@ import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
-import { caretakerItemCount, filterCaretakerOrders } from '../utils/caretakerOrders';
+import { caretakerProductTotals, filterCaretakerOrders } from '../utils/caretakerOrders';
 import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 
 const HISTORY_PAGE_SIZE = 25;
@@ -87,6 +87,17 @@ const PackageLines = ({ items }) => (
       <div key={item.productId || item.name} className="wh-order-line">
         <span className="wh-order-line-name">{item.name}</span>
         <strong className="wh-order-line-qty wh-num">×{item.quantity}</strong>
+      </div>
+    ))}
+  </div>
+);
+
+const HostelOrderItems = ({ items }) => (
+  <div className="wh-hostel-items">
+    {items.map((item) => (
+      <div key={item.id}>
+        <span>{item.name}</span>
+        <strong className="wh-num">×{item.quantity}</strong>
       </div>
     ))}
   </div>
@@ -183,7 +194,7 @@ const CaretakerOrders = () => {
     STATUS_STEPS.indexOf(b.status) - STATUS_STEPS.indexOf(a.status) ||
     new Date(a.deliverBy).getTime() - new Date(b.deliverBy).getTime()
   ), [orders]);
-  const totalItems = useMemo(() => caretakerItemCount(orders), [orders]);
+  const hostelProducts = useMemo(() => caretakerProductTotals(orders), [orders]);
   const visibleOrders = useMemo(
     () => filterCaretakerOrders(currentOrders, orderSearch),
     [currentOrders, orderSearch]
@@ -217,18 +228,23 @@ const CaretakerOrders = () => {
           {loading ? <Skeleton height={240} radius={14} /> : (!loadError || orders.length > 0) ? (
             <>
               <section className="caretaker-hostel-order" aria-label="Entire hostel order summary">
-                <div>
-                  <span>Entire hostel order</span>
-                  <strong>All current packages</strong>
-                  <small>
-                    {orders.length} student {orders.length === 1 ? 'order' : 'orders'}
+                <article className="wh-hostel-tile">
+                  <div className="wh-hostel-tile-head">
+                    <div>
+                      <span className="wh-hostel-kicker">Entire hostel order</span>
+                      <h3>All current packages</h3>
+                    </div>
+                    <span className="wh-hostel-count">
+                      <strong className="wh-num">{orders.length}</strong>
+                      <small>{orders.length === 1 ? 'order' : 'orders'}</small>
+                    </span>
+                  </div>
+                  <p className="wh-remaining">
+                    {hostelProducts.length} product {hostelProducts.length === 1 ? 'type' : 'types'} being delivered
                     {awaitingCollection > 0 ? ` · ${awaitingCollection} ready for collection` : ''}
-                  </small>
-                </div>
-                <div className="caretaker-hostel-order__count">
-                  <strong className="wh-num">{totalItems}</strong>
-                  <span>{totalItems === 1 ? 'item' : 'items'}</span>
-                </div>
+                  </p>
+                  <HostelOrderItems items={hostelProducts} />
+                </article>
               </section>
 
               <section className="caretaker-student-orders" aria-labelledby="caretaker-student-orders-title">

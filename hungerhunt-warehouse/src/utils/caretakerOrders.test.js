@@ -1,23 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { caretakerItemCount, filterCaretakerOrders } from './caretakerOrders.js';
+import { caretakerProductTotals, filterCaretakerOrders } from './caretakerOrders.js';
 
 const orders = [
   {
     id: 'one',
     student: { name: 'Asha Rao', admissionNumber: '10425' },
-    items: [{ quantity: 2 }, { quantity: 3 }],
+    items: [
+      { productId: 'juice', name: 'Apple Juice', quantity: 2 },
+      { productId: 'chips', name: 'Banana Chips', quantity: 3 },
+    ],
   },
   {
     id: 'two',
     student: { name: 'Dev Kumar', admissionNumber: '20810' },
-    items: [{ quantity: 1 }],
+    items: [{ productId: 'juice', name: 'Apple Juice', quantity: 1 }],
   },
 ];
 
-test('counts every item unit in the hostel current-order summary', () => {
-  assert.equal(caretakerItemCount(orders), 6);
+test('groups the whole hostel order by product and totals each quantity', () => {
+  assert.deepEqual(caretakerProductTotals(orders), [
+    { id: 'juice', name: 'Apple Juice', quantity: 3 },
+    { id: 'chips', name: 'Banana Chips', quantity: 3 },
+  ]);
 });
 
 test('finds caretaker orders by student name without case sensitivity', () => {

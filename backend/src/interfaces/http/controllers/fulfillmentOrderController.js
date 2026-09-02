@@ -5,6 +5,7 @@ import Transaction from '../../../../models/Transaction.js';
 import { buildDeliveryReport } from '../../../domain/fulfillment/deliveryReport.js';
 import {
   OrderStatus,
+  canAdminEditOrderStatus,
   canTransitionOrder,
   orderStatuses,
 } from '../../../domain/fulfillment/orderState.js';
@@ -438,7 +439,7 @@ export const transition = async (req, res) => {
   readObjectId(req.params.id);
 
   const to = String(req.body.status || '').toUpperCase();
-  if (!orderStatuses.includes(to) || to === OrderStatus.PENDING) {
+  if (!orderStatuses.includes(to) || (to === OrderStatus.PENDING && req.staff.role !== 'admin')) {
     throw new ValidationError([{ field: 'status', message: 'Unknown transition target.' }]);
   }
   /* Only the student can finish a package, and they do it by typing their
@@ -508,7 +509,8 @@ export const transition = async (req, res) => {
       paymentProcessed: false,
     });
   }
-  if (!canTransitionOrder(current.status, to)) {
+  const adminCorrection = req.staff.role === 'admin' && canAdminEditOrderStatus(current.status, to);
+  if (!adminCorrection && !canTransitionOrder(current.status, to)) {
     throw new ConflictError(
       `Fulfilment order is ${current.status}; it cannot transition to ${to}.`,
       { currentStatus: current.status, requestedStatus: to }
@@ -516,9 +518,26 @@ export const transition = async (req, res) => {
   }
 
   const now = new Date();
-  const [timestampField, actorField] = transitionFields[to];
   const note = String(req.body.note || '').trim().slice(0, 200);
-  const set = { status: to, [timestampField]: now, [actorField]: req.staff.id };
+  const set = { status: to };
+  const transitionFieldNames = transitionFields[to];
+  if (transitionFieldNames) {
+    const [timestampField, actorField] = transitionFieldNames;
+    set[timestampField] = now;
+    set[actorField] = req.staff.id;
+  }
+
+  // Rolling work back must roll its derived timestamps back too. Counts in
+  // the warehouse are status-based and update immediately; clearing these
+  // prevents reports and parent timelines from still claiming a later step
+  // happened after the admin corrected it.
+  const unset = adminCorrection
+    ? to === OrderStatus.PENDING
+      ? { packedAt: 1, packedBy: 1, dispatchedAt: 1, dispatchedBy: 1 }
+      : to === OrderStatus.PACKED
+        ? { dispatchedAt: 1, dispatchedBy: 1 }
+        : {}
+    : {};
 
   /* Delivery is the warehouse handing the package over at the hostel. The
      receiver name and callback number come from the handoff form; the staff
@@ -536,6 +555,7 @@ export const transition = async (req, res) => {
     { _id: current._id, status: current.status },
     {
       $set: set,
+      ...(Object.keys(unset).length ? { $unset: unset } : {}),
       $push: {
         transitions: {
           from: current.status,

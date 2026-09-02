@@ -927,20 +927,10 @@
   position: sticky;
   z-index: 20;
   top: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
   margin-bottom: 18px;
-  padding: 16px 18px;
-  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--primary-bg) 55%, var(--surface));
   box-shadow: var(--shadow-raised);
 }
 
-.caretaker-hostel-order > div:first-child { display: grid; min-width: 0; }
-.caretaker-hostel-order > div:first-child > span,
 .caretaker-student-orders__heading span {
   color: var(--muted);
   font-size: 10px;
@@ -948,21 +938,6 @@
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.caretaker-hostel-order > div:first-child > strong { margin-top: 3px; color: var(--ink); font-size: 18px; }
-.caretaker-hostel-order > div:first-child > small { margin-top: 4px; color: var(--muted); font-size: 12px; }
-
-.caretaker-hostel-order__count {
-  display: grid;
-  flex: 0 0 auto;
-  min-width: 78px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: var(--primary);
-  color: var(--on-primary, white);
-  text-align: center;
-}
-.caretaker-hostel-order__count strong { font-size: 28px; line-height: 1; }
-.caretaker-hostel-order__count span { margin-top: 3px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
 
 .caretaker-student-orders {
   padding-top: 18px;

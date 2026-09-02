@@ -18,6 +18,7 @@ const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const Transaction = (await import('../models/Transaction.js')).default;
 const StaffReport = (await import('../models/StaffReport.js')).default;
 const { signStaffToken, signParentToken } = await import('../utils/tokens.js');
 const {
@@ -63,6 +64,7 @@ afterEach(() => mock.restoreAll());
 beforeEach(() => {
   mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+  mock.method(Transaction, 'exists', async () => ({ _id: TRANSACTION_ID }));
 });
 
 // One stand-in for every chain these controllers build: find().sort().skip()

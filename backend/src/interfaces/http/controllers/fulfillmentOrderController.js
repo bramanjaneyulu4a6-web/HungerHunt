@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
+import Transaction from '../../../../models/Transaction.js';
 import { buildDeliveryReport } from '../../../domain/fulfillment/deliveryReport.js';
 import {
   OrderStatus,
@@ -62,6 +63,10 @@ const serialize = (order, { includeMoney = true } = {}) => ({
     : order.items.map(({ productId, name, quantity }) => ({ productId, name, quantity })),
   ...(includeMoney ? { totalAmount: order.totalAmount } : {}),
   status: order.status,
+  // A fulfilment order is normally created in the same successful checkout as
+  // this ledger row. Exposing the result keeps clients from treating a legacy
+  // or damaged orphan as permission to move goods.
+  paymentProcessed: Boolean(order.paymentProcessed ?? order.transactionId),
   businessWeekStart: order.businessWeekStart,
   orderedAt: order.orderedAt,
   deliverBy: order.deliverBy,
@@ -497,6 +502,12 @@ export const transition = async (req, res) => {
 
   const current = await FulfillmentOrder.findById(req.params.id).lean();
   if (!current) throw new NotFoundError('Fulfilment order');
+  if (!current.transactionId || !(await Transaction.exists({ _id: current.transactionId }))) {
+    throw new ConflictError('Payment has not been processed for this order, so its status cannot be changed.', {
+      currentStatus: current.status,
+      paymentProcessed: false,
+    });
+  }
   if (!canTransitionOrder(current.status, to)) {
     throw new ConflictError(
       `Fulfilment order is ${current.status}; it cannot transition to ${to}.`,

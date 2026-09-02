@@ -3,7 +3,12 @@ import toast from 'react-hot-toast';
 
 import api from '../utils/api';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
+import Icon from '../components/Icon';
 import { formatINR } from '../utils/format';
+import {
+  availableFulfillmentStatuses,
+  fulfillmentStatusLabel,
+} from '../utils/fulfillmentStatus';
 
 const CANCELLABLE = new Set(['PENDING', 'PACKED']);
 const HISTORY_PAGE_SIZE = 50;
@@ -24,13 +29,22 @@ const cancellationKey = (orderId) => {
   return `admin-cancel-${orderId}-${nonce}`;
 };
 
-const OrdersLedger = ({ orders, expanded, onExpand, onCancel, history = false }) => (
+const OrdersLedger = ({
+  orders,
+  expanded,
+  onExpand,
+  onCancel,
+  onStatusChange,
+  statusMenu,
+  onStatusMenu,
+  history = false,
+}) => (
   <Card className="warehouse-ledger-card fulfillment-ledger">
     <div className="fulfillment-ledger__summary">
       <div><strong>{orders.length}</strong><span>{history ? 'orders on this page' : 'active orders'}</span></div>
       <p>{history
         ? 'Completed and cancelled packages are listed newest first.'
-        : 'Only pending and packed orders can be cancelled. Dispatched packages must complete delivery.'}</p>
+        : 'Update paid orders as they move from confirmed through delivery. Confirmed and packed orders can be cancelled.'}</p>
     </div>
     <div className="table-wrap">
       <table className="table table--stack table--hover">
@@ -42,8 +56,10 @@ const OrdersLedger = ({ orders, expanded, onExpand, onCancel, history = false })
           </tr>
         </thead>
         <tbody>
-          {orders.map((order) => (
-            <Fragment key={order.id}>
+          {orders.map((order) => {
+            const availableStatuses = availableFulfillmentStatuses(order);
+            return (
+              <Fragment key={order.id}>
               <tr>
                 <td data-label="Order"><strong>{orderNumber(order)}</strong></td>
                 <td data-label="Student">
@@ -57,7 +73,37 @@ const OrdersLedger = ({ orders, expanded, onExpand, onCancel, history = false })
                 <td data-label="Placed">{new Date(order.orderedAt).toLocaleString()}</td>
                 <td data-label="Total"><strong>{formatINR(order.totalAmount)}</strong></td>
                 <td data-label="Status">
-                  <Badge variant={badgeFor(order.status)}>{order.status.replaceAll('_', ' ')}</Badge>
+                  {!history && availableStatuses.length > 0 ? (
+                    <div className="fulfillment-status-picker">
+                      <button
+                        type="button"
+                        className="fulfillment-status-trigger"
+                        aria-haspopup="menu"
+                        aria-expanded={statusMenu === order.id}
+                        aria-label={`Change status for ${orderNumber(order)}. Current status: ${fulfillmentStatusLabel(order.status)}`}
+                        onClick={() => onStatusMenu(statusMenu === order.id ? null : order.id)}
+                      >
+                        <Badge variant={badgeFor(order.status)}>{fulfillmentStatusLabel(order.status)}</Badge>
+                        <Icon name="caret" size={14} />
+                      </button>
+                      {statusMenu === order.id && (
+                        <div className="fulfillment-status-menu" role="menu">
+                          {availableStatuses.map((status) => (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              key={status}
+                              onClick={() => onStatusChange(order, status)}
+                            >
+                              Mark as {fulfillmentStatusLabel(status)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Badge variant={badgeFor(order.status)}>{fulfillmentStatusLabel(order.status)}</Badge>
+                  )}
                 </td>
                 <td data-label="Actions">
                   <div className="fulfillment-actions">
@@ -107,8 +153,9 @@ const OrdersLedger = ({ orders, expanded, onExpand, onCancel, history = false })
                   </td>
                 </tr>
               )}
-            </Fragment>
-          ))}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -129,6 +176,11 @@ export default function FulfillmentOrders() {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  const [statusMenu, setStatusMenu] = useState(null);
+  const [statusChange, setStatusChange] = useState(null);
+  const [statusError, setStatusError] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
   const cancellationKeyRef = useRef('');
 
   const loadActive = useCallback(async () => {
@@ -173,10 +225,59 @@ export default function FulfillmentOrders() {
   }, [historyPage, loadActive, loadHistory, view]);
 
   const openCancellation = (order) => {
+    setStatusMenu(null);
     cancellationKeyRef.current = cancellationKey(order.id);
     setCancelling(order);
     setReason('');
     setCancelError('');
+  };
+
+  const openStatusChange = (order, status) => {
+    setStatusMenu(null);
+    setStatusChange({ order, status });
+    setStatusError('');
+    setReceivedBy('');
+    setReceiverPhone('');
+  };
+
+  const closeStatusChange = () => {
+    if (saving) return;
+    setStatusChange(null);
+    setStatusError('');
+  };
+
+  const changeStatus = async (event) => {
+    event.preventDefault();
+    if (!statusChange) return;
+
+    const { order, status } = statusChange;
+    const body = { status };
+    if (status === 'DELIVERED') {
+      body.receivedBy = receivedBy.trim();
+      body.receiverPhone = receiverPhone.trim();
+    }
+
+    setSaving(true);
+    setStatusError('');
+    try {
+      const response = await api.post(`/v1/fulfillment-orders/${order.id}/transition`, body);
+      const updated = response.data.data;
+      setOrders((current) => status === 'DELIVERED'
+        ? current.filter((item) => item.id !== order.id)
+        : current.map((item) => item.id === order.id ? updated : item));
+      setExpanded((current) => status === 'DELIVERED' && current === order.id ? null : current);
+      toast.success(`${orderNumber(order)} is now ${fulfillmentStatusLabel(status).toLowerCase()}.`);
+      setStatusChange(null);
+    } catch (error) {
+      console.error(error);
+      setStatusError(
+        error.response?.data?.message ||
+        error.response?.data?.error?.message ||
+        'The status could not be changed. It may have already been updated.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const closeCancellation = () => {
@@ -260,6 +361,9 @@ export default function FulfillmentOrders() {
             expanded={expanded}
             onExpand={setExpanded}
             onCancel={openCancellation}
+            onStatusChange={openStatusChange}
+            statusMenu={statusMenu}
+            onStatusMenu={setStatusMenu}
             history={view === 'history'}
           />
           {view === 'history' && historyPages > 1 && (
@@ -305,6 +409,65 @@ export default function FulfillmentOrders() {
               <Button variant="ghost" disabled={saving} onClick={closeCancellation}>Keep order</Button>
               <Button type="submit" variant="danger" disabled={saving || !reason.trim()}>
                 {saving ? 'Cancelling…' : 'Cancel and refund'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {statusChange && (
+        <div className="modal-backdrop" onClick={closeStatusChange}>
+          <form
+            className="modal fulfillment-status-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="change-order-status-title"
+            onSubmit={changeStatus}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="modal-title" id="change-order-status-title">
+              Change status to {fulfillmentStatusLabel(statusChange.status)}?
+            </h2>
+            <p className="fulfillment-cancel-copy">
+              {orderNumber(statusChange.order)} will move from {fulfillmentStatusLabel(statusChange.order.status).toLowerCase()} to {fulfillmentStatusLabel(statusChange.status).toLowerCase()}.
+            </p>
+            {statusChange.status === 'DELIVERED' && (
+              <div className="fulfillment-delivery-fields">
+                <label htmlFor="fulfillment-received-by">
+                  <span className="field-label">Received by</span>
+                  <input
+                    id="fulfillment-received-by"
+                    className="input"
+                    maxLength="60"
+                    autoFocus
+                    required
+                    value={receivedBy}
+                    placeholder="Name or hostel role"
+                    onChange={(event) => setReceivedBy(event.target.value)}
+                  />
+                </label>
+                <label htmlFor="fulfillment-receiver-phone">
+                  <span className="field-label">Receiver phone</span>
+                  <input
+                    id="fulfillment-receiver-phone"
+                    className="input"
+                    inputMode="tel"
+                    required
+                    value={receiverPhone}
+                    placeholder="10-digit phone number"
+                    onChange={(event) => setReceiverPhone(event.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+            {statusError && <Banner variant="alert" icon="⚠️">{statusError}</Banner>}
+            <div className="modal-actions fulfillment-cancel-actions">
+              <Button variant="ghost" disabled={saving} onClick={closeStatusChange}>Keep current status</Button>
+              <Button
+                type="submit"
+                disabled={saving || (statusChange.status === 'DELIVERED' && (!receivedBy.trim() || !receiverPhone.trim()))}
+              >
+                {saving ? 'Updating…' : 'Confirm status change'}
               </Button>
             </div>
           </form>

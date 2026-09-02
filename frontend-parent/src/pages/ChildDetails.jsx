@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
 import { formatINR } from '../utils/format';
 import {
   AnimateIn,
@@ -15,9 +16,12 @@ import Icon from '../components/Icon';
 import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
 import DemoUpiCheckout from '../components/DemoUpiCheckout';
+import WalletDialog from '../components/WalletDialog';
+import StatusToggleTile from '../components/StatusToggleTile';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
 import { demoAmountProblem } from '../utils/demoUpi';
+import { tick } from '../utils/haptics';
 import { createTopup, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
 
 const BASE_TABS = [
@@ -26,6 +30,9 @@ const BASE_TABS = [
 ];
 
 const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
+
+// How long a wallet tile stays pressed after its sheet closes.
+const TILE_PRESS_HOLD_MS = 200;
 
 // Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
 // same language wherever a payment lands.
@@ -232,7 +239,23 @@ export default function ChildDetails() {
   const [walletLimit, setWalletLimit] = useState(500);
   const [walletType, setWalletType] = useState('WEEKLY');
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
+  // null | 'topup' | 'control' — which of the two wallet actions is open.
+  const [walletDialog, setWalletDialog] = useState(null);
+  /* Which tile is drawn pressed. It trails `walletDialog` rather than mirroring
+     it: the sheet lifts off a screen the parent has not looked at in a while,
+     and releasing the tile in the same frame gives them nothing to land on.
+     Holding it a moment lets the tile they came out of be the first thing they
+     see, then let go. */
+  const [pressedTile, setPressedTile] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Only the release is deferred — the press itself lands with the tap, in
+  // openWalletDialog below. Reopening either tile cancels a pending release.
+  useEffect(() => {
+    if (walletDialog) return undefined;
+    const timer = window.setTimeout(() => setPressedTile(null), TILE_PRESS_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [walletDialog]);
 
   const [approvalRequired, setApprovalRequired] = useState(false);
   const [approvalSaving, setApprovalSaving] = useState(false);
@@ -339,14 +362,22 @@ export default function ChildDetails() {
 
     // The balance shown here changes with every purchase and top-up made
     // elsewhere, so it is refreshed on a push and on returning to the app —
-    // this screen used to sit on whatever it loaded on arrival.
-    window.addEventListener(PUSH_EVENT, load);
-    window.addEventListener('focus', load);
+    // this screen used to sit on whatever it loaded on arrival. It waits on
+    // an open payment sheet, which this load would otherwise unmount by
+    // refreshing the paid order out of the pending list below.
+    const refresh = () => {
+      if (claimBackgroundRefresh()) load();
+    };
+
+    window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    const stopWaitingOnPayment = onBackgroundRefreshResumed(load);
 
     return () => {
       ignore = true;
-      window.removeEventListener(PUSH_EVENT, load);
-      window.removeEventListener('focus', load);
+      window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+      stopWaitingOnPayment();
     };
   }, [id, attempt]);
 
@@ -504,6 +535,86 @@ export default function ChildDetails() {
       // The payment already applied server-side. A push or the next
       // foreground refresh will catch up if this follow-up read fails.
     }
+  };
+
+  /* The spending limit, wherever it is asked for. It reads and writes the
+     page's own wallet state, so the dialog that shows it stays a shell. */
+  const renderWalletControl = () => (
+    <>
+      {walletBanner.message && (
+        <Banner
+          variant={walletBanner.type === 'error' ? 'alert' : 'success'}
+          icon={walletBanner.type === 'error' ? '⚠️' : '✅'}
+          style={{ marginBottom: 20 }}
+        >
+          {walletBanner.message}
+        </Banner>
+      )}
+
+      <StatusToggleTile
+        label="Spending limit"
+        value={walletEnabled}
+        disabled={saving}
+        onTap={() => setWalletEnabled(!walletEnabled)}
+        activeLabel="On"
+        inactiveLabel="Off"
+        activeIcon={<Icon name="shield" size={24} />}
+        inactiveIcon={<Icon name="wallet" size={24} />}
+        activeDescription={`Wallet spending is capped for ${student.name}. Set the amount and period below.`}
+        inactiveDescription={`${student.name} can spend the whole balance. Tap to set a limit.`}
+      />
+
+      <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
+        <div>
+          <label className="field-label" htmlFor="wallet-limit">
+            Limit Amount (₹)
+          </label>
+          <input
+            id="wallet-limit"
+            className={`input${walletBanner.type === 'error' ? ' field-has-error' : ''}`}
+            type="number"
+            min="0"
+            value={walletLimit}
+            disabled={!walletEnabled || saving}
+            onChange={(e) => setWalletLimit(Number(e.target.value))}
+            placeholder="Enter amount"
+            aria-invalid={walletBanner.type === 'error'}
+            aria-describedby={walletBanner.type === 'error' ? 'wallet-limit-error' : undefined}
+          />
+          {walletBanner.type === 'error' && walletBanner.message === 'Enter a spending limit greater than ₹0.' && (
+            <InlineFieldError id="wallet-limit-error">{walletBanner.message}</InlineFieldError>
+          )}
+        </div>
+
+        <div>
+          <label className="field-label" htmlFor="wallet-frequency">
+            Frequency
+          </label>
+          <select
+            id="wallet-frequency"
+            className="select"
+            value={walletType}
+            disabled={!walletEnabled || saving}
+            onChange={(e) => setWalletType(e.target.value)}
+          >
+            <option value="DAILY">Daily</option>
+            <option value="WEEKLY">Weekly</option>
+            <option value="MONTHLY">Monthly</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Disabled while in flight so the limit cannot be submitted twice. */}
+      <Button block onClick={saveWalletControl} disabled={saving}>
+        {saving ? 'Saving…' : 'Save wallet control'}
+      </Button>
+    </>
+  );
+
+  const openWalletDialog = async (which) => {
+    await tick();
+    setPressedTile(which);
+    setWalletDialog(which);
   };
 
   const setQuickTopupAmount = (amount) => {
@@ -750,30 +861,72 @@ export default function ChildDetails() {
                 Paid orders will appear here with live delivery updates.
               </EmptyState>
             ),
-            children: fulfillmentOrders.items.map((item, i) => (
-              <AnimateIn key={item.id} index={i}>
-                <OrderCard order={item} index={i} showAllOrdersLink={false} />
-              </AnimateIn>
-            )),
+            children: (
+              <div className="order-list">
+                {fulfillmentOrders.items.map((item, i) => (
+                  <AnimateIn key={item.id} index={i}>
+                    <OrderCard order={item} index={i} showAllOrdersLink={false} />
+                  </AnimateIn>
+                ))}
+              </div>
+            ),
           })}
         </div>
       )}
 
       {activeTab === 'wallet' && (
         <div role="tabpanel" id="panel-wallet" aria-labelledby="tab-wallet" tabIndex={0}>
-          {(PAYMENTS_ENABLED || DEMO_UPI_ENABLED) && (
-          <Card style={{ marginBottom: 24 }}>
-            <div className="demo-topup-heading">
-              <h2 className="section-title" style={{ fontSize: 20 }}>
-                Add money
-              </h2>
-            </div>
-            <p style={{ marginTop: 4, marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-              {!DEMO_UPI_ENABLED && PAYMENTS_ENABLED
-                ? `Top up ${student.name}'s wallet by UPI.`
-                : `Choose an amount to add to ${student.name}'s wallet using UPI.`}
-            </p>
+          <div className="wallet-actions">
+            {(PAYMENTS_ENABLED || DEMO_UPI_ENABLED) && (
+              <button
+                type="button"
+                className={`wallet-action${pressedTile === 'topup' ? ' wallet-action--on' : ''}`}
+                aria-haspopup="dialog"
+                aria-expanded={walletDialog === 'topup'}
+                onClick={() => openWalletDialog('topup')}
+              >
+                <span className="wallet-action__icon" aria-hidden="true">
+                  <Icon name="plus" size={22} />
+                </span>
+                <strong>Add money to wallet</strong>
+                <small>Top up {student.name}&apos;s balance by UPI.</small>
+              </button>
+            )}
 
+            <button
+              type="button"
+              className={`wallet-action wallet-action--control${pressedTile === 'control' ? ' wallet-action--on' : ''}`}
+              aria-haspopup="dialog"
+              aria-expanded={walletDialog === 'control'}
+              onClick={() => openWalletDialog('control')}
+            >
+              <span className="wallet-action__icon" aria-hidden="true">
+                <Icon name="shield" size={22} />
+              </span>
+              <strong>Wallet control</strong>
+              <small>
+                {walletEnabled
+                  ? `${formatINR(walletLimit)} ${walletType.toLowerCase()} spending limit.`
+                  : 'No spending limit set.'}
+              </small>
+            </button>
+          </div>
+
+          {walletDialog === 'topup' && (
+          <WalletDialog
+            eyebrow="Wallet"
+            title="Add money"
+            description={
+              !DEMO_UPI_ENABLED && PAYMENTS_ENABLED
+                ? `Top up ${student.name}'s wallet by UPI.`
+                : `Choose an amount to add to ${student.name}'s wallet using UPI.`
+            }
+            /* The UPI checkout opens on top of this dialog and this one waits
+               underneath for the receipt — so while it is up, this sheet is
+               not the one Escape or a backdrop click should be closing. */
+            busy={demoCheckoutOpen}
+            onClose={() => setWalletDialog(null)}
+          >
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               {QUICK_TOPUP_AMOUNTS.map((amount) => (
                 <Button
@@ -838,7 +991,19 @@ export default function ChildDetails() {
                 Payment completed with {demoPaymentResult.provider}.
               </Banner>
             )}
-          </Card>
+          </WalletDialog>
+          )}
+
+          {walletDialog === 'control' && (
+            <WalletDialog
+              eyebrow="Wallet"
+              title="Wallet control"
+              description={`Cap what ${student.name} can spend from the wallet over a set period.`}
+              busy={saving}
+              onClose={() => setWalletDialog(null)}
+            >
+              {renderWalletControl()}
+            </WalletDialog>
           )}
 
           {demoCheckoutOpen && (
@@ -949,76 +1114,6 @@ export default function ChildDetails() {
             </p>
           </Card>
 
-          <Card className="settings-card">
-            <h2 className="section-title" style={{ fontSize: 20 }}>
-              Wallet Control
-            </h2>
-
-            {walletBanner.message && (
-              <Banner
-                variant={walletBanner.type === 'error' ? 'alert' : 'success'}
-                icon={walletBanner.type === 'error' ? '⚠️' : '✅'}
-                style={{ marginBottom: 20 }}
-              >
-                {walletBanner.message}
-              </Banner>
-            )}
-
-            <label className="checkbox-row" style={{ marginBottom: 20 }}>
-              <input
-                type="checkbox"
-                checked={walletEnabled}
-                disabled={saving}
-                onChange={(e) => setWalletEnabled(e.target.checked)}
-              />
-              Enable Spending Limit
-            </label>
-
-            <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
-              <div>
-                <label className="field-label" htmlFor="wallet-limit">
-                  Limit Amount (₹)
-                </label>
-                <input
-                  id="wallet-limit"
-                  className={`input${walletBanner.type === 'error' ? ' field-has-error' : ''}`}
-                  type="number"
-                  min="0"
-                  value={walletLimit}
-                  disabled={!walletEnabled || saving}
-                  onChange={(e) => setWalletLimit(Number(e.target.value))}
-                  placeholder="Enter amount"
-                  aria-invalid={walletBanner.type === 'error'}
-                  aria-describedby={walletBanner.type === 'error' ? 'wallet-limit-error' : undefined}
-                />
-                {walletBanner.type === 'error' && walletBanner.message === 'Enter a spending limit greater than ₹0.' && (
-                  <InlineFieldError id="wallet-limit-error">{walletBanner.message}</InlineFieldError>
-                )}
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="wallet-frequency">
-                  Frequency
-                </label>
-                <select
-                  id="wallet-frequency"
-                  className="select"
-                  value={walletType}
-                  disabled={!walletEnabled || saving}
-                  onChange={(e) => setWalletType(e.target.value)}
-                >
-                  <option value="DAILY">Daily</option>
-                  <option value="WEEKLY">Weekly</option>
-                  <option value="MONTHLY">Monthly</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Disabled while in flight so the limit cannot be submitted twice. */}
-            <Button onClick={saveWalletControl} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Wallet Control'}
-            </Button>
-          </Card>
           </div>
         </div>
       )}

@@ -23,6 +23,10 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SetPurchasePassword = lazy(() => import("./pages/SetPurchasePassword"));
 const PaymentReturn = lazy(() => import("./pages/PaymentReturn"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
+const ShippingPolicy = lazy(() => import("./pages/ShippingPolicy"));
+const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 
 import Navbar from "./components/Navbar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -51,6 +55,10 @@ const pageTitle = (pathname) => {
   if (pathname === '/forgot-password') return 'Forgot password';
   if (pathname.startsWith('/reset-password/')) return 'Reset password';
   if (pathname === '/payment-return') return 'Payment';
+  if (pathname === '/privacy-policy') return 'Privacy Policy';
+  if (pathname === '/refund-policy') return 'Refund Policy';
+  if (pathname === '/shipping-policy') return 'Shipping Policy';
+  if (pathname === '/terms-and-conditions') return 'Terms and Conditions';
   return 'Dashboard';
 };
 
@@ -114,6 +122,10 @@ function AppContent() {
         {/* A reset link may be opened while another session is still present;
             it must remain usable so the token can close those old sessions. */}
         <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/shipping-policy" element={<ShippingPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
 
         {/* Protected Routes */}
         <Route

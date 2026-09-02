@@ -51,9 +51,15 @@ export default function Login() {
       title="Parent Login"
       subtitle="Enter your phone number and password to access your account"
       footer={
-        <>
-          Have a school-issued code? <Link to="/activate">Activate account</Link>
-        </>
+        <span className="auth-footer-stack">
+          <span>Have a school-issued code? <Link to="/activate">Activate account</Link></span>
+          <span className="auth-policy-links">
+            <Link to="/terms-and-conditions">Terms</Link>
+            <Link to="/privacy-policy">Privacy</Link>
+            <Link to="/refund-policy">Refunds</Link>
+            <Link to="/shipping-policy">Shipping</Link>
+          </span>
+        </span>
       }
     >
       {expired && !error && (

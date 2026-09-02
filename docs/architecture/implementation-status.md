@@ -114,16 +114,6 @@ Updated: 2026-08-27
   to an installed UPI app, but that hand-off has only run on Android. It has
   never been built and run on a physical iPhone, and the iOS Simulator cannot
   install a UPI app to test against in the first place.
-- **Two route-registration lines are deliberately uncommitted** in the
-  working tree: the `paymentRoutes` import and `app.use('/api/payments',
-  paymentRoutes)` in `backend/app.js`, and the `/payment-return` route in
-  `frontend-parent/src/App.jsx`. Both files are mid-refactor for unrelated
-  work (the admin activation flow and the `/api/v1` mount restructuring), so
-  wiring the payment routes into them was left for that refactor to land
-  first rather than committed underneath it. Until those two lines are
-  committed, `POST /api/payments/intents` and its siblings exist in the
-  repository but nothing serves them, and PhonePe's checkout would have
-  nowhere to redirect back to.
 - **Not live.** The feature is sandbox-ready, not production-ready: going
   live needs PhonePe Business production credentials, the production webhook
   URL registered on the PhonePe dashboard, `PHONEPE_ENV=production` set, and

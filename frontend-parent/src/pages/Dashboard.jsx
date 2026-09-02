@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
 import { AnimateIn, Banner, EmptyState, PageHeader, Skeleton, Card } from '../components/ui';
 import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
@@ -57,13 +58,22 @@ export default function Dashboard() {
       }
     };
 
+    // Not while a payment sheet is open: this list is what the sheet is
+    // mounted inside, so refreshing a paid order out of it would take the
+    // confirmation with it. Deferred to the moment the payment is done.
+    const refresh = () => {
+      if (claimBackgroundRefresh()) load();
+    };
+
     load();
-    window.addEventListener(PUSH_EVENT, load);
-    window.addEventListener('focus', load);
+    window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    const stopWaitingOnPayment = onBackgroundRefreshResumed(load);
     return () => {
       ignore = true;
-      window.removeEventListener(PUSH_EVENT, load);
-      window.removeEventListener('focus', load);
+      window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+      stopWaitingOnPayment();
     };
   }, [attempt]);
 

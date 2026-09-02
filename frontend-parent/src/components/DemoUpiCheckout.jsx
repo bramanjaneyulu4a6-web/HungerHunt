@@ -1,29 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatINR } from '../utils/format';
 import { DEMO_UPI_PROVIDERS, makeUpiReference } from '../utils/demoUpi';
+import { PaymentMark, PaymentProcessingStage, PaymentSuccessStage } from './PaymentStage';
 
 const PROCESSING_MS = 1700;
 
-/* `providerId` is for the caller that has already asked which UPI app to use —
-   the order chooser lists them itself, so arriving here to be asked a second
-   time would be the same question twice. Given one, this opens straight into
-   processing. Left out, it opens on its own picker, which is what the wallet
-   top-up does: there is no earlier sheet in that flow to have chosen in. */
+/* The wallet top-up checkout: there is no earlier sheet in that flow to have
+   chosen a UPI app in, so this one opens on its own picker and carries the
+   payment through to its receipt. The order flow asks and confirms inside its
+   own payment sheet instead — see PaymentMethodChooser. */
 export default function DemoUpiCheckout({
   amount,
   studentName,
   purposeLabel = 'Wallet top-up',
-  providerId: chosenProviderId = null,
-  instantConfirm = false,
-  autoFinishMs = null,
-  successTitle = 'Payment successful',
   onClose,
   onComplete,
 }) {
-  const [providerId, setProviderId] = useState(chosenProviderId || 'gpay');
-  const [stage, setStage] = useState(
-    instantConfirm ? 'success' : chosenProviderId ? 'processing' : 'choose'
-  );
+  const [providerId, setProviderId] = useState('gpay');
+  const [stage, setStage] = useState('choose');
   const [reference] = useState(makeUpiReference);
   const closeButtonRef = useRef(null);
   const finishedRef = useRef(false);
@@ -32,14 +27,12 @@ export default function DemoUpiCheckout({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    if (instantConfirm) document.body.classList.add('upi-confirmation-open');
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      if (instantConfirm) document.body.classList.remove('upi-confirmation-open');
     };
-  }, [instantConfirm]);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -62,19 +55,10 @@ export default function DemoUpiCheckout({
     onComplete({ provider: provider.name, reference });
   }, [onClose, onComplete, provider.name, reference]);
 
-  useEffect(() => {
-    if (stage !== 'success' || !autoFinishMs) return undefined;
-    const timer = window.setTimeout(finish, autoFinishMs);
-    return () => window.clearTimeout(timer);
-  }, [autoFinishMs, finish, stage]);
-
-  return (
-    <div
-      className={`upi-demo-overlay${instantConfirm ? ' upi-demo-overlay--confirmation' : ''}`}
-      role="presentation"
-    >
+  return createPortal(
+    <div className="upi-demo-overlay" role="presentation">
       <section
-        className={`upi-demo-sheet${instantConfirm ? ' upi-demo-sheet--confirmation' : ''}`}
+        className="upi-demo-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="upi-demo-title"
@@ -155,41 +139,26 @@ export default function DemoUpiCheckout({
         )}
 
         {stage === 'processing' && (
-          <div className="upi-demo-state" aria-live="polite">
-            <div className="upi-demo-processing" aria-hidden="true">
-              <span className="upi-demo-provider-mark" style={{ '--provider-color': provider.color, '--provider-tint': provider.tint }}>
-                {provider.mark}
-              </span>
-              <span className="upi-demo-spinner" />
-            </div>
-            <span className="upi-demo-badge">Payment in progress</span>
-            <h2 id="upi-demo-title">Opening {provider.name}…</h2>
-            <p>Waiting for confirmation from your UPI app. Please wait.</p>
-            <strong className="upi-demo-state-amount">{formatINR(amount)}</strong>
-          </div>
+          <PaymentProcessingStage
+            mark={<PaymentMark color={provider.color} tint={provider.tint}>{provider.mark}</PaymentMark>}
+            title={`Opening ${provider.name}…`}
+            message="Waiting for confirmation from your UPI app. Please wait."
+            amount={amount}
+            titleId="upi-demo-title"
+          />
         )}
 
         {stage === 'success' && (
-          <div className="upi-demo-state upi-demo-state--success" aria-live="polite">
-            <div className="upi-demo-success-mark" aria-hidden="true">
-              <span>✓</span>
-              {[0, 1, 2, 3, 4, 5].map((dot) => <i key={dot} style={{ '--dot': dot }} />)}
-            </div>
-            <span className="upi-demo-badge upi-demo-badge--success">Payment complete</span>
-            <h2 id="upi-demo-title">{successTitle}</h2>
-            <p>Your {purposeLabel.toLowerCase()} of {formatINR(amount)} was completed with {provider.name}.</p>
-            <div className="upi-demo-receipt">
-              <span>UPI reference number</span>
-              <strong>{reference}</strong>
-            </div>
-            {!autoFinishMs && (
-              <button type="button" className="upi-demo-pay" onClick={finish}>
-                Done
-              </button>
-            )}
-          </div>
+          <PaymentSuccessStage
+            title="Payment successful"
+            message={`Your ${purposeLabel.toLowerCase()} of ${formatINR(amount)} was completed with ${provider.name}.`}
+            receipt={{ label: 'UPI reference number', value: reference }}
+            titleId="upi-demo-title"
+            onDone={finish}
+          />
         )}
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }

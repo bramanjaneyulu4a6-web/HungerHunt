@@ -21,13 +21,6 @@ body {
 
 /* Demo UPI checkout --------------------------------------------------- */
 
-.demo-topup-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .upi-demo-overlay {
   position: fixed;
   inset: 0;
@@ -41,27 +34,280 @@ body {
   animation: upi-demo-fade 180ms ease-out both;
 }
 
-/* Order-demo confirmation is a compact card over the dashboard, not another
-   full-screen surface. Do not put backdrop-filter on this ancestor: some
-   WebViews composite that filter through the child card as well. #root below
-   owns the blur, while this portaled subtree stays entirely unfiltered. */
-.upi-demo-overlay.upi-demo-overlay--confirmation {
-  z-index: 1000;
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  -webkit-filter: none;
-  filter: none;
+/* Every payment surface blurs the page the same way: `backdrop-filter` on the
+   overlay, which samples only what is painted behind it. Never blur an
+   ancestor of a sheet with `filter` instead — that applies to the whole
+   subtree, so the sheet comes out blurred along with the page. Both overlays
+   are portaled to <body> so no filtered ancestor can reach them either. */
+
+/* The wallet's two actions, sat above the activity list. Big enough to be the
+   first thing read on the tab, and each carrying the state it opens onto —
+   what the limit currently is, whose balance is being topped up — so the
+   parent knows what they are about to change before they tap. */
+.wallet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 26px;
 }
 
-/* Backdrop filters alone do not consistently include fixed/sticky compositing
-   layers in every WebView. The checkout is portaled beside #root, so filtering
-   the app root guarantees that navigation, selectors and page content all blur
-   while the confirmation itself stays crisp. */
-body.upi-confirmation-open #root {
-  filter: blur(12px) saturate(0.86);
-  pointer-events: none;
-  user-select: none;
+/* Same press as the status toggle, and for the same reason: these tiles are
+   buttons that stay engaged. A tile is "on" for exactly as long as its sheet
+   is open, so it presses in as the sheet arrives and lifts back out when the
+   parent returns to this screen — the row itself says which one they were
+   just in. Each tile keeps its own accent so the two stay distinguishable. */
+.wallet-action {
+  --tile-accent: #187744;
+  --tile-cast: 150, 132, 110;
+
+  display: block;
+  padding: 20px 18px;
+  border: 1px solid var(--parent-line);
+  border-radius: 22px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 4.8px 4.8px 15.2px 0.7px rgba(var(--tile-cast), 0.2);
+  transition:
+    background-color 240ms linear,
+    border-color 240ms linear,
+    box-shadow 240ms linear,
+    transform 150ms ease;
+}
+
+.wallet-action--control {
+  --tile-accent: #a4611c;
+}
+
+/* Raised further under the cursor, but only while there is still somewhere to
+   rise from — a tile whose sheet is open is pressed and stays pressed. */
+.wallet-action:not(.wallet-action--on):hover {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 18px 0.7px rgba(var(--tile-cast), 0.26);
+}
+
+/* The press lands under the finger, before the sheet has had time to open. */
+.wallet-action:active {
+  transform: translateY(0);
+  box-shadow: 1.5px 1.5px 4.8px 0 rgba(var(--tile-cast), 0.1);
+}
+
+.wallet-action--on {
+  background: color-mix(in srgb, var(--tile-accent) 10%, #fff);
+  border-color: color-mix(in srgb, var(--tile-accent) 28%, transparent);
+  box-shadow: 1.5px 1.5px 4.8px 0 rgba(var(--tile-cast), 0.1);
+}
+
+.wallet-action strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--parent-ink);
+  font-size: 16px;
+  letter-spacing: -0.3px;
+}
+
+.wallet-action small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.wallet-action__icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 14px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--tile-accent) 12%, transparent);
+  color: var(--tile-accent);
+  transition: background-color 240ms linear;
+}
+
+.wallet-action--on .wallet-action__icon {
+  background: color-mix(in srgb, var(--tile-accent) 18%, transparent);
+}
+
+/* Status toggle tile ---------------------------------------------------
+
+   A card that is itself the switch: raised above the page when off, settled
+   into it when on. Translated from a grayscale soft-UI spec onto this app's
+   warm palette — the greys became the cream ramp and the cast shadow a warm
+   taupe.
+
+   The original recipe modelled the card with two outward shadows, a dark cast
+   down-right and a white highlight up-left, and that pairing needs a ground
+   darker than the card. On this app's white sheets the white half has nothing
+   to fall on, so the raise is carried by the cast shadow alone: it drops from
+   a 15.2px blur at (4.8, 4.8) to a 4.8px blur at (1.5, 1.5) when pressed, and
+   interpolating that loss of altitude over 240ms is the whole effect. */
+
+.status-toggle {
+  /* Green rather than the brand orange: on this tile the accent is what says
+     the limit is on, and green is what says so everywhere else in the app —
+     the wallet chip, the add-money tile, the payment confirmation. */
+  --toggle-accent: #187744;
+  --toggle-fg: 32, 26, 20; /* --parent-ink, for the alpha steps below */
+  --toggle-cast: 150, 132, 110; /* warm stand-in for the spec's mid grey */
+
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 132px;
+  padding: 16px;
+  border: 1px solid rgba(var(--toggle-fg), 0.12);
+  border-radius: 22px;
+  margin-bottom: 20px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  /* Raised: the cast shadow, down-right of a top-left light source. */
+  box-shadow: 4.8px 4.8px 15.2px 0.7px rgba(var(--toggle-cast), 0.2);
+  transition:
+    background-color 240ms linear,
+    border-color 240ms linear,
+    box-shadow 240ms linear;
+}
+
+.status-toggle--on {
+  /* A blend, not an overlay, so the surface stays opaque. 10% is the ceiling:
+     this is a warm neutral design that whispers the accent, never an orange
+     card. */
+  background: color-mix(in srgb, var(--toggle-accent) 10%, #fff);
+  border-color: color-mix(in srgb, var(--toggle-accent) 28%, transparent);
+  /* Pressed: one tiny, close shadow. The card simply loses altitude — both
+     states are a single outward shadow, so the tween between them is a clean
+     interpolation with nothing to snap. */
+  box-shadow: 1.5px 1.5px 4.8px 0 rgba(var(--toggle-cast), 0.1);
+}
+
+.status-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.status-toggle__chip {
+  display: grid;
+  flex: 0 0 48px;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-right: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--toggle-accent) 12%, transparent);
+  color: var(--toggle-accent);
+  transition: background-color 240ms linear;
+}
+
+.status-toggle--on .status-toggle__chip {
+  background: color-mix(in srgb, var(--toggle-accent) 18%, transparent);
+}
+
+.status-toggle__text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.status-toggle__label {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--parent-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-toggle__copy {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 6px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: rgba(var(--toggle-fg), 0.58);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.status-toggle--on .status-toggle__copy {
+  color: rgba(var(--toggle-fg), 0.68);
+}
+
+/* Serif on this one word is the signature: the tile pairs the UI face for
+   text with a serif for the state itself. A sans here makes the whole thing
+   read as a generic settings row.
+
+   Fixed width, right aligned, so "On" becoming "Off" cannot reflow the
+   description mid-animation. Its colour snaps rather than tweening — the word
+   must read as a discrete change, and cross-fading text looks like a bug. */
+.status-toggle__state {
+  flex: 0 0 44px;
+  width: 44px;
+  margin-left: 12px;
+  color: var(--parent-ink);
+  font-family: Georgia, 'Times New Roman', 'Noto Serif', serif;
+  font-size: 18px;
+  font-weight: 400;
+  text-align: right;
+}
+
+.status-toggle--on .status-toggle__state {
+  color: var(--toggle-accent);
+}
+
+.wallet-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  /* Under the UPI checkout at 500: adding money opens that sheet on top of
+     this one, and this one stays put underneath to receive the receipt. */
+  z-index: 460;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 18, 13, 0.56);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: upi-demo-fade 180ms ease-out both;
+}
+
+.wallet-dialog {
+  width: min(100%, 480px);
+  max-height: min(760px, calc(100svh - 40px));
+  overflow: auto;
+  padding: 24px 26px calc(24px + env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
+  animation: upi-demo-rise 340ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.wallet-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.wallet-dialog__head h2 {
+  margin-top: 8px;
+  color: var(--parent-ink);
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.wallet-dialog__head p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .payment-choice-overlay {
@@ -85,6 +331,19 @@ body.upi-confirmation-open #root {
   background: #fff;
   box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
   animation: upi-demo-rise 340ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+/* Processing and confirmation are screens of this sheet, not a sheet of their
+   own, so they drop the full-height framing they get in the top-up checkout
+   and let the sheet shrink to what is actually on screen. */
+.payment-choice-sheet--stage {
+  overflow: hidden;
+}
+
+.payment-choice-sheet .upi-demo-state,
+.payment-choice-sheet .upi-demo-state--success {
+  min-height: 0;
+  padding: 26px 4px 10px;
 }
 
 .payment-choice-header {
@@ -234,22 +493,6 @@ body.upi-confirmation-open #root {
   background: #fff;
   box-shadow: 0 34px 90px rgba(26, 18, 11, 0.3);
   animation: upi-demo-rise 360ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
-}
-
-.upi-demo-sheet.upi-demo-sheet--confirmation {
-  isolation: isolate;
-  width: min(100%, 420px);
-  height: auto;
-  max-height: calc(100svh - 40px);
-  padding: 22px 24px;
-  overflow: hidden;
-  -webkit-filter: none;
-  filter: none;
-}
-
-.upi-demo-sheet--confirmation .upi-demo-state--success {
-  min-height: 0;
-  padding: 24px 8px 12px;
 }
 
 .upi-demo-header {
@@ -907,6 +1150,16 @@ body.upi-confirmation-open #root {
   gap: 16px;
 }
 
+/* The same 16px the dashboard grid gives its cards. Order cards carry no
+   margin of their own — they are laid out by whatever holds them — so a
+   single-column list needs to space them itself. The bottom margin keeps the
+   "Load more" button off the last card. */
+.order-list {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
 /* Order status cards -------------------------------------------------- */
 
 .order-card {
@@ -1420,6 +1673,185 @@ body.upi-confirmation-open #root {
   color: var(--parent-brand-deep);
 }
 
+.auth-footer-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-policy-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12px;
+}
+
+/* ---- public policies ------------------------------------------------ */
+
+.policy-page {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(255, 107, 53, 0.1), transparent 34rem),
+    var(--bg);
+  color: var(--ink);
+}
+
+.policy-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 72px;
+  padding: 12px max(24px, calc((100vw - 920px) / 2));
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+}
+
+.policy-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.policy-brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  object-fit: cover;
+}
+
+.policy-nav {
+  display: flex;
+  gap: 16px;
+}
+
+.policy-nav a {
+  color: var(--ink-dim);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.policy-nav a:hover,
+.policy-nav a:focus-visible {
+  color: var(--brand-deep);
+}
+
+.policy-document {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0 72px;
+}
+
+.policy-eyebrow {
+  color: var(--brand-deep);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.policy-document h1 {
+  margin-top: 8px;
+  font-size: clamp(34px, 7vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+
+.policy-updated {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.policy-summary {
+  margin-top: 30px;
+  padding: 22px 24px;
+  border: 1px solid #fed7c7;
+  border-radius: 16px;
+  background: #fff8f5;
+  color: var(--ink-soft);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.policy-content {
+  display: grid;
+  gap: 34px;
+  margin-top: 44px;
+}
+
+.policy-content section {
+  scroll-margin-top: 94px;
+}
+
+.policy-content h2 {
+  margin-bottom: 12px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.policy-content p {
+  color: var(--ink-dim);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.policy-content p + p {
+  margin-top: 14px;
+}
+
+.policy-content a {
+  color: var(--primary);
+  font-weight: 650;
+}
+
+.policy-footer {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.policy-footer span:first-child {
+  color: var(--ink-soft);
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .policy-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px 16px 14px;
+  }
+
+  .policy-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .policy-document {
+    padding-top: 42px;
+  }
+
+  .policy-summary {
+    padding: 18px;
+    font-size: 15px;
+  }
+}
+
 /* Modal -------------------------------------------------------------- */
 
 .parent-modal-backdrop {
@@ -1646,7 +2078,11 @@ body.upi-confirmation-open #root {
   gap: 18px;
 }
 
+/* Wallet Control opens from its own button above now, leaving Purchase
+   Approval alone here — a lone card in a two-column grid sat stranded at
+   half width. */
 .wallet-settings-grid {
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 24px;
 }
 
@@ -2137,6 +2573,23 @@ body.upi-confirmation-open #root {
 }
 
 @media (max-width: 520px) {
+  .wallet-actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .wallet-dialog-overlay {
+    place-items: center;
+    padding: 16px;
+  }
+
+  .wallet-dialog {
+    width: min(100%, 470px);
+    max-height: calc(100svh - 32px);
+    padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+    border-radius: 24px;
+  }
+
   .payment-choice-overlay {
     place-items: center;
     padding: 16px;
@@ -2149,6 +2602,10 @@ body.upi-confirmation-open #root {
     overflow: auto;
     padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
     border-radius: 24px;
+  }
+
+  .payment-choice-sheet--stage {
+    height: auto;
   }
 
   .payment-choice-option {
@@ -2353,10 +2810,20 @@ body.upi-confirmation-open #root {
   .upi-demo-sheet,
   .payment-choice-overlay,
   .payment-choice-sheet,
+  .wallet-dialog-overlay,
+  .wallet-dialog,
   .upi-demo-spinner,
   .upi-demo-success-mark,
   .upi-demo-success-mark i {
     animation: none;
+  }
+
+  /* The press is still shown, just not travelled through. */
+  .status-toggle,
+  .status-toggle__chip,
+  .wallet-action,
+  .wallet-action__icon {
+    transition: none;
   }
 
 }

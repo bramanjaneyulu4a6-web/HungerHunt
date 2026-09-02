@@ -5,7 +5,6 @@ import API from '../services/api';
 import { formatINR } from '../utils/format';
 import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
-import DemoUpiCheckout from './DemoUpiCheckout';
 import PaymentMethodChooser from './PaymentMethodChooser';
 import { DEMO_UPI_PROVIDERS } from '../utils/demoUpi';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
@@ -88,8 +87,6 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   const [confirming, setConfirming] = useState(null);
   const [reviewing, setReviewing] = useState(false);
   const [paymentChooserOpen, setPaymentChooserOpen] = useState(false);
-  const [demoOrderCheckoutOpen, setDemoOrderCheckoutOpen] = useState(false);
-  const [demoProviderId, setDemoProviderId] = useState(null);
   const [demoOrderResult, setDemoOrderResult] = useState(null);
   const [error, setError] = useState(null);
   const [constraint, setConstraint] = useState(null);
@@ -122,14 +119,18 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   // A parent who navigates away mid-payment must not leave pollIntent's
   // 3-second loop running in the background for up to 5 minutes, and must
   // not leave the degraded-notice timer trying to update this card later.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Strict Mode rehearses this effect once before the real mount. Reset the
+    // flag here so that rehearsal cleanup does not make every later payment
+    // result look as though it arrived after unmount.
+    mountedRef.current = true;
+
+    return () => {
       mountedRef.current = false;
       payAbortRef.current?.abort();
       if (degradedNoticeTimeoutRef.current) clearTimeout(degradedNoticeTimeoutRef.current);
-    },
-    []
-  );
+    };
+  }, []);
 
   const total = useMemo(
     () =>
@@ -186,21 +187,25 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
   const saveEdits = () => run(putEdits, 'Order updated.');
 
-  const approve = () => {
+  /* The wallet charge, and nothing after it. onResolved is deliberately not
+     called here: it refreshes the pending list, which unmounts this card and
+     the payment sheet with it — before the parent has seen the payment land.
+     completeWalletPayment runs it once the confirmation has had its moment. */
+  const chargeWallet = async () => {
     if (!approvalKey.current) {
       approvalKey.current =
         globalThis.crypto?.randomUUID?.() ||
         `${order._id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
 
-    return run(
-      () =>
-        API.post(
-          `/pending-orders/${order._id}/approve`,
-          {},
-          { headers: { 'Idempotency-Key': approvalKey.current } }
-        ),
-      'Approved. The wallet has been charged.'
+    // Only ever true in the compact card, whose review modal edits the cart;
+    // the full card keeps Accept disabled until the edits are saved.
+    if (edited) await putEdits();
+
+    await API.post(
+      `/pending-orders/${order._id}/approve`,
+      {},
+      { headers: { 'Idempotency-Key': approvalKey.current } }
     );
   };
 
@@ -350,84 +355,58 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     await payByUpi();
   };
 
-  const placeOrder = async () => {
-    if (!approvalKey.current) {
-      approvalKey.current =
-        globalThis.crypto?.randomUUID?.() ||
-        `${order._id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      if (edited) {
-        await API.put(`/pending-orders/${order._id}`, {
-          items: order.items.map((item) => ({
-            productId: item.productId,
-            quantity: quantities[String(item.productId)] ?? 0,
-          })),
-        });
-      }
-
-      await API.post(
-        `/pending-orders/${order._id}/approve`,
-        {},
-        { headers: { 'Idempotency-Key': approvalKey.current } }
-      );
-      setReviewing(false);
-      await onResolved?.('Order placed. The wallet has been charged.');
-    } catch (err) {
-      setError(presentError(err, { message: err.response?.data?.message || 'That did not go through. Please try again.' }));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const openPaymentChooser = () => {
     setError(null);
     setDemoOrderResult(null);
     setPaymentChooserOpen(true);
   };
 
-  const payThroughWallet = () => {
-    setPaymentChooserOpen(false);
-    if (compact) placeOrder();
-    else approve();
+  /* Awaited by the payment sheet, which shows its confirmation on a truthy
+     answer. A failure closes the sheet instead, so the error lands in the
+     card's own ErrorFeedback — which knows how to offer a way out of a stale
+     order or a wallet that fell short, as an inline apology never could. */
+  const payThroughWallet = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await chargeWallet();
+      return true;
+    } catch (err) {
+      setError(presentError(err, { message: err.response?.data?.message || 'That did not go through. Please try again.' }));
+      setPaymentChooserOpen(false);
+      return false;
+    } finally {
+      setBusy(false);
+    }
   };
 
-  /* Exactly the condition under which the demo sheet is what opens, so the
+  const completeWalletPayment = () => {
+    setPaymentChooserOpen(false);
+    setReviewing(false);
+    setConfirming(null);
+    onResolved?.('Order placed. The wallet has been charged.');
+  };
+
+  /* Exactly the condition under which the demo payment is what runs, so the
      chooser lists UPI apps only when picking one here is what actually
      decides the payment. On the live gateway it stays a single UPI row that
      hands off, because the app is chosen in PhonePe's own screen, not ours. */
   const demoCheckout = DEMO_UPI_ENABLED || !PAYMENTS_ENABLED;
 
+  // Only reachable with the live gateway: with the demo, the chooser lists the
+  // apps itself and there is no separate UPI row to hand off from.
   const chooseUpi = () => {
     setPaymentChooserOpen(false);
-    if (!demoCheckout) {
-      if (compact) payByUpiFromReview();
-      else payByUpi();
-      return;
-    }
-    setDemoOrderCheckoutOpen(true);
+    if (compact) payByUpiFromReview();
+    else payByUpi();
   };
 
-  const chooseUpiProvider = (providerId) => {
-    setPaymentChooserOpen(false);
-    setReviewing(false);
-    setConfirming(null);
-    setDemoProviderId(providerId);
-    setDemoOrderCheckoutOpen(true);
-  };
-
-  const closeDemoOrderCheckout = () => {
-    setDemoOrderCheckoutOpen(false);
-    setDemoProviderId(null);
-  };
-
+  /* The demo payment confirms inside the chooser, so by the time this runs
+     the parent has already seen it succeed. Everything that was open closes
+     together, in one step, rather than one popup replacing another. */
   const completeDemoOrderPayment = (result) => {
     setDemoOrderResult(result);
-    setDemoOrderCheckoutOpen(false);
-    setDemoProviderId(null);
+    setPaymentChooserOpen(false);
     setReviewing(false);
     setConfirming(null);
     navigate('/', { replace: true });
@@ -444,22 +423,10 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           busy={busy}
           upiProviders={demoCheckout ? DEMO_UPI_PROVIDERS : null}
           onWallet={payThroughWallet}
+          onWalletPaid={completeWalletPayment}
           onUpi={chooseUpi}
-          onUpiProvider={chooseUpiProvider}
+          onUpiPaid={completeDemoOrderPayment}
           onClose={() => setPaymentChooserOpen(false)}
-        />
-      )}
-      {demoOrderCheckoutOpen && (
-        <DemoUpiCheckout
-          amount={total}
-          studentName={student.name || 'Your child'}
-          purposeLabel="Order payment"
-          providerId={demoProviderId}
-          instantConfirm
-          autoFinishMs={2000}
-          successTitle="Payment confirmed"
-          onClose={closeDemoOrderCheckout}
-          onComplete={completeDemoOrderPayment}
         />
       )}
     </>

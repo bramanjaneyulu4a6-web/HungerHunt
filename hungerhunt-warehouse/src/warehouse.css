@@ -920,6 +920,66 @@
   font-size: 13px;
 }
 
+/* The caretaker receives the hostel shipment as one handoff, then finds the
+   student inside it. Keep that whole-shipment fact in view while the individual
+   package list scrolls underneath. */
+.caretaker-hostel-order {
+  position: sticky;
+  z-index: 20;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--primary-bg) 55%, var(--surface));
+  box-shadow: var(--shadow-raised);
+}
+
+.caretaker-hostel-order > div:first-child { display: grid; min-width: 0; }
+.caretaker-hostel-order > div:first-child > span,
+.caretaker-student-orders__heading span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.caretaker-hostel-order > div:first-child > strong { margin-top: 3px; color: var(--ink); font-size: 18px; }
+.caretaker-hostel-order > div:first-child > small { margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+.caretaker-hostel-order__count {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 78px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--on-primary, white);
+  text-align: center;
+}
+.caretaker-hostel-order__count strong { font-size: 28px; line-height: 1; }
+.caretaker-hostel-order__count span { margin-top: 3px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+
+.caretaker-student-orders {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.caretaker-student-orders__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.caretaker-student-orders__heading h2 { margin: 2px 0 0; color: var(--ink); font-size: 21px; }
+.caretaker-student-orders__heading > strong { color: var(--primary); font-size: 12px; }
+.caretaker-order-search { background: var(--surface); }
+
 .wh-order-progress {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

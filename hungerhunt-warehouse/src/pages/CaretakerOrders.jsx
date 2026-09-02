@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { caretakerItemCount, filterCaretakerOrders } from '../utils/caretakerOrders';
 import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 
 const HISTORY_PAGE_SIZE = 25;
@@ -111,6 +113,7 @@ const CaretakerOrders = () => {
   const [loadError, setLoadError] = useState(false);
   const [historyError, setHistoryError] = useState(false);
   const [awaitingCollection, setAwaitingCollection] = useState(0);
+  const [orderSearch, setOrderSearch] = useState('');
   const loadMoreRef = useRef(null);
   const arrivalRequestRef = useRef(0);
 
@@ -176,9 +179,14 @@ const CaretakerOrders = () => {
     if (nextView === 'history' && !historyLoaded) await loadHistory(1, true);
   };
 
-  const currentOrders = [...orders].sort((a, b) =>
+  const currentOrders = useMemo(() => [...orders].sort((a, b) =>
     STATUS_STEPS.indexOf(b.status) - STATUS_STEPS.indexOf(a.status) ||
     new Date(a.deliverBy).getTime() - new Date(b.deliverBy).getTime()
+  ), [orders]);
+  const totalItems = useMemo(() => caretakerItemCount(orders), [orders]);
+  const visibleOrders = useMemo(
+    () => filterCaretakerOrders(currentOrders, orderSearch),
+    [currentOrders, orderSearch]
   );
 
   return (
@@ -206,40 +214,88 @@ const CaretakerOrders = () => {
       {view === 'arriving' ? (
         <>
           {loadError && <Banner variant="alert" icon="⚠️">Could not load arriving packages.</Banner>}
-          {loading ? <Skeleton height={240} radius={14} /> : orders.length === 0 && !loadError ? (
-            <EmptyState icon="✓" title="You're all caught up" variant="success">
-              Nothing is on its way to your hostel, and no package is waiting to be collected.
-            </EmptyState>
-          ) : currentOrders.map((order) => {
-            const status = STATUS_DETAILS[order.status] || {
-              label: order.status?.replaceAll('_', ' ') || 'Unknown',
-              detail: 'Waiting for an update.',
-              badge: 'new',
-            };
-            const activeStep = STATUS_STEPS.indexOf(order.status);
+          {loading ? <Skeleton height={240} radius={14} /> : (!loadError || orders.length > 0) ? (
+            <>
+              <section className="caretaker-hostel-order" aria-label="Entire hostel order summary">
+                <div>
+                  <span>Entire hostel order</span>
+                  <strong>All current packages</strong>
+                  <small>
+                    {orders.length} student {orders.length === 1 ? 'order' : 'orders'}
+                    {awaitingCollection > 0 ? ` · ${awaitingCollection} ready for collection` : ''}
+                  </small>
+                </div>
+                <div className="caretaker-hostel-order__count">
+                  <strong className="wh-num">{totalItems}</strong>
+                  <span>{totalItems === 1 ? 'item' : 'items'}</span>
+                </div>
+              </section>
 
-            return (
-              <article key={order.id} className="wh-card wh-order">
-                <div className="wh-row">
-                  <StudentDetails order={order} />
-                  <span className={`wh-badge wh-badge--${status.badge}`}>{status.label}</span>
+              <section className="caretaker-student-orders" aria-labelledby="caretaker-student-orders-title">
+                <div className="caretaker-student-orders__heading">
+                  <div>
+                    <span>Individual packages</span>
+                    <h2 id="caretaker-student-orders-title">Student orders</h2>
+                  </div>
+                  <strong>{visibleOrders.length} of {orders.length}</strong>
                 </div>
 
-                <div className="wh-order-progress" aria-label={`Current status: ${status.label}`}>
-                  {STATUS_STEPS.map((step, index) => (
-                    <span key={step} className={index <= activeStep ? 'complete' : ''}>
-                      <i aria-hidden="true" />
-                      {STATUS_DETAILS[step].label}
-                    </span>
-                  ))}
-                </div>
+                <label className="wh-search caretaker-order-search" htmlFor="caretaker-order-search">
+                  <Icon name="search" size={19} />
+                  <span className="sr-only">Search student orders</span>
+                  <input
+                    id="caretaker-order-search"
+                    className="wh-search-input"
+                    type="search"
+                    value={orderSearch}
+                    placeholder="Search student name or admission number"
+                    onChange={(event) => setOrderSearch(event.target.value)}
+                  />
+                </label>
 
-                <p className="wh-status-detail">{status.detail}</p>
-                <PackageLines items={order.items} />
-                {order.status === 'DELIVERED' && <DeliveredActions order={order} />}
-              </article>
-            );
-          })}
+                {visibleOrders.length === 0 ? (
+                  <EmptyState
+                    icon={orders.length === 0 ? '✓' : '⌕'}
+                    title={orders.length === 0 ? "You're all caught up" : 'No matching student orders'}
+                    variant={orders.length === 0 ? 'success' : 'default'}
+                  >
+                    {orders.length === 0
+                      ? 'Nothing is on its way to your hostel, and no package is waiting to be collected.'
+                      : 'Try another student name or admission number.'}
+                  </EmptyState>
+                ) : visibleOrders.map((order) => {
+                  const status = STATUS_DETAILS[order.status] || {
+                    label: order.status?.replaceAll('_', ' ') || 'Unknown',
+                    detail: 'Waiting for an update.',
+                    badge: 'new',
+                  };
+                  const activeStep = STATUS_STEPS.indexOf(order.status);
+
+                  return (
+                    <article key={order.id} className="wh-card wh-order">
+                      <div className="wh-row">
+                        <StudentDetails order={order} />
+                        <span className={`wh-badge wh-badge--${status.badge}`}>{status.label}</span>
+                      </div>
+
+                      <div className="wh-order-progress" aria-label={`Current status: ${status.label}`}>
+                        {STATUS_STEPS.map((step, index) => (
+                          <span key={step} className={index <= activeStep ? 'complete' : ''}>
+                            <i aria-hidden="true" />
+                            {STATUS_DETAILS[step].label}
+                          </span>
+                        ))}
+                      </div>
+
+                      <p className="wh-status-detail">{status.detail}</p>
+                      <PackageLines items={order.items} />
+                      {order.status === 'DELIVERED' && <DeliveredActions order={order} />}
+                    </article>
+                  );
+                })}
+              </section>
+            </>
+          ) : null}
         </>
       ) : (
         <section aria-label="Package history">

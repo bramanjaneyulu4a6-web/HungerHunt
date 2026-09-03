@@ -15,9 +15,10 @@ import { useAuth } from "./context/auth";
    auth context, navbar and error boundary stay eager — they wrap every route
    and there is no route that does not need them. */
 const Login = lazy(() => import("./pages/Login"));
-const Activate = lazy(() => import("./pages/Activate"));
+const FirstPassword = lazy(() => import("./pages/FirstPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Accounts = lazy(() => import("./pages/Accounts"));
+const Account = lazy(() => import("./pages/Account"));
 const ChildDetails = lazy(() => import("./pages/ChildDetails"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -49,9 +50,10 @@ const pageTitle = (pathname) => {
   if (pathname.startsWith('/child/')) return 'Child account';
   if (pathname === '/pending-orders') return 'Approval requests';
   if (pathname === '/accounts') return 'Student accounts';
+  if (pathname === '/account') return 'Your account';
   if (pathname.startsWith('/purchase-password/')) return 'Purchase code';
   if (pathname === '/login') return 'Sign in';
-  if (pathname === '/activate') return 'Activate account';
+  if (pathname === '/create-password') return 'Create password';
   if (pathname === '/forgot-password') return 'Forgot password';
   if (pathname.startsWith('/reset-password/')) return 'Reset password';
   if (pathname === '/payment-return') return 'Payment';
@@ -116,8 +118,9 @@ function AppContent() {
         <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-        <Route path="/activate" element={<PublicOnlyRoute><Activate /></PublicOnlyRoute>} />
-        <Route path="/register" element={<Navigate to="/activate" replace />} />
+        <Route path="/create-password" element={<PublicOnlyRoute><FirstPassword /></PublicOnlyRoute>} />
+        <Route path="/activate" element={<Navigate to="/login" replace />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
         {/* A reset link may be opened while another session is still present;
             it must remain usable so the token can close those old sessions. */}
@@ -142,6 +145,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Accounts />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <Account />
             </ProtectedRoute>
           }
         />

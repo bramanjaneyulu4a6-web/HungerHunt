@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 
 import Admin, { FULL_ADMIN } from '../models/Admin.js';
@@ -6,19 +5,10 @@ import Hostel from '../models/Hostel.js';
 import Parent from '../models/Parent.js';
 import PendingOrder from '../models/PendingOrder.js';
 import Student from '../models/Student.js';
+import { syncStudentRegistration } from '../utils/studentRegistration.js';
 import { emailProblem, phoneProblem } from '../utils/validation.js';
 
-const ACTIVATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STAFF_ROLES = ['admin', 'warehouse', 'caretaker'];
-
-const newActivation = (phone) => {
-  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-  return {
-    code,
-    hash: crypto.createHash('sha256').update(`${phone}:${code}`).digest('hex'),
-    expiresAt: new Date(Date.now() + ACTIVATION_TTL_MS),
-  };
-};
 
 const validId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -29,9 +19,9 @@ const parentView = (parent) => ({
   email: parent.email,
   active: parent.active !== false,
   activationRequired: Boolean(parent.activationRequired),
-  activationCodeExpire: parent.activationCodeExpire || null,
   activatedAt: parent.activatedAt || null,
   archivedAt: parent.archivedAt || null,
+  archivedReason: parent.archivedReason || null,
   students: (parent.studentIds || []).filter(Boolean).map((student) => ({
     id: String(student._id || student),
     name: student.name || '',
@@ -78,13 +68,6 @@ const assertStudentsAvailable = async (studentIds, exceptParentId = null) => {
   throw error;
 };
 
-const syncStudentRegistration = async (ids) => {
-  for (const id of [...new Set(ids.map(String))].filter(validId)) {
-    const linked = await Parent.exists({ active: { $ne: false }, studentIds: id });
-    await Student.updateOne({ _id: id }, { $set: { isParentRegistered: Boolean(linked) } });
-  }
-};
-
 export const listParents = async (req, res) => {
   const parents = await Parent.find().sort({ active: -1, fatherName: 1 })
     .populate('studentIds', 'name admissionNumber hostelNumber').lean();
@@ -105,7 +88,6 @@ export const createParent = async (req, res) => {
       return res.status(409).json({ message: 'A parent account already uses that phone number or email.' });
     }
 
-    const activation = newActivation(phone);
     const parent = await Parent.create({
       fatherName,
       phone,
@@ -113,18 +95,12 @@ export const createParent = async (req, res) => {
       studentIds: students.map((student) => student._id),
       active: true,
       activationRequired: true,
-      activationCodeHash: activation.hash,
-      activationCodeExpire: activation.expiresAt,
     });
     await Student.updateMany(
       { _id: { $in: parent.studentIds } },
       { $set: { isParentRegistered: true, parentPhoneNumber: phone, fatherName } }
     );
-    res.status(201).json({
-      parent: parentView({ ...parent.toObject(), studentIds: students }),
-      activationCode: activation.code,
-      activationCodeExpire: activation.expiresAt,
-    });
+    res.status(201).json({ parent: parentView({ ...parent.toObject(), studentIds: students }) });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message });
   }
@@ -151,15 +127,13 @@ export const updateParent = async (req, res) => {
     }
 
     const previousIds = parent.studentIds.map(String);
-    const phoneChangedWhileAwaitingActivation = parent.activationRequired && phone !== parent.phone;
-    const replacementActivation = phoneChangedWhileAwaitingActivation ? newActivation(phone) : null;
     parent.fatherName = fatherName;
     parent.phone = phone;
     parent.email = email;
     parent.studentIds = students.map((student) => student._id);
-    if (replacementActivation) {
-      parent.activationCodeHash = replacementActivation.hash;
-      parent.activationCodeExpire = replacementActivation.expiresAt;
+    if (parent.activationRequired) {
+      parent.activationCodeHash = undefined;
+      parent.activationCodeExpire = undefined;
     }
     await parent.save();
     await Student.updateMany(
@@ -167,13 +141,7 @@ export const updateParent = async (req, res) => {
       { $set: { isParentRegistered: parent.active !== false, parentPhoneNumber: phone, fatherName } }
     );
     await syncStudentRegistration([...previousIds, ...parent.studentIds.map(String)]);
-    res.json({
-      parent: parentView({ ...parent.toObject(), studentIds: students }),
-      ...(replacementActivation ? {
-        activationCode: replacementActivation.code,
-        activationCodeExpire: replacementActivation.expiresAt,
-      } : {}),
-    });
+    res.json({ parent: parentView({ ...parent.toObject(), studentIds: students }) });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message });
   }
@@ -189,6 +157,7 @@ export const archiveParent = async (req, res) => {
   parent.active = false;
   parent.archivedAt = new Date();
   parent.archivedBy = req.staff.id;
+  parent.archivedReason = 'admin';
   parent.pushTokens = [];
   parent.fcmToken = null;
   parent.resetPasswordToken = undefined;
@@ -199,17 +168,17 @@ export const archiveParent = async (req, res) => {
   res.json({ message: 'Parent account archived.', parent: parentView(parent) });
 };
 
-export const issueActivationCode = async (req, res) => {
+export const requireParentPasswordSetup = async (req, res) => {
   if (!validId(req.params.id)) return res.status(404).json({ message: 'Parent not found.' });
   const parent = await Parent.findById(req.params.id);
   if (!parent) return res.status(404).json({ message: 'Parent not found.' });
-  const activation = newActivation(parent.phone);
   parent.active = true;
   parent.archivedAt = undefined;
   parent.archivedBy = undefined;
+  parent.archivedReason = undefined;
   parent.activationRequired = true;
-  parent.activationCodeHash = activation.hash;
-  parent.activationCodeExpire = activation.expiresAt;
+  parent.activationCodeHash = undefined;
+  parent.activationCodeExpire = undefined;
   parent.pushTokens = [];
   parent.fcmToken = null;
   parent.resetPasswordToken = undefined;
@@ -218,9 +187,8 @@ export const issueActivationCode = async (req, res) => {
   await parent.save();
   await syncStudentRegistration(parent.studentIds.map(String));
   res.json({
-    message: 'New activation code issued. Existing sessions have been revoked.',
-    activationCode: activation.code,
-    activationCodeExpire: activation.expiresAt,
+    message: 'First-time password setup required. Existing sessions have been revoked.',
+    parent: parentView(parent),
   });
 };
 

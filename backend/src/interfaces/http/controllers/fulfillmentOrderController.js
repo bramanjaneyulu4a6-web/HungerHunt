@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
-import Transaction from '../../../../models/Transaction.js';
 import { buildDeliveryReport } from '../../../domain/fulfillment/deliveryReport.js';
 import {
   OrderStatus,
@@ -503,7 +502,11 @@ export const transition = async (req, res) => {
 
   const current = await FulfillmentOrder.findById(req.params.id).lean();
   if (!current) throw new NotFoundError('Fulfilment order');
-  if (!current.transactionId || !(await Transaction.exists({ _id: current.transactionId }))) {
+  // A fulfilment order is created only as part of a successful checkout and
+  // transactionId is required by its schema. Do not make later operational
+  // corrections depend on a second ledger lookup: imported/retained orders
+  // can legitimately outlive that lookup while still being paid orders.
+  if (!current.transactionId) {
     throw new ConflictError('Payment has not been processed for this order, so its status cannot be changed.', {
       currentStatus: current.status,
       paymentProcessed: false,

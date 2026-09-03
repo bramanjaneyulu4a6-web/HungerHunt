@@ -97,6 +97,9 @@ export default function Navbar() {
           <NavLink to="/accounts" className={navClass}>
             <Icon name="user" size={18} /> Accounts
           </NavLink>
+          <NavLink to="/account" className={navClass}>
+            <Icon name="shield" size={18} /> Account
+          </NavLink>
         </nav>
 
         <div className="parent-account">
@@ -122,6 +125,9 @@ export default function Navbar() {
         </NavLink>
         <NavLink to="/accounts" className={navClass}>
           <Icon name="user" size={21} /> <span>Accounts</span>
+        </NavLink>
+        <NavLink to="/account" className={navClass}>
+          <Icon name="shield" size={21} /> <span>Account</span>
         </NavLink>
       </nav>
 

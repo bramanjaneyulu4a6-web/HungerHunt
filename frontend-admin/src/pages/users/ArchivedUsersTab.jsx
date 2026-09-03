@@ -21,7 +21,6 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
   const [studentTotal, setStudentTotal] = useState(0);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [activation, setActivation] = useState(null);
 
   const loadStudents = useCallback(async (requestedPage = 1) => {
     setLoadingStudents(true);
@@ -89,15 +88,10 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
   };
 
   const restoreParent = async (parent) => {
-    if (!window.confirm(`Restore ${parent.fatherName}'s account and issue a new activation code?`)) return;
+    if (!window.confirm(`Restore ${parent.fatherName}'s account? They will verify their phone by SMS and create a password.`)) return;
     setWorkingId(parent.id);
     try {
-      const { data } = await api.post(`/admin/users/parents/${parent.id}/activation-code`);
-      setActivation({
-        parentName: parent.fatherName,
-        code: data.activationCode,
-        expiresAt: data.activationCodeExpire,
-      });
+      await api.post(`/admin/users/parents/${parent.id}/require-password-setup`);
       toast.success('Parent account restored');
       await onChanged?.();
     } catch (error) {
@@ -201,17 +195,6 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
         </nav>
       )}
 
-      {activation && (
-        <div className="modal-backdrop" onClick={() => setActivation(null)}>
-          <div className="modal activation-card" style={{ maxWidth: 440 }} onClick={(event) => event.stopPropagation()}>
-            <h3 className="modal-title">One-time activation code</h3>
-            <Banner variant="warn">Share this code with {activation.parentName} through a trusted channel. It is displayed only here.</Banner>
-            <div className="activation-code">{activation.code}</div>
-            <p className="modal-note">Expires {new Date(activation.expiresAt).toLocaleString()}.</p>
-            <div className="modal-actions"><Button variant="ghost" onClick={() => navigator.clipboard?.writeText(activation.code)}>Copy code</Button><Button onClick={() => setActivation(null)}>Done</Button></div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

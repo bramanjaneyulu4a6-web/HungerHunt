@@ -4,7 +4,7 @@ import {
   archiveParent,
   archiveStaff,
   createParent,
-  issueActivationCode,
+  requireParentPasswordSetup,
   listParents,
   listStaff,
   updateParent,
@@ -18,7 +18,7 @@ router.use(protectAdmin);
 
 router.route('/parents').get(asyncHandler(listParents)).post(asyncHandler(createParent));
 router.route('/parents/:id').put(asyncHandler(updateParent)).delete(asyncHandler(archiveParent));
-router.post('/parents/:id/activation-code', asyncHandler(issueActivationCode));
+router.post('/parents/:id/require-password-setup', asyncHandler(requireParentPasswordSetup));
 router.get('/staff', asyncHandler(listStaff));
 router.route('/staff/:id').put(asyncHandler(updateStaff)).delete(asyncHandler(archiveStaff));
 

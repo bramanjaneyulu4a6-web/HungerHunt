@@ -22,8 +22,8 @@ npm install
 npm run dev
 ```
 
-`VITE_API_BASE_URL` must point at the backend. Everything else is push
-notifications — the app runs fine without them.
+`VITE_API_BASE_URL` must point at the backend. The Firebase values are also
+required for first-time password setup in the browser.
 
 For local development, keep it at `http://localhost:5001/api`. Browser and iOS
 Simulator builds use that value directly. On Android Emulator the app maps the
@@ -81,6 +81,31 @@ inside the WebView and stamps `capacitor://localhost` (iOS) or
 `https://localhost` (Android) on every request. Both are in the backend's CORS
 allowlist in `backend/app.js`; without them the phone builds get a 403 on their
 first call and look broken with nothing in the logs to explain it.
+
+## First-time SMS verification
+
+The office creates a parent with the phone number on record. On first sign-in,
+Firebase sends an SMS OTP; the API verifies the resulting Firebase ID token
+before it allows the parent to create a password. Later sign-ins use that phone
+number and password.
+
+Setup that must be completed in Firebase Console:
+
+1. Authentication → Sign-in method → enable **Phone**.
+2. Authentication → Settings → SMS region policy → allow **India**. New Firebase
+   projects allow no SMS regions until this is configured.
+3. Add `hunger-hunt-parent.vercel.app` under Authentication → Settings →
+   Authorized domains. Web phone auth uses an invisible reCAPTCHA.
+4. Put the Firebase project on the Blaze plan so it can send verification SMS.
+   Use Firebase fictional phone numbers for development and automated testing.
+5. Register the Android app's SHA-1 and SHA-256 fingerprints in Firebase. For
+   iOS, keep Push Notifications enabled, upload the APNs key, and add the iOS
+   app's Encoded App ID as a URL scheme in Xcode so reCAPTCHA fallback returns
+   to the app.
+
+The backend service account and each platform's Firebase client configuration
+must all belong to the same Firebase project, or valid OTPs will be rejected by
+the API.
 
 ## Push notifications
 

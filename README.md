@@ -60,11 +60,11 @@ student records each time. It refuses to run outside development.
 
 ## Environment variables
 
-**backend** — `MONGO_URI`, `JWT_SECRET`, `PORT`, `MAX_ADMIN_ACCOUNTS`, `PARENT_CLIENT_URL` and `ADMIN_CLIENT_URL` (used to build password-reset links in emails), `EMAIL_USER` / `EMAIL_PASS` (Gmail app password), `CLOUDINARY_*`, and `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`. Firebase is optional — leave it unset and push notifications simply switch off instead of crashing the server.
+**backend** — `MONGO_URI`, `JWT_SECRET`, `PORT`, `MAX_ADMIN_ACCOUNTS`, `PARENT_CLIENT_URL` and `ADMIN_CLIENT_URL` (used to build password-reset links in emails), `EMAIL_USER` / `EMAIL_PASS` (Gmail app password), `CLOUDINARY_*`, and `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`. Firebase is required in production to verify first-time parent phone authentication and to send push notifications.
 
 Set `TRUST_PROXY` when deploying behind a proxy or managed host (usually `1`, the number of hops in front of the server). Without it every request appears to come from the proxy's IP, so all clients share one rate-limit bucket and a handful of failed logins locks out everyone. Setting it to `true` is refused at boot — it would let any client spoof `X-Forwarded-For` and skip the limiter altogether.
 
-**frontends** — `VITE_API_BASE_URL` pointing at the backend's `/api`. The parent app additionally needs `VITE_VAPID_KEY` for web push.
+**frontends** — `VITE_API_BASE_URL` pointing at the backend's `/api`. The parent app additionally needs its `VITE_FIREBASE_*` web configuration for browser SMS verification and `VITE_VAPID_KEY` for web push.
 
 ## Authentication
 
@@ -74,7 +74,7 @@ The API has three explicit token boundaries:
 - **Parents** (`protectParent`) use `PARENT_JWT_SECRET`. Parents may only act on linked students; the server enforces ownership on every child-scoped endpoint.
 - **Students** (`protectStudent`) receive short-lived kiosk sessions signed with `STUDENT_JWT_SECRET` after entering their admission number. The kiosk device itself is deliberately public and has no account, device credential or enrollment step. The four-digit purchase code is still required at checkout before money can move.
 
-Production must use three different secrets. Parent accounts cannot self-register: an admin creates the account and gives the parent a one-time activation code, which the parent uses to choose a password and sign in. A student has a four-digit **purchase code**, set by the parent and entered at the kiosk; it is separate from the parent's account password.
+Production must use three different secrets. Parent accounts cannot self-register: an admin creates the account, then the parent verifies the registered phone by Firebase SMS OTP and chooses a password on first sign-in. A student has a four-digit **purchase code**, set by the parent and entered at the kiosk; it is separate from the parent's account password.
 
 Four digits because of where it is used: on a touch screen, by a child, with a queue behind them. What bounds the spending is the wallet balance, the spending limit and the approval flow below — not the length of the code.
 

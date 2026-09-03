@@ -3,25 +3,22 @@ import Student from "../models/Student.js";
 import Transaction from "../models/Transaction.js";
 import WalletReversal from '../models/WalletReversal.js';
 import Parent from "../models/Parent.js";
+import PendingOrder from "../models/PendingOrder.js";
 
 import bcrypt from "bcryptjs";
-import crypto from "node:crypto";
 import { isOverdue, OPEN_STATUSES } from "../src/domain/fulfillment/overdue.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
 import { flushQueuedPushes } from "../utils/sendNotification.js";
+import { syncStudentRegistration } from "../utils/studentRegistration.js";
+import firebasePhoneAuth from '../utils/firebasePhoneAuth.js';
 import {
   passwordProblem,
   phoneProblem,
   purchaseCodeProblem,
 } from "../utils/validation.js";
-
-const ACTIVATION_CODE_PATTERN = /^\d{6}$/;
-
-const activationCodeHash = (phone, code) =>
-  crypto.createHash('sha256').update(`${String(phone).trim()}:${String(code).trim()}`).digest('hex');
 
 const parentSessionView = (parent) => ({
   id: parent._id,
@@ -31,28 +28,59 @@ const parentSessionView = (parent) => ({
   studentIds: parent.studentIds,
 });
 
-/* The office creates the account. The parent uses its one-time code to choose
-   the permanent password; the successful activation is also the first login. */
-export const activateParent = async (req, res) => {
+/* The first screen asks this question only after Continue. An unknown or
+   archived phone deliberately gets the ordinary password path: that preserves
+   the login endpoint's existing account-enumeration protection. Only a real,
+   active account that still needs its first password is sent to SMS proof. */
+export const getParentLoginStep = async (req, res) => {
   try {
     const phone = String(req.body?.parentPhoneNumber ?? '').trim();
-    const code = String(req.body?.activationCode ?? '').trim();
-    const problem = phoneProblem(phone) ||
-      (!ACTIVATION_CODE_PATTERN.test(code) ? 'Activation code must be 6 digits.' : null) ||
-      passwordProblem(req.body?.password);
+    const problem = phoneProblem(phone);
     if (problem) return res.status(400).json({ message: problem });
+
+    const parent = await Parent.findOne({ phone, active: { $ne: false } });
+    const needsFirstPassword = Boolean(parent && (parent.activationRequired || !parent.password));
+    res.json({ next: needsFirstPassword ? 'VERIFY_PHONE' : 'PASSWORD' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* A phone number is not a credential. Firebase sends and verifies the SMS
+   code, then signs an ID token containing the proved E.164 phone number. Only
+   that signed proof may claim a provisioned account and create its password. */
+export const setFirstParentPassword = async (req, res) => {
+  try {
+    const phone = String(req.body?.parentPhoneNumber ?? '').trim();
+    const idToken = String(req.body?.firebaseIdToken ?? '').trim();
+    const problem = phoneProblem(phone) || passwordProblem(req.body?.password) ||
+      (!idToken ? 'Phone verification is required.' : null);
+    if (problem) return res.status(400).json({ message: problem });
+
+    let proof;
+    try {
+      proof = await firebasePhoneAuth.verifyPhoneIdToken(idToken);
+    } catch {
+      return res.status(401).json({ message: 'Phone verification expired or is invalid. Request a new code.' });
+    }
+
+    const expectedPhone = `+91${phone}`;
+    if (
+      proof.phone_number !== expectedPhone ||
+      proof.firebase?.sign_in_provider !== 'phone'
+    ) {
+      return res.status(401).json({ message: 'The verified phone number does not match this account.' });
+    }
 
     const parent = await Parent.findOne({
       phone,
       active: { $ne: false },
-      activationRequired: true,
-      activationCodeHash: activationCodeHash(phone, code),
-      activationCodeExpire: { $gt: new Date() },
-    }).select('+activationCodeHash');
+      $or: [{ activationRequired: true }, { password: { $exists: false } }, { password: null }],
+    });
 
     if (!parent) {
-      return res.status(400).json({
-        message: 'Activation details are invalid or the code has expired. Ask the school office for a new code.',
+      return res.status(409).json({
+        message: 'This account is not waiting for first-time password setup.',
       });
     }
 
@@ -67,7 +95,7 @@ export const activateParent = async (req, res) => {
     await parent.save();
 
     const token = signParentToken(parent._id, parent.phone, parent.tokenVersion);
-    res.json({ token, parent: parentSessionView(parent), message: 'Account activated.' });
+    res.json({ token, parent: parentSessionView(parent), message: 'Password created.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -750,5 +778,99 @@ export const updatePurchaseApproval = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================================================
+   ✅ DELETE PARENT ACCOUNT
+   The parent's own route out. Both stores require one for any app that has
+   accounts, and the office's archive route is not it: that needs a member of
+   staff.
+
+   Server-side this is the same transition archiveParent performs. The row
+   survives because approvals, notifications and the students' ledger all
+   resolve a parent id — what goes is everything that gets anyone back into
+   the account, and every device it was reaching. The privacy policy says so
+   in as many words; if that stops being true, that page changes too.
+========================================================= */
+export const deleteParentAccount = async (req, res) => {
+  try {
+    const { password } = req.body || {};
+
+    if (!password) {
+      return res.status(400).json({
+        message: "Your account password is required to delete your account.",
+      });
+    }
+
+    const parent = await Parent.findById(req.parent.id);
+
+    /* Same 401-without-a-code as resetPurchasePassword: a mistyped password is
+       a form error, and the app signs out on AUTH_REQUIRED alone. */
+    if (!parent || !parent.password || !(await bcrypt.compare(password, parent.password))) {
+      return res.status(401).json({ message: "Your account password is incorrect." });
+    }
+
+    /* The same refusal the office gets, in the parent's words. Answering the
+       request is a movement of money, and a deletion route is the wrong place
+       to decide it either way.
+
+       This check and the save below are not one transaction, so an approval
+       raised in the gap between them survives against an archived parent, with
+       nobody able to answer it. The race is accepted, not missed: the window is
+       the few milliseconds between two queries, the till only raises an order
+       against a parent it just read as active, and the cost of closing it — a
+       transaction, or a second check after the write with a rollback behind
+       it — buys less than it complicates. An order stranded that way is
+       recoverable from the office; the deletion is not undone by leaving it. */
+    if (await PendingOrder.exists({
+      parentId: parent._id,
+      status: { $in: ['PENDING', 'PROCESSING'] },
+    })) {
+      return res.status(409).json({
+        message: "You have a purchase waiting for your answer. Answer it before deleting your account.",
+      });
+    }
+
+    parent.active = false;
+    parent.archivedAt = new Date();
+    parent.archivedBy = null;
+    parent.archivedReason = 'parent';
+    parent.password = undefined;
+    parent.pushTokens = [];
+    parent.fcmToken = null;
+    parent.resetPasswordToken = undefined;
+    parent.resetPasswordExpire = undefined;
+    /* Ends every session this account has on every device at once, including
+       the one that sent this request. */
+    parent.tokenVersion = (parent.tokenVersion ?? 0) + 1;
+
+    await parent.save();
+
+    /* The deletion is done at the line above. What follows only puts the
+       students' cached `isParentRegistered` back in step, and it must never be
+       able to fail the request: the account is already archived and its
+       password already gone, so a 500 here would tell the parent to try again,
+       and the retry would answer "Your account password is incorrect" before
+       the next navigation dropped them on the expired-session screen. That is
+       the exact sentence this screen exists to avoid.
+
+       So the parent is told the truth — it worked — and the stale flag is
+       logged instead. A roster row reading `isParentRegistered: true` with no
+       active parent behind it is a cosmetic lie the office can correct; either
+       archive route re-running this sync repairs it. */
+    try {
+      await syncStudentRegistration((parent.studentIds || []).map(String));
+    } catch (syncError) {
+      console.error(
+        "Parent account deleted, but student registration flags are now stale for parent",
+        String(parent._id),
+        syncError,
+      );
+    }
+
+    res.json({ message: "Your account has been deleted." });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

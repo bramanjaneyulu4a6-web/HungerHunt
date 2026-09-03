@@ -71,7 +71,7 @@ test('archived student search is paged, filtered, and sorted on the server', asy
   assert.deepEqual({ page: body.page, pages: body.pages, total: body.total }, { page: 3, pages: 3, total: 121 });
 });
 
-test('a recovery code reactivates the parent and revokes existing sessions', async () => {
+test('requiring password setup reactivates the parent and revokes existing sessions', async () => {
   authenticate();
   const account = {
     _id: PARENT_ID,
@@ -83,11 +83,11 @@ test('a recovery code reactivates the parent and revokes existing sessions', asy
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
   mock.method(Student, 'updateOne', async () => ({ modifiedCount: 1 }));
 
-  const response = await request(`/api/admin/users/parents/${PARENT_ID}/activation-code`, { method: 'POST' });
+  const response = await request(`/api/admin/users/parents/${PARENT_ID}/require-password-setup`, { method: 'POST' });
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.match(body.activationCode, /^\d{6}$/);
+  assert.match(body.message, /password setup required/i);
   assert.equal(account.active, true);
   assert.equal(account.activationRequired, true);
   assert.equal(account.tokenVersion, 5);
@@ -113,6 +113,30 @@ test('archiving a parent is recoverable and ends their sessions', async () => {
   assert.equal(account.active, false);
   assert.equal(account.tokenVersion, 2);
   assert.equal(String(account.archivedBy), ADMIN_ID);
+});
+
+test('archiving a parent from the console records that staff did it', async () => {
+  authenticate();
+  const saved = [];
+  const account = {
+    _id: PARENT_ID,
+    fatherName: 'Dev Rao', phone: '9876543210', email: 'dev@example.com',
+    studentIds: [], active: true, tokenVersion: 3,
+    pushTokens: [{ token: 't', platform: 'android' }],
+    save: async function () { saved.push(this); return this; },
+  };
+  mock.method(Parent, 'findById', async () => account);
+  mock.method(Parent, 'exists', async () => null);
+  mock.method(PendingOrder, 'exists', async () => null);
+  mock.method(Student, 'updateOne', async () => ({ modifiedCount: 1 }));
+
+  const response = await request(`/api/admin/users/parents/${PARENT_ID}`, { method: 'DELETE' });
+
+  assert.equal(response.status, 200);
+  assert.equal(saved[0].archivedReason, 'admin');
+  assert.equal(saved[0].active, false);
+  assert.equal(saved[0].tokenVersion, 4);
+  assert.deepEqual(saved[0].pushTokens, []);
 });
 
 test('the final active admin cannot be demoted or deactivated', async () => {

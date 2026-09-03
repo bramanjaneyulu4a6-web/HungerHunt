@@ -16,7 +16,10 @@ have their own list: [docs/android-apk-builds.md](docs/android-apk-builds.md).
 
 ## Before the first release
 
-These are open items, not formalities. Each one is a real gap today.
+The unticked ones are open items, not formalities: each is a real gap today.
+The ticked ones are settled — a decision taken deliberately, or work that has
+landed — and they stay on the page because both stores ask about them and the
+answer has to be findable at the moment the form does.
 
 - [ ] **Rotate every credential that was committed to git.** They were removed
       from tracking, which does not remove them from history — anyone who has
@@ -125,68 +128,106 @@ These are open items, not formalities. Each one is a real gap today.
       it at the kiosk with their own code. Students whose parents have never
       registered cannot be billed from the console at all.
 
-- [ ] **Decide what the store listings say.** Both stores ask the same
-      question in different words, and this app has an answer neither of them
-      treats lightly: it shows a named child's wallet balance and itemised
-      spending to an adult identified by a phone number. Everything below is
-      the store's requirement, not a legal opinion — the privacy answers in
+- [x] **In-app account deletion shipped.** Both stores require a way out of the
+      app for anything that has accounts, and the office's archive route is not
+      it — that one needs a member of staff. The parent's own route is
+      **Account → Delete my account** (`frontend-parent/src/pages/Account.jsx`,
+      at `/account`), which calls `DELETE /api/parent/account`
+      (`deleteParentAccount` in `backend/controllers/parentController.js`). It
+      asks for the account password, then ends every session on every device
+      including the one that pressed the button, drops the stored password and
+      every notification device it was reaching, and stops that parent standing
+      as their children's registered parent. It refuses while a purchase is
+      waiting for their answer, because answering one moves money and a
+      deletion route is the wrong place to decide it either way. The children's
+      balances and purchase history stay with the school — the privacy policy
+      says so in as many words, and the wording both consoles are given is in
+      [docs/store-listing.md](docs/store-listing.md). Covered by
+      `backend/tests/parentAccountDeletion.test.js`.
+
+- [x] **iOS export compliance is answered in the build.**
+      `ITSAppUsesNonExemptEncryption` is `false` in
+      `frontend-parent/ios/App/App/Info.plist`. The app makes HTTPS calls and
+      nothing more, which is the standard Category 5 Part 2 exemption; putting
+      the answer in the plist stops App Store Connect asking it by hand on
+      every single upload.
+
+- [ ] **Decide what the store listings say — then copy it out of
+      [docs/store-listing.md](docs/store-listing.md).** Both stores ask the
+      same question in different words, and this app has an answer neither of
+      them treats lightly: it shows a named child's wallet balance and itemised
+      spending to an adult identified by a phone number. What that file holds
+      is the store's requirement, not a legal opinion — the privacy answers in
       particular need whoever owns the school's data policy to sign them off,
       not whoever builds the app.
 
-      *Apple, in App Store Connect:*
-      - App record created under the right team, bundle id
-        `com.hungerhunt.parent`.
-      - Privacy policy URL and support URL. Both are required fields; neither
-        can be a placeholder.
-      - Privacy nutrition labels covering, at minimum, name, phone number,
-        purchase history and identifiers, and whether any of it is linked to
-        the user.
-      - Age rating, and an answer to whether the app is directed at children —
-        the data is *about* children, but the account holder is a parent, and
-        which of those Apple's Kids Category rules follow is the call to get
-        right before submitting rather than after a rejection.
-      - Screenshots for every required device class (6.9" and 6.5" iPhone at
-        least).
-      - A working demo parent account plus notes for App Review, since every
-        screen is behind a login they cannot create themselves.
-      - Export compliance: the app makes HTTPS calls and nothing more, which
-        is the standard exemption — declare it, do not skip it.
-      - Push notification purpose, if asked: transactional account activity,
-        not marketing.
-      - Account deletion. Apple requires an in-app route to delete the account
-        for any app that lets you create one. Parent accounts here are created
-        by the school, which is the argument for exemption — make that
-        argument deliberately and explain the activation flow in review notes.
-      - Build with Xcode 26 / the iOS 26 SDK. This is required for submissions
-        after 28 April 2026. The local unsigned Release build has been checked
-        with Xcode 26; the signed archive still needs the distribution profile.
+      Every field either console asks for is written there once and measured
+      against its character limit: names and descriptions, Apple's privacy
+      labels and Google's Data Safety answers, the age rating and the
+      directed-at-children call, the review notes, and what the reviewer's
+      account has to be able to see. Screenshots and graphics — the shot list,
+      the exact size each store demands, and the script that turns raw captures
+      into them — are in [docs/store-assets.md](docs/store-assets.md). Copy out
+      of those files into the consoles and never back the other way: the two
+      stores ask overlapping questions, and answering each console on its own
+      is how they end up disagreeing with each other and with the app.
 
-      *Google, in Play Console:*
-      - App record, and Play App Signing enrolled at creation (it cannot be
-        added later without a key reset).
-      - Data Safety form — separate from Apple's labels, asks about collection
-        *and* sharing *and* encryption in transit, and is cross-checked
-        against observed behaviour.
-      - Privacy policy URL, content rating questionnaire, and target audience.
-        Naming a child audience pulls in the Families policy and its own
-        review; naming an adult one has to be true of the actual listing.
-      - App access: reviewer credentials for a parent account, or the whole
-        app looks like a login screen.
-      - Screenshots and a 1024×500 feature graphic.
-      - Ship to the internal testing track first and install from it. It is
-        the only way to find out that the signed bundle behaves before
-        production does.
-      - Target Android 16 / API 36 for submissions from 31 August 2026. The
-        project already targets API 36.
-      - If this is a new personal developer account created after 13 November
-        2023, complete Google's closed test with at least 12 opted-in testers
-        for 14 continuous days before applying for production access.
+      Two toolchain deadlines are not listing copy, so they are not in that
+      file. Apple requires Xcode 26 / the iOS 26 SDK for submissions after
+      28 April 2026 — the local unsigned Release build has been checked with
+      Xcode 26, and the signed archive still needs the distribution profile.
+      Play requires Android 16 / API 36 from 31 August 2026, and
+      `frontend-parent/android/variables.gradle` already targets 36.
 
       Official references: [Apple submission requirements](https://developer.apple.com/app-store/submitting/),
       [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app/),
       [Google target API requirements](https://support.google.com/googleplay/android-developer/answer/11926878),
       [Google testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465),
       and [Google account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111).
+
+- [ ] **Decide whether this is an iPhone app or an iPhone-and-iPad app. It is
+      currently both, and nobody chose that.**
+      `frontend-parent/ios/App/App.xcodeproj/project.pbxproj` sets
+      `TARGETED_DEVICE_FAMILY = "1,2"` in both build configurations — Debug at
+      line 328, Release at line 351. Family 1 is iPhone, family 2 is iPad. That
+      is Capacitor's default, inherited rather than decided, and it is the more
+      expensive of the two answers. Nothing in this repo changes it for you:
+      it is a product call, not a build detail.
+
+      **Option A — narrow it to iPhone.** Set both lines to `"1"`. App Store
+      Connect then stops requiring iPad screenshots, and App Review stops
+      testing on an iPad. The app still installs and runs on one, in the iPhone
+      compatibility window, which is what most single-school apps do.
+
+      **Option B — keep iPad.** Then a **13" iPad screenshot set — 2064 × 2752,
+      portrait — is required before the build can be submitted at all**, and
+      App Review will run the entire app on an iPad and file whatever it finds
+      there against the submission. That means capturing the shot list a second
+      time on an iPad (see [docs/store-assets.md](docs/store-assets.md)) and
+      checking the layout at that width first, because no screen in this app
+      has been designed for it. The tooling is ready either way:
+      `scripts/store-screenshots.mjs` already emits an `apple-ipad-13/`
+      directory alongside the two iPhone sizes.
+
+      Leaving the file alone is not a way of avoiding the decision — it *is*
+      option B, taken by default. The moment that becomes expensive is the
+      upload, which is the worst moment to find out.
+
+- [ ] **Run Play's closed test: 12 opted-in testers, 14 continuous days.** Not
+      a condition to check — this is a personal developer account created after
+      13 November 2023, and Google will not let it so much as *apply* for
+      production access until a closed test has held at least 12 testers who
+      opted in, unbroken for 14 days. The clock starts when the test starts, so
+      recruiting is the thing to begin before the build is finished. It is also
+      the only way to find out how the signed bundle behaves before production
+      does.
+
+      Android parents need something to use in the meantime, and that is a
+      signed APK installed by hand: `npm run apk:release --prefix
+      frontend-parent`, off the same keystore and the same pre-build checks as
+      the Play bundle. It has its own section, including the uninstall every
+      sideloader has to do when the Play version finally arrives:
+      [The parent app's interim APK](docs/android-apk-builds.md#the-parent-apps-interim-apk).
 
 ---
 
@@ -219,6 +260,40 @@ the build numbers still have to be incremented deliberately for each upload.
       loudly on a laptop.
 - [ ] Backend `PARENT_CLIENT_URL` points at the deployed parent app, or the
       password-reset emails link somewhere nobody can reach.
+- [ ] **Both payment flags are set deliberately — and the release build now
+      refuses to run until they are.** Both default the wrong way round for a
+      store build: `frontend-parent/src/services/payments.js` turns payments on
+      only when `VITE_PAYMENTS_ENABLED` is exactly `true`, and leaves the demo
+      on unless `VITE_DEMO_UPI_ENABLED` is exactly `false`;
+      `PendingApprovalCard.jsx` runs the demo when either of those holds.
+      `frontend-parent/.env` sets neither today, so a release built on the
+      defaults shows parents a payment screen labelled as a preview that never
+      moves any money. Apple rejects placeholder or demo functionality under
+      guideline 2.2, and Google requires a submitted app to be fully
+      functional.
+
+      That is no longer left to somebody reading this line.
+      `scripts/validate-frontend-release-env.mjs` now asserts both flags, and
+      every release path runs it — `check:release` and `build:release`, and
+      through them `sync:release`, `bundle:android` and `apk:release`. It
+      refuses the build unless `VITE_DEMO_UPI_ENABLED` is exactly `false`, and
+      unless `VITE_PAYMENTS_ENABLED` is explicitly `true` or `false`.
+
+      The asymmetry between those two is the decision itself, so it is worth
+      keeping in view: **shipping without payments is a legitimate choice**, and
+      the check does not demand `true`. What it refuses is shipping on a
+      default nobody chose. The demo checkout is not a choice at all — there is
+      no combination of flags that ships it.
+
+      Setting the flags is still only half of it, and the half nothing checks:
+      real payments also need the backend's `PHONEPE_*` credentials (listed in
+      `backend/.env.example`), or the app offers a checkout the server cannot
+      start. The other way out is to submit with payments off and cut the
+      payments paragraphs from both descriptions and both sets of review notes
+      in [docs/store-listing.md](docs/store-listing.md), so the listing stops
+      describing a feature the reviewer will not find. Either decision is fine.
+      Not making one is now a failed build rather than a rejected submission,
+      which is the cheaper place to find out.
 - [ ] Backend is running with `NODE_ENV=production` and `TRUST_PROXY` set to
       the number of proxy hops in front of it. Without `TRUST_PROXY` every
       request looks like it came from the proxy, so all parents share one
@@ -231,7 +306,7 @@ on every push and pull request ([.github/workflows/ci.yml](.github/workflows/ci.
 Run these locally before tagging anyway — CI does not compile the native shells.
 
 ```bash
-npm test            --prefix backend            # 458 tests, all mocked; no database is touched
+npm test            --prefix backend            # 705 tests, all mocked; no database is touched
 npm test            --prefix frontend-parent    # validation and formatting unit tests
 npm run lint        --prefix frontend-parent    # must be 0 errors, 0 warnings
 npm run lint        --prefix hungerhunt-kiosk
@@ -239,7 +314,9 @@ npm run build       --prefix frontend-parent
 npm run build       --prefix frontend-admin
 npm run build       --prefix hungerhunt-kiosk
 node scripts/check-shared-files.mjs             # the files duplicated across apps still match
-VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run sync:release --prefix frontend-parent
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api \
+  VITE_PAYMENTS_ENABLED=true VITE_DEMO_UPI_ENABLED=false \
+  npm run sync:release --prefix frontend-parent
 ```
 
 - [ ] All of the above pass.
@@ -283,12 +360,16 @@ cd frontend-parent
 
 # 1. Android. Validate versions, native/Firebase files, the production API and
 #    signing; then build, sync both native shells, and create the Play bundle.
-#    Set the URL in .env or supply it for this command as shown. It needs
+#    Set the URL in .env or supply it for this command as shown — along with
+#    the two payment flags from section 2, which this now refuses to build
+#    without. It needs
 #    android/app/google-services.json and a release keystore
 #    (see "Signing", below). With no keystore configured this now refuses to
 #    start, in about a second, naming the values it could not find — rather
 #    than building an unsigned .aab that Play rejects at the end of the upload.
-VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run bundle:android
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api \
+  VITE_PAYMENTS_ENABLED=true VITE_DEMO_UPI_ENABLED=false \
+  npm run bundle:android
 #    → android/app/build/outputs/bundle/release/app-release.aab
 
 # 2. iOS. The command above has already synced its production bundle. Archiving
@@ -302,25 +383,32 @@ npx cap open ios
 
 **Signing — manual, and not from this repo.**
 
-- [ ] Android: the release keystore is created once, with
-      `keytool -genkeypair -v -keystore <path outside the repo>.jks -alias upload
-      -keyalg RSA -keysize 2048 -validity 10000`, and referenced from a
-      `keystore.properties` that is **not** committed (`.gitignore` already
-      covers `*.jks`, `*.keystore` and `keystore.properties`). Type the
-      password at the prompt rather than passing it on the command line, where
-      it lands in shell history. Copy
-      [frontend-parent/android/keystore.properties.example](frontend-parent/android/keystore.properties.example)
-      to `keystore.properties` and fill in the four values; every one of them
-      can come from an environment variable instead, named in that file, which
-      is how a build machine supplies them.
-- [ ] `validity 10000` is not a formality. The key must outlive every update
-      the app will ever have: Play refuses an upload signed with an expired
-      certificate, and there is no way to re-sign an existing listing with a
-      new one.
-- [ ] That keystore is backed up somewhere other than the machine that built
-      it. Losing it means losing the ability to update the app at all —
-      unless Play App Signing is enrolled, in which case the upload key can be
-      reset by Google and only the *upload* key is lost.
+- [x] Android: the release keystore exists on this machine.
+      `frontend-parent/android/keystore.properties` is present and filled in,
+      and points at the `.jks` upload keystore. None of it is in git —
+      `.gitignore` covers `*.jks`, `*.keystore` and `keystore.properties`. For
+      any of those four values the file does not supply, the build falls back
+      to an environment variable named in
+      [keystore.properties.example](frontend-parent/android/keystore.properties.example),
+      which is how a build machine supplies them. Note the direction: the file
+      wins wherever it has a value, one value at a time, so an environment
+      variable set against a key the file already fills is ignored rather than
+      obeyed. If the keystore ever has to be made again it is
+      `keytool -genkeypair -v -keystore <path outside the repo>.jks -alias
+      upload -keyalg RSA -keysize 2048 -validity 10000`, with the password
+      typed at the prompt rather than passed on the command line where it
+      lands in shell history.
+- [ ] The certificate in that keystore outlives every update the app will ever
+      have. `-validity 10000` is not a formality: Play refuses an upload signed
+      with an expired certificate, and there is no way to re-sign an existing
+      listing with a new one. Check it with
+      `keytool -list -v -keystore <path>.jks` before the first upload rather
+      than in year ten.
+- [ ] **That keystore is backed up somewhere other than the machine that built
+      it.** Still open, and it is the one item on this page that nothing later
+      can recover from. Losing it means losing the ability to update the app at
+      all — unless Play App Signing is enrolled, in which case Google can reset
+      the upload key and only the *upload* key is lost.
 - [ ] iOS: an Apple Developer team is selected on the *App* target, the
       Distribution certificate exists, and the App ID
       `com.hungerhunt.parent` carries the Push Notifications entitlement.
@@ -348,6 +436,9 @@ On a real device, against production, signed in as a real parent:
       arrive with the app backgrounded, appear with it open, and open that
       child's page when tapped. This is the one path that only works if the
       manual push setup above was completed correctly.
+- [ ] Open **Account**: your own details are right, all four policy pages open,
+      and **Delete my account** refuses a wrong password inside the dialog
+      without signing you out. Do not complete the deletion on a real account.
 - [ ] Force-quit and reopen: the session is restored rather than bouncing to
       the login screen.
 
@@ -357,18 +448,18 @@ On a real device, against production, signed in as a real parent:
 
 Worth knowing when deciding how much the green checkmarks are worth.
 
-- **The parent app has utility tests, not screen-level tests.** Validation and
-  formatting behaviour now run in CI, and backend tests cover the API surface
-  and auth, but no automated test drives a parent workflow through the UI;
-  those are still verified by hand in section 5.
+- **The parent app has utility tests, not screen-level tests.** Validation,
+  formatting, the payment hold and the demo-UPI helper all run in CI, and
+  backend tests cover the API surface and auth, but no automated test drives a
+  parent workflow through the UI; those are still verified by hand in
+  section 5.
 - **Nothing tests the native shells.** CI runs on Linux and builds the web
   bundle only; iOS and Android are exercised only by an actual release.
-- **`npm run build` still has a silent fallback.** `src/services/api.js`
-  defaults to `http://localhost:5000/api` when `VITE_API_BASE_URL` is unset —
-  and 5000 is the port this repo already moved off. A plain `build` with no env
-  file therefore succeeds, ships, and reaches nothing. `npm run build:release`
-  is the one that refuses; the plain target is left permissive because CI
-  builds without an env file on every push.
+- **`npm run build` still has a silent fallback.** `src/services/api.js:6`
+  defaults to `http://localhost:5001/api` when `VITE_API_BASE_URL` is unset. A
+  plain `build` with no env file therefore succeeds, ships, and reaches
+  nothing. `npm run build:release` is the one that refuses; the plain target is
+  left permissive because CI builds without an env file on every push.
 - **The browser build is not an offline app.** `public/manifest.webmanifest`
   now exists and `index.html` links it, so a browser can add it to a home
   screen — but the only service worker is the Firebase push worker, which

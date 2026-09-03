@@ -29,7 +29,7 @@ Updated: 2026-08-27
 - CI tests and lints the backend, builds all four clients, checks shared files,
   and lints all four clients with zero warnings.
 - Admin's Users workspace has paginated Students, Parents, Staff and Archived
-  tabs. It supports parent provisioning and one-time activation, parent and
+  tabs. It supports parent provisioning with first-time SMS verification, parent and
   staff lifecycle management, linked-parent status, atomic spreadsheet import
   with exact invalid-cell reporting, and archived-student restoration.
 - The student self-service kiosk is intentionally public at the device level:

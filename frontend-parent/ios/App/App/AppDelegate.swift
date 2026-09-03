@@ -13,6 +13,10 @@ import FirebaseCore
 import FirebaseMessaging
 #endif
 
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
+
 enum PushSetupError: LocalizedError {
     case firebaseSDKMissing
     case firebaseNotConfigured
@@ -117,8 +121,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
+        #if canImport(FirebaseAuth)
+        // Firebase's automatic app-delegate proxy is disabled for Capacitor
+        // push handling, so phone-auth reCAPTCHA callbacks are forwarded here.
+        if Auth.auth().canHandle(url) {
+            return true
+        }
+        #endif
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

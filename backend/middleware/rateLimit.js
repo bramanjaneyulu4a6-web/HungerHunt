@@ -43,11 +43,11 @@ export const searchLimiter = rateLimit({
   message: { message: "Too many searches. Please slow down." },
 });
 
-/* The payment limiters below key by parent account, not IP: they are mounted
-   after protectParent, so a parent id is always present, and a school's
-   worth of parents behind one NAT must never share a bucket on the routes
-   their money moves through. The IP fallback exists only for safety if a
-   limiter is ever mounted before the auth gate. */
+/* The limiters below key by parent account, not IP: they are mounted after
+   protectParent, so a parent id is always present, and a school's worth of
+   parents behind one NAT must never share a bucket on the routes their money
+   moves through, or the one that ends their account. The IP fallback exists
+   only for safety if a limiter is ever mounted before the auth gate. */
 const parentKeyGenerator = (req) =>
   (req.parent?.id ? `parent:${req.parent.id}` : ipKeyGenerator(req.ip));
 
@@ -85,6 +85,27 @@ export const paymentStatusLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many status checks. Please wait a moment and try again." },
+});
+
+/* Deleting an account asks for the account password, which makes the route
+   guessable the way the login route is: a stolen phone left unlocked must not
+   be a cheap way to try passwords. authLimiter is the wrong tool for it even
+   so. That one keys by IP, and this route sits behind protectParent — ten
+   fumbled attempts by one parent would spend the bucket every other parent on
+   the school's NAT signs in through, and a deletion nobody completed would
+   lock the whole school out of the app for fifteen minutes.
+
+   The account is what is being guessed at, so the account is the bucket. Same
+   ceiling as authLimiter's, and generous for what it guards: a parent deleting
+   their own account types one password, twice if they fumble it. */
+export const accountDeleteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: parentKeyGenerator,
+  skip: skipAuthLimitsInDevelopment,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again in a few minutes." },
 });
 
 /* The public return-page read has no account to key on, and IP is the wrong

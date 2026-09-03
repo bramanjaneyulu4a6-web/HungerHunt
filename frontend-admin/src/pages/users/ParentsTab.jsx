@@ -3,13 +3,13 @@ import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
-import { Badge, Banner, Button, EmptyState, Skeleton } from '../../components/ui';
+import { Badge, Button, EmptyState, Skeleton } from '../../components/ui';
 
 const EMPTY = { fatherName: '', phone: '', email: '', studentIds: [] };
 
 const statusOf = (parent) => {
   if (!parent.active) return ['Inactive', 'neutral'];
-  if (parent.activationRequired) return ['Awaiting activation', 'warn'];
+  if (parent.activationRequired) return ['Password setup pending', 'warn'];
   return ['Active', 'success'];
 };
 
@@ -20,7 +20,6 @@ export default function ParentsTab({ parents, loading, onChanged }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState(null);
-  const [activation, setActivation] = useState(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOptions, setStudentOptions] = useState([]);
   const [studentOptionsLoading, setStudentOptionsLoading] = useState(false);
@@ -106,17 +105,10 @@ export default function ParentsTab({ parents, loading, onChanged }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const response = editing
+      editing
         ? await api.put(`/admin/users/parents/${editing.id}`, form)
         : await api.post('/admin/users/parents', form);
-      if (response.data.activationCode) {
-        setActivation({
-          parentName: form.fatherName,
-          code: response.data.activationCode,
-          expiresAt: response.data.activationCodeExpire,
-        });
-      }
-      toast.success(editing ? 'Parent account updated' : 'Parent account created');
+      toast.success(editing ? 'Parent account updated' : 'Parent created. They can verify their phone and create a password.');
       close();
       await onChanged();
     } catch (error) {
@@ -126,22 +118,18 @@ export default function ParentsTab({ parents, loading, onChanged }) {
     }
   };
 
-  const issueCode = async (parent) => {
+  const requirePasswordSetup = async (parent) => {
     const message = parent.active
-      ? `Issue a new activation code for ${parent.fatherName}? Every existing session will be signed out.`
-      : `Reactivate ${parent.fatherName} and issue a new activation code?`;
+      ? `Require ${parent.fatherName} to verify their phone and create a new password? Every existing session will be signed out.`
+      : `Reactivate ${parent.fatherName}? They will verify their phone by SMS and create a password.`;
     if (!window.confirm(message)) return;
     setWorkingId(parent.id);
     try {
-      const response = await api.post(`/admin/users/parents/${parent.id}/activation-code`);
-      setActivation({
-        parentName: parent.fatherName,
-        code: response.data.activationCode,
-        expiresAt: response.data.activationCodeExpire,
-      });
+      await api.post(`/admin/users/parents/${parent.id}/require-password-setup`);
+      toast.success(parent.active ? 'New password setup required' : 'Parent account restored');
       await onChanged();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not issue an activation code');
+      toast.error(error.response?.data?.message || 'Could not update password setup');
     } finally {
       setWorkingId(null);
     }
@@ -172,7 +160,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
 
       {!parents.length ? (
         <EmptyState icon="♙" title="No parent accounts" action={<Button onClick={openCreate}>Create the first parent</Button>}>
-          Parents cannot register themselves. Create their account here and give them the one-time code.
+          Parents cannot register themselves. Create their account here; their first sign-in verifies the registered phone by SMS.
         </EmptyState>
       ) : (
         <div className="table-wrap">
@@ -204,8 +192,8 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   <td data-label="Status"><Badge variant={variant}>{status}</Badge></td>
                   <td data-label="Actions"><div className="cell-actions">
                     <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>
-                    <Button className="btn--sm" variant="ghost" disabled={workingId === parent.id} onClick={() => issueCode(parent)}>
-                      {parent.active ? 'Recovery code' : 'Reactivate'}
+                    <Button className="btn--sm" variant="ghost" disabled={workingId === parent.id} onClick={() => requirePasswordSetup(parent)}>
+                      {parent.active ? 'Reset access' : 'Reactivate'}
                     </Button>
                     {parent.active && <Button className="btn--sm" variant="danger" disabled={workingId === parent.id} onClick={() => archive(parent)}>Archive</Button>}
                   </div></td>
@@ -242,17 +230,6 @@ export default function ParentsTab({ parents, loading, onChanged }) {
         </div>
       )}
 
-      {activation && (
-        <div className="modal-backdrop" onClick={() => setActivation(null)}>
-          <div className="modal activation-card" style={{ maxWidth: 440 }} onClick={(event) => event.stopPropagation()}>
-            <h3 className="modal-title">One-time activation code</h3>
-            <Banner variant="warn">Show this code to {activation.parentName} through a trusted channel. It is displayed only here.</Banner>
-            <div className="activation-code">{activation.code}</div>
-            <p className="modal-note">Expires {new Date(activation.expiresAt).toLocaleString()}. The parent enters it with their phone number, chooses a password, and is signed in.</p>
-            <div className="modal-actions"><Button variant="ghost" onClick={() => navigator.clipboard?.writeText(activation.code)}>Copy code</Button><Button onClick={() => setActivation(null)}>Done</Button></div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

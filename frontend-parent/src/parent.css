@@ -1597,6 +1597,47 @@ body {
   gap: 18px;
 }
 
+.login-password-reveal,
+.auth-password-create {
+  transform-origin: top;
+  animation: login-field-grow 360ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+
+.auth-inline-button,
+.auth-text-button {
+  border: 0;
+  background: transparent;
+  color: var(--parent-brand-deep);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.auth-inline-button {
+  min-height: 20px;
+  padding: 0;
+  font-size: 12px;
+}
+
+.auth-text-button {
+  min-height: 44px;
+  margin: -4px auto 0;
+  padding: 8px 12px;
+}
+
+.auth-inline-button:disabled,
+.auth-text-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.auth-step-copy {
+  margin: 0;
+  color: var(--parent-muted);
+  line-height: 1.6;
+  text-align: center;
+}
+
 .auth-field {
   gap: 7px;
   text-align: left;
@@ -2475,6 +2516,17 @@ body {
   from { opacity: 0; transform: translateY(18px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
+
+@keyframes login-field-grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0.72) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
 @keyframes parent-float { to { transform: translate3d(16px, 20px, 0) scale(1.06); } }
 
 @media (max-width: 760px) {
@@ -2826,4 +2878,85 @@ body {
     transition: none;
   }
 
+}
+
+/* --- Account screen ------------------------------------------------- */
+
+.account-details {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.account-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.account-details dt {
+  color: var(--parent-muted);
+  font-size: 14px;
+}
+
+.account-details dd {
+  margin: 0;
+  color: var(--parent-ink);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.account-note {
+  margin: 16px 0 0;
+  color: var(--parent-muted);
+  font-size: 13px;
+}
+
+.account-policy-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.account-policy-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0;
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--parent-line);
+}
+
+.account-policy-list li:last-child a {
+  border-bottom: 0;
+}
+
+/* The one destructive surface in the app. It is set apart deliberately: a
+   parent should not be able to arrive here by mistaking it for a settings
+   toggle. */
+.account-danger {
+  border-color: var(--danger-bg-strong);
+}
+
+.account-danger p {
+  color: var(--parent-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.account-dialog-error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+/* The bottom nav is laid out as a fixed column count, so a third tab has to
+   be given room or the three share two columns. Overriding here rather than
+   editing the rule above keeps this screen's styles in one block. */
+@media (max-width: 760px) {
+  .parent-bottom-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

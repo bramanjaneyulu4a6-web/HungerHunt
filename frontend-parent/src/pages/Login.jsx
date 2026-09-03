@@ -6,6 +6,7 @@ import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../compone
 import { phoneProblem } from '../utils/validation';
 
 export default function Login() {
+  const [stage, setStage] = useState('phone');
   const [formData, setFormData] = useState({
     parentPhoneNumber: '',
     password: '',
@@ -20,6 +21,10 @@ export default function Login() {
   // dropping the parent on a bare login screen with no explanation.
   const expired = searchParams.get('expired') === '1';
 
+  // Set by the Account screen after a successful deletion, so the parent lands
+  // on a sentence about what they just did rather than the expired-session one.
+  const deleted = searchParams.get('deleted') === '1';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -27,9 +32,27 @@ export default function Login() {
     const problem = phoneProblem(formData.parentPhoneNumber);
     if (problem) return setError(problem);
 
+    if (stage === 'password' && !formData.password) return setError('Enter your password.');
+
     setSubmitting(true);
 
     try {
+      if (stage === 'phone') {
+        const response = await API.post('/parent/login-step', {
+          parentPhoneNumber: formData.parentPhoneNumber,
+        });
+
+        if (response.data.next === 'VERIFY_PHONE') {
+          sessionStorage.setItem('firstPasswordPhone', formData.parentPhoneNumber);
+          navigate('/create-password');
+          return;
+        }
+
+        setStage('password');
+        setSubmitting(false);
+        return;
+      }
+
       const res = await API.post('/parent/login', formData);
 
       login(res.data.token, res.data.parent);
@@ -49,10 +72,9 @@ export default function Login() {
       logo="/Logo.jpeg"
       eyebrow="Hunger Hunt Parent"
       title="Parent Login"
-      subtitle="Enter your phone number and password to access your account"
+      subtitle={stage === 'phone' ? 'Enter your registered phone number to continue' : 'Enter your password to access your account'}
       footer={
         <span className="auth-footer-stack">
-          <span>Have a school-issued code? <Link to="/activate">Activate account</Link></span>
           <span className="auth-policy-links">
             <Link to="/terms-and-conditions">Terms</Link>
             <Link to="/privacy-policy">Privacy</Link>
@@ -68,13 +90,19 @@ export default function Login() {
         </Banner>
       )}
 
+      {deleted && !error && (
+        <Banner variant="success" icon="✅" style={{ marginBottom: 28 }}>
+          Your account has been deleted. Ask your school office if you want it back.
+        </Banner>
+      )}
+
       {error && (
         <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
           {error}
         </Banner>
       )}
 
-      <form onSubmit={handleSubmit} className="auth-form">
+      <form onSubmit={handleSubmit} className="auth-form login-form">
         <AuthField
           id="phone"
           label="Phone Number"
@@ -82,42 +110,53 @@ export default function Login() {
           inputMode="numeric"
           autoComplete="tel"
           required
+          readOnly={stage === 'password'}
           placeholder="e.g. 9876543210"
           value={formData.parentPhoneNumber}
           maxLength={10}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              parentPhoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10),
-            })
-          }
+          onChange={(e) => setFormData({
+            ...formData,
+            parentPhoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10),
+          })}
+          aside={stage === 'password' ? (
+            <button
+              type="button"
+              className="auth-inline-button"
+              onClick={() => {
+                setStage('phone');
+                setFormData({ ...formData, password: '' });
+                setError('');
+              }}
+            >
+              Edit
+            </button>
+          ) : null}
         />
 
-        <PasswordField
-          id="password"
-          label="Password"
-          autoComplete="current-password"
-          required
-          placeholder="••••••••"
-          value={formData.password}
-          onChange={(e) =>
-            setFormData({ ...formData, password: e.target.value })
-          }
-          aside={
-            <Link to="/forgot-password" className="auth-link">
-              Forgot password?
-            </Link>
-          }
-        />
+        {stage === 'password' && (
+          <div className="login-password-reveal">
+            <PasswordField
+              id="password"
+              label="Password"
+              autoComplete="current-password"
+              autoFocus
+              required
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              aside={<Link to="/forgot-password" className="auth-link">Forgot password?</Link>}
+            />
+          </div>
+        )}
 
         <Button
           type="submit"
           variant="dark"
           block
           className="auth-submit"
-          disabled={submitting}
+          disabled={submitting || (stage === 'phone' && formData.parentPhoneNumber.length !== 10)}
         >
-          {submitting ? 'Signing in…' : 'Sign in securely'}
+          {submitting ? (stage === 'phone' ? 'Checking…' : 'Signing in…') : (stage === 'phone' ? 'Continue' : 'Sign in securely')}
         </Button>
       </form>
     </AuthLayout>

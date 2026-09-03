@@ -921,12 +921,9 @@
 }
 
 /* The caretaker receives the hostel shipment as one handoff, then finds the
-   student inside it. Keep that whole-shipment fact in view while the individual
-   package list scrolls underneath. */
+   student inside it. The summary remains part of the page flow so it does not
+   cover individual orders while the caretaker scrolls. */
 .caretaker-hostel-order {
-  position: sticky;
-  z-index: 20;
-  top: 10px;
   margin-bottom: 18px;
   box-shadow: var(--shadow-raised);
 }

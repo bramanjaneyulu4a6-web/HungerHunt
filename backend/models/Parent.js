@@ -18,18 +18,27 @@ const parentSchema = new mongoose.Schema(
 
   password: String,
 
-  // Parent accounts are provisioned by the office. Until the one-time code is
-  // used there is deliberately no usable password, and an archived account is
-  // retained so old approvals and notifications keep a resolvable parent id.
+  // Parent accounts are provisioned by the office. Until the registered phone
+  // is proved by Firebase SMS there is deliberately no usable password, and an
+  // archived account is retained so old approvals keep a resolvable parent id.
   active: { type: Boolean, default: true, index: true },
   // False preserves already-existing password accounts during deployment.
   // Every account created by the new admin flow explicitly sets this true.
   activationRequired: { type: Boolean, default: false },
+  // Legacy activation-code fields. New accounts never receive either value;
+  // first-password setup clears them from accounts created by older builds.
   activationCodeHash: { type: String, select: false },
   activationCodeExpire: Date,
   activatedAt: Date,
   archivedAt: Date,
   archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+
+  // Who closed the account. 'admin' is the office doing it from the console;
+  // 'parent' is the parent deleting it from their own phone, where archivedBy
+  // is deliberately null because no member of staff was involved. Rows
+  // archived before this field existed have neither, and read as 'admin' by
+  // circumstance rather than by record — which is true of every one of them.
+  archivedReason: { type: String, enum: ["admin", "parent"], default: undefined },
 
   studentIds: [
     {

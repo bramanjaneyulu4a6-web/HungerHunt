@@ -11,6 +11,7 @@ const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
+const firebasePhoneAuth = (await import('../utils/firebasePhoneAuth.js')).default;
 const { signAdminToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -32,7 +33,7 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 afterEach(() => mock.restoreAll());
 
-test('an admin-created parent receives a one-time code and no password', async () => {
+test('an admin-created parent waits for phone verification and has no password', async () => {
   mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
   mock.method(Student, 'find', async () => [{
     _id: STUDENT_ID, name: 'Asha', admissionNumber: '10425', hostelNumber: 'D-4', active: true,
@@ -61,13 +62,13 @@ test('an admin-created parent receives a one-time code and no password', async (
   const body = await response.json();
 
   assert.equal(response.status, 201);
-  assert.match(body.activationCode, /^\d{6}$/);
+  assert.equal(body.activationCode, undefined);
   assert.equal(created.activationRequired, true);
   assert.equal(created.password, undefined);
-  assert.notEqual(created.activationCodeHash, body.activationCode);
+  assert.equal(created.activationCodeHash, undefined);
 });
 
-test('a valid activation sets the password, consumes the code, and signs the parent in', async () => {
+test('a verified registered phone sets the password and signs the parent in', async () => {
   const account = {
     _id: PARENT_ID,
     fatherName: 'Dev Rao',
@@ -78,16 +79,20 @@ test('a valid activation sets the password, consumes the code, and signs the par
     tokenVersion: 0,
     save: async function () { return this; },
   };
-  let filter;
-  mock.method(Parent, 'findOne', (value) => {
-    filter = value;
-    return { select: async () => account };
-  });
+  mock.method(firebasePhoneAuth, 'verifyPhoneIdToken', async () => ({
+    phone_number: '+919876543210',
+    firebase: { sign_in_provider: 'phone' },
+  }));
+  mock.method(Parent, 'findOne', async () => account);
 
-  const response = await fetch(`${base}/api/parent/activate`, {
+  const response = await fetch(`${base}/api/parent/first-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parentPhoneNumber: '9876543210', activationCode: '123456', password: 'new-password' }),
+    body: JSON.stringify({
+      parentPhoneNumber: '9876543210',
+      firebaseIdToken: 'firebase-proof',
+      password: 'new-password',
+    }),
   });
   const body = await response.json();
 
@@ -97,8 +102,6 @@ test('a valid activation sets the password, consumes the code, and signs the par
   assert.equal(account.activationCodeHash, undefined);
   assert.equal(account.tokenVersion, 1);
   assert.equal(await bcrypt.compare('new-password', account.password), true);
-  assert.match(filter.activationCodeHash, /^[a-f0-9]{64}$/);
-  assert.notEqual(filter.activationCodeHash, '123456');
 });
 
 test('parent self-registration is no longer an API route', async () => {

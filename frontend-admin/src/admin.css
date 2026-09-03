@@ -578,6 +578,8 @@
 }
 
 .warehouse-ledger-card { padding: 0; overflow: hidden; }
+.fulfillment-ledger { min-height: 100vh; }
+.fulfillment-ledger .table-wrap { min-height: calc(100vh - 76px); }
 .warehouse-ledger-detail > td { padding: 0 !important; background: var(--slate-50); }
 
 .warehouse-ledger-detail__grid {
@@ -2041,17 +2043,6 @@
 .student-picker__row span,
 .student-picker__row small {
   display: block;
-}
-
-.activation-card {
-  text-align: center;
-}
-
-.activation-code {
-  margin: 24px 0 8px;
-  font-size: clamp(2rem, 9vw, 3.5rem);
-  font-weight: 800;
-  letter-spacing: .22em;
 }
 
 .import-errors {

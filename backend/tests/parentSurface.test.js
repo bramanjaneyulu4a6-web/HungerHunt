@@ -19,6 +19,7 @@ const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const firebasePhoneAuth = (await import('../utils/firebasePhoneAuth.js')).default;
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -276,11 +277,32 @@ describe('child history comes a page at a time', () => {
   });
 });
 
-describe('activation holds passwords to the same rule as the reset', () => {
+describe('phone-first login and first password setup', () => {
+  test('a registered first-time parent is sent to phone verification', async () => {
+    mock.method(Parent, 'findOne', async () => ({ activationRequired: true, password: null }));
+
+    const res = await post('/api/parent/login-step', { parentPhoneNumber: '9876543210' });
+
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).next, 'VERIFY_PHONE');
+  });
+
+  test('an existing password and an unknown number both use the password step', async () => {
+    mock.method(Parent, 'findOne', async () => ({ activationRequired: false, password: 'hash' }));
+    const existing = await post('/api/parent/login-step', { parentPhoneNumber: '9876543210' });
+
+    mock.restoreAll();
+    mock.method(Parent, 'findOne', async () => null);
+    const unknown = await post('/api/parent/login-step', { parentPhoneNumber: '9000000000' });
+
+    assert.equal((await existing.json()).next, 'PASSWORD');
+    assert.equal((await unknown.json()).next, 'PASSWORD');
+  });
+
   test('a short password is refused before any lookup', async () => {
-    const res = await post('/api/parent/activate', {
+    const res = await post('/api/parent/first-password', {
       parentPhoneNumber: '9876543210',
-      activationCode: '123456',
+      firebaseIdToken: 'firebase-proof',
       password: 'abc',
     });
 
@@ -290,23 +312,70 @@ describe('activation holds passwords to the same rule as the reset', () => {
 
   test('a missing password does not reach bcrypt', async () => {
     // bcrypt.hash(undefined) threw, and the parent saw a 500.
-    const res = await post('/api/parent/activate', {
+    const res = await post('/api/parent/first-password', {
       parentPhoneNumber: '9876543210',
-      activationCode: '123456',
+      firebaseIdToken: 'firebase-proof',
     });
 
     assert.equal(res.status, 400);
   });
 
   test('a number that cannot match the school records is refused', async () => {
-    const res = await post('/api/parent/activate', {
+    const res = await post('/api/parent/first-password', {
       parentPhoneNumber: '+91 98765 43210',
-      activationCode: '123456',
+      firebaseIdToken: 'firebase-proof',
       password: 'longenough',
     });
 
     assert.equal(res.status, 400);
     assert.match((await res.json()).message, /10-digit/);
+  });
+
+  test('a Firebase phone proof must match the registered number', async () => {
+    mock.method(firebasePhoneAuth, 'verifyPhoneIdToken', async () => ({
+      phone_number: '+919000000000',
+      firebase: { sign_in_provider: 'phone' },
+    }));
+
+    const res = await post('/api/parent/first-password', {
+      parentPhoneNumber: '9876543210',
+      firebaseIdToken: 'firebase-proof',
+      password: 'longenough',
+    });
+
+    assert.equal(res.status, 401);
+    assert.match((await res.json()).message, /does not match/i);
+  });
+
+  test('a matching Firebase proof creates the first password and signs in', async () => {
+    const parent = {
+      _id: PARENT_ID,
+      fatherName: 'Dev Rao',
+      phone: '9876543210',
+      email: 'dev@example.com',
+      studentIds: [STUDENT_ID],
+      activationRequired: true,
+      tokenVersion: 2,
+      save: async function () { return this; },
+    };
+    mock.method(firebasePhoneAuth, 'verifyPhoneIdToken', async () => ({
+      phone_number: '+919876543210',
+      firebase: { sign_in_provider: 'phone' },
+    }));
+    mock.method(Parent, 'findOne', async () => parent);
+
+    const res = await post('/api/parent/first-password', {
+      parentPhoneNumber: '9876543210',
+      firebaseIdToken: 'firebase-proof',
+      password: 'longenough',
+    });
+    const body = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.equal(parent.activationRequired, false);
+    assert.match(parent.password, /^\$2/);
+    assert.equal(parent.tokenVersion, 3);
+    assert.ok(body.token);
   });
 });
 

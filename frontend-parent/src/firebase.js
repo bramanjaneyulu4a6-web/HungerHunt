@@ -4,9 +4,9 @@
    hiding the keys. They live in env vars anyway so that a staging project can
    be pointed at without editing source.
 
-   Only the *web* push path uses this. On iOS and Android the native
-   @capacitor/push-notifications plugin talks to APNs/FCM directly and reads its
-   credentials from GoogleService-Info.plist / google-services.json instead. */
+   Web push and web phone verification use this. On iOS and Android the native
+   Firebase plugins read their credentials from GoogleService-Info.plist /
+   google-services.json instead. */
 
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,10 +18,13 @@ export const firebaseConfig = {
 };
 
 export const firebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.messagingSenderId
+  firebaseConfig.apiKey
+  && firebaseConfig.authDomain
+  && firebaseConfig.projectId
+  && firebaseConfig.messagingSenderId
 );
 
-/* Imported dynamically, and only on the web push path. Loading the Firebase SDK
+/* Imported dynamically, and only when a web Firebase feature is used. Loading the Firebase SDK
    at module scope pulled ~90 kB into every page load — including the native
    builds, which never use it. */
 let appPromise;

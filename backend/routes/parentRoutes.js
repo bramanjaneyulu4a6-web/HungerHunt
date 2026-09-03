@@ -1,6 +1,7 @@
 import express from 'express';
 import {
-  activateParent,
+  getParentLoginStep,
+  setFirstParentPassword,
   loginParent,
   getParentDashboardDetails,
   getChildDetails,
@@ -15,16 +16,18 @@ import {
   forgotPassword,
   resetPassword,
   savePushToken,
-  removePushToken
+  removePushToken,
+  deleteParentAccount
 } from "../controllers/parentController.js";
 import { getWalletBalance } from '../controllers/walletController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
-import { authLimiter } from '../middleware/rateLimit.js';
+import { authLimiter, accountDeleteLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
-router.post('/activate', authLimiter, activateParent);
+router.post('/login-step', authLimiter, getParentLoginStep);
+router.post('/first-password', authLimiter, setFirstParentPassword);
 router.post('/login', authLimiter, loginParent);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPassword);
@@ -45,5 +48,16 @@ router.post('/reset-purchase-password', protectParent, resetPurchasePassword);
 
 router.put('/wallet-control/:studentId', protectParent, updateWalletControl);
 router.put('/purchase-approval/:studentId', protectParent, updatePurchaseApproval);
+
+/* Rate-limited as well as gated: this route checks a password, so it is
+   guessable in the way the login route is, and a session alone must not make
+   guessing cheap.
+
+   protectParent runs FIRST, and the order is the point. accountDeleteLimiter
+   keys by parent account, which it can only do once the gate has put one on
+   the request; mounted ahead of it, it would fall back to the IP and one
+   parent's ten wrong passwords would lock every parent on the school's NAT out
+   of signing in. */
+router.delete('/account', protectParent, accountDeleteLimiter, deleteParentAccount);
 
 export default router;

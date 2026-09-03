@@ -22,7 +22,7 @@ export default function PolicyPage({ title, summary, children }) {
       <main className="policy-document">
         <p className="policy-eyebrow">Hunger Hunt Parent policy</p>
         <h1>{title}</h1>
-        <p className="policy-updated">Last updated: 2 September 2026</p>
+        <p className="policy-updated">Last updated: 3 September 2026</p>
         <p className="policy-summary">{summary}</p>
         <div className="policy-content">{children}</div>
       </main>

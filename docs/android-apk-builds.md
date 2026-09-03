@@ -1,14 +1,21 @@
-# Android APK builds — kiosk and warehouse
+# Android APK builds — kiosk, warehouse, and the parent app for now
 
 How `hungerhunt-kiosk` and `hungerhunt-warehouse` are turned into Android apps and
-put onto school devices.
+put onto school devices — and, temporarily, how the parent app reaches Android
+parents while Play still will not take it.
 
 Companion to [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md), which covers the
-*parent* app. That one goes to the App Store and Play. **This one does not go to
-either store.** Both apps here are installed by hand — copied to the device and
-tapped, or pushed over `adb`. Everything the checklist says about store listings,
-privacy forms, review, and Play App Signing is irrelevant here; a few things it
-says about signing and versions are not, and differ in the details below.
+*parent* app's store releases. **The kiosk and warehouse apps go to neither
+store**, and are not meant to: both are installed by hand — copied to the device
+and tapped, or pushed over `adb`. Everything the checklist says about store
+listings, privacy forms, review, and Play App Signing is irrelevant to them; a
+few things it says about signing and versions are not, and differ in the details
+below.
+
+The parent app is the exception here, and a temporary one. It is store-bound and
+the checklist governs it in full; it appears in this document only because Play
+will not let it through yet. [Its own section](#the-parent-apps-interim-apk)
+covers that, and carries the one thing that bites at the switchover.
 
 Verified against the repo on 2026-08-20: both shells were generated, built as
 debug APKs, and built again as signed release APKs on a macOS machine with
@@ -208,6 +215,52 @@ the Home button, which no amount of app code can. Set it up on the terminal
 before the kiosk goes live.
 
 The warehouse app needs none of this; it is used by staff on a normal device.
+
+---
+
+## The parent app's interim APK
+
+Unlike the two apps above, the parent app has a Play listing and an App Store
+listing, and everything in [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md)
+applies to it. Nothing below replaces any of that.
+
+Google requires a personal developer account created after 13 November 2023 to
+run a closed test with at least 12 opted-in testers for 14 continuous days
+before it can even *apply* for production access. This account is one of those.
+Until that clears there is no Play install for parents to use, so Android
+parents install a signed APK by hand:
+
+```bash
+VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api npm run apk:release --prefix frontend-parent
+#   → frontend-parent/android/app/build/outputs/apk/release/app-release.apk
+```
+
+Same keystore, same version rules and the same production-API check as the Play
+bundle — `apk:release` and `bundle:android` differ only in the last Gradle task
+they run. This is the release build, delivered differently, not a lesser one.
+With no keystore configured it refuses to start in about a second, exactly as
+the bundle does.
+
+### The cost, which is not avoidable
+
+Play App Signing means Google re-signs the app with its own key. An APK signed
+with the upload key and a build installed from Play therefore carry **different
+signatures**, and Android will not install one over the other. Every parent who
+sideloads has to uninstall before the Play version will install — and an
+uninstall clears the app's local state, including their session, so they sign in
+again.
+
+This is inherent to Play App Signing, not a defect to fix later. Tell parents
+once, at the switchover, rather than letting them discover it as an update that
+fails with a message about a conflicting package.
+
+### When this section goes
+
+When the closed test clears and the app is live on production Play, delete this
+section and the `apk:release` script in
+[frontend-parent/package.json](../frontend-parent/package.json) with it. An
+interim path that outlives its reason becomes the path someone reaches for out
+of habit.
 
 ---
 

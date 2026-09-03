@@ -560,7 +560,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                     const parent = parentByStudent.get(String(student._id));
                     if (!parent) return <span className="cell-unset">Not linked</span>;
                     const variant = !parent.active ? 'neutral' : parent.activationRequired ? 'warn' : 'success';
-                    const status = !parent.active ? 'Inactive' : parent.activationRequired ? 'Awaiting activation' : 'Active';
+                    const status = !parent.active ? 'Inactive' : parent.activationRequired ? 'Password setup pending' : 'Active';
                     return (
                       <Badge variant={variant}>
                         {status} ·{' '}

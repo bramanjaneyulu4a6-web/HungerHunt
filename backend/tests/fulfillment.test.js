@@ -1,4 +1,4 @@
-import test, { afterEach, before, beforeEach, describe, mock } from 'node:test';
+import test, { afterEach, before, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -9,7 +9,6 @@ process.env.BUSINESS_TIME_ZONE = 'Asia/Kolkata';
 
 const Admin = (await import('../models/Admin.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
-const Transaction = (await import('../models/Transaction.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const { fulfillmentSchedule, createFulfillmentOrder } = await import('../utils/fulfillment.js');
 const {
@@ -38,7 +37,6 @@ const ORDER_ID = '507f191e810c19729de860ef';
 const token = signStaffToken(STAFF_ID, 'warehouse');
 const adminToken = signStaffToken(STAFF_ID, 'admin');
 let base;
-let paymentProcessed;
 
 before(async () => {
   const server = app.listen(0);
@@ -48,11 +46,6 @@ before(async () => {
 });
 
 afterEach(() => mock.restoreAll());
-
-beforeEach(() => {
-  paymentProcessed = true;
-  mock.method(Transaction, 'exists', async () => paymentProcessed ? { _id: TRANSACTION_ID } : null);
-});
 
 describe('dorm fulfilment policy', () => {
   test('uses the business week and a hard 48-hour delivery deadline', () => {
@@ -177,11 +170,10 @@ describe('dorm fulfilment policy', () => {
     assert.equal((await response.json()).data.status, 'PACKED');
   });
 
-  test('refuses to change status when the payment ledger entry is missing', async () => {
-    paymentProcessed = false;
+  test('refuses to change status when the paid transaction link is missing', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
     mock.method(FulfillmentOrder, 'findById', () => ({
-      lean: async () => ({ _id: ORDER_ID, transactionId: TRANSACTION_ID, status: 'PENDING' }),
+      lean: async () => ({ _id: ORDER_ID, status: 'PENDING' }),
     }));
     const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => {
       throw new Error('must not run');
@@ -196,6 +188,55 @@ describe('dorm fulfilment policy', () => {
     assert.equal(response.status, 409);
     assert.match((await response.json()).error.message, /payment has not been processed/i);
     assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('an admin can move a packed order back to confirmed', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => ({
+        _id: ORDER_ID,
+        transactionId: TRANSACTION_ID,
+        status: 'PACKED',
+        packedAt: new Date(),
+        packedBy: STAFF_ID,
+      }),
+    }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
+      update = requestedUpdate;
+      return {
+        lean: async () => ({
+          _id: ORDER_ID,
+          transactionId: TRANSACTION_ID,
+          studentId: STUDENT_ID,
+          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          items: [],
+          totalAmount: 40,
+          status: 'PENDING',
+          businessWeekStart: new Date(),
+          orderedAt: new Date(),
+          deliverBy: new Date(),
+          transitions: [requestedUpdate.$push.transitions],
+        }),
+      };
+    });
+
+    const response = await fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ status: 'PENDING' }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).data.status, 'PENDING');
+    assert.deepEqual(update.$unset, {
+      packedAt: 1,
+      packedBy: 1,
+      dispatchedAt: 1,
+      dispatchedBy: 1,
+    });
+    assert.equal(update.$push.transitions.from, 'PACKED');
+    assert.equal(update.$push.transitions.to, 'PENDING');
   });
 
   test('an admin can move an out-for-delivery order back to confirmed', async () => {

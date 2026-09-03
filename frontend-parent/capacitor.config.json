@@ -2,7 +2,25 @@
   "appId": "com.hungerhunt.parent",
   "appName": "Hunger Hunt Parent",
   "webDir": "dist",
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageOptions": {
+          "@capacitor-firebase/authentication": {
+            "symlink": true
+          }
+        },
+        "packageTraits": {
+          "@capacitor-firebase/authentication": ["Lite"]
+        }
+      }
+    }
+  },
   "plugins": {
+    "FirebaseAuthentication": {
+      "providers": ["phone"]
+    },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
     }

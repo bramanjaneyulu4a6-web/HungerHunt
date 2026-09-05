@@ -16,17 +16,17 @@ import { useKeepFocusedInView } from "../hooks/useKeepFocusedInView";
    Nobody signs in to this terminal any more, staff included. It stopped being
    a counter somebody stands behind. */
 const Login = () => {
-  // The five digit boxes are the only thing on this screen, and on a phone the
-  // keyboard can sit over them.
+  // The admission field is the only input on this screen, and on a phone the
+  // keyboard can sit over it.
   useKeepFocusedInView();
 
   const navigate = useNavigate();
-  const [digits, setDigits] = useState(["", "", "", "", ""]);
+  const [admissionNumber, setAdmissionNumber] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [blockedScreen, setBlockedScreen] = useState(null);
-  const digitRefs = useRef([]);
+  const admissionInputRef = useRef(null);
   const requestInFlight = useRef(false);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const Login = () => {
   }, [navigate, sessionReady]);
 
   const startSession = async (admissionNumber) => {
-    if (!/^\d{5}$/.test(admissionNumber) || requestInFlight.current) return;
+    if (!/^[A-Z0-9]{4,8}$/.test(admissionNumber) || requestInFlight.current) return;
 
     setError("");
     requestInFlight.current = true;
@@ -72,70 +72,35 @@ const Login = () => {
           response?.message || "Could not start a session. Please try again."
         );
       }
-      setDigits(["", "", "", "", ""]);
+      setAdmissionNumber("");
       setLoading(false);
       requestInFlight.current = false;
-      window.setTimeout(() => digitRefs.current[0]?.focus(), 0);
+      window.setTimeout(() => admissionInputRef.current?.focus(), 0);
     }
   };
 
   const returnToLogin = () => {
     setBlockedScreen(null);
     setError("");
-    setDigits(["", "", "", "", ""]);
+    setAdmissionNumber("");
     requestInFlight.current = false;
-    window.setTimeout(() => digitRefs.current[0]?.focus(), 0);
+    window.setTimeout(() => admissionInputRef.current?.focus(), 0);
   };
 
-  const updateDigit = (index, rawValue) => {
+  const updateAdmissionNumber = (rawValue) => {
     if (loading || sessionReady) return;
 
-    const value = rawValue.replace(/\D/g, "").slice(-1);
-    const next = [...digits];
-    next[index] = value;
-    setDigits(next);
+    const value = rawValue
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 8);
+    setAdmissionNumber(value);
     setError("");
-
-    if (value && index < next.length - 1) {
-      digitRefs.current[index + 1]?.focus();
-    }
-    if (next.every(Boolean)) startSession(next.join(""));
   };
 
-  const handleKeyDown = (event, index) => {
-    if (event.key === "Backspace") {
-      event.preventDefault();
-      const next = [...digits];
-
-      if (next[index]) {
-        next[index] = "";
-      } else if (index > 0) {
-        next[index - 1] = "";
-        digitRefs.current[index - 1]?.focus();
-      }
-      setDigits(next);
-      setError("");
-    } else if (event.key === "ArrowLeft" && index > 0) {
-      digitRefs.current[index - 1]?.focus();
-    } else if (event.key === "ArrowRight" && index < digits.length - 1) {
-      digitRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handlePaste = (event) => {
-    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 5);
-    if (!pasted) return;
-
+  const handleSubmit = (event) => {
     event.preventDefault();
-    const next = Array.from({ length: 5 }, (_, index) => pasted[index] || "");
-    setDigits(next);
-    setError("");
-
-    if (pasted.length === 5) {
-      startSession(pasted);
-    } else {
-      digitRefs.current[pasted.length]?.focus();
-    }
+    startSession(admissionNumber);
   };
 
   if (blockedScreen) {
@@ -180,7 +145,6 @@ const Login = () => {
           <div className="kiosk-login-card__icon" aria-hidden="true">#</div>
           <p className="kiosk-login-card__kicker">Let&rsquo;s find your account</p>
           <h2 id="student-sign-in-title">Enter admission number</h2>
-          <p>Use the five-digit number provided by your school.</p>
 
           {error && (
             <ErrorFeedback
@@ -190,38 +154,37 @@ const Login = () => {
             />
           )}
 
-          <fieldset className="kiosk-login-form" disabled={loading || sessionReady}>
-            <legend>Five-digit admission number</legend>
-            <div className="kiosk-login-otp" onPaste={handlePaste}>
-              {digits.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(element) => { digitRefs.current[index] = element; }}
-                  className="kiosk-login-otp__digit"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength="1"
-                  autoComplete={index === 0 ? "one-time-code" : "off"}
-                  autoFocus={index === 0}
-                  aria-label={`Admission number digit ${index + 1} of 5`}
-                  value={digit}
-                  aria-invalid={Boolean(error)}
-                  onChange={(event) => updateDigit(index, event.target.value)}
-                  onKeyDown={(event) => handleKeyDown(event, index)}
-                  onFocus={(event) => event.target.select()}
-                />
-              ))}
-            </div>
-          </fieldset>
+          <form className="kiosk-login-form" onSubmit={handleSubmit}>
+            <label htmlFor="admission-number">Admission number</label>
+            <input
+              id="admission-number"
+              ref={admissionInputRef}
+              className="kiosk-login-admission"
+              type="text"
+              inputMode="text"
+              pattern="[A-Za-z0-9]{4,8}"
+              minLength="4"
+              maxLength="8"
+              autoCapitalize="characters"
+              autoComplete="off"
+              autoFocus
+              aria-invalid={Boolean(error)}
+              value={admissionNumber}
+              disabled={loading || sessionReady}
+              onChange={(event) => updateAdmissionNumber(event.target.value)}
+            />
+            <button
+              type="submit"
+              className="kiosk-login-submit"
+              disabled={loading || sessionReady || admissionNumber.length < 4}
+            >
+              {loading ? <><span className="kiosk-button-spinner" /> Finding you…</> : 'Continue'}
+            </button>
+          </form>
 
           <div className="kiosk-login-status" aria-live="polite">
-            {sessionReady ? (
+            {sessionReady && (
               <><span className="kiosk-ready-check">✓</span> Welcome!</>
-            ) : loading ? (
-              <><span className="kiosk-button-spinner" /> Finding you…</>
-            ) : (
-              <span>Enter all five digits to continue automatically</span>
             )}
           </div>
 

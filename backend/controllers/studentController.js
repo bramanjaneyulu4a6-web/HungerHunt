@@ -10,6 +10,11 @@ import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.
 import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import {
+  ADMISSION_NUMBER_MESSAGE,
+  isValidAdmissionNumber,
+  normalizeAdmissionNumber,
+} from '../utils/admissionNumber.js';
+import {
   linkQuietly,
   findStudentsByIdentity,
   unlinkStudent
@@ -30,7 +35,12 @@ const pickWritable = (body) => {
   return Object.fromEntries(
     WRITABLE_FIELDS
       .filter((field) => source[field] !== undefined)
-      .map((field) => [field, source[field]])
+      .map((field) => [
+        field,
+        field === 'admissionNumber'
+          ? normalizeAdmissionNumber(source[field])
+          : source[field],
+      ])
   );
 };
 
@@ -240,7 +250,7 @@ export const bulkImportStudents = async (req, res) => {
     const normalized = students.map((row) => ({
       ...row,
       name: String(row?.name ?? '').trim(),
-      admissionNumber: String(row?.admissionNumber ?? '').trim(),
+      admissionNumber: normalizeAdmissionNumber(row?.admissionNumber),
       fatherName: String(row?.fatherName ?? '').trim(),
       roomNumber: normalizeRoomCode(row?.roomNumber),
       grade: String(row?.grade ?? '').trim(),
@@ -249,8 +259,8 @@ export const bulkImportStudents = async (req, res) => {
 
     normalized.forEach((row, index) => {
       if (!row.name) addInvalid(students[index], index, 'name', 'Student name is required.');
-      if (!/^\d{5}$/.test(row.admissionNumber)) {
-        addInvalid(students[index], index, 'admissionNumber', 'Admission number must be exactly 5 digits.');
+      if (!isValidAdmissionNumber(row.admissionNumber)) {
+        addInvalid(students[index], index, 'admissionNumber', ADMISSION_NUMBER_MESSAGE);
       }
       if (!row.fatherName) addInvalid(students[index], index, 'fatherName', "Father's name is required.");
       if (!row.roomNumber) addInvalid(students[index], index, 'roomNumber', 'Room code is required.');
@@ -370,6 +380,7 @@ export const searchStudents = async (req, res) => {
       active: { $ne: false },
       $or: [
         { name: pattern },
+        { admissionNumber: pattern },
         { roomNumber: pattern },
         { parentPhoneNumber: pattern }
       ]
@@ -397,10 +408,13 @@ export const searchStudents = async (req, res) => {
    A student whose parent has never set a code is refused here rather than
    after they have filled a basket they cannot pay for. */
 export const createKioskSession = async (req, res) => {
-  const admissionNumber = String(req.body?.admissionNumber ?? '').trim();
+  const admissionNumber = normalizeAdmissionNumber(req.body?.admissionNumber);
 
   if (!admissionNumber) {
     return res.status(400).json({ message: 'An admission number is required.' });
+  }
+  if (!isValidAdmissionNumber(admissionNumber)) {
+    return res.status(400).json({ message: ADMISSION_NUMBER_MESSAGE });
   }
 
   try {

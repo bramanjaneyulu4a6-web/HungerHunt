@@ -26,17 +26,24 @@ before(async () => {
 afterEach(() => mock.restoreAll());
 
 describe('the Student schema carries the kiosk fields', () => {
-  test('admissionNumber is a unique, sparse, trimmed string', () => {
+  test('admissionNumber is a required, unique, canonical string', () => {
     const path = Student.schema.path('admissionNumber');
     assert.ok(path, 'admissionNumber must exist on the schema');
     assert.equal(path.instance, 'String');
     assert.equal(path.options.unique, true);
-    assert.equal(
-      path.options.sparse,
-      true,
-      'sparse: existing rows have no number and must not collide on null'
-    );
+    assert.equal(path.options.sparse, true);
+    assert.ok(path.options.required);
     assert.equal(path.options.trim, true);
+    assert.equal(path.options.minlength[0], 4);
+    assert.equal(path.options.maxlength[0], 8);
+  });
+
+  test('admission numbers accept 4–8 letters or numbers and normalize case', () => {
+    assert.equal(new Student({ admissionNumber: ' hh7a42 ' }).admissionNumber, 'HH7A42');
+    assert.equal(new Student({ admissionNumber: 'A123' }).validateSync()?.errors.admissionNumber, undefined);
+    assert.ok(new Student({ admissionNumber: 'A12' }).validateSync().errors.admissionNumber);
+    assert.ok(new Student({ admissionNumber: 'AB-12' }).validateSync().errors.admissionNumber);
+    assert.ok(new Student({ admissionNumber: 'ABCDEFGHI' }).validateSync().errors.admissionNumber);
   });
 
   test('lockout fields default to unlocked', () => {
@@ -71,7 +78,7 @@ const asStudent = (path, options = {}) =>
   fetch(base + path, {
     ...options,
     headers: {
-      Authorization: `Bearer ${signStudentToken(STUDENT_ID, 'ADM-1042')}`,
+      Authorization: `Bearer ${signStudentToken(STUDENT_ID, 'ADM1042')}`,
       'Content-Type': 'application/json',
       ...options.headers,
     },
@@ -132,7 +139,7 @@ describe('opening a kiosk session', () => {
   const onRoll = {
     _id: STUDENT_ID,
     name: 'Asha Rao',
-    admissionNumber: 'ADM-1042',
+    admissionNumber: 'ADM1042',
     pocketMoney: 350,
     requiresParentApproval: false,
     purchasePassword: 'some-bcrypt-hash',
@@ -146,11 +153,16 @@ describe('opening a kiosk session', () => {
   };
 
   test('a known admission number gets a token and only what the screen needs', async () => {
-    mock.method(Student, 'findOne', () => queryFor(onRoll));
+    let filter;
+    mock.method(Student, 'findOne', (askedFilter) => {
+      filter = askedFilter;
+      return queryFor(onRoll);
+    });
     noActiveOrder();
 
-    const res = await postSession({ admissionNumber: ' ADM-1042 ' });
+    const res = await postSession({ admissionNumber: ' adm1042 ' });
     assert.equal(res.status, 200);
+    assert.equal(filter.admissionNumber, 'ADM1042');
 
     const body = await res.json();
     assert.ok(body.token);
@@ -158,7 +170,7 @@ describe('opening a kiosk session', () => {
     assert.deepEqual(body.student, {
       id: STUDENT_ID,
       name: 'Asha Rao',
-      admissionNumber: 'ADM-1042',
+      admissionNumber: 'ADM1042',
       pocketMoney: 350,
       wallet: {
         studentId: STUDENT_ID,
@@ -181,17 +193,17 @@ describe('opening a kiosk session', () => {
     mock.method(Student, 'findOne', () => queryFor(onRoll));
     noActiveOrder();
 
-    const { token } = await (await postSession({ admissionNumber: 'ADM-1042' })).json();
+    const { token } = await (await postSession({ admissionNumber: 'ADM1042' })).json();
     const payload = verifyToken(token, 'student');
 
     assert.equal(payload?.id, STUDENT_ID);
-    assert.equal(payload?.admissionNumber, 'ADM-1042');
+    assert.equal(payload?.admissionNumber, 'ADM1042');
   });
 
   test('an unknown admission number is refused', async () => {
     mock.method(Student, 'findOne', () => queryFor(null));
 
-    const res = await postSession({ admissionNumber: 'ADM-9999' });
+    const res = await postSession({ admissionNumber: 'ADM9999' });
     assert.equal(res.status, 404);
   });
 
@@ -199,7 +211,7 @@ describe('opening a kiosk session', () => {
   test('a student with no purchase code cannot open a session', async () => {
     mock.method(Student, 'findOne', () => queryFor({ ...onRoll, purchasePassword: null }));
 
-    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const res = await postSession({ admissionNumber: 'ADM1042' });
     assert.equal(res.status, 403);
     assert.match((await res.json()).message, /purchase code/i);
   });
@@ -207,7 +219,7 @@ describe('opening a kiosk session', () => {
   test('an empty wallet gets the full-screen refusal payload and no token', async () => {
     mock.method(Student, 'findOne', () => queryFor({ ...onRoll, pocketMoney: 0 }));
 
-    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const res = await postSession({ admissionNumber: 'ADM1042' });
     const body = await res.json();
 
     assert.equal(res.status, 403);
@@ -222,7 +234,7 @@ describe('opening a kiosk session', () => {
     mock.method(PendingOrder, 'findOne', () => queryFor(null));
     mock.method(FulfillmentOrder, 'findOne', () => queryFor({ status: 'PACKED', deliverBy }));
 
-    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const res = await postSession({ admissionNumber: 'ADM1042' });
     const body = await res.json();
 
     assert.equal(res.status, 409);
@@ -240,7 +252,7 @@ describe('opening a kiosk session', () => {
     mock.method(PendingOrder, 'findOne', () => queryFor({ status: 'PENDING' }));
     mock.method(FulfillmentOrder, 'findOne', () => queryFor(null));
 
-    const res = await postSession({ admissionNumber: 'ADM-1042' });
+    const res = await postSession({ admissionNumber: 'ADM1042' });
     const body = await res.json();
 
     assert.equal(res.status, 409);
@@ -253,6 +265,15 @@ describe('opening a kiosk session', () => {
 
     const res = await postSession({});
     assert.equal(res.status, 400);
+    assert.equal(findOne.mock.callCount(), 0);
+  });
+
+  test('an invalid admission number is answered without a query', async () => {
+    const findOne = mock.method(Student, 'findOne', () => queryFor(null));
+
+    const res = await postSession({ admissionNumber: 'AB-12' });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).message, /4 to 8 letters or numbers/i);
     assert.equal(findOne.mock.callCount(), 0);
   });
 });

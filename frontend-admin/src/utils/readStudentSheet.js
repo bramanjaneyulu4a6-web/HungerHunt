@@ -1,3 +1,9 @@
+import {
+  ADMISSION_NUMBER_HELP,
+  ADMISSION_NUMBER_PATTERN,
+  normalizeAdmissionNumber,
+} from './admissionNumber.js';
+
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_STUDENT_ROWS = 5_000;
 const REQUIRED_COLUMNS = [
@@ -68,6 +74,9 @@ export const studentRecordsFromRows = (rows) => {
         header && hasValue(row[index]) ? [[header, String(row[index]).trim()]] : []
       )
     );
+    if (record.admissionNumber !== undefined) {
+      record.admissionNumber = normalizeAdmissionNumber(record.admissionNumber);
+    }
     record.__importRow = sheetRow;
     record.__importCells = Object.fromEntries(
       headers.filter(Boolean).map((header) => {
@@ -85,7 +94,11 @@ export const studentRecordsFromRows = (rows) => {
       });
     };
     check('name', Boolean(record.name), 'Student name is required.');
-    check('admissionNumber', /^\d{5}$/.test(record.admissionNumber || ''), 'Admission number must be exactly 5 digits.');
+    check(
+      'admissionNumber',
+      new RegExp(`^${ADMISSION_NUMBER_PATTERN}$`).test(record.admissionNumber || ''),
+      `Admission number is invalid. ${ADMISSION_NUMBER_HELP}`
+    );
     check('fatherName', Boolean(record.fatherName), "Father's name is required.");
     check('roomNumber', Boolean(record.roomNumber), 'Room code is required.');
     check('grade', Boolean(record.grade), 'Grade / class is required.');

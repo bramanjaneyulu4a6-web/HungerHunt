@@ -23,9 +23,8 @@ const centre = (element) => {
  * It fires on the keyboard arriving and on focus moving, and deliberately not
  * on every measurement: scrollIntoView moves the visual viewport, which fires
  * 'scroll', which would scroll again. Following focus matters on its own — the
- * five admission-number boxes hand focus along without resizing anything, so a
- * resize-only version would centre the first box and then hold still while the
- * student typed their way down behind the keys.
+ * focus can move between fields without resizing anything, so a resize-only
+ * version could leave the newly focused field behind the keys.
  *
  * The screen still has to be able to scroll for any of this to do anything. */
 export const useKeepFocusedInView = (active = true) => {

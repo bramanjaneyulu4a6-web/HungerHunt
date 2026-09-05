@@ -15,10 +15,10 @@ const headers = [
 test('maps the first worksheet row to the backend student field names', () => {
   const [record] = studentRecordsFromRows([
     headers,
-    ['Asha', '10425', 'Ravi', 'D-4', '8', '9876543210'],
+    ['Asha', 'hh7a42', 'Ravi', 'D-4', '8', '9876543210'],
   ]);
   assert.equal(record.name, 'Asha');
-  assert.equal(record.admissionNumber, '10425');
+  assert.equal(record.admissionNumber, 'HH7A42');
   assert.equal(record.__importRow, 2);
   assert.equal(record.__importCells.parentPhoneNumber, 'F2');
 });
@@ -60,5 +60,23 @@ test('reports every invalid student cell by spreadsheet coordinate', () => {
       assert.deepEqual(error.invalidCells.map((item) => item.cell), ['A2', 'B2', 'E2', 'F2']);
       return true;
     }
+  );
+});
+
+test('accepts 4–8 alphanumeric admission numbers and rejects punctuation', () => {
+  for (const admissionNumber of ['A123', '1234', 'AB12CD34']) {
+    const [record] = studentRecordsFromRows([
+      headers,
+      ['Asha', admissionNumber, 'Ravi', 'D-4', '8', '9876543210'],
+    ]);
+    assert.equal(record.admissionNumber, admissionNumber);
+  }
+
+  assert.throws(
+    () => studentRecordsFromRows([
+      headers,
+      ['Asha', 'AB-12', 'Ravi', 'D-4', '8', '9876543210'],
+    ]),
+    (error) => error.invalidCells.some((item) => item.column === 'admissionNumber')
   );
 });

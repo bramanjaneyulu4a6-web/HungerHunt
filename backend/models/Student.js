@@ -1,4 +1,11 @@
 import mongoose from 'mongoose';
+import {
+  ADMISSION_NUMBER_MAX_LENGTH,
+  ADMISSION_NUMBER_MESSAGE,
+  ADMISSION_NUMBER_MIN_LENGTH,
+  ADMISSION_NUMBER_PATTERN,
+  normalizeAdmissionNumber,
+} from '../utils/admissionNumber.js';
 
 const studentSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -21,15 +28,23 @@ const studentSchema = new mongoose.Schema({
   archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 
   // The school's own ID for the student, imported from its roll. It is what a
-  // student types to open a kiosk session, so it is unique — and sparse,
-  // because every row from before the field exists has none, and two nulls
-  // must not collide. A student without one cannot use the kiosk.
+  // student types to open a kiosk session, so it is required and unique.
+  // It is canonicalized to uppercase so sign-in and uniqueness do not depend
+  // on how somebody capitalizes the letters.
   admissionNumber: {
     type: String,
+    required: [true, 'Admission number is required.'],
     unique: true,
+    // Keep the existing index shape during rollout. Required blocks new
+    // omissions, while sparse lets legacy rows be repaired by the migration
+    // without an index-options conflict at application startup.
     sparse: true,
     trim: true,
-    default: undefined
+    uppercase: true,
+    minlength: [ADMISSION_NUMBER_MIN_LENGTH, ADMISSION_NUMBER_MESSAGE],
+    maxlength: [ADMISSION_NUMBER_MAX_LENGTH, ADMISSION_NUMBER_MESSAGE],
+    match: [ADMISSION_NUMBER_PATTERN, ADMISSION_NUMBER_MESSAGE],
+    set: normalizeAdmissionNumber,
   },
 
   pocketMoney: { type: Number, default: 0 },

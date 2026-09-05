@@ -6,7 +6,7 @@ import { caretakerProductTotals, filterCaretakerOrders } from './caretakerOrders
 const orders = [
   {
     id: 'one',
-    student: { name: 'Asha Rao', admissionNumber: '10425' },
+    student: { name: 'Asha Rao', admissionNumber: 'HH7A42' },
     items: [
       { productId: 'juice', name: 'Apple Juice', quantity: 2 },
       { productId: 'chips', name: 'Banana Chips', quantity: 3 },
@@ -32,7 +32,7 @@ test('finds caretaker orders by student name without case sensitivity', () => {
 });
 
 test('finds caretaker orders by partial admission number', () => {
-  assert.deepEqual(filterCaretakerOrders(orders, '425').map((order) => order.id), ['one']);
+  assert.deepEqual(filterCaretakerOrders(orders, '7a4').map((order) => order.id), ['one']);
 });
 
 test('an empty search keeps the complete student-order list', () => {

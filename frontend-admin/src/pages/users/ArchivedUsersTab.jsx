@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
 import { Badge, Banner, Button, EmptyState, Skeleton } from '../../components/ui';
@@ -12,6 +13,8 @@ const matches = (values, search) => {
 };
 
 export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onChanged }) {
+  const [searchParams] = useSearchParams();
+  const focusedParentId = searchParams.get('focus') || '';
   const [workingId, setWorkingId] = useState(null);
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
@@ -48,6 +51,14 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
     const timer = window.setTimeout(() => loadStudents(1), 250);
     return () => window.clearTimeout(timer);
   }, [loadStudents]);
+
+  useEffect(() => {
+    if (loadingAccounts || !focusedParentId) return;
+    document.getElementById(`archived-parent-${focusedParentId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [focusedParentId, loadingAccounts, parents]);
 
   const archivedParents = useMemo(() => parents.filter((parent) => !parent.active && matches([
     parent.fatherName,
@@ -164,7 +175,11 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                 </tr>
               ))}
               {showParents && archivedParents.map((parent) => (
-                <tr key={`parent-${parent.id}`}>
+                <tr
+                  id={`archived-parent-${parent.id}`}
+                  key={`parent-${parent.id}`}
+                  className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
+                >
                   <td data-label="User"><strong>{parent.fatherName}</strong><small>{parent.email}</small></td>
                   <td data-label="Type">Parent</td>
                   <td data-label="Details">{parent.phone} · {(parent.students || []).map((student) => student.name).join(', ') || 'No linked students'}</td>

@@ -920,7 +920,11 @@ components:
           required: [name, roomNumber]
           properties:
             name: { type: string }
-            admissionNumber: { type: string }
+            admissionNumber:
+              type: string
+              minLength: 4
+              maxLength: 8
+              pattern: '^[A-Z0-9]{4,8}$'
             roomNumber: { type: string }
             roomId:
               type: string

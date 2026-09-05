@@ -75,7 +75,7 @@ describe('useKeepFocusedInView', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
-  /* Moving between the admission-number digits does not resize anything, so a
+  /* Moving between form fields does not resize anything, so a
      resize-only hook would centre the first box and then sit still while the
      student typed their way down to one behind the keys. */
   test('follows focus to the next field while the keyboard stays up', () => {

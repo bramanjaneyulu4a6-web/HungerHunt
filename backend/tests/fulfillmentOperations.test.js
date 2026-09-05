@@ -116,7 +116,7 @@ const orderFixture = (overrides = {}) => ({
   _id: ORDER_ID,
   transactionId: TRANSACTION_ID,
   studentId: STUDENT_ID,
-  studentSnapshot: { name: 'Asha', admissionNumber: 'A-10', roomNumber: 'D-4' },
+  studentSnapshot: { name: 'Asha', admissionNumber: 'A010', roomNumber: 'D-4' },
   items: [{ productId: PRODUCT_ID, name: 'Package', quantity: 1, price: 40 }],
   totalAmount: 40,
   status: 'PENDING',
@@ -290,7 +290,7 @@ describe('delivery reporting', () => {
 
   test('carries no student, staff, item, or money detail out of the aggregate', () => {
     const body = JSON.stringify(report([orderFixture({ status: 'PENDING' })]));
-    for (const leak of ['Asha', 'A-10', 'D-4', STUDENT_ID, TRANSACTION_ID, 'totalAmount', 'items']) {
+    for (const leak of ['Asha', 'A010', 'D-4', STUDENT_ID, TRANSACTION_ID, 'totalAmount', 'items']) {
       assert.equal(body.includes(leak), false, `report leaked ${leak}`);
     }
   });

@@ -19,6 +19,7 @@
     "backfill:product-mrp": "node scripts/backfillProductMrp.js",
     "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",
     "backfill:staff-profiles": "node scripts/backfillStaffProfiles.js",
+    "migrate:admission-numbers": "node scripts/migrateAdmissionNumbers.js",
     "backfill:collected-packages": "node scripts/backfillCollectedPackages.js",
     "seed:catalogue": "node scripts/seedCatalogue.js",
     "sync:live-product-images": "node scripts/syncLiveProductImagesToLocal.js",

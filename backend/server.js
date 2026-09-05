@@ -7,7 +7,6 @@ import mongoose from 'mongoose';
 import app from './app.js';
 import FulfillmentOrder, { WEEKLY_ORDER_INDEX } from './models/FulfillmentOrder.js';
 import { startPushRetrySweep } from './utils/sendNotification.js';
-import { HOSTEL_MIGRATION_REQUIRED, hasLegacyHostelCollection } from './utils/hostelRenameGuard.js';
 import { validateRuntimeEnv } from './config/runtimeEnv.js';
 
 // The app itself is built in app.js and exported without a database connection
@@ -47,14 +46,6 @@ const start = async () => {
   // MongoDB transactions and cannot safely run in a degraded database state.
   await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10_000 });
   console.log('MongoDB Connected Successfully');
-
-  /* Deploy-order guard for the hostel→room rename. Delete this block, and
-     utils/hostelRenameGuard.js, once every environment has migrated. */
-  if (await hasLegacyHostelCollection(mongoose.connection.db)) {
-    console.error(HOSTEL_MIGRATION_REQUIRED);
-    await mongoose.disconnect();
-    process.exit(1);
-  }
 
   await releaseWeeklyOrderIndex();
 

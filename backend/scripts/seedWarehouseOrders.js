@@ -8,7 +8,7 @@ import Product from '../models/Product.js';
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 
-const DEMO_ADMISSION_PREFIX = 'WH-DEMO-';
+const DEMO_ADMISSION_PREFIX = 'WHD';
 const BLOCKS = ['A', 'B', 'C'];
 const ROOMS_PER_BLOCK = 8;
 const BASE_ORDERS_PER_STATUS = 2;
@@ -181,4 +181,3 @@ try {
 } finally {
   await mongoose.disconnect();
 }
-

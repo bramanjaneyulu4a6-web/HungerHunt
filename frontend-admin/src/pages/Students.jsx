@@ -7,6 +7,11 @@ import { formatINR } from '../utils/format';
 import { readStudentSheet } from '../utils/readStudentSheet';
 import { digitsOnly, numericFieldProps } from '../utils/numericInput';
 import {
+  ADMISSION_NUMBER_HELP,
+  admissionNumberFieldProps,
+  sanitizeAdmissionNumberInput,
+} from '../utils/admissionNumber';
+import {
   Badge,
   Banner,
   Button,
@@ -53,15 +58,11 @@ const FORM_FIELDS = [
   // an imported record that arrived without one has to be given a number
   // before any other edit to it can be saved.
   //
-  // Five digits, because that is what the kiosk login asks for. This box used
-  // to take any text and suggest "ADM-1042", so a record could be saved in a
-  // shape that cannot log in — a mismatch found by a child at the till rather
-  // than by the office.
   {
     key: 'admissionNumber',
     label: 'Admission number',
-    placeholder: 'e.g. 10425',
-    digits: 5,
+    placeholder: 'e.g. HH7A42',
+    admissionNumber: true,
     required: true,
   },
   { key: 'fatherName', label: "Father's name", placeholder: 'e.g. Ramesh Rao', required: true },
@@ -566,7 +567,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                         {status} ·{' '}
                         <Link
                           className="user-relationship-link"
-                          to={`/users/parents?focus=${encodeURIComponent(parent.id)}`}
+                          to={`/users/${parent.active ? 'parents' : 'archived'}?focus=${encodeURIComponent(parent.id)}`}
                         >
                           {parent.fatherName}
                         </Link>
@@ -621,7 +622,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             />
 
             <div className="modal-fields">
-              {FORM_FIELDS.map(({ key, label, digits, autoComplete, ...inputProps }) => (
+              {FORM_FIELDS.map(({ key, label, digits, admissionNumber, autoComplete, ...inputProps }) => (
                 <div key={key}>
                   <label className="field-label" htmlFor={`student-${key}`}>{label}</label>
                   <input
@@ -631,14 +632,18 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                     onChange={(event) =>
                       setFormData({
                         ...formData,
-                        [key]: digits
-                          ? digitsOnly(event.target.value, digits)
-                          : event.target.value,
+                        [key]: admissionNumber
+                          ? sanitizeAdmissionNumberInput(event.target.value)
+                          : digits
+                            ? digitsOnly(event.target.value, digits)
+                            : event.target.value,
                       })
                     }
                     {...(digits ? numericFieldProps(digits, autoComplete) : {})}
+                    {...(admissionNumber ? admissionNumberFieldProps : {})}
                     {...inputProps}
                   />
+                  {admissionNumber && <small className="field-help">{ADMISSION_NUMBER_HELP}</small>}
                 </div>
               ))}
 
@@ -724,7 +729,8 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
               Columns read: <strong>name</strong>, <strong>admissionNumber</strong>,{' '}
               <strong>fatherName</strong>, <strong>roomNumber</strong>, <strong>grade</strong> and{' '}
               <strong>parentPhoneNumber</strong>. Every room in the sheet must already exist and be
-              active, or the import is refused before anything is written.
+              active. Admission numbers must contain 4–8 letters or numbers. Invalid sheets are
+              refused before anything is written.
             </p>
 
             {importErrors.length > 0 && (

@@ -71,7 +71,7 @@ describe('dorm fulfilment policy', () => {
       student: {
         _id: STUDENT_ID,
         name: 'Asha',
-        admissionNumber: 'A-10',
+        admissionNumber: 'A010',
         roomNumber: 'D-4',
         roomId: ROOM_ID,
       },
@@ -80,7 +80,7 @@ describe('dorm fulfilment policy', () => {
 
     assert.equal(String(stored.transactionId), TRANSACTION_ID);
     assert.deepEqual(stored.studentSnapshot, {
-      name: 'Asha', admissionNumber: 'A-10', roomNumber: 'D-4', roomId: ROOM_ID,
+      name: 'Asha', admissionNumber: 'A010', roomNumber: 'D-4', roomId: ROOM_ID,
     });
     assert.equal(stored.status, OrderStatus.PENDING);
   });

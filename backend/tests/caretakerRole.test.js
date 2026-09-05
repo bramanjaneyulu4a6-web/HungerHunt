@@ -95,7 +95,7 @@ const order = (roomId = ROOM_ID, roomNumber = 'D-4') => ({
   _id: ORDER_ID,
   transactionId: '507f191e810c19729de860e4',
   studentId: STUDENT_ID,
-  studentSnapshot: { name: 'Asha', admissionNumber: 'A-10', roomNumber, roomId },
+  studentSnapshot: { name: 'Asha', admissionNumber: 'A010', roomNumber, roomId },
   items: [{ productId: '507f191e810c19729de860e6', name: 'Juice', quantity: 2, price: 10 }],
   totalAmount: 20,
   status: 'OUT_FOR_DELIVERY',

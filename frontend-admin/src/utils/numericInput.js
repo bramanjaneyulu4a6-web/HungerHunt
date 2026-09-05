@@ -1,11 +1,6 @@
-/* Fields the school records as digits and nothing else — admission numbers,
-   phone numbers — where an accepted stray character is worse than a refused
+/* Fields the school records as digits and nothing else — currently phone
+   numbers — where an accepted stray character is worse than a refused
    keystroke.
- *
- * The kiosk asks a student for five digits and nothing else, so an admission
- * number entered here as "ADM-1042" is a record that cannot log in, discovered
- * by a child standing at the till rather than by the office. That is the case
- * this file exists for.
  *
  * Deliberately not <input type="number">: it accepts e, E, +, - and ., shows
  * spinners that mean nothing on a phone number, and reports value as '' for

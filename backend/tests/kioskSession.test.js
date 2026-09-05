@@ -137,7 +137,7 @@ describe('opening a kiosk session', () => {
     requiresParentApproval: false,
     purchasePassword: 'some-bcrypt-hash',
     parentPhoneNumber: '9876543210',
-    hostelNumber: 'H-4',
+    roomNumber: 'H-4',
   };
 
   const noActiveOrder = () => {
@@ -173,7 +173,7 @@ describe('opening a kiosk session', () => {
     // admission number can read. Nothing beyond the student's own ID card.
     const raw = JSON.stringify(body.student);
     assert.equal(raw.includes('9876543210'), false, 'the parent phone must not ride along');
-    assert.equal(raw.includes('H-4'), false, 'nor the hostel');
+    assert.equal(raw.includes('H-4'), false, 'nor the room');
     assert.equal(raw.includes('bcrypt'), false, 'nor anything of the code');
   });
 

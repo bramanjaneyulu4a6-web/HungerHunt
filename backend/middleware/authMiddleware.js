@@ -50,10 +50,10 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
     req.staff = { id: payload.id, role };
 
     if (role === 'caretaker') {
-      const account = await Admin.findById(payload.id).select('email hostelId').lean();
-      if (!account?.hostelId) return denied(res, 'Not authorized');
+      const account = await Admin.findById(payload.id).select('email roomIds').lean();
+      if (!account?.roomIds?.length) return denied(res, 'Not authorized');
       req.staff.email = account.email;
-      req.staff.hostelId = String(account.hostelId);
+      req.staff.roomIds = account.roomIds.map(String);
     }
     next();
   } catch (_error) {

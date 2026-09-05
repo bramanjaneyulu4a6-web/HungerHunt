@@ -79,7 +79,7 @@
 }
 
 .caretaker-header__brand span,
-.caretaker-identity__hostel span {
+.caretaker-identity__rooms span {
   display: flex;
   flex-direction: column;
 }
@@ -149,7 +149,7 @@
   font-weight: 650;
 }
 
-.caretaker-identity__hostel {
+.caretaker-identity__rooms {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -160,8 +160,8 @@
   color: var(--ink-soft);
 }
 
-.caretaker-identity__hostel small { color: var(--muted); font-size: 11px; }
-.caretaker-identity__hostel strong { margin-top: 2px; font-size: 13px; }
+.caretaker-identity__rooms small { color: var(--muted); font-size: 11px; }
+.caretaker-identity__rooms strong { margin-top: 2px; font-size: 13px; }
 
 .wh-sessionbar {
   display: flex;
@@ -517,7 +517,7 @@
 }
 .wh-cta:disabled { opacity: 0.45; cursor: default; }
 
-/* Warehouse-to-hostel handoff. This replaces the browser prompt with the same
+/* Warehouse-to-room handoff. This replaces the browser prompt with the same
    dark clipboard surfaces, amber focus treatment and large standing-thumb
    controls used by the rest of the warehouse app. */
 .wh-handoff-backdrop {
@@ -920,10 +920,10 @@
   font-size: 13px;
 }
 
-/* The caretaker receives the hostel shipment as one handoff, then finds the
+/* The caretaker receives the unit shipment as one handoff, then finds the
    student inside it. The summary remains part of the page flow so it does not
    cover individual orders while the caretaker scrolls. */
-.caretaker-hostel-order {
+.caretaker-unit-order {
   margin-bottom: 18px;
   box-shadow: var(--shadow-raised);
 }
@@ -1263,7 +1263,7 @@
 .wh-metric-grid strong { font-size: 26px; color: var(--wh-amber); }
 .wh-metric-grid span { color: var(--wh-muted); font-size: 12px; }
 
-/* ---- block and hostel fulfilment --------------------------------------- */
+/* ---- block and unit fulfilment --------------------------------------- */
 
 .wh-order-tabs button {
   display: flex;
@@ -1355,8 +1355,8 @@
 .wh-block-stack-head h2 { margin: 2px 0; font-size: 23px; }
 .wh-block-heading > strong { color: var(--wh-amber); font-size: 14px; }
 
-.wh-hostel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.wh-hostel-tile {
+.wh-unit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.wh-unit-tile {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1365,10 +1365,10 @@
   border: 1px solid var(--wh-line);
   border-radius: 15px;
 }
-.wh-hostel-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.wh-hostel-kicker { color: var(--wh-muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-.wh-hostel-tile h3 { margin: 2px 0 0; font-size: 21px; }
-.wh-hostel-count {
+.wh-unit-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wh-unit-kicker { color: var(--wh-muted); font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.wh-unit-tile h3 { margin: 2px 0 0; font-size: 21px; }
+.wh-unit-count {
   display: flex;
   align-items: baseline;
   gap: 5px;
@@ -1378,15 +1378,15 @@
   border: 1px solid color-mix(in srgb, var(--wh-amber) 25%, var(--wh-line));
   border-radius: 11px;
 }
-.wh-hostel-count strong { font-size: 24px; line-height: 1; }
-.wh-hostel-count small { color: var(--wh-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.wh-unit-count strong { font-size: 24px; line-height: 1; }
+.wh-unit-count small { color: var(--wh-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
 .wh-overdue-copy { color: var(--wh-red); font-weight: 800; }
-.wh-hostel-items { margin: 12px 0 14px; border-top: 1px solid var(--wh-line); }
-.wh-hostel-items > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wh-line); font-size: 13px; }
-.wh-hostel-items span { overflow-wrap: anywhere; }
-.wh-hostel-items strong { color: var(--wh-ink); }
-.wh-hostel-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: auto; }
-.wh-hostel-actions .wh-cta { margin: 0; min-height: 44px; padding: 10px 12px; font-size: 13px; }
+.wh-unit-items { margin: 12px 0 14px; border-top: 1px solid var(--wh-line); }
+.wh-unit-items > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--wh-line); font-size: 13px; }
+.wh-unit-items span { overflow-wrap: anywhere; }
+.wh-unit-items strong { color: var(--wh-ink); }
+.wh-unit-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: auto; }
+.wh-unit-actions .wh-cta { margin: 0; min-height: 44px; padding: 10px 12px; font-size: 13px; }
 .wh-report-tile,
 .wh-block-action {
   padding: 10px 13px;
@@ -1406,8 +1406,8 @@
 .wh-block-stack-head { padding: 0 15px 12px 0; }
 .wh-block-stack-head small { color: var(--wh-muted); font-size: 12px; }
 .wh-block-action { color: var(--wh-amber-ink); background: var(--wh-amber); border-color: var(--wh-amber); }
-.wh-hostel-scroll { display: flex; gap: 12px; padding-right: 15px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.wh-hostel-scroll .wh-hostel-tile { flex: 0 0 min(78vw, 330px); scroll-snap-align: start; background: var(--wh-panel-raised); }
+.wh-unit-scroll { display: flex; gap: 12px; padding-right: 15px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.wh-unit-scroll .wh-unit-tile { flex: 0 0 min(78vw, 330px); scroll-snap-align: start; background: var(--wh-panel-raised); }
 
 .wh-history-statuses { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .wh-history-statuses span { padding: 6px 8px; color: var(--wh-muted); background: var(--wh-bg); border-radius: 8px; font-size: 11px; }
@@ -1465,7 +1465,7 @@
 .wh-receiver-list .wh-handoff-phone { background: var(--wh-bg); }
 
 @media (max-width: 560px) {
-  .wh-hostel-grid { grid-template-columns: 1fr; }
+  .wh-unit-grid { grid-template-columns: 1fr; }
   .wh-block-select { grid-template-columns: auto minmax(0, 1fr) auto; }
   .wh-block-select > svg { display: none; }
   .wh-block-total small { max-width: 72px; text-align: right; }
@@ -1490,7 +1490,7 @@
 @media (max-width: 360px) {
   .caretaker-header__brand span { display: none; }
   .caretaker-identity { grid-template-columns: auto minmax(0, 1fr); margin-inline: 12px; }
-  .caretaker-identity__hostel { grid-column: 1 / -1; max-width: none; }
+  .caretaker-identity__rooms { grid-column: 1 / -1; max-width: none; }
   .wh-page { padding: 12px; }
   .wh-modebar { grid-template-columns: 1fr; }
   .wh-stepper button { width: 46px; }

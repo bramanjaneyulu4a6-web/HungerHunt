@@ -859,7 +859,7 @@ const KioskBilling = ({ student, onLogout }) => {
                 </p>
               </div>
 
-              {/* The hostel and the father's name were here for a cashier
+              {/* The room and the father's name were here for a cashier
                   making sure they had the right child. The child is holding
                   the terminal now, so what is left is what they came to check:
                   that this is them, and what they have to spend. */}

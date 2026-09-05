@@ -28,18 +28,29 @@ const parentSessionView = (parent) => ({
   studentIds: parent.studentIds,
 });
 
-/* The first screen asks this question only after Continue. An unknown or
-   archived phone deliberately gets the ordinary password path: that preserves
-   the login endpoint's existing account-enumeration protection. Only a real,
-   active account that still needs its first password is sent to SMS proof. */
+/* The first screen asks this question only after Continue, and answers with
+   one of three steps:
+     PASSWORD     — an active account that has set its password.
+     VERIFY_PHONE — an active account still waiting on first-time setup.
+     NO_ACCOUNT   — no account, or an archived one; the app shows "contact
+                    the school" instead of a password box that cannot work.
+
+   NO_ACCOUNT is an owner-chosen trade-off (2026-09-05): it tells a caller
+   which numbers have live accounts, which the earlier design deliberately
+   hid. Chosen anyway so a typo'd or de-registered number gets an honest
+   answer at the first step rather than a password prompt that can only end
+   in "invalid credentials". authLimiter bounds how fast anyone can probe,
+   and loginParent keeps its own single generic answer regardless. */
 export const getParentLoginStep = async (req, res) => {
   try {
     const phone = String(req.body?.parentPhoneNumber ?? '').trim();
     const problem = phoneProblem(phone);
     if (problem) return res.status(400).json({ message: problem });
 
-    const parent = await Parent.findOne({ phone, active: { $ne: false } });
-    const needsFirstPassword = Boolean(parent && (parent.activationRequired || !parent.password));
+    const parent = await Parent.findOne({ phone });
+    if (!parent || parent.active === false) return res.json({ next: 'NO_ACCOUNT' });
+
+    const needsFirstPassword = Boolean(parent.activationRequired || !parent.password);
     res.json({ next: needsFirstPassword ? 'VERIFY_PHONE' : 'PASSWORD' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -148,7 +159,7 @@ export const getParentDashboardDetails = async (req, res) => {
        fields the cards actually show. */
     const parent = await Parent.findById(req.parent.id).populate({
       path: "studentIds",
-      select: "name grade hostelNumber pocketMoney"
+      select: "name grade roomNumber pocketMoney"
     });
 
     if (!parent) {
@@ -439,8 +450,10 @@ export const getChildRecharges = async (req, res) => {
  * The order snapshot also carries the packing staff, the dispatching staff,
  * the transition trail and the internal operational notes. None of that is a
  * parent's business — the question this screen answers is "where is my child's
- * package and when is it due", so it is answered with states, times and the
- * short receiver note, and the staff accounts stay inside the storeroom.
+ * package and when is it due", so it is answered with states and times, and
+ * the staff accounts stay inside the storeroom. So does the room receiver:
+ * who is holding a handed-over package is the back office's detail, and to a
+ * parent that package is simply still out for delivery.
  *
  * deliverBy is read from the order rather than recalculated here: it was
  * stored at payment for exactly this reason, so the deadline the parent reads
@@ -453,18 +466,17 @@ const parentPackageView = (order, now) => ({
   status: order.status,
   items: (order.items || []).map(({ name, quantity, price }) => ({ name, quantity, price })),
   totalAmount: order.totalAmount,
-  hostelNumber: order.studentSnapshot?.hostelNumber || "",
+  roomNumber: order.studentSnapshot?.roomNumber || "",
   orderedAt: order.orderedAt,
   deliverBy: order.deliverBy,
   packedAt: order.packedAt || null,
   dispatchedAt: order.dispatchedAt || null,
   deliveredAt: order.deliveredAt || null,
   /* Two different facts, and a parent wants both: deliveredAt is when the
-     warehouse handed the package to the hostel's caretaker, collectedAt is
+     warehouse handed the package to the room's caretaker, collectedAt is
      when their child actually took it from them. Until the second exists the
      package is at the dorm, not with the child. */
   collectedAt: order.collectedAt || null,
-  receivedBy: order.proofOfDelivery?.receivedBy || "",
   overdue: isOverdue(order, now),
 });
 
@@ -714,9 +726,22 @@ export const updateWalletControl = async (req, res) => {
 
     const { enabled, limitAmount, limitType } = req.body;
 
-    if (enabled && (!limitAmount || limitAmount <= 0)) {
+    // New limits are weekly only, between ₹30 and ₹250. Controls saved under
+    // the old rules may still be daily or monthly and keep working until the
+    // parent next saves — checkout reads whatever is stored — but this route
+    // no longer writes anything else.
+    if (limitType && limitType !== "WEEKLY") {
       return res.status(400).json({
-        message: "Limit amount must be greater than 0",
+        message: "Only a weekly spending limit is supported",
+      });
+    }
+
+    if (
+      enabled &&
+      !(Number.isFinite(Number(limitAmount)) && limitAmount >= 30 && limitAmount <= 250)
+    ) {
+      return res.status(400).json({
+        message: "Weekly limit must be between ₹30 and ₹250",
       });
     }
 
@@ -726,7 +751,7 @@ export const updateWalletControl = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    student.walletControl = { enabled, limitAmount, limitType };
+    student.walletControl = { enabled, limitAmount, limitType: "WEEKLY" };
 
     await student.save();
 

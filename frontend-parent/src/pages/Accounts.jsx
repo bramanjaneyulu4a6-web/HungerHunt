@@ -70,7 +70,7 @@ export default function Accounts() {
                   <div className="student-card-head">
                     <div className="student-identity">
                       <span className="student-avatar" aria-hidden="true">{child.name?.charAt(0).toUpperCase() || 'S'}</span>
-                      <div><h2 className="card-title">{child.name}</h2><p className="student-meta">Grade {child.grade || '—'} · Room {child.hostelNumber || '—'}</p></div>
+                      <div><h2 className="card-title">{child.name}</h2><p className="student-meta">Grade {child.grade || '—'} · Room {child.roomNumber || '—'}</p></div>
                     </div>
                     <Badge variant={balance > LOW_BALANCE ? 'success' : 'alert'}>{balance > LOW_BALANCE ? 'Available' : 'Low balance'}</Badge>
                   </div>

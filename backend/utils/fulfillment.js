@@ -26,8 +26,8 @@ export const createFulfillmentOrder = async ({
     studentSnapshot: {
       name: student.name,
       admissionNumber: student.admissionNumber || '',
-      hostelNumber: student.hostelNumber,
-      ...(student.hostelId ? { hostelId: student.hostelId } : {}),
+      roomNumber: student.roomNumber,
+      ...(student.roomId ? { roomId: student.roomId } : {}),
     },
     items: transaction.items.map((item) => ({
       productId: item.productId,

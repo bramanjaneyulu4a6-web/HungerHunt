@@ -89,7 +89,7 @@ export const COMPLAINT_CATEGORIES = Object.freeze({
   WORKING_CONDITIONS: 'Working conditions',
   STAFF_CONDUCT: 'Conduct of another member of staff',
   STUDENT_WELFARE: 'A student’s welfare',
-  DELIVERY_SERVICE: 'How packages are being delivered to my hostel',
+  DELIVERY_SERVICE: 'How packages are being delivered to my rooms',
   APP_PROBLEM: 'A problem with this app',
   OTHER: 'Something else',
 });

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const hostelSchema = new mongoose.Schema(
+const roomSchema = new mongoose.Schema(
   {
     code: {
       type: String,
@@ -15,6 +15,6 @@ const hostelSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const normalizeHostelCode = (value) => String(value ?? '').trim().toUpperCase();
+export const normalizeRoomCode = (value) => String(value ?? '').trim().toUpperCase();
 
-export default mongoose.model('Hostel', hostelSchema);
+export default mongoose.model('Room', roomSchema);

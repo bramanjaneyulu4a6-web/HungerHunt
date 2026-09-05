@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import api from '../../utils/api';
 import { Badge, Button, EmptyState, Skeleton } from '../../components/ui';
 
-const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', hostelId: '' };
+const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [] };
 
-export default function StaffTab({ staff, hostels, loading, onChanged }) {
+export default function StaffTab({ staff, rooms, loading, onChanged }) {
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -17,19 +17,29 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
     setEditing(account);
     setForm({
       name: account.name || '', phone: account.phone || '', email: account.email || '', password: '',
-      role: account.role || 'admin', hostelId: account.hostel?.id || '',
+      role: account.role || 'admin', roomIds: (account.rooms || []).map((room) => room.id),
     });
   };
   const close = () => { setEditing(undefined); setForm(EMPTY); };
 
   const submit = async (event) => {
     event.preventDefault();
+    if (form.role === 'caretaker' && !form.roomIds.length) {
+      toast.error('Choose at least one room');
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
-        await api.put(`/admin/users/staff/${editing.id}`, form);
+        await api.put(`/admin/users/staff/${editing.id}`, {
+          ...form,
+          roomIds: form.role === 'caretaker' ? form.roomIds : [],
+        });
       } else {
-        await api.post('/admin/register', form);
+        await api.post('/admin/register', {
+          ...form,
+          roomIds: form.role === 'caretaker' ? form.roomIds : [],
+        });
       }
       toast.success(editing ? 'Staff account updated' : 'Staff account created');
       close();
@@ -45,7 +55,7 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
     if (!active && !window.confirm(`Archive ${account.name}? Their current session will stop working immediately.`)) return;
     setWorkingId(account.id);
     try {
-      if (active) await api.put(`/admin/users/staff/${account.id}`, { active: true, role: account.role, hostelId: account.hostel?.id || '' });
+      if (active) await api.put(`/admin/users/staff/${account.id}`, { active: true, role: account.role, roomIds: (account.rooms || []).map((room) => room.id) });
       else await api.delete(`/admin/users/staff/${account.id}`);
       toast.success(active ? 'Staff account restored' : 'Staff account archived');
       await onChanged();
@@ -60,7 +70,7 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
 
   return (
     <section>
-      <div className="users-tab-head"><div><h2>Staff accounts</h2><p>Admins, warehouse staff, and hostel caretakers.</p></div><Button onClick={openCreate}>Add staff account</Button></div>
+      <div className="users-tab-head"><div><h2>Staff accounts</h2><p>Admins, warehouse staff, and room caretakers.</p></div><Button onClick={openCreate}>Add staff account</Button></div>
       {!staff.length ? (
         <EmptyState icon="♙" title="No staff accounts" action={<Button onClick={openCreate}>Add staff</Button>} />
       ) : (
@@ -71,7 +81,7 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
               <td data-label="Name"><strong>{account.name}</strong></td>
               <td data-label="Contact"><div>{account.phone}</div><small>{account.email}</small></td>
               <td data-label="Role">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}</td>
-              <td data-label="Assignment">{account.hostel ? `${account.hostel.code}${account.hostel.name ? ` — ${account.hostel.name}` : ''}` : '—'}</td>
+              <td data-label="Assignment">{(account.rooms || []).map((room) => room.code).join(' · ') || '—'}</td>
               <td data-label="Status"><Badge variant={account.active ? 'success' : 'neutral'}>{account.active ? 'Active' : 'Inactive'}</Badge></td>
               <td data-label="Actions"><div className="cell-actions">
                 <Button className="btn--sm" variant="ghost" onClick={() => openEdit(account)}>Edit</Button>
@@ -91,14 +101,28 @@ export default function StaffTab({ staff, hostels, loading, onChanged }) {
               <label><span className="field-label">Phone</span><input className="input" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
               <label><span className="field-label">Email</span><input className="input" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
               {!editing && <label><span className="field-label">Temporary password</span><input className="input" type="password" minLength={8} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>}
-              <label><span className="field-label">Role</span><select className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value, hostelId: event.target.value === 'caretaker' ? form.hostelId : '' })}>
+              <label><span className="field-label">Role</span><select className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [] })}>
                 <option value="admin">Admin — full back office</option><option value="warehouse">Warehouse</option><option value="caretaker">Caretaker</option>
               </select></label>
-              {form.role === 'caretaker' && <label><span className="field-label">Assigned hostel</span><select className="input" required value={form.hostelId} onChange={(event) => setForm({ ...form, hostelId: event.target.value })}>
-                <option value="">Choose a hostel</option>{hostels.filter((hostel) => hostel.active).map((hostel) => <option key={hostel._id} value={hostel._id}>{hostel.code}{hostel.name ? ` — ${hostel.name}` : ''}</option>)}
-              </select></label>}
+              {form.role === 'caretaker' && <fieldset className="student-picker"><legend>Assigned rooms</legend>
+                {rooms.filter((room) => room.active).map((room) => (
+                  <label key={room._id} className="student-picker__row">
+                    <input
+                      type="checkbox"
+                      checked={form.roomIds.includes(room._id)}
+                      onChange={() => setForm({
+                        ...form,
+                        roomIds: form.roomIds.includes(room._id)
+                          ? form.roomIds.filter((id) => id !== room._id)
+                          : [...form.roomIds, room._id],
+                      })}
+                    />
+                    <span><strong>{room.code}</strong>{room.name && <small>{room.name}</small>}</span>
+                  </label>
+                ))}
+              </fieldset>}
             </div>
-            <div className="modal-actions"><Button variant="ghost" disabled={saving} onClick={close}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save staff account'}</Button></div>
+            <div className="modal-actions"><Button variant="ghost" disabled={saving} onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (form.role === 'caretaker' && !form.roomIds.length)}>{saving ? 'Saving…' : 'Save staff account'}</Button></div>
           </form>
         </div>
       )}

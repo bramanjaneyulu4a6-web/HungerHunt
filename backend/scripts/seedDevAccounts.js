@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import Student from '../models/Student.js';
-import Hostel from '../models/Hostel.js';
+import Room from '../models/Room.js';
 
 export const DEV_ACCOUNTS = Object.freeze({
   admin: {
@@ -40,14 +40,16 @@ export const DEV_ACCOUNTS = Object.freeze({
   },
 });
 
-const ensureStaffAccount = async (role, credentials, hostelId = null) => {
+// Rooms are a caretaker's alone: the model refuses an account of any other role
+// that carries one, and a caretaker that carries none.
+const ensureStaffAccount = async (role, credentials, roomIds = []) => {
   const account = await Admin.findOne({ email: credentials.email }) ?? new Admin();
   account.email = credentials.email;
   account.name = credentials.name;
   account.phone = credentials.phone;
   account.password = credentials.password;
   account.role = role;
-  account.hostelId = hostelId;
+  account.roomIds = roomIds;
   await account.save();
   return account;
 };
@@ -67,12 +69,12 @@ const seed = async () => {
   await ensureStaffAccount('warehouse', DEV_ACCOUNTS.warehouse);
 
   const { student: studentDetails, parent: parentDetails } = DEV_ACCOUNTS;
-  const hostel = await Hostel.findOneAndUpdate(
-    { code: 'DEV-HOSTEL-01' },
-    { $setOnInsert: { code: 'DEV-HOSTEL-01', name: 'Development Hostel', active: true } },
+  const room = await Room.findOneAndUpdate(
+    { code: 'DEV-ROOM-01' },
+    { $setOnInsert: { code: 'DEV-ROOM-01', name: 'Development Room', active: true } },
     { upsert: true, new: true }
   );
-  await ensureStaffAccount('caretaker', DEV_ACCOUNTS.caretaker, hostel._id);
+  await ensureStaffAccount('caretaker', DEV_ACCOUNTS.caretaker, [room._id]);
 
   const student = await Student.findOne({
     $or: [
@@ -85,8 +87,8 @@ const seed = async () => {
   Object.assign(student, {
     name: studentDetails.name,
     fatherName: parentDetails.fatherName,
-    hostelNumber: 'DEV-HOSTEL-01',
-    hostelId: hostel._id,
+    roomNumber: 'DEV-ROOM-01',
+    roomId: room._id,
     grade: 'DEV',
     parentPhoneNumber: parentDetails.phone,
     admissionNumber: studentDetails.admissionNumber,

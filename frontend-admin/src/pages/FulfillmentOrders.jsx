@@ -7,6 +7,8 @@ import Icon from '../components/Icon';
 import { formatINR } from '../utils/format';
 import {
   availableFulfillmentStatuses,
+  fulfillmentActionLabel,
+  fulfillmentStatusDisplay,
   fulfillmentStatusLabel,
 } from '../utils/fulfillmentStatus';
 
@@ -50,7 +52,7 @@ const OrdersLedger = ({
       <table className="table table--stack table--hover">
         <thead>
           <tr>
-            <th>Order</th><th>Student</th><th>Hostel</th><th>Items</th>
+            <th>Order</th><th>Student</th><th>Room</th><th>Items</th>
             <th>Placed</th><th>Total</th><th>Status</th>
             <th><span className="sr-only">Actions</span></th>
           </tr>
@@ -68,7 +70,7 @@ const OrdersLedger = ({
                     <small>{order.student?.admissionNumber || 'No admission number'}</small>
                   </span>
                 </td>
-                <td data-label="Hostel">{order.student?.hostelNumber || '—'}</td>
+                <td data-label="Room">{order.student?.roomNumber || '—'}</td>
                 <td data-label="Items">{itemCount(order)}</td>
                 <td data-label="Placed">{new Date(order.orderedAt).toLocaleString()}</td>
                 <td data-label="Total"><strong>{formatINR(order.totalAmount)}</strong></td>
@@ -83,7 +85,7 @@ const OrdersLedger = ({
                         aria-label={`Change status for ${orderNumber(order)}. Current status: ${fulfillmentStatusLabel(order.status)}`}
                         onClick={() => onStatusMenu(statusMenu === order.id ? null : order.id)}
                       >
-                        <Badge variant={badgeFor(order.status)}>{fulfillmentStatusLabel(order.status)}</Badge>
+                        <Badge variant={badgeFor(order.status)}>{fulfillmentStatusDisplay(order)}</Badge>
                         <Icon name="caret" size={14} />
                       </button>
                       {statusMenu === order.id && (
@@ -95,14 +97,14 @@ const OrdersLedger = ({
                               key={status}
                               onClick={() => onStatusChange(order, status)}
                             >
-                              Mark as {fulfillmentStatusLabel(status)}
+                              Mark as {fulfillmentActionLabel(status)}
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <Badge variant={badgeFor(order.status)}>{fulfillmentStatusLabel(order.status)}</Badge>
+                    <Badge variant={badgeFor(order.status)}>{fulfillmentStatusDisplay(order)}</Badge>
                   )}
                 </td>
                 <td data-label="Actions">
@@ -266,7 +268,7 @@ export default function FulfillmentOrders() {
         ? current.filter((item) => item.id !== order.id)
         : current.map((item) => item.id === order.id ? updated : item));
       setExpanded((current) => status === 'DELIVERED' && current === order.id ? null : current);
-      toast.success(`${orderNumber(order)} is now ${fulfillmentStatusLabel(status).toLowerCase()}.`);
+      toast.success(`${orderNumber(order)} is now ${fulfillmentActionLabel(status).toLowerCase()}.`);
       setStatusChange(null);
     } catch (error) {
       console.error(error);
@@ -328,7 +330,7 @@ export default function FulfillmentOrders() {
     <div className="page warehouse-page">
       <PageHeader
         title="Student Orders"
-        subtitle="Review active warehouse packages and the complete history of delivered, collected, and cancelled orders."
+        subtitle="Review active warehouse packages and the complete history of handed-over, delivered, and cancelled orders."
       />
 
       <div className="tabs users-tabs" role="tablist" aria-label="Student order views">
@@ -351,8 +353,8 @@ export default function FulfillmentOrders() {
       ) : (view === 'active' ? orders : historyOrders).length === 0 && !loadError ? (
         <EmptyState icon="✓" title={view === 'active' ? 'No active student orders' : 'No order history yet'} variant="success">
           {view === 'active'
-            ? 'Every warehouse package has been delivered, collected, or cancelled.'
-            : 'Delivered, collected, and cancelled orders will appear here.'}
+            ? 'Every warehouse package has been handed over, delivered, or cancelled.'
+            : 'Handed-over, delivered, and cancelled orders will appear here.'}
         </EmptyState>
       ) : (view === 'active' ? orders : historyOrders).length > 0 ? (
         <>
@@ -426,10 +428,14 @@ export default function FulfillmentOrders() {
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="modal-title" id="change-order-status-title">
-              Change status to {fulfillmentStatusLabel(statusChange.status)}?
+              {statusChange.status === 'DELIVERED'
+                ? 'Record the handover to the room?'
+                : `Change status to ${fulfillmentStatusLabel(statusChange.status)}?`}
             </h2>
             <p className="fulfillment-cancel-copy">
-              {orderNumber(statusChange.order)} will move from {fulfillmentStatusLabel(statusChange.order.status).toLowerCase()} to {fulfillmentStatusLabel(statusChange.status).toLowerCase()}.
+              {statusChange.status === 'DELIVERED'
+                ? `${orderNumber(statusChange.order)} stays out for delivery until its student collects it with their code; this records who is holding it at the room.`
+                : `${orderNumber(statusChange.order)} will move from ${fulfillmentStatusLabel(statusChange.order.status).toLowerCase()} to ${fulfillmentStatusLabel(statusChange.status).toLowerCase()}.`}
             </p>
             {statusChange.status === 'DELIVERED' && (
               <div className="fulfillment-delivery-fields">
@@ -442,7 +448,7 @@ export default function FulfillmentOrders() {
                     autoFocus
                     required
                     value={receivedBy}
-                    placeholder="Name or hostel role"
+                    placeholder="Name or room role"
                     onChange={(event) => setReceivedBy(event.target.value)}
                   />
                 </label>

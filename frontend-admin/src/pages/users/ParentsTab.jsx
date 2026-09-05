@@ -214,13 +214,13 @@ export default function ParentsTab({ parents, loading, onChanged }) {
               <label><span className="field-label">Email</span><input className="input" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
             </div>
             <fieldset className="student-picker"><legend>Linked students</legend>
-              <input className="input" type="search" placeholder="Search by student, admission number, parent or hostel…" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} />
+              <input className="input" type="search" placeholder="Search by student, admission number, parent or room…" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} />
               {studentOptionsLoading && <small>Searching students…</small>}
               {!studentOptionsLoading && !visibleStudentOptions.length && <small>No active students found.</small>}
               {visibleStudentOptions.map((student) => (
                 <label key={student._id} className="student-picker__row">
                   <input type="checkbox" disabled={linkedToAnotherParent.has(String(student._id))} checked={form.studentIds.includes(String(student._id))} onChange={() => toggleStudent(student)} />
-                  <span><strong>{student.name}</strong><small>{student.admissionNumber || 'No admission number'} · Hostel {student.hostelNumber}{linkedToAnotherParent.has(String(student._id)) ? ` · Linked to ${linkedToAnotherParent.get(String(student._id))}` : ''}</small></span>
+                  <span><strong>{student.name}</strong><small>{student.admissionNumber || 'No admission number'} · Room {student.roomNumber}{linkedToAnotherParent.has(String(student._id)) ? ` · Linked to ${linkedToAnotherParent.get(String(student._id))}` : ''}</small></span>
                 </label>
               ))}
               <small>Up to 50 matches are shown. Search to find students outside the first page.</small>

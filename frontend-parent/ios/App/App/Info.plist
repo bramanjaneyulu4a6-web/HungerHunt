@@ -22,6 +22,22 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Firebase phone auth's reCAPTCHA fallback returns from Safari via this
+	     scheme (the encoded GOOGLE_APP_ID from GoogleService-Info.plist).
+	     AppDelegate forwards it to Auth.auth().canHandle(url). Without it,
+	     first-time parent sign-in fails on any device where silent APNs
+	     verification is unavailable. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>firebase-phone-auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-383327390863-ios-9dc6a25b80dbe86dfb34fa</string>
+			</array>
+		</dict>
+	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>

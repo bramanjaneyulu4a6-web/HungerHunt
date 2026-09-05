@@ -14,7 +14,7 @@
     "reconcile:payments": "node scripts/reconcilePaymentIntents.js",
     "load:test": "node scripts/loadTest.js",
     "migrate:enterprise": "node scripts/migrateEnterpriseData.js",
-    "backfill:hostels": "node scripts/backfillHostels.js",
+    "backfill:rooms": "node scripts/backfillRooms.js",
     "backfill:product-subcategories": "node scripts/backfillProductSubcategories.js",
     "backfill:product-mrp": "node scripts/backfillProductMrp.js",
     "backfill:category-subcategories": "node scripts/backfillCategorySubcategories.js",

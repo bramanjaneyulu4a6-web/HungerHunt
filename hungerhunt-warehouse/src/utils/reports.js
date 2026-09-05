@@ -21,7 +21,7 @@ export const COMPLAINT_CATEGORIES = [
   ['WORKING_CONDITIONS', 'Working conditions'],
   ['STAFF_CONDUCT', 'Conduct of another member of staff'],
   ['STUDENT_WELFARE', "A student's welfare"],
-  ['DELIVERY_SERVICE', 'How packages reach my hostel'],
+  ['DELIVERY_SERVICE', 'How packages reach my rooms'],
   ['APP_PROBLEM', 'A problem with this app'],
   ['OTHER', 'Something else'],
 ];

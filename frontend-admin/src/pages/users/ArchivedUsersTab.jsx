@@ -53,7 +53,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
     parent.fatherName,
     parent.phone,
     parent.email,
-    ...(parent.students || []).flatMap((student) => [student.name, student.admissionNumber, student.hostelNumber]),
+    ...(parent.students || []).flatMap((student) => [student.name, student.admissionNumber, student.roomNumber]),
   ], search)), [parents, search]);
 
   const archivedStaff = useMemo(() => staff.filter((account) => !account.active && matches([
@@ -61,8 +61,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
     account.phone,
     account.email,
     account.role,
-    account.hostel?.code,
-    account.hostel?.name,
+    ...(account.rooms || []).flatMap((room) => [room.code, room.name]),
   ], search)), [search, staff]);
 
   const showStudents = type === 'all' || type === 'student';
@@ -107,7 +106,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
       await api.put(`/admin/users/staff/${account.id}`, {
         active: true,
         role: account.role,
-        hostelId: account.hostel?.id || '',
+        roomIds: account.role === 'caretaker' ? (account.rooms || []).map((room) => room.id) : [],
       });
       toast.success(`${account.name} restored`);
       await onChanged?.();
@@ -159,7 +158,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                 <tr key={`student-${student._id}`}>
                   <td data-label="User"><strong>{student.name}</strong><small>{student.admissionNumber || 'No admission number'}</small></td>
                   <td data-label="Type">Student</td>
-                  <td data-label="Details">Grade {student.grade || '—'} · Hostel {student.hostelNumber || '—'}</td>
+                  <td data-label="Details">Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
                   <td data-label="Action"><Button className="btn--sm" disabled={workingId === student._id} onClick={() => restoreStudent(student)}>{workingId === student._id ? 'Restoring…' : 'Restore'}</Button></td>
                 </tr>
@@ -177,7 +176,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                 <tr key={`staff-${account.id}`}>
                   <td data-label="User"><strong>{account.name}</strong><small>{account.email}</small></td>
                   <td data-label="Type">Staff</td>
-                  <td data-label="Details">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}{account.hostel ? ` · ${account.hostel.code}` : ''}</td>
+                  <td data-label="Details">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}{(account.rooms || []).length ? ` · ${(account.rooms || []).map((room) => room.code).join(' · ')}` : ''}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
                   <td data-label="Action"><Button className="btn--sm" disabled={workingId === account.id} onClick={() => restoreStaff(account)}>{workingId === account.id ? 'Restoring…' : 'Restore'}</Button></td>
                 </tr>

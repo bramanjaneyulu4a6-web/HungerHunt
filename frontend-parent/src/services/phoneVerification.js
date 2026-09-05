@@ -72,7 +72,14 @@ const startWebVerification = async (phone, recaptchaButtonId) => {
   ]);
   const auth = getAuth(app);
 
-  webVerifier?.clear();
+  try {
+    // On a resend the previous verifier is bound to a button that has since
+    // unmounted (the send screen's), and clear() can throw over the missing
+    // element. A fresh verifier is being made either way.
+    webVerifier?.clear();
+  } catch {
+    // Nothing left to clear.
+  }
   webVerifier = new RecaptchaVerifier(auth, recaptchaButtonId, { size: 'invisible' });
   webConfirmation = await signInWithPhoneNumber(auth, internationalPhone(phone), webVerifier);
   return { automaticallyVerified: false };
@@ -101,8 +108,16 @@ export const confirmPhoneVerification = async (verificationCode) => {
   return result.user.getIdToken(true);
 };
 
+/* Never throws. It runs after outcomes it must not be able to overturn — a
+   password already created, a component already unmounting — so a cleanup
+   hiccup here (clear() can throw once the button the verifier rendered into
+   has unmounted) must never read as the flow failing. */
 export const clearPhoneVerification = async () => {
-  webVerifier?.clear();
+  try {
+    webVerifier?.clear();
+  } catch {
+    // The verifier's host element is gone; there is nothing left to clear.
+  }
   webVerifier = undefined;
   webConfirmation = undefined;
   nativeVerificationId = undefined;

@@ -3,7 +3,7 @@ import Parent from "../models/Parent.js";
 import WalletAdjustment from "../models/WalletAdjustment.js";
 import PendingOrder from "../models/PendingOrder.js";
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
-import Hostel, { normalizeHostelCode } from '../models/Hostel.js';
+import Room, { normalizeRoomCode } from '../models/Room.js';
 import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
@@ -21,7 +21,7 @@ import {
 // purchasePassword and walletControl to the parent. Handing a request body
 // straight to the driver let these routes quietly set any of them.
 const WRITABLE_FIELDS = ['name', 'fatherName', 'grade', 'parentPhoneNumber', 'admissionNumber'];
-const STUDENT_SORT_FIELDS = new Set(['admissionNumber', 'name', 'grade', 'hostelNumber', 'pocketMoney', 'createdAt']);
+const STUDENT_SORT_FIELDS = new Set(['admissionNumber', 'name', 'grade', 'roomNumber', 'pocketMoney', 'createdAt']);
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const pickWritable = (body) => {
@@ -34,29 +34,29 @@ const pickWritable = (body) => {
   );
 };
 
-const resolveHostel = async (source) => {
-  const hostelId = source?.hostelId;
-  const code = normalizeHostelCode(source?.hostelNumber);
-  const hostel = hostelId
-    ? await Hostel.findOne({ _id: hostelId, active: true }).lean()
+const resolveRoom = async (source) => {
+  const roomId = source?.roomId;
+  const code = normalizeRoomCode(source?.roomNumber);
+  const room = roomId
+    ? await Room.findOne({ _id: roomId, active: true }).lean()
     : code
-      ? await Hostel.findOne({ code, active: true }).lean()
+      ? await Room.findOne({ code, active: true }).lean()
       : null;
 
-  if (!hostel) {
-    const value = code || String(hostelId || '').trim() || '(blank)';
-    const error = new Error(`Unknown or inactive hostel: ${value}.`);
-    error.code = 'UNKNOWN_HOSTEL';
+  if (!room) {
+    const value = code || String(roomId || '').trim() || '(blank)';
+    const error = new Error(`Unknown or inactive room: ${value}.`);
+    error.code = 'UNKNOWN_ROOM';
     throw error;
   }
-  return { hostelId: hostel._id, hostelNumber: hostel.code };
+  return { roomId: room._id, roomNumber: room.code };
 };
 
 export const addStudent = async (req, res) => {
   try {
     const student = await Student.create({
       ...pickWritable(req.body),
-      ...(await resolveHostel(req.body)),
+      ...(await resolveRoom(req.body)),
     });
 
     // A child enrolled after their parent registered used to be linked to
@@ -84,11 +84,11 @@ export const getStudents = async (req, res) => {
         { name: pattern },
         { admissionNumber: pattern },
         { fatherName: pattern },
-        { hostelNumber: pattern },
+        { roomNumber: pattern },
         { parentPhoneNumber: pattern },
       ];
     }
-    if (req.query.hostelId) filter.hostelId = req.query.hostelId;
+    if (req.query.roomId) filter.roomId = req.query.roomId;
 
     const page = Math.max(parseInt(req.query.page) || 0, 0);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
@@ -116,12 +116,12 @@ export const getStudents = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
-    const hostel = req.body?.hostelId !== undefined || req.body?.hostelNumber !== undefined
-      ? await resolveHostel(req.body)
+    const room = req.body?.roomId !== undefined || req.body?.roomNumber !== undefined
+      ? await resolveRoom(req.body)
       : {};
     const student = await Student.findOneAndUpdate(
       { _id: req.params.id, active: { $ne: false } },
-      { ...pickWritable(req.body), ...hostel },
+      { ...pickWritable(req.body), ...room },
       { new: true, runValidators: true }
     );
 
@@ -242,7 +242,7 @@ export const bulkImportStudents = async (req, res) => {
       name: String(row?.name ?? '').trim(),
       admissionNumber: String(row?.admissionNumber ?? '').trim(),
       fatherName: String(row?.fatherName ?? '').trim(),
-      hostelNumber: normalizeHostelCode(row?.hostelNumber),
+      roomNumber: normalizeRoomCode(row?.roomNumber),
       grade: String(row?.grade ?? '').trim(),
       parentPhoneNumber: String(row?.parentPhoneNumber ?? '').trim(),
     }));
@@ -253,7 +253,7 @@ export const bulkImportStudents = async (req, res) => {
         addInvalid(students[index], index, 'admissionNumber', 'Admission number must be exactly 5 digits.');
       }
       if (!row.fatherName) addInvalid(students[index], index, 'fatherName', "Father's name is required.");
-      if (!row.hostelNumber) addInvalid(students[index], index, 'hostelNumber', 'Hostel code is required.');
+      if (!row.roomNumber) addInvalid(students[index], index, 'roomNumber', 'Room code is required.');
       if (!row.grade) addInvalid(students[index], index, 'grade', 'Grade / class is required.');
       if (!/^\d{10}$/.test(row.parentPhoneNumber)) {
         addInvalid(students[index], index, 'parentPhoneNumber', 'Parent phone number must be exactly 10 digits.');
@@ -278,13 +278,13 @@ export const bulkImportStudents = async (req, res) => {
       }
     });
 
-    const requestedCodes = students.map((row) => normalizeHostelCode(row?.hostelNumber));
+    const requestedCodes = students.map((row) => normalizeRoomCode(row?.roomNumber));
     const uniqueCodes = [...new Set(requestedCodes.filter(Boolean))];
-    const hostels = await Hostel.find({ code: { $in: uniqueCodes }, active: true }).lean();
-    const byCode = new Map(hostels.map((hostel) => [hostel.code, hostel]));
+    const rooms = await Room.find({ code: { $in: uniqueCodes }, active: true }).lean();
+    const byCode = new Map(rooms.map((room) => [room.code, room]));
     normalized.forEach((row, index) => {
-      if (row.hostelNumber && !byCode.has(row.hostelNumber)) {
-        addInvalid(students[index], index, 'hostelNumber', `Hostel ${row.hostelNumber} does not exist or is inactive.`);
+      if (row.roomNumber && !byCode.has(row.roomNumber)) {
+        addInvalid(students[index], index, 'roomNumber', `Room ${row.roomNumber} does not exist or is inactive.`);
       }
     });
 
@@ -316,11 +316,11 @@ export const bulkImportStudents = async (req, res) => {
     }
 
     const rows = normalized.map((row) => {
-      const hostel = byCode.get(row.hostelNumber);
+      const room = byCode.get(row.roomNumber);
       return {
         ...pickWritable(row),
-        hostelId: hostel._id,
-        hostelNumber: hostel.code,
+        roomId: room._id,
+        roomNumber: room.code,
       };
     });
 
@@ -353,7 +353,7 @@ export const bulkImportStudents = async (req, res) => {
 // whose parent has never registered, because nobody would be there to approve
 // the order, and the screen says so rather than letting the request fail.
 const SEARCH_FIELDS =
-  "_id name fatherName hostelId hostelNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
+  "_id name fatherName roomId roomNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
 
 export const searchStudents = async (req, res) => {
   try {
@@ -370,7 +370,7 @@ export const searchStudents = async (req, res) => {
       active: { $ne: false },
       $or: [
         { name: pattern },
-        { hostelNumber: pattern },
+        { roomNumber: pattern },
         { parentPhoneNumber: pattern }
       ]
     })
@@ -475,7 +475,7 @@ export const createKioskSession = async (req, res) => {
           title: waitingForParent ? 'Waiting for parent approval' : 'Your order is in progress',
           body: waitingForParent
             ? 'You can start another order after your parent approves or cancels this request.'
-            : 'You can start another order after this one is delivered or cancelled.',
+            : 'You can reorder next week.',
           ...(!waitingForParent && {
             orderStatus: fulfillmentOrder.status,
             estimatedDeliveryDate: fulfillmentOrder.deliverBy,

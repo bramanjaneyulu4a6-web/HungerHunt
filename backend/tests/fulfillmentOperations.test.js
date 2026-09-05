@@ -20,6 +20,7 @@ const Parent = (await import('../models/Parent.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const StaffReport = (await import('../models/StaffReport.js')).default;
+const Room = (await import('../models/Room.js')).default;
 const { signStaffToken, signParentToken } = await import('../utils/tokens.js');
 const {
   ALERT_SNOOZE_MS,
@@ -61,8 +62,18 @@ before(async () => {
 after(() => mock.restoreAll());
 afterEach(() => mock.restoreAll());
 
+/* Every warehouse-facing response now carries the caretaker unit map, which is
+   derived on read from two collections. There is no database here, so the
+   default is "nobody covers anything" and the tests that care about the
+   grouping install their own rooms and caretakers over it. */
+const roomsAndCaretakers = (rooms = [], caretakers = []) => {
+  mock.method(Room, 'find', () => query(rooms));
+  mock.method(Admin, 'find', () => query(caretakers));
+};
+
 beforeEach(() => {
   mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+  roomsAndCaretakers();
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
   mock.method(Transaction, 'exists', async () => ({ _id: TRANSACTION_ID }));
 });
@@ -105,7 +116,7 @@ const orderFixture = (overrides = {}) => ({
   _id: ORDER_ID,
   transactionId: TRANSACTION_ID,
   studentId: STUDENT_ID,
-  studentSnapshot: { name: 'Asha', admissionNumber: 'A-10', hostelNumber: 'D-4' },
+  studentSnapshot: { name: 'Asha', admissionNumber: 'A-10', roomNumber: 'D-4' },
   items: [{ productId: PRODUCT_ID, name: 'Package', quantity: 1, price: 40 }],
   totalAmount: 40,
   status: 'PENDING',
@@ -125,7 +136,7 @@ describe('overdue policy', () => {
 
   test('a delivered, collected or cancelled package is never late, however old', () => {
     assert.equal(isOverdue(orderFixture({ status: 'DELIVERED' }), now), false);
-    // The deadline measures the warehouse reaching the hostel, so a package
+    // The deadline measures the warehouse reaching the room, so a package
     // waiting there for its student is not the storeroom's overdue work.
     assert.equal(isOverdue(orderFixture({ status: 'COLLECTED' }), now), false);
     assert.equal(isOverdue(orderFixture({ status: 'CANCELLED' }), now), false);
@@ -169,9 +180,9 @@ describe('overdue policy', () => {
 
 describe('proof-of-delivery policy', () => {
   test('a receiver must be recorded', () => {
-    assert.match(proofOfDeliveryProblem(''), /who at the hostel/i);
-    assert.match(proofOfDeliveryProblem('   '), /who at the hostel/i);
-    assert.match(proofOfDeliveryProblem(undefined), /who at the hostel/i);
+    assert.match(proofOfDeliveryProblem(''), /who at the room/i);
+    assert.match(proofOfDeliveryProblem('   '), /who at the room/i);
+    assert.match(proofOfDeliveryProblem(undefined), /who at the room/i);
   });
 
   test('a name is accepted, and a room number with it', () => {
@@ -333,22 +344,34 @@ describe('warehouse-to-caretaker handoff', () => {
   });
 });
 
-describe('warehouse hostel reports', () => {
-  test('files one warehouse report for a grouped pending hostel tile', async () => {
-    const secondOrderId = '507f191e810c19729de860f0';
-    const hostelId = '507f191e810c19729de860e1';
-    mock.method(FulfillmentOrder, 'find', () => query([
-      orderFixture({ studentSnapshot: { hostelId, hostelNumber: 'D-4' } }),
-      orderFixture({
-        _id: secondOrderId,
-        studentSnapshot: { hostelId, hostelNumber: 'D-4' },
-      }),
-    ]));
+describe('warehouse room reports', () => {
+  const ROOM_A = '507f191e810c19729de860e1';
+  const ROOM_B = '507f191e810c19729de860e2';
+  const OTHER_ROOM = '507f191e810c19729de860e7';
+  const SECOND_ORDER_ID = '507f191e810c19729de860f0';
+  const CARETAKER_ID = '507f1f77bcf86cd799439021';
+  const OTHER_CARETAKER_ID = '507f1f77bcf86cd799439022';
+
+  /* Rooms A and B are held by the same caretaker, so they are one run and one
+     report. The third room is somebody else's. */
+  const oneUnitOfTwoRooms = () => roomsAndCaretakers(
+    [
+      { _id: ROOM_A, code: 'D-4' },
+      { _id: ROOM_B, code: 'D-5' },
+      { _id: OTHER_ROOM, code: 'E-1' },
+    ],
+    [
+      { _id: CARETAKER_ID, roomIds: [ROOM_A, ROOM_B] },
+      { _id: OTHER_CARETAKER_ID, roomIds: [OTHER_ROOM] },
+    ]
+  );
+
+  const capturingCreate = () => {
+    const captured = {};
     mock.method(StaffReport, 'countDocuments', async () => 0);
     mock.method(Admin, 'findById', () => query({ name: 'Warehouse One', email: 'wh@example.test' }));
-    let stored;
     mock.method(StaffReport, 'create', async (document) => {
-      stored = document;
+      Object.assign(captured, document);
       return {
         toObject: () => ({
           _id: '507f191e810c19729de860f1',
@@ -358,24 +381,42 @@ describe('warehouse hostel reports', () => {
         }),
       };
     });
+    return captured;
+  };
 
-    const response = await asStaff('/api/v1/fulfillment-orders/warehouse-reports', {
-      method: 'POST',
-      body: JSON.stringify({
-        orderIds: [ORDER_ID, secondOrderId],
-        category: 'MISSING_ITEM',
-        note: 'Two bottles are unavailable on the shelf.',
+  const file = (orderIds) => asStaff('/api/v1/fulfillment-orders/warehouse-reports', {
+    method: 'POST',
+    body: JSON.stringify({
+      orderIds,
+      category: 'MISSING_ITEM',
+      note: 'Two bottles are unavailable on the shelf.',
+    }),
+  });
+
+  test('files one warehouse report for a grouped pending room tile', async () => {
+    oneUnitOfTwoRooms();
+    mock.method(FulfillmentOrder, 'find', () => query([
+      orderFixture({ studentSnapshot: { roomId: ROOM_A, roomNumber: 'D-4' } }),
+      orderFixture({
+        _id: SECOND_ORDER_ID,
+        studentSnapshot: { roomId: ROOM_A, roomNumber: 'D-4' },
       }),
-    });
+    ]));
+    const stored = capturingCreate();
+
+    const response = await file([ORDER_ID, SECOND_ORDER_ID]);
 
     assert.equal(response.status, 201);
     assert.equal(stored.raiser.role, 'warehouse');
-    assert.equal(stored.raiser.hostelNumber, 'D-4');
-    assert.equal(String(stored.hostelId), hostelId);
+    /* Stamped with the whole run, not only the room this group of orders
+       happened to touch: the report is about the trolley. */
+    assert.equal(stored.raiser.roomNumbers, 'D-4 · D-5');
+    assert.deepEqual(stored.roomIds, [ROOM_A, ROOM_B]);
     const body = await response.json();
     assert.equal(body.meta.groupedOrders, 2);
-    assert.equal(body.meta.hostelNumber, 'D-4');
+    assert.equal(body.meta.roomNumbers, 'D-4 · D-5');
   });
+
 });
 
 describe('overdue alerts for staff', () => {
@@ -614,6 +655,39 @@ describe('delivery history and operational reports', () => {
     assert.equal(body.data.delivery.delivered, 1);
     assert.equal(JSON.stringify(body.data).includes('Asha'), false);
   });
+
+  /* The Records and Orders screens group their blocks from this map rather than
+     guessing a grouping from room codes, so it has to travel with every
+     warehouse-facing response. */
+  test('the caretaker unit map travels with the list, the history and the report', async () => {
+    roomsAndCaretakers(
+      [
+        { _id: '507f191e810c19729de860e1', code: 'D-4' },
+        { _id: '507f191e810c19729de860e2', code: 'D-5' },
+        { _id: '507f191e810c19729de860e7', code: 'E-1' },
+      ],
+      [{ _id: '507f1f77bcf86cd799439021', roomIds: ['507f191e810c19729de860e1', '507f191e810c19729de860e2'] }]
+    );
+    mock.method(FulfillmentOrder, 'find', () => query([orderFixture()]));
+    mock.method(FulfillmentOrder, 'countDocuments', async () => 1);
+
+    // Two rooms held by one caretaker are one run; the room nobody covers
+    // stands alone rather than being folded in with them.
+    const expected = [
+      { rooms: [{ id: '507f191e810c19729de860e1', code: 'D-4' }, { id: '507f191e810c19729de860e2', code: 'D-5' }] },
+      { rooms: [{ id: '507f191e810c19729de860e7', code: 'E-1' }] },
+    ];
+
+    for (const path of [
+      '/api/v1/fulfillment-orders',
+      '/api/v1/fulfillment-orders/history?scope=all',
+      '/api/v1/fulfillment-orders/report?from=2026-08-01&to=2026-08-12',
+    ]) {
+      const response = await asStaff(path);
+      assert.equal(response.status, 200, path);
+      assert.deepEqual((await response.json()).meta.roomUnits, expected, path);
+    }
+  });
 });
 
 describe('who may reach fulfilment operations', () => {
@@ -683,7 +757,7 @@ describe('what the parent is shown about a package', () => {
     assert.equal(item.deliverBy, '2026-08-12T10:00:00.000Z');
     assert.equal(item.packedAt, '2026-08-10T14:00:00.000Z');
     assert.equal(item.overdue, true);
-    assert.equal(item.hostelNumber, 'D-4');
+    assert.equal(item.roomNumber, 'D-4');
   });
 
   test('a package inside its window is not shown as overdue', async () => {
@@ -692,7 +766,7 @@ describe('what the parent is shown about a package', () => {
     assert.equal(packages[0].overdue, false);
   });
 
-  test('a delivered package is never overdue, and shows who received it', async () => {
+  test('a handed-over package is never overdue, and keeps its receiver private', async () => {
     listOneOrder({
       status: 'DELIVERED',
       deliveredAt: new Date('2026-08-11T10:00:00.000Z'),
@@ -701,8 +775,10 @@ describe('what the parent is shown about a package', () => {
 
     const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
     assert.equal(packages[0].overdue, false);
-    assert.equal(packages[0].receivedBy, 'Asha');
-    // Delivered to the hostel, not yet taken by the child — and a parent must
+    // Who at the room is holding the package is the back office's detail;
+    // to a parent it is simply still out for delivery.
+    assert.equal(packages[0].receivedBy, undefined);
+    // Handed to the room, not yet taken by the child — and a parent must
     // be able to tell those apart.
     assert.equal(packages[0].collectedAt, null);
   });
@@ -729,15 +805,16 @@ describe('what the parent is shown about a package', () => {
       packedBy: STAFF_ID,
       deliveryNote: 'left at the warden desk',
       transitions: [{ from: 'PACKED', to: 'DELIVERED', at: new Date(), actorId: STAFF_ID }],
-      proofOfDelivery: { receivedBy: 'Asha', recordedBy: STAFF_ID, recordedAt: new Date() },
+      // Deliberately not the student's name: the receiver must be checkable
+      // as absent while 'Asha' still rightly appears as the child.
+      proofOfDelivery: { receivedBy: 'Sundari', recordedBy: STAFF_ID, recordedAt: new Date() },
     });
 
     const body = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).text();
 
-    for (const leak of [STAFF_ID, TRANSACTION_ID, 'transitions', 'deliveredBy', 'deliveryNote']) {
+    for (const leak of [STAFF_ID, TRANSACTION_ID, 'transitions', 'deliveredBy', 'deliveryNote', 'Sundari']) {
       assert.equal(body.includes(leak), false, `parent response leaked ${leak}`);
     }
-    assert.equal(body.includes('Asha'), true);
   });
 
   test('the list is paged and clamped rather than sent whole', async () => {

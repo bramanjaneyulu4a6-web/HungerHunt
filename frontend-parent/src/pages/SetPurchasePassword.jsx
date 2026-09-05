@@ -262,7 +262,7 @@ export default function SetPurchasePassword() {
           </h1>
           <p className="card-meta" style={{ fontSize: 14 }}>
             {student.name} · Grade {student.grade || '—'} · Room{' '}
-            {student.hostelNumber || '—'}
+            {student.roomNumber || '—'}
           </p>
 
           <p

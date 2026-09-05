@@ -101,8 +101,11 @@ const ReportsButton = () => {
 
 const CaretakerShell = ({ children, identity = true }) => {
   const profile = readStaffProfile();
-  const hostel = profile.hostel || {};
-  const hostelLabel = [hostel.code, hostel.name].filter(Boolean).join(" — ");
+  /* Devices already in the field hold the single-room profile written by the
+     old login and will keep it until the caretaker signs in again, so the one
+     room is read as a list of one rather than shown as missing. */
+  const profileRooms = profile.rooms ?? (profile.hostel ? [profile.hostel] : []);
+  const roomLabel = profileRooms.map((room) => room.code).filter(Boolean).join(" · ");
 
   return (
     <div className="wh-app wh-app--single caretaker-app">
@@ -129,9 +132,12 @@ const CaretakerShell = ({ children, identity = true }) => {
             {profile.phone || "Phone unavailable"}
           </a>
         </div>
-        <div className="caretaker-identity__hostel">
+        <div className="caretaker-identity__rooms">
           <Icon name="home" size={20} />
-          <span><small>Your hostel</small><strong>{hostelLabel || "Hostel unavailable"}</strong></span>
+          <span>
+            <small>{profileRooms.length === 1 ? "Your room" : "Your rooms"}</small>
+            <strong>{roomLabel || "Rooms unavailable"}</strong>
+          </span>
         </div>
       </section>
       )}

@@ -7,7 +7,7 @@ const headers = [
   'name',
   'admissionNumber',
   'fatherName',
-  'hostelNumber',
+  'roomNumber',
   'grade',
   'parentPhoneNumber',
 ];

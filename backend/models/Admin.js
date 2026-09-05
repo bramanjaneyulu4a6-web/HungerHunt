@@ -23,15 +23,15 @@ const adminSchema = new mongoose.Schema({
     default: 'admin',
   },
 
-  hostelId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Hostel',
-    default: null,
+  roomIds: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Room' }],
+    default: [],
     validate: {
       validator(value) {
-        return this.role === 'caretaker' ? Boolean(value) : value == null;
+        const count = Array.isArray(value) ? value.length : 0;
+        return this.role === 'caretaker' ? count > 0 : count === 0;
       },
-      message: 'A hostel is required for caretaker accounts and is not allowed for other roles.',
+      message: 'At least one room is required for caretaker accounts and rooms are not allowed for other roles.',
     },
   },
 

@@ -7,7 +7,7 @@ export const OrderStatus = Object.freeze({
   CANCELLED: 'CANCELLED',
 });
 
-/* DELIVERED is the warehouse handing the package to the hostel's caretaker,
+/* DELIVERED is the warehouse handing the package to the room's caretaker,
    and it is where the storeroom's job ends: the receiver is named by the
    person who handed it over. COLLECTED is the step after, at the dorm door,
    and only the student's own purchase code can move a package into it — which

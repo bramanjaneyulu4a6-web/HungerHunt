@@ -1,7 +1,7 @@
 import { OrderStatus, orderStatuses } from './orderState.js';
 import { isOverdue } from './overdue.js';
 
-// Both states in which the warehouse has handed the package over at the hostel.
+// Both states in which the warehouse has handed the package over at the room.
 const DELIVERED_STATUSES = Object.freeze([OrderStatus.DELIVERED, OrderStatus.COLLECTED]);
 
 /* 1.1 added collection: the counts below stopped being able to say whether a
@@ -80,7 +80,7 @@ export const buildDeliveryReport = ({ orders, from, to, now = new Date(), timeZo
       deliverToCollect.push(hoursBetween(order.deliveredAt, order.collectedAt));
     }
 
-    /* Delivery is measured at the hostel door, so a package the student has
+    /* Delivery is measured at the room door, so a package the student has
        since collected is still a delivered package — it must be counted here
        too, or every on-time delivery would quietly leave the numerator the
        moment its student turned up for it. */

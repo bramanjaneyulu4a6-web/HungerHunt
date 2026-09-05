@@ -30,7 +30,7 @@ const app = (await import('../app.js')).default;
 
 const STAFF_ID = '507f1f77bcf86cd799439011';
 const STUDENT_ID = '507f191e810c19729de860eb';
-const HOSTEL_ID = '507f191e810c19729de860e1';
+const ROOM_ID = '507f191e810c19729de860e1';
 const PRODUCT_ID = '507f191e810c19729de860ec';
 const TRANSACTION_ID = '507f191e810c19729de860ee';
 const ORDER_ID = '507f191e810c19729de860ef';
@@ -72,15 +72,15 @@ describe('dorm fulfilment policy', () => {
         _id: STUDENT_ID,
         name: 'Asha',
         admissionNumber: 'A-10',
-        hostelNumber: 'D-4',
-        hostelId: HOSTEL_ID,
+        roomNumber: 'D-4',
+        roomId: ROOM_ID,
       },
       orderedAt: new Date('2026-08-13T10:00:00.000Z'),
     });
 
     assert.equal(String(stored.transactionId), TRANSACTION_ID);
     assert.deepEqual(stored.studentSnapshot, {
-      name: 'Asha', admissionNumber: 'A-10', hostelNumber: 'D-4', hostelId: HOSTEL_ID,
+      name: 'Asha', admissionNumber: 'A-10', roomNumber: 'D-4', roomId: ROOM_ID,
     });
     assert.equal(stored.status, OrderStatus.PENDING);
   });
@@ -92,7 +92,7 @@ describe('dorm fulfilment policy', () => {
     await assert.rejects(
       () => createFulfillmentOrder({
         transaction: { _id: TRANSACTION_ID, totalAmount: 40, items: [] },
-        student: { _id: STUDENT_ID, name: 'Asha', hostelNumber: 'D-4' },
+        student: { _id: STUDENT_ID, name: 'Asha', roomNumber: 'D-4' },
       }),
       (error) => error === duplicate
     );
@@ -146,7 +146,7 @@ describe('dorm fulfilment policy', () => {
           _id: ORDER_ID,
           transactionId: TRANSACTION_ID,
           studentId: STUDENT_ID,
-          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
           items: [],
           totalAmount: 40,
           status: 'PACKED',
@@ -209,7 +209,7 @@ describe('dorm fulfilment policy', () => {
           _id: ORDER_ID,
           transactionId: TRANSACTION_ID,
           studentId: STUDENT_ID,
-          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
           items: [],
           totalAmount: 40,
           status: 'PENDING',
@@ -258,7 +258,7 @@ describe('dorm fulfilment policy', () => {
           _id: ORDER_ID,
           transactionId: TRANSACTION_ID,
           studentId: STUDENT_ID,
-          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
           items: [],
           totalAmount: 40,
           status: 'PENDING',
@@ -288,7 +288,7 @@ describe('dorm fulfilment policy', () => {
     assert.equal(update.$push.transitions.to, 'PENDING');
   });
 
-  test('the warehouse records delivery by naming who at the hostel took it', async () => {
+  test('the warehouse records delivery by naming who at the room took it', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
     mock.method(FulfillmentOrder, 'findById', () => ({
       lean: async () => ({ _id: ORDER_ID, transactionId: TRANSACTION_ID, status: 'OUT_FOR_DELIVERY' }),
@@ -301,7 +301,7 @@ describe('dorm fulfilment policy', () => {
           _id: ORDER_ID,
           transactionId: TRANSACTION_ID,
           studentId: STUDENT_ID,
-          studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+          studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
           items: [],
           totalAmount: 40,
           status: 'DELIVERED',

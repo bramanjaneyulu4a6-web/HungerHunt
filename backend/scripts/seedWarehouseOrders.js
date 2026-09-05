@@ -3,14 +3,14 @@ import 'dotenv/config';
 import mongoose from 'mongoose';
 
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
-import Hostel from '../models/Hostel.js';
+import Room from '../models/Room.js';
 import Product from '../models/Product.js';
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 
 const DEMO_ADMISSION_PREFIX = 'WH-DEMO-';
 const BLOCKS = ['A', 'B', 'C'];
-const HOSTELS_PER_BLOCK = 8;
+const ROOMS_PER_BLOCK = 8;
 const BASE_ORDERS_PER_STATUS = 2;
 const EXTRA_NEW_ORDERS = 12;
 const STATUSES = ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY'];
@@ -57,16 +57,19 @@ const seed = async () => {
     await Student.deleteMany({ _id: { $in: previousStudentIds } });
   }
 
-  const hostels = [];
+  /* Room codes stay shaped <BLOCK>-<n>: the warehouse board derives the block
+     it groups by from the part before the dash, so a code without one collapses
+     every room into a single unnamed block. */
+  const rooms = [];
   for (const block of BLOCKS) {
-    for (let number = 1; number <= HOSTELS_PER_BLOCK; number += 1) {
+    for (let number = 1; number <= ROOMS_PER_BLOCK; number += 1) {
       const code = `${block}-${number}`;
-      const hostel = await Hostel.findOneAndUpdate(
+      const room = await Room.findOneAndUpdate(
         { code },
-        { $set: { name: `Block ${block} Hostel ${number}`, active: true } },
+        { $set: { name: `Block ${block} Room ${number}`, active: true } },
         { upsert: true, new: true, runValidators: true }
       );
-      hostels.push(hostel);
+      rooms.push(room);
     }
   }
 
@@ -77,17 +80,17 @@ const seed = async () => {
   const products = catalogue.length ? catalogue : FALLBACK_PRODUCTS;
 
   const specifications = [];
-  for (const [hostelIndex, hostel] of hostels.entries()) {
+  for (const [roomIndex, room] of rooms.entries()) {
     for (const status of STATUSES) {
       for (let copy = 0; copy < BASE_ORDERS_PER_STATUS; copy += 1) {
-        specifications.push({ hostel, hostelIndex, status, copy });
+        specifications.push({ room, roomIndex, status, copy });
       }
     }
   }
   for (let extra = 0; extra < EXTRA_NEW_ORDERS; extra += 1) {
     specifications.push({
-      hostel: hostels[extra],
-      hostelIndex: extra,
+      room: rooms[extra],
+      roomIndex: extra,
       status: 'PENDING',
       copy: BASE_ORDERS_PER_STATUS,
     });
@@ -96,8 +99,8 @@ const seed = async () => {
   const students = await Student.insertMany(specifications.map((spec, index) => ({
     name: `Warehouse Demo Student ${String(index + 1).padStart(3, '0')}`,
     fatherName: `Demo Parent ${String(index + 1).padStart(3, '0')}`,
-    hostelNumber: spec.hostel.code,
-    hostelId: spec.hostel._id,
+    roomNumber: spec.room.code,
+    roomId: spec.room._id,
     grade: `${9 + (index % 4)}`,
     parentPhoneNumber: String(8100000000 + index),
     admissionNumber: `${DEMO_ADMISSION_PREFIX}${String(index + 1).padStart(3, '0')}`,
@@ -107,7 +110,7 @@ const seed = async () => {
 
   const now = Date.now();
   const transactionRows = specifications.map((spec, index) => {
-    const typeCount = 1 + ((index + spec.hostelIndex) % 4);
+    const typeCount = 1 + ((index + spec.roomIndex) % 4);
     const items = Array.from({ length: typeCount }, (_, itemIndex) => {
       const product = products[(index * 3 + itemIndex) % products.length];
       const quantity = 1 + ((index + itemIndex) % 3);
@@ -147,8 +150,8 @@ const seed = async () => {
       studentSnapshot: {
         name: students[index].name,
         admissionNumber: students[index].admissionNumber,
-        hostelNumber: spec.hostel.code,
-        hostelId: spec.hostel._id,
+        roomNumber: spec.room.code,
+        roomId: spec.room._id,
       },
       items: transactionRows[index].items,
       totalAmount: transactionRows[index].totalAmount,
@@ -168,7 +171,7 @@ const seed = async () => {
     orders.filter((order) => order.status === status).length,
   ]));
   console.log(
-    `Warehouse demo ready: ${orders.length} orders, ${hostels.length} hostels, ${BLOCKS.length} blocks.`
+    `Warehouse demo ready: ${orders.length} orders, ${rooms.length} rooms, ${BLOCKS.length} blocks.`
   );
   console.log(`New ${counts.PENDING} · Packed ${counts.PACKED} · Out for delivery ${counts.OUT_FOR_DELIVERY}`);
 };

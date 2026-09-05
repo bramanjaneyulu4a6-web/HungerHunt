@@ -19,10 +19,10 @@ const REPORT_CATEGORIES = [
   ["OTHER", "Something else"],
 ];
 
-const unitLabel = (count) => `${count} item${count === 1 ? "" : "s"}`;
+const itemLabel = (count) => `${count} item${count === 1 ? "" : "s"}`;
 
 const ItemList = ({ items }) => (
-  <div className="wh-hostel-items">
+  <div className="wh-unit-items">
     {items.map((item) => (
       <div key={item.id}>
         <span>{item.name}</span>
@@ -32,37 +32,39 @@ const ItemList = ({ items }) => (
   </div>
 );
 
-const HostelTile = ({ hostel, status, busy, onAdvance, onReport }) => (
-  <article className="wh-hostel-tile">
-    <div className="wh-hostel-tile-head">
+/* A unit is the rooms one caretaker holds, and they travel as one delivery, so
+   the board gives them one tile and one button rather than a row each. */
+const UnitTile = ({ unit, status, busy, onAdvance, onReport }) => (
+  <article className="wh-unit-tile">
+    <div className="wh-unit-tile-head">
       <div>
-        <span className="wh-hostel-kicker">Hostel</span>
-        <h3>{hostel.hostelNumber}</h3>
+        <span className="wh-unit-kicker">{unit.roomNumbers.length === 1 ? "Room" : "Rooms"}</span>
+        <h3>{unit.label}</h3>
       </div>
-      <span className="wh-hostel-count">
-        <strong className="wh-num">{hostel.itemCount}</strong>
+      <span className="wh-unit-count">
+        <strong className="wh-num">{unit.itemCount}</strong>
         <small>items</small>
       </span>
     </div>
 
     <p className="wh-remaining">
-      {hostel.items.length} product type{hostel.items.length === 1 ? "" : "s"} to handle
-      {hostel.overdue && <span className="wh-overdue-copy"> · overdue</span>}
+      {unit.items.length} product type{unit.items.length === 1 ? "" : "s"} to handle
+      {unit.overdue && <span className="wh-overdue-copy"> · overdue</span>}
     </p>
-    <ItemList items={hostel.items} />
+    <ItemList items={unit.items} />
 
-    <div className="wh-hostel-actions">
-      <button type="button" className="wh-cta" disabled={busy} onClick={() => onAdvance(hostel)}>
+    <div className="wh-unit-actions">
+      <button type="button" className="wh-cta" disabled={busy} onClick={() => onAdvance(unit)}>
         {busy
           ? "Updating…"
           : status === "PENDING"
             ? "Mark as packed"
             : status === "PACKED"
               ? "Deliver"
-              : "Mark as delivered"}
+              : "Record handover"}
       </button>
       {status === "PENDING" && (
-        <button type="button" className="wh-report-tile" disabled={busy} onClick={() => onReport(hostel)}>
+        <button type="button" className="wh-report-tile" disabled={busy} onClick={() => onReport(unit)}>
           Report
         </button>
       )}
@@ -73,6 +75,8 @@ const HostelTile = ({ hostel, status, busy, onAdvance, onReport }) => (
 const Orders = () => {
   const [view, setView] = useState("PENDING");
   const [orders, setOrders] = useState([]);
+  // Which rooms travel together is the server's answer, not this screen's.
+  const [roomUnits, setRoomUnits] = useState([]);
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -86,6 +90,7 @@ const Orders = () => {
     try {
       const response = await api.get("/v1/fulfillment-orders");
       setOrders(response.data.data || []);
+      setRoomUnits(response.data.meta?.roomUnits || []);
     } catch (error) {
       console.error(error);
       setLoadError(true);
@@ -97,22 +102,26 @@ const Orders = () => {
   useEffect(() => { (async () => { await load(); })(); }, [load]);
 
   const counts = useMemo(() => Object.fromEntries(VIEWS.map(([status]) => {
-    const statusBlocks = groupOrdersByBlock(orders.filter((order) => order.status === status));
-    return [status, statusBlocks.reduce((sum, block) => sum + block.hostelCount, 0)];
-  })), [orders]);
+    const statusBlocks = groupOrdersByBlock(orders.filter((order) => order.status === status), roomUnits);
+    return [status, statusBlocks.reduce((sum, block) => sum + block.unitCount, 0)];
+  })), [orders, roomUnits]);
   const blocks = useMemo(
-    () => groupOrdersByBlock(orders.filter((order) => order.status === view)),
-    [orders, view]
+    () => groupOrdersByBlock(orders.filter((order) => order.status === view), roomUnits),
+    [orders, roomUnits, view]
   );
   const activeBlock = blocks.find((block) => block.key === selectedBlock) || null;
 
-  const transitionHostels = async (hostels, status, proofByHostel = {}) => {
-    const key = `${status}:${hostels.map((hostel) => hostel.key).join(",")}`;
+  /* Unit keys are compared whole. "unit:1" is a prefix of "unit:10", so a
+     substring test would grey out a tile nobody is waiting on. */
+  const busyUnits = busyKey ? busyKey.split("|") : [];
+
+  const transitionUnits = async (units, status, proofByUnit = {}) => {
+    const key = [status, ...units.map((unit) => unit.key)].join("|");
     setBusyKey(key);
-    const work = hostels.flatMap((hostel) =>
-      hostel.orders.map((order) => api.post(`/v1/fulfillment-orders/${order.id}/transition`, {
+    const work = units.flatMap((unit) =>
+      unit.orders.map((order) => api.post(`/v1/fulfillment-orders/${order.id}/transition`, {
         status,
-        ...(proofByHostel[hostel.key] || {}),
+        ...(proofByUnit[unit.key] || {}),
       }))
     );
     const results = await Promise.allSettled(work);
@@ -127,62 +136,78 @@ const Orders = () => {
         ? "Moved to Packed"
         : status === "OUT_FOR_DELIVERY"
           ? "Moved to Out for delivery"
-          : "Delivery recorded");
+          : "Handover recorded — delivered once the student collects it");
     }
     setBusyKey("");
     await load();
   };
 
-  const openDelivery = (hostels, { wholeBlock = false, blockLabel = "" } = {}) => setDelivery({
-    hostels,
+  const openDelivery = (units, { wholeBlock = false, blockLabel = "" } = {}) => setDelivery({
+    units,
     wholeBlock,
     blockLabel,
     receivers: wholeBlock
       ? { block: { receivedBy: "", receiverPhone: "" } }
-      : { [hostels[0].key]: { receivedBy: "", receiverPhone: "" } },
+      : { [units[0].key]: { receivedBy: "", receiverPhone: "" } },
     error: "",
   });
 
+  // One row per receiver: a whole-block handover records one person for the
+  // block, a unit handover records one person for the rooms that unit holds.
+  const receiverRows = (state) => state.wholeBlock
+    ? [{
+        key: "block",
+        label: state.blockLabel,
+        rooms: state.units.length,
+        itemCount: state.units.reduce((sum, unit) => sum + unit.itemCount, 0),
+      }]
+    : state.units.map((unit) => ({
+        key: unit.key,
+        label: unit.label,
+        rooms: unit.roomNumbers.length,
+        itemCount: unit.itemCount,
+      }));
+
   const submitDelivery = async (event) => {
     event.preventDefault();
-    const receiverKeys = delivery.wholeBlock
-      ? ["block"]
-      : delivery.hostels.map((hostel) => hostel.key);
-    const incompleteKey = receiverKeys.find((key) => {
-      const receiver = delivery.receivers[key];
+    const rows = receiverRows(delivery);
+    const incomplete = rows.find((row) => {
+      const receiver = delivery.receivers[row.key];
       return receiver.receivedBy.trim().length < 2 ||
         receiver.receiverPhone.replace(/\D/g, "").length !== 10;
     });
-    if (incompleteKey) {
+    if (incomplete) {
       setDelivery((current) => ({
         ...current,
         error: delivery.wholeBlock
           ? `Enter the receiver name and 10-digit phone number for ${delivery.blockLabel}.`
-          : `Enter the receiver name and 10-digit phone number for hostel ${incompleteKey}.`,
+          : `Enter the receiver name and 10-digit phone number for room${incomplete.rooms === 1 ? "" : "s"} ${incomplete.label}.`,
       }));
       return;
     }
     const sharedReceiver = delivery.wholeBlock ? delivery.receivers.block : null;
-    const proof = Object.fromEntries(delivery.hostels.map((hostel) => {
-      const receiver = sharedReceiver || delivery.receivers[hostel.key];
-      return [hostel.key, {
+    const proof = Object.fromEntries(delivery.units.map((unit) => {
+      const receiver = sharedReceiver || delivery.receivers[unit.key];
+      return [unit.key, {
         receivedBy: receiver.receivedBy.trim(),
         receiverPhone: receiver.receiverPhone.replace(/\D/g, ""),
       }];
     }));
-    const hostels = delivery.hostels;
+    const units = delivery.units;
     setDelivery(null);
-    await transitionHostels(hostels, "DELIVERED", proof);
+    await transitionUnits(units, "DELIVERED", proof);
   };
 
   const submitReport = async (event) => {
     event.preventDefault();
     const note = reporting.note.trim();
     if (!reporting.category || note.length < 10) return;
-    setBusyKey(`report:${reporting.hostel.key}`);
+    setBusyKey(`report:${reporting.unit.key}`);
     try {
+      // One unit's orders, never a mix: the office reads a grouped report as
+      // one caretaker's delivery, and the server refuses anything wider.
       await api.post("/v1/fulfillment-orders/warehouse-reports", {
-        orderIds: reporting.hostel.orders.map((order) => order.id),
+        orderIds: reporting.unit.orders.map((order) => order.id),
         category: reporting.category,
         note,
       });
@@ -196,10 +221,10 @@ const Orders = () => {
     }
   };
 
-  const advanceHostel = (hostel) => {
-    if (view === "PENDING") return transitionHostels([hostel], "PACKED");
-    if (view === "PACKED") return transitionHostels([hostel], "OUT_FOR_DELIVERY");
-    return openDelivery([hostel]);
+  const advanceUnit = (unit) => {
+    if (view === "PENDING") return transitionUnits([unit], "PACKED");
+    if (view === "PACKED") return transitionUnits([unit], "OUT_FOR_DELIVERY");
+    return openDelivery([unit]);
   };
 
   return (
@@ -207,7 +232,7 @@ const Orders = () => {
       <div className="wh-row">
         <div>
           <h1 className="wh-title">Active orders</h1>
-          <p className="wh-subtitle">Pack and deliver by block and hostel</p>
+          <p className="wh-subtitle">Pack and deliver by block and room</p>
         </div>
       </div>
 
@@ -235,7 +260,7 @@ const Orders = () => {
               <span className="wh-block-mark">{block.key.slice(0, 2)}</span>
               <span className="wh-block-select-main">
                 <strong>{block.label}</strong>
-                <small>{block.hostelCount} hostel{block.hostelCount === 1 ? "" : "s"} waiting</small>
+                <small>{block.unitCount} unit{block.unitCount === 1 ? "" : "s"} waiting</small>
               </span>
               <span className="wh-block-total"><strong className="wh-num">{block.itemCount}</strong><small>items to pack</small></span>
               <Icon name="chevronRight" size={20} />
@@ -249,13 +274,13 @@ const Orders = () => {
           </button>
           <div className="wh-block-heading">
             <div><span>Selected block</span><h2>{activeBlock.label}</h2></div>
-            <strong>{unitLabel(activeBlock.itemCount)} to pack</strong>
+            <strong>{itemLabel(activeBlock.itemCount)} to pack</strong>
           </div>
-          <div className="wh-hostel-grid">
-            {activeBlock.hostels.map((hostel) => (
-              <HostelTile key={hostel.key} hostel={hostel} status={view}
-                busy={busyKey.includes(hostel.key)} onAdvance={advanceHostel}
-                onReport={(selected) => setReporting({ hostel: selected, category: "", note: "" })} />
+          <div className="wh-unit-grid">
+            {activeBlock.units.map((unit) => (
+              <UnitTile key={unit.key} unit={unit} status={view}
+                busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit}
+                onReport={(selected) => setReporting({ unit: selected, category: "", note: "" })} />
             ))}
           </div>
         </section>
@@ -264,18 +289,18 @@ const Orders = () => {
           {blocks.map((block) => (
             <section key={block.key} className="wh-block-stack">
               <header className="wh-block-stack-head">
-                <div><span>{block.hostelCount} hostel{block.hostelCount === 1 ? "" : "s"}</span><h2>{block.label}</h2><small>{unitLabel(block.itemCount)}</small></div>
+                <div><span>{block.unitCount} unit{block.unitCount === 1 ? "" : "s"}</span><h2>{block.label}</h2><small>{itemLabel(block.itemCount)}</small></div>
                 <button type="button" className="wh-block-action" disabled={Boolean(busyKey)}
                   onClick={() => view === "PACKED"
-                    ? transitionHostels(block.hostels, "OUT_FOR_DELIVERY")
-                    : openDelivery(block.hostels, { wholeBlock: true, blockLabel: block.label })}>
-                  {view === "PACKED" ? "Send whole block" : "Deliver whole block"}
+                    ? transitionUnits(block.units, "OUT_FOR_DELIVERY")
+                    : openDelivery(block.units, { wholeBlock: true, blockLabel: block.label })}>
+                  {view === "PACKED" ? "Send whole block" : "Hand over whole block"}
                 </button>
               </header>
-              <div className="wh-hostel-scroll">
-                {block.hostels.map((hostel) => (
-                  <HostelTile key={hostel.key} hostel={hostel} status={view}
-                    busy={busyKey.includes(hostel.key)} onAdvance={advanceHostel} />
+              <div className="wh-unit-scroll">
+                {block.units.map((unit) => (
+                  <UnitTile key={unit.key} unit={unit} status={view}
+                    busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit} />
                 ))}
               </div>
             </section>
@@ -286,7 +311,9 @@ const Orders = () => {
       {reporting && (
         <div className="wh-dialog-backdrop">
           <form className="wh-work-dialog" role="dialog" aria-modal="true" onSubmit={submitReport}>
-            <span className="wh-dialog-kicker">{reporting.hostel.hostelNumber}</span><h2>Report a packing issue</h2>
+            <span className="wh-dialog-kicker">
+              {reporting.unit.roomNumbers.length === 1 ? "Room" : "Rooms"} {reporting.unit.label}
+            </span><h2>Report a packing issue</h2>
             <div className="wh-report-choices">
               {REPORT_CATEGORIES.map(([value, label]) => (
                 <button key={value} type="button" className={reporting.category === value ? "active" : ""}
@@ -311,32 +338,31 @@ const Orders = () => {
             <span className="wh-dialog-kicker">Delivery handoff</span>
             <h2>{delivery.wholeBlock
               ? `Receiver for ${delivery.blockLabel}`
-              : `Receiver at ${delivery.hostels[0].hostelNumber}`}</h2>
+              : `Receiver at ${delivery.units[0].roomNumbers.length === 1 ? "room" : "rooms"} ${delivery.units[0].label}`}</h2>
             <p className="wh-remaining">
               {delivery.wholeBlock
-                ? `This receiver will be recorded for all ${delivery.hostels.length} hostels in the block.`
-                : "Record who accepted the items at this hostel."}
+                ? `This receiver will be recorded for all ${delivery.units.length} unit${delivery.units.length === 1 ? "" : "s"} in the block.`
+                : delivery.units[0].roomNumbers.length === 1
+                  ? "Record who accepted the items at this room."
+                  : "Record who accepted the items for these rooms."}
             </p>
             {delivery.error && <div className="wh-handoff-error">{delivery.error}</div>}
             <div className="wh-receiver-list">
-              {(delivery.wholeBlock
-                ? [{ key: "block", hostelNumber: delivery.blockLabel, itemCount: delivery.hostels.reduce((sum, hostel) => sum + hostel.itemCount, 0) }]
-                : delivery.hostels
-              ).map((hostel) => {
-                const receiver = delivery.receivers[hostel.key];
+              {receiverRows(delivery).map((row) => {
+                const receiver = delivery.receivers[row.key];
                 return (
-                  <fieldset key={hostel.key}>
-                    <legend>{hostel.hostelNumber} · {unitLabel(hostel.itemCount)}</legend>
+                  <fieldset key={row.key}>
+                    <legend>{row.label} · {itemLabel(row.itemCount)}</legend>
                     <input className="wh-input" value={receiver.receivedBy} placeholder="Receiver name"
-                      aria-label={`Receiver name for ${hostel.hostelNumber}`}
+                      aria-label={`Receiver name for ${row.label}`}
                       onChange={(event) => setDelivery((current) => ({ ...current, error: "", receivers: {
-                        ...current.receivers, [hostel.key]: { ...receiver, receivedBy: event.target.value },
+                        ...current.receivers, [row.key]: { ...receiver, receivedBy: event.target.value },
                       } }))} />
                     <div className="wh-handoff-phone"><span>+91</span>
                       <input value={receiver.receiverPhone} inputMode="numeric" placeholder="98765 43210"
-                        aria-label={`Receiver phone for ${hostel.hostelNumber}`}
+                        aria-label={`Receiver phone for ${row.label}`}
                         onChange={(event) => setDelivery((current) => ({ ...current, error: "", receivers: {
-                          ...current.receivers, [hostel.key]: { ...receiver, receiverPhone: event.target.value.replace(/\D/g, "").slice(0, 10) },
+                          ...current.receivers, [row.key]: { ...receiver, receiverPhone: event.target.value.replace(/\D/g, "").slice(0, 10) },
                         } }))} />
                     </div>
                   </fieldset>
@@ -345,7 +371,7 @@ const Orders = () => {
             </div>
             <div className="wh-dialog-actions">
               <button type="button" className="wh-cancel" onClick={() => setDelivery(null)}>Cancel</button>
-              <button type="submit" className="wh-cta">Confirm delivery</button>
+              <button type="submit" className="wh-cta">Confirm handover</button>
             </div>
           </form>
         </div>

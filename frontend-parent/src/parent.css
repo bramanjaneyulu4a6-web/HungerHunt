@@ -460,6 +460,11 @@ body {
   letter-spacing: -0.5px;
 }
 
+.payment-choice-icon--provider svg {
+  width: 82%;
+  height: 82%;
+}
+
 .payment-choice-option:disabled .payment-choice-icon--wallet {
   filter: grayscale(1);
   opacity: 0.62;
@@ -661,6 +666,14 @@ body {
   font-size: 18px;
   font-weight: 900;
   letter-spacing: -0.5px;
+}
+
+/* Official logo artwork (Google Pay, Paytm) rendered inside the tile.
+   Both are wide wordmarks, so they fill the tile's width and let their
+   own aspect ratio decide the height. */
+.upi-demo-provider-mark svg {
+  width: 82%;
+  height: 82%;
 }
 
 .upi-demo-provider-name {
@@ -1201,14 +1214,9 @@ body {
   --order-surface: #f1faff;
 }
 
-.order-card--delivered {
-  --order-accent: #2e8758;
-  --order-border: #bfe1cc;
-  --order-surface: #f2fbf5;
-}
-
-/* Collected is the only truly finished state, so it is the settled one: the
-   same green, deepened, rather than a sixth colour to learn. */
+/* Collected is the only truly finished state — the student's code ended the
+   package — so it alone gets the settled green. A handed-over package wears
+   the out-for-delivery blue instead (see statusClass in OrderCard). */
 .order-card--collected {
   --order-accent: #1f6b43;
   --order-border: #a8d6bc;

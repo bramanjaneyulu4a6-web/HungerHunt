@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 import Admin, { FULL_ADMIN } from '../models/Admin.js';
-import Hostel from '../models/Hostel.js';
+import Room from '../models/Room.js';
 import Parent from '../models/Parent.js';
 import PendingOrder from '../models/PendingOrder.js';
 import Student from '../models/Student.js';
@@ -26,7 +26,7 @@ const parentView = (parent) => ({
     id: String(student._id || student),
     name: student.name || '',
     admissionNumber: student.admissionNumber || '',
-    hostelNumber: student.hostelNumber || '',
+    roomNumber: student.roomNumber || '',
   })),
 });
 
@@ -70,7 +70,7 @@ const assertStudentsAvailable = async (studentIds, exceptParentId = null) => {
 
 export const listParents = async (req, res) => {
   const parents = await Parent.find().sort({ active: -1, fatherName: 1 })
-    .populate('studentIds', 'name admissionNumber hostelNumber').lean();
+    .populate('studentIds', 'name admissionNumber roomNumber').lean();
   res.json(parents.map(parentView));
 };
 
@@ -192,20 +192,41 @@ export const requireParentPasswordSetup = async (req, res) => {
   });
 };
 
-export const listStaff = async (req, res) => {
-  const staff = await Admin.find().sort({ active: -1, name: 1 }).populate('hostelId', 'code name').lean();
-  res.json(staff.map((account) => ({
+/* The only shape a staff account is ever published in.
+ *
+ * The update endpoint used to answer with the raw Mongoose document, which
+ * carries `password` — the bcrypt hash — straight into the browser, devtools,
+ * logs and every proxy between. Both endpoints go through this now so the two
+ * answers cannot drift apart again.
+ *
+ * `roomIds` arrives already populated from the list query and as raw ObjectIds
+ * from a document that was just saved, so the rooms are re-read whenever they
+ * are not documents already. Half-shaped rooms are never emitted.
+ */
+const staffView = async (account) => {
+  const roomIds = (account.roomIds || []).filter(Boolean);
+  const rooms = roomIds.every((room) => room?.code !== undefined)
+    ? roomIds
+    : await Room.find({ _id: { $in: roomIds.map(String) } }, 'code name').lean();
+  return {
     id: String(account._id),
     name: account.name,
     phone: account.phone,
     email: account.email,
     role: account.role || 'admin',
     active: account.active !== false,
-    hostel: account.hostelId
-      ? { id: String(account.hostelId._id), code: account.hostelId.code, name: account.hostelId.name || '' }
-      : null,
+    rooms: rooms.map((room) => ({
+      id: String(room._id),
+      code: room.code,
+      name: room.name || '',
+    })),
     createdAt: account.createdAt,
-  })));
+  };
+};
+
+export const listStaff = async (req, res) => {
+  const staff = await Admin.find().sort({ active: -1, name: 1 }).populate('roomIds', 'code name').lean();
+  res.json(await Promise.all(staff.map((account) => staffView(account))));
 };
 
 export const updateStaff = async (req, res) => {
@@ -227,12 +248,29 @@ export const updateStaff = async (req, res) => {
     if (remaining === 0) return res.status(409).json({ message: 'At least one active admin account is required.' });
   }
   update.role = role;
+  /* Rooms are only touched when the caller actually sends them. Requiring them
+     on every update made archiveStaff — which sends nothing but { active:false }
+     — fail with a 400 for caretakers, and made a phone-only edit impossible
+     without resending the whole room list. A caretaker still may never end up
+     with zero rooms: a role CHANGE into caretaker has none to inherit and is
+     still refused, and an explicit list is still validated against active rooms. */
   if (role === 'caretaker') {
-    const hostel = req.body?.hostelId ? await Hostel.findOne({ _id: req.body.hostelId, active: true }) : null;
-    if (!hostel) return res.status(400).json({ message: 'Choose an active hostel for the caretaker.' });
-    update.hostelId = hostel._id;
+    if (req.body?.roomIds !== undefined) {
+      const requestedRoomIds = [...new Set(
+        (Array.isArray(req.body.roomIds) ? req.body.roomIds : []).map(String)
+      )];
+      const rooms = requestedRoomIds.length
+        ? await Room.find({ _id: { $in: requestedRoomIds }, active: true })
+        : [];
+      if (!requestedRoomIds.length || rooms.length !== requestedRoomIds.length) {
+        return res.status(400).json({ message: 'Choose at least one active room for the caretaker.' });
+      }
+      update.roomIds = rooms.map((room) => room._id);
+    } else if (!(account.roomIds || []).length) {
+      return res.status(400).json({ message: 'Choose at least one active room for the caretaker.' });
+    }
   } else {
-    update.hostelId = null;
+    update.roomIds = [];
   }
   if (req.body?.active !== undefined) {
     if (String(account._id) === String(req.staff.id) && req.body.active === false) {
@@ -247,7 +285,7 @@ export const updateStaff = async (req, res) => {
   try {
     Object.assign(account, update);
     await account.save();
-    res.json({ message: 'Staff account updated.', staff: account });
+    res.json({ message: 'Staff account updated.', staff: await staffView(account) });
   } catch (error) {
     res.status(error.code === 11000 ? 409 : 400).json({
       message: error.code === 11000 ? 'That email is already in use.' : error.message,

@@ -14,7 +14,7 @@ export default function Users() {
   const { section } = useParams();
   const [parents, setParents] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [hostels, setHostels] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -22,14 +22,14 @@ export default function Users() {
     setLoading(true);
     setError(false);
     try {
-      const [parentRes, staffRes, hostelRes] = await Promise.all([
+      const [parentRes, staffRes, roomRes] = await Promise.all([
         api.get('/admin/users/parents'),
         api.get('/admin/users/staff'),
-        api.get('/hostels'),
+        api.get('/rooms'),
       ]);
       setParents(parentRes.data || []);
       setStaff(staffRes.data || []);
-      setHostels(hostelRes.data || []);
+      setRooms(roomRes.data || []);
     } catch (loadError) {
       console.error(loadError);
       setError(true);
@@ -72,7 +72,7 @@ export default function Users() {
         <ParentsTab parents={activeParents} loading={loading} onChanged={load} />
       )}
       {section === 'staff' && (
-        <StaffTab staff={activeStaff} hostels={hostels} loading={loading} onChanged={load} />
+        <StaffTab staff={activeStaff} rooms={rooms} loading={loading} onChanged={load} />
       )}
       {section === 'archived' && (
         <ArchivedUsersTab parents={parents} staff={staff} loadingAccounts={loading} onChanged={load} />

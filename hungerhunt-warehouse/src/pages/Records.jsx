@@ -18,12 +18,14 @@ const initialRange = () => {
   return { from: dateOnly(from), to: dateOnly(to) };
 };
 
+// A handed-over package (DELIVERED) still reads as out for delivery; only the
+// student's code (COLLECTED) makes it delivered.
 const STATUS_LABELS = {
   PENDING: "New",
   PACKED: "Packed",
   OUT_FOR_DELIVERY: "Out for delivery",
-  DELIVERED: "Delivered",
-  COLLECTED: "Collected",
+  DELIVERED: "Out for delivery",
+  COLLECTED: "Delivered",
   CANCELLED: "Cancelled",
 };
 const HISTORY_PAGE_SIZE = 100;
@@ -35,6 +37,9 @@ const Records = () => {
   const [from, setFrom] = useState(range.from);
   const [to, setTo] = useState(range.to);
   const [orders, setOrders] = useState([]);
+  // History is the only place this screen groups, and its own response carries
+  // the unit map — the live list is a different call and not read here.
+  const [roomUnits, setRoomUnits] = useState([]);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPages, setHistoryPages] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
@@ -51,6 +56,7 @@ const Records = () => {
           `/v1/fulfillment-orders/history?scope=all&page=${historyPage}&limit=${HISTORY_PAGE_SIZE}`
         );
         setOrders(response.data.data || []);
+        setRoomUnits(response.data.meta?.roomUnits || []);
         setHistoryPage(response.data.meta?.page || historyPage);
         setHistoryPages(response.data.meta?.pages || 1);
         setHistoryTotal(response.data.meta?.total || 0);
@@ -67,7 +73,7 @@ const Records = () => {
   }, [from, historyPage, to, view]);
 
   useEffect(() => { (async () => { await load(); })(); }, [load]);
-  const blocks = useMemo(() => groupOrdersByBlock(orders), [orders]);
+  const blocks = useMemo(() => groupOrdersByBlock(orders, roomUnits), [orders, roomUnits]);
 
   return (
     <div className="wh-page">
@@ -97,25 +103,25 @@ const Records = () => {
               {blocks.map((block) => (
                 <section key={block.key} className="wh-block-stack">
                   <header className="wh-block-stack-head">
-                    <div><span>{block.hostelCount} hostel{block.hostelCount === 1 ? "" : "s"}</span><h2>{block.label}</h2><small>{block.itemCount} items on this page</small></div>
+                    <div><span>{block.unitCount} unit{block.unitCount === 1 ? "" : "s"}</span><h2>{block.label}</h2><small>{block.itemCount} items on this page</small></div>
                   </header>
-                  <div className="wh-hostel-scroll">
-                    {block.hostels.map((hostel) => {
-                      const statuses = Object.entries(hostel.orders.reduce((counts, order) => ({
+                  <div className="wh-unit-scroll">
+                    {block.units.map((unit) => {
+                      const statuses = Object.entries(unit.orders.reduce((counts, order) => ({
                         ...counts,
                         [order.status]: (counts[order.status] || 0) + 1,
                       }), {}));
                       return (
-                        <article key={hostel.key} className="wh-hostel-tile wh-history-tile">
-                          <div className="wh-hostel-tile-head">
-                            <div><span className="wh-hostel-kicker">Hostel</span><h3>{hostel.hostelNumber}</h3></div>
-                            <span className="wh-hostel-count"><strong>{hostel.itemCount}</strong><small>items</small></span>
+                        <article key={unit.key} className="wh-unit-tile wh-history-tile">
+                          <div className="wh-unit-tile-head">
+                            <div><span className="wh-unit-kicker">{unit.roomNumbers.length === 1 ? "Room" : "Rooms"}</span><h3>{unit.label}</h3></div>
+                            <span className="wh-unit-count"><strong>{unit.itemCount}</strong><small>items</small></span>
                           </div>
                           <div className="wh-history-statuses">
                             {statuses.map(([status, count]) => <span key={status}><strong>{count}</strong> {STATUS_LABELS[status] || status}</span>)}
                           </div>
                           <div className="wh-history-orders">
-                            {hostel.orders.map((order) => (
+                            {unit.orders.map((order) => (
                               <div key={order.id}>
                                 <span><strong>{orderNumber(order)}</strong><small>{order.student?.name || "Unknown student"}</small></span>
                                 <span><strong>{STATUS_LABELS[order.status] || order.status}</strong><small>{new Date(order.orderedAt).toLocaleDateString()}</small></span>
@@ -143,15 +149,15 @@ const Records = () => {
           <div className="wh-card wh-metric-grid">
             <div><strong>{report.summary.packages}</strong><span>Packages ordered</span></div>
             <div><strong>{report.summary.openOverdue}</strong><span>Currently overdue</span></div>
-            <div><strong>{report.delivery.delivered}</strong><span>Delivered</span></div>
-            <div><strong>{report.delivery.awaitingCollection}</strong><span>Waiting at hostels</span></div>
-            <div><strong>{report.delivery.onTimeRate === null ? "—" : `${Math.round(report.delivery.onTimeRate * 100)}%`}</strong><span>Delivered on time</span></div>
+            <div><strong>{report.delivery.delivered}</strong><span>Handed over</span></div>
+            <div><strong>{report.delivery.awaitingCollection}</strong><span>Waiting at rooms</span></div>
+            <div><strong>{report.delivery.onTimeRate === null ? "—" : `${Math.round(report.delivery.onTimeRate * 100)}%`}</strong><span>Handed over on time</span></div>
           </div>
           <div className="wh-card">
             <h2 className="wh-product">Cycle time</h2>
             <div className="wh-summary">
               <div className="wh-row"><span>Order to packing</span><strong>{report.durations.orderToPack.medianHours ?? "—"} h median</strong></div>
-              <div className="wh-row"><span>Order to delivery</span><strong>{report.durations.orderToDeliver.medianHours ?? "—"} h median</strong></div>
+              <div className="wh-row"><span>Order to handover</span><strong>{report.durations.orderToDeliver.medianHours ?? "—"} h median</strong></div>
               <div className="wh-row"><span>Receiver proof recorded</span><strong>{report.proofOfDelivery.recorded}/{report.delivery.delivered}</strong></div>
             </div>
           </div>

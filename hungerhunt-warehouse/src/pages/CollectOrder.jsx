@@ -214,8 +214,8 @@ const CollectOrder = () => {
             <div>
               <span className="wh-who">{order.student.name}</span>
               <p className="wh-remaining wh-handover-sub">
-                {order.student.admissionNumber || 'No admission number'} · Hostel{' '}
-                {order.student.hostelNumber}
+                {order.student.admissionNumber || 'No admission number'} · Room{' '}
+                {order.student.roomNumber}
               </p>
             </div>
           </section>

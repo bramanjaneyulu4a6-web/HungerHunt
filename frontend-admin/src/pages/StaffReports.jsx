@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 
-/* What the hostels are telling the office.
+/* What the rooms are telling the office.
  *
  * Two things arrive here: something wrong with one package, raised while it was
  * being handed to a student, and anything else a caretaker needs on the record
@@ -32,7 +32,7 @@ const SOURCES = [
 
 const SOURCE_COPY = {
   student: 'Reports raised by students while collecting a package.',
-  caretaker: 'Package issues and complaints raised by hostel caretakers.',
+  caretaker: 'Package issues and complaints raised by room caretakers.',
   warehouse: 'Reports raised by warehouse staff.',
   parent: 'Reports raised by parents.',
 };
@@ -185,7 +185,9 @@ export default function StaffReports() {
                   {report.reportNumber ? `Report #${report.reportNumber} · ` : ''}
                   {report.raisedBy?.name || 'Unknown reporter'}
                   {report.raisedBy?.role === 'student' ? ' (student, from the handover screen)' : ''}
-                  {report.raisedBy?.hostelNumber ? ` · Hostel ${report.raisedBy.hostelNumber}` : ''}
+                  {report.raisedBy?.roomNumbers
+                    ? ` · ${report.raisedBy.roomNumbers.includes(' · ') ? 'Rooms' : 'Room'} ${report.raisedBy.roomNumbers}`
+                    : ''}
                   {' · '}
                   {formatWhen(report.raisedAt)}
                 </p>
@@ -203,7 +205,7 @@ export default function StaffReports() {
             {report.order && (
               <p className="report-card__order">
                 About the package for <strong>{report.order.studentName}</strong>
-                {report.order.hostelNumber ? ` at hostel ${report.order.hostelNumber}` : ''} — it was{' '}
+                {report.order.roomNumber ? ` at room ${report.order.roomNumber}` : ''} — it was{' '}
                 {report.order.statusAtReport.replaceAll('_', ' ').toLowerCase()} when this was raised.
                 The package was not held; the student could still collect it.
               </p>

@@ -4,7 +4,7 @@ const REQUIRED_COLUMNS = [
   'name',
   'admissionNumber',
   'fatherName',
-  'hostelNumber',
+  'roomNumber',
   'grade',
   'parentPhoneNumber',
 ];
@@ -87,7 +87,7 @@ export const studentRecordsFromRows = (rows) => {
     check('name', Boolean(record.name), 'Student name is required.');
     check('admissionNumber', /^\d{5}$/.test(record.admissionNumber || ''), 'Admission number must be exactly 5 digits.');
     check('fatherName', Boolean(record.fatherName), "Father's name is required.");
-    check('hostelNumber', Boolean(record.hostelNumber), 'Hostel code is required.');
+    check('roomNumber', Boolean(record.roomNumber), 'Room code is required.');
     check('grade', Boolean(record.grade), 'Grade / class is required.');
     check('parentPhoneNumber', /^\d{10}$/.test(record.parentPhoneNumber || ''), 'Parent phone number must be exactly 10 digits.');
     return record;

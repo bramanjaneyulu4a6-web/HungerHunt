@@ -66,7 +66,7 @@ const CaretakerReports = () => {
           <h2 className="wh-product">Raise something with the office</h2>
           <p className="wh-status-detail">
             This goes to the school office, and only to the school office. Nobody in the
-            warehouse or at another hostel can read it.
+            warehouse or at another room can read it.
           </p>
           <ReportForm
             kind="COMPLAINT"

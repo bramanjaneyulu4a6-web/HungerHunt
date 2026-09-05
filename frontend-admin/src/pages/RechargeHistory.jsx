@@ -43,7 +43,7 @@ const RechargeHistory = () => {
     if (!query) return true;
     return (
       st.name?.toLowerCase().includes(query) ||
-      st.hostelNumber?.toString().toLowerCase().includes(query)
+      st.roomNumber?.toString().toLowerCase().includes(query)
     );
   });
 
@@ -79,7 +79,7 @@ const RechargeHistory = () => {
     const headers = [
       "S.No.",
       "Student Name",
-      "Hostel Number",
+      "Room Number",
       "Grade",
       "Father's Name",
       "Current Wallet Balance (INR)",
@@ -90,7 +90,7 @@ const RechargeHistory = () => {
       [
         index + 1,
         esc(st.name),
-        esc(st.hostelNumber),
+        esc(st.roomNumber),
         esc(st.grade),
         esc(st.fatherName),
         st.pocketMoney ?? 0,
@@ -112,7 +112,7 @@ const RechargeHistory = () => {
     const metaRows = [
       `"STUDENT TRANSACTION STATEMENT"`,
       `"Student Name:",${esc(student.name)}`,
-      `"Hostel Number:",${esc(student.hostelNumber)}`,
+      `"Room Number:",${esc(student.roomNumber)}`,
       `"Grade:",${esc(student.grade)}`,
       `"Father's Name:",${esc(student.fatherName)}`,
       `""`,
@@ -163,7 +163,7 @@ const RechargeHistory = () => {
             type="search"
             className="input"
             aria-label="Search students"
-            placeholder="🔍 Search by student name or hostel number…"
+            placeholder="🔍 Search by student name or room number…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -238,7 +238,7 @@ const RechargeHistory = () => {
                           color: "var(--muted)",
                         }}
                       >
-                        Hostel ID: H—{st.hostelNumber || "N/A"}
+                        Room ID: R—{st.roomNumber || "N/A"}
                       </span>
                     </span>
 

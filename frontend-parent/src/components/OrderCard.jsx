@@ -3,26 +3,30 @@ import { Link } from 'react-router-dom';
 import { Card } from './ui';
 import { formatINR } from '../utils/format';
 
+/* The warehouse handing the package to the room (DELIVERED) is not
+   delivery: only the student ending the package with their own code
+   (COLLECTED) is. So DELIVERED holds the out-for-delivery step, and the
+   final step lights up at collection. */
 const ORDER_STEPS = [
   ['PENDING', 'Order confirmed'],
   ['PACKED', 'Packed'],
   ['OUT_FOR_DELIVERY', 'Out for delivery'],
-  ['DELIVERED', 'Delivered'],
+  ['COLLECTED', 'Delivered'],
 ];
 
 const ORDER_STATUS_LABELS = {
   PENDING: 'Order confirmed',
   PACKED: 'Packed',
   OUT_FOR_DELIVERY: 'Out for delivery',
-  DELIVERED: 'Delivered',
-  // Collection happens after the four delivery steps and does not create a
-  // fifth customer-facing warehouse status.
+  DELIVERED: 'Out for delivery',
   COLLECTED: 'Delivered',
   CANCELLED: 'Cancelled and refunded',
 };
 
 const progressIndex = (status) => {
-  if (status === 'COLLECTED') return ORDER_STEPS.length - 1;
+  if (status === 'DELIVERED') {
+    return ORDER_STEPS.findIndex(([value]) => value === 'OUT_FOR_DELIVERY');
+  }
   return ORDER_STEPS.findIndex(([value]) => value === status);
 };
 
@@ -41,8 +45,11 @@ const formatDateTime = (value) =>
     minute: '2-digit',
   }).format(new Date(value));
 
-const statusClass = (status) =>
-  String(status || 'PENDING').toLowerCase().replaceAll('_', '-');
+const statusClass = (status) => {
+  // A handed-over package still reads — and is coloured — as out for delivery.
+  if (status === 'DELIVERED') return 'out-for-delivery';
+  return String(status || 'PENDING').toLowerCase().replaceAll('_', '-');
+};
 
 /* `showAllOrdersLink` is for the caller that is already the destination. The
    link goes to the child's orders tab, so on the dashboard it is a way through
@@ -111,25 +118,17 @@ export default function OrderCard({
         <div>
           <span>
             {order.collectedAt
-              ? 'Collected'
-              : order.deliveredAt
-                ? 'Delivered'
-                : order.overdue ? 'Overdue since' : 'Expected by'}
+              ? 'Delivered'
+              : order.overdue ? 'Overdue since' : 'Expected by'}
           </span>
           <strong className={order.overdue ? 'order-card__overdue' : ''}>
-            {formatDateTime(order.collectedAt || order.deliveredAt || order.deliverBy)}
+            {formatDateTime(order.collectedAt || order.deliverBy)}
           </strong>
         </div>
         <div>
           <span>Dorm room</span>
-          <strong>{order.hostelNumber || '—'}</strong>
+          <strong>{order.roomNumber || '—'}</strong>
         </div>
-        {order.receivedBy && (
-          <div>
-            <span>Handed to</span>
-            <strong>{order.receivedBy}</strong>
-          </div>
-        )}
       </div>
 
       <div className="order-card__footer">

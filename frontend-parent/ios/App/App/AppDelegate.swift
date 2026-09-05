@@ -93,6 +93,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         Messaging.messaging().apnsToken = deviceToken
 
+        #if canImport(FirebaseAuth)
+        // With FirebaseAppDelegateProxyEnabled off, Auth never sees the APNs
+        // token unless it is handed over here too. Phone verification uses it
+        // for the silent-push proof; without it every verification falls back
+        // to the reCAPTCHA round-trip through Safari. .unknown lets the SDK
+        // work out sandbox vs production from the provisioning profile.
+        Auth.auth().setAPNSToken(deviceToken, type: .unknown)
+        #endif
+
         Messaging.messaging().token { token, error in
             guard let token else {
                 self.failRegistration(error ?? PushSetupError.noTokenReturned)
@@ -118,6 +127,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             name: .capacitorDidFailToRegisterForRemoteNotifications,
             object: error
         )
+    }
+
+    /* The other half of silent phone verification: Firebase Auth answers its
+       own APNs challenge from this callback. Auth pushes are internal to the
+       SDK — when canHandleNotification claims one, no other handler needs it.
+       Everything else reports .noData, which is also what iOS assumed back
+       when this method did not exist at all. */
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        #if canImport(FirebaseAuth)
+        if Auth.auth().canHandleNotification(userInfo) {
+            completionHandler(.noData)
+            return
+        }
+        #endif
+        completionHandler(.noData)
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {

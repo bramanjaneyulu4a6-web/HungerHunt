@@ -16,7 +16,7 @@ process.env.NODE_ENV = 'test';
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const Student = (await import('../models/Student.js')).default;
-const Hostel = (await import('../models/Hostel.js')).default;
+const Room = (await import('../models/Room.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const { signAdminToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -25,7 +25,7 @@ mongoose.set('bufferTimeoutMS', 1000);
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';
 const STUDENT_ID = '507f191e810c19729de860ea';
-const HOSTEL_ID = '507f191e810c19729de860eb';
+const ROOM_ID = '507f191e810c19729de860eb';
 
 const adminToken = signAdminToken(ADMIN_ID);
 
@@ -55,7 +55,7 @@ const IDENTITY = {
   name: 'Test Student',
   admissionNumber: '10425',
   fatherName: 'Test Father',
-  hostelNumber: 'A-1',
+  roomNumber: 'A-1',
   grade: '8',
   parentPhoneNumber: '9000000000',
 };
@@ -73,7 +73,7 @@ const SMUGGLED = {
 };
 
 const assertOnlyIdentity = (written, label) => {
-  const expected = { ...IDENTITY, hostelId: HOSTEL_ID };
+  const expected = { ...IDENTITY, roomId: ROOM_ID };
   assert.deepEqual(
     Object.keys(written ?? {}).sort(),
     Object.keys(expected).sort(),
@@ -98,15 +98,15 @@ const stubLinking = () => {
   mock.method(Parent, 'updateOne', async () => ({ modifiedCount: 0 }));
   mock.method(Student, 'updateOne', async () => ({ modifiedCount: 0 }));
   mock.method(Student, 'find', () => ({ select: async () => [], lean: async () => [] }));
-  mock.method(Hostel, 'findOne', () => ({
-    lean: async () => ({ _id: HOSTEL_ID, code: IDENTITY.hostelNumber }),
+  mock.method(Room, 'findOne', () => ({
+    lean: async () => ({ _id: ROOM_ID, code: IDENTITY.roomNumber }),
   }));
-  mock.method(Hostel, 'find', () => ({
-    lean: async () => [{ _id: HOSTEL_ID, code: IDENTITY.hostelNumber }],
+  mock.method(Room, 'find', () => ({
+    lean: async () => [{ _id: ROOM_ID, code: IDENTITY.roomNumber }],
   }));
 };
 
-describe('only identity and resolved hostel fields are writable', () => {
+describe('only identity and resolved room fields are writable', () => {
   before(() => {});
 
   test('addStudent ignores everything else in the body', async () => {

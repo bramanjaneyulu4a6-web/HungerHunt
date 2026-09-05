@@ -89,11 +89,26 @@ export default function FirstPassword() {
         password,
         firebaseIdToken: idToken,
       });
-      sessionStorage.removeItem(PHONE_STORAGE_KEY);
-      await clearPhoneVerification();
+      /* The account is created the moment the request succeeds — everything
+         after this line is housekeeping and must not be able to turn the
+         success into an error screen. So: sign in first, tidy up after, and
+         clearPhoneVerification (which cannot throw) is not awaited. */
       login(response.data.token, response.data.parent);
+      sessionStorage.removeItem(PHONE_STORAGE_KEY);
+      clearPhoneVerification();
       navigate('/');
     } catch (createError) {
+      /* 409: the account already has its password — this device lost a race
+         with another, or a retry of a request that actually landed. Sending
+         the parent back through SMS verification would loop forever (each
+         lap ends in this same 409) and burn a text message every time. The
+         password box on the sign-in screen is the way forward. */
+      if (createError.response?.status === 409) {
+        sessionStorage.removeItem(PHONE_STORAGE_KEY);
+        clearPhoneVerification();
+        navigate(`/login?password-set=1`, { replace: true });
+        return;
+      }
       setError(createError.response?.data?.message || 'Could not create your password. Please verify your phone again.');
       setStep('send');
       setIdToken('');

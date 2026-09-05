@@ -92,8 +92,8 @@ const PackageLines = ({ items }) => (
   </div>
 );
 
-const HostelOrderItems = ({ items }) => (
-  <div className="wh-hostel-items">
+const UnitOrderItems = ({ items }) => (
+  <div className="wh-unit-items">
     {items.map((item) => (
       <div key={item.id}>
         <span>{item.name}</span>
@@ -107,7 +107,7 @@ const StudentDetails = ({ order }) => (
   <div>
     <span className="wh-who">{order.student.name}</span>
     <p className="wh-remaining" style={{ margin: '4px 0 0' }}>
-      Hostel {order.student.hostelNumber} · {order.student.admissionNumber || 'No admission number'}
+      Room {order.student.roomNumber} · {order.student.admissionNumber || 'No admission number'}
     </p>
   </div>
 );
@@ -194,7 +194,7 @@ const CaretakerOrders = () => {
     STATUS_STEPS.indexOf(b.status) - STATUS_STEPS.indexOf(a.status) ||
     new Date(a.deliverBy).getTime() - new Date(b.deliverBy).getTime()
   ), [orders]);
-  const hostelProducts = useMemo(() => caretakerProductTotals(orders), [orders]);
+  const unitProducts = useMemo(() => caretakerProductTotals(orders), [orders]);
   const visibleOrders = useMemo(
     () => filterCaretakerOrders(currentOrders, orderSearch),
     [currentOrders, orderSearch]
@@ -204,7 +204,7 @@ const CaretakerOrders = () => {
     <main className="wh-page">
       <div className="wh-row">
         <div>
-          <h1 className="wh-title">Hostel packages</h1>
+          <h1 className="wh-title">Room packages</h1>
           <p className="wh-subtitle">
             {awaitingCollection > 0
               ? `${awaitingCollection} ${awaitingCollection === 1 ? 'package is' : 'packages are'} with you, waiting for their student`
@@ -227,23 +227,23 @@ const CaretakerOrders = () => {
           {loadError && <Banner variant="alert" icon="⚠️">Could not load arriving packages.</Banner>}
           {loading ? <Skeleton height={240} radius={14} /> : (!loadError || orders.length > 0) ? (
             <>
-              <section className="caretaker-hostel-order" aria-label="Entire hostel order summary">
-                <article className="wh-hostel-tile">
-                  <div className="wh-hostel-tile-head">
+              <section className="caretaker-unit-order" aria-label="Entire unit order summary">
+                <article className="wh-unit-tile">
+                  <div className="wh-unit-tile-head">
                     <div>
-                      <span className="wh-hostel-kicker">Entire hostel order</span>
+                      <span className="wh-unit-kicker">Entire unit order</span>
                       <h3>All current packages</h3>
                     </div>
-                    <span className="wh-hostel-count">
+                    <span className="wh-unit-count">
                       <strong className="wh-num">{orders.length}</strong>
                       <small>{orders.length === 1 ? 'order' : 'orders'}</small>
                     </span>
                   </div>
                   <p className="wh-remaining">
-                    {hostelProducts.length} product {hostelProducts.length === 1 ? 'type' : 'types'} being delivered
+                    {unitProducts.length} product {unitProducts.length === 1 ? 'type' : 'types'} being delivered
                     {awaitingCollection > 0 ? ` · ${awaitingCollection} ready for collection` : ''}
                   </p>
-                  <HostelOrderItems items={hostelProducts} />
+                  <UnitOrderItems items={unitProducts} />
                 </article>
               </section>
 
@@ -276,7 +276,7 @@ const CaretakerOrders = () => {
                     variant={orders.length === 0 ? 'success' : 'default'}
                   >
                     {orders.length === 0
-                      ? 'Nothing is on its way to your hostel, and no package is waiting to be collected.'
+                      ? 'Nothing is on its way to your rooms, and no package is waiting to be collected.'
                       : 'Try another student name or admission number.'}
                   </EmptyState>
                 ) : visibleOrders.map((order) => {
@@ -324,7 +324,7 @@ const CaretakerOrders = () => {
             <article key={order.id} className="wh-card wh-order">
               <div className="wh-row">
                 <StudentDetails order={order} />
-                <span className="wh-badge wh-badge--partial">COLLECTED</span>
+                <span className="wh-badge wh-badge--partial">DELIVERED</span>
               </div>
               <p className="wh-history-date">
                 {order.collectedAt

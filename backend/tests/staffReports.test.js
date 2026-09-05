@@ -8,7 +8,7 @@ process.env.FEATURE_V1_PROCUREMENT = 'true';
 
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
-const Hostel = (await import('../models/Hostel.js')).default;
+const Room = (await import('../models/Room.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const StaffReport = (await import('../models/StaffReport.js')).default;
 const {
@@ -23,7 +23,8 @@ mongoose.set('bufferTimeoutMS', 200);
 
 const STAFF_ID = '507f1f77bcf86cd799439011';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
-const HOSTEL_ID = '507f191e810c19729de860e1';
+const ROOM_ID = '507f191e810c19729de860e1';
+const SECOND_ROOM_ID = '507f191e810c19729de860e2';
 const ORDER_ID = '507f191e810c19729de860e3';
 const REPORT_ID = '507f191e810c19729de860e9';
 
@@ -43,7 +44,7 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 afterEach(() => mock.restoreAll());
 
-const authenticate = (role, id) => {
+const authenticate = (role, id, roomIds = [ROOM_ID]) => {
   mock.method(Admin, 'exists', async (filter) => {
     const allowed = filter.$or?.find((branch) => branch.role?.$in)?.role.$in || [];
     return String(filter._id) === id && allowed.includes(role) ? { _id: id } : null;
@@ -52,13 +53,13 @@ const authenticate = (role, id) => {
     select: () => ({
       lean: async () =>
         String(requested) === STAFF_ID
-          ? { _id: STAFF_ID, name: 'Meena Rao', email: 'd4.caretaker@example.com', hostelId: HOSTEL_ID }
+          ? { _id: STAFF_ID, name: 'Meena Rao', email: 'd4.caretaker@example.com', roomIds }
           : { _id: ADMIN_ID, name: 'Office', email: 'admin@example.com' },
     }),
   }));
 };
 
-const asCaretaker = () => authenticate('caretaker', STAFF_ID);
+const asCaretaker = (roomIds) => authenticate('caretaker', STAFF_ID, roomIds);
 const asAdmin = () => authenticate('admin', ADMIN_ID);
 
 const send = (method, path, body, token = caretakerToken) =>
@@ -70,9 +71,9 @@ const send = (method, path, body, token = caretakerToken) =>
 
 const noOpenReports = () => mock.method(StaffReport, 'countDocuments', async () => 0);
 
-const hostelFound = () =>
-  mock.method(Hostel, 'findById', () => ({
-    select: () => ({ lean: async () => ({ _id: HOSTEL_ID, code: 'D-4', name: 'Dorm 4' }) }),
+const roomsFound = (rooms = [{ _id: ROOM_ID, code: 'D-4', name: 'Dorm 4' }]) =>
+  mock.method(Room, 'find', () => ({
+    select: () => ({ lean: async () => rooms }),
   }));
 
 const capturingCreate = () => {
@@ -90,7 +91,7 @@ describe('what a caretaker may report', () => {
   test('a complaint is filed against the account that sent it, not the body', async () => {
     asCaretaker();
     noOpenReports();
-    hostelFound();
+    roomsFound();
     const captured = capturingCreate();
 
     const response = await send('POST', '/api/v1/caretaker/reports', {
@@ -108,7 +109,7 @@ describe('what a caretaker may report', () => {
     assert.equal(String(captured.raisedBy), STAFF_ID);
     assert.equal(captured.raiser.name, 'Meena Rao');
     assert.equal(captured.raiser.role, 'caretaker');
-    assert.equal(captured.raiser.hostelNumber, 'D-4');
+    assert.equal(captured.raiser.roomNumbers, 'D-4');
     assert.equal(captured.status, 'OPEN');
     assert.equal(captured.order, undefined);
 
@@ -117,10 +118,33 @@ describe('what a caretaker may report', () => {
     assert.equal(body.data.categoryLabel, 'Conduct of another member of staff');
   });
 
-  test('an order issue is scoped to the caretaker\'s own hostel', async () => {
+  /* "Which room" is not a question a complaint can answer, so the report
+     carries every room its raiser held when they wrote it — in reading order,
+     so ROOM-10 follows ROOM-9 rather than preceding it. */
+  test('a caretaker with several rooms stamps all of them on the report', async () => {
+    asCaretaker([ROOM_ID, SECOND_ROOM_ID]);
+    noOpenReports();
+    roomsFound([
+      { _id: ROOM_ID, code: 'D-10', name: 'Dorm 10' },
+      { _id: SECOND_ROOM_ID, code: 'D-9', name: 'Dorm 9' },
+    ]);
+    const captured = capturingCreate();
+
+    const response = await send('POST', '/api/v1/caretaker/reports', {
+      kind: 'COMPLAINT',
+      category: 'DELIVERY_SERVICE',
+      note: 'The trolley arrives after the students have gone to class.',
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(captured.raiser.roomNumbers, 'D-9 · D-10');
+    assert.deepEqual(captured.roomIds, [ROOM_ID, SECOND_ROOM_ID]);
+  });
+
+  test('an order issue is scoped to the caretaker\'s own room', async () => {
     asCaretaker();
     noOpenReports();
-    hostelFound();
+    roomsFound();
     const captured = capturingCreate();
     let filter;
     mock.method(FulfillmentOrder, 'findOne', (requested) => {
@@ -129,7 +153,7 @@ describe('what a caretaker may report', () => {
         select: () => ({
           lean: async () => ({
             _id: ORDER_ID,
-            studentSnapshot: { name: 'Asha', hostelNumber: 'D-4' },
+            studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
             status: 'DELIVERED',
           }),
         }),
@@ -144,7 +168,7 @@ describe('what a caretaker may report', () => {
     });
 
     assert.equal(response.status, 201);
-    assert.deepEqual(filter, { _id: ORDER_ID, 'studentSnapshot.hostelId': HOSTEL_ID });
+    assert.deepEqual(filter, { _id: ORDER_ID, 'studentSnapshot.roomId': { $in: [ROOM_ID] } });
     assert.equal(String(captured.order.orderId), ORDER_ID);
     assert.equal(captured.order.statusAtReport, 'DELIVERED');
     // The snapshot carries no price: a caretaker never sees what a package
@@ -152,7 +176,7 @@ describe('what a caretaker may report', () => {
     assert.equal(JSON.stringify(captured).includes('totalAmount'), false);
   });
 
-  test('a package at another hostel is 404, not a refusal', async () => {
+  test('a package at another room is 404, not a refusal', async () => {
     asCaretaker();
     noOpenReports();
     mock.method(FulfillmentOrder, 'findOne', () => ({ select: () => ({ lean: async () => null }) }));
@@ -220,7 +244,7 @@ describe('what a caretaker may report', () => {
           note: 'Something happened.',
           status: 'RESOLVED',
           raisedBy: STAFF_ID,
-          raiser: { name: 'Meena Rao', role: 'caretaker', hostelNumber: 'D-4' },
+          raiser: { name: 'Meena Rao', role: 'caretaker', roomNumbers: 'D-4' },
           resolutionNote: 'Spoke to the driver; it will not happen again.',
           handling: [{ from: 'OPEN', to: 'RESOLVED', at: new Date(), actorId: ADMIN_ID, note: 'done' }],
           createdAt: new Date(),
@@ -374,7 +398,7 @@ describe('handling a report', () => {
     note: 'Two juices are missing.',
     status,
     raisedBy: STAFF_ID,
-    raiser: { name: 'Meena Rao', role: 'caretaker', hostelNumber: 'D-4' },
+    raiser: { name: 'Meena Rao', role: 'caretaker', roomNumbers: 'D-4' },
     handling: [],
     createdAt: new Date(),
   });
@@ -425,7 +449,7 @@ describe('handling a report', () => {
           note: 'Something happened.',
           status: 'RESOLVED',
           raisedBy: STAFF_ID,
-          raiser: { name: 'Meena Rao', role: 'caretaker', hostelNumber: 'D-4' },
+          raiser: { name: 'Meena Rao', role: 'caretaker', roomNumbers: 'D-4' },
           resolutionNote: 'Spoke to the driver.',
           resolvedByName: 'Priya Sharma',
           handling: [{ from: 'OPEN', to: 'RESOLVED', at: new Date(), actorId: ADMIN_ID, actorName: 'Priya Sharma', note: 'done' }],

@@ -82,8 +82,8 @@ const fulfillmentOrderSchema = new mongoose.Schema(
     studentSnapshot: {
       name: { type: String, required: true },
       admissionNumber: { type: String, default: '' },
-      hostelNumber: { type: String, required: true },
-      hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel', required: true },
+      roomNumber: { type: String, required: true },
+      roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
     },
     items: { type: [itemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
@@ -143,10 +143,10 @@ fulfillmentOrderSchema.index(
 fulfillmentOrderSchema.index({ orderedAt: -1 });
 fulfillmentOrderSchema.index({ status: 1, orderedAt: -1 });
 fulfillmentOrderSchema.index({ studentId: 1, orderedAt: -1 });
-fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliverBy: 1 });
-fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, deliveredAt: -1 });
+fulfillmentOrderSchema.index({ 'studentSnapshot.roomId': 1, status: 1, deliverBy: 1 });
+fulfillmentOrderSchema.index({ 'studentSnapshot.roomId': 1, status: 1, deliveredAt: -1 });
 
-// The caretaker's receipt log: their hostel's collected packages, newest first.
-fulfillmentOrderSchema.index({ 'studentSnapshot.hostelId': 1, status: 1, collectedAt: -1 });
+// The caretaker's receipt log: their room's collected packages, newest first.
+fulfillmentOrderSchema.index({ 'studentSnapshot.roomId': 1, status: 1, collectedAt: -1 });
 
 export default mongoose.model('FulfillmentOrder', fulfillmentOrderSchema);

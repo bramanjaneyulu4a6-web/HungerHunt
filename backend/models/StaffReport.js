@@ -11,14 +11,14 @@ import {
 
 /* Who raised it, copied at the time. The account is still referenced, and staff
    accounts are never deleted — but a report read six months later should say
-   the name and hostel the person had when they wrote it, not the ones a later
+   the name and room(s) the person had when they wrote it, not the ones a later
    transfer gave them. No phone number: the office has the staff roster, and a
    report is not the place to spread a contact detail. */
 const raiserSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     role: { type: String, required: true },
-    hostelNumber: { type: String, default: '' },
+    roomNumbers: { type: String, default: '' },
   },
   { _id: false }
 );
@@ -31,7 +31,7 @@ const orderSnapshotSchema = new mongoose.Schema(
   {
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'FulfillmentOrder', required: true },
     studentName: { type: String, required: true },
-    hostelNumber: { type: String, default: '' },
+    roomNumber: { type: String, default: '' },
     statusAtReport: { type: String, required: true },
   },
   { _id: false }
@@ -91,7 +91,7 @@ const staffReportSchema = new mongoose.Schema(
       index: true,
     },
     raiser: { type: raiserSchema, required: true },
-    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
+    roomIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Room' }],
 
     // Present on ORDER_ISSUE and absent on COMPLAINT. Not required at the
     // schema level because the two kinds share one collection; the controller

@@ -36,7 +36,7 @@ afterEach(() => mock.restoreAll());
 test('an admin-created parent waits for phone verification and has no password', async () => {
   mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
   mock.method(Student, 'find', async () => [{
-    _id: STUDENT_ID, name: 'Asha', admissionNumber: '10425', hostelNumber: 'D-4', active: true,
+    _id: STUDENT_ID, name: 'Asha', admissionNumber: '10425', roomNumber: 'D-4', active: true,
   }]);
   mock.method(Parent, 'findOne', () => ({ populate: async () => null }));
   mock.method(Parent, 'exists', async () => null);

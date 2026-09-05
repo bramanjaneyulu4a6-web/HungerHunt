@@ -2,7 +2,7 @@ import { OrderStatus } from './orderState.js';
 
 /* The states in which a package is finished as far as the delivery deadline
    is concerned. CANCELLED never arrives; DELIVERED means the warehouse has
-   handed it to the hostel's caretaker, which is the act the 48-hour deadline
+   handed it to the room's caretaker, which is the act the 48-hour deadline
    measures; COLLECTED is that same package afterwards, in the student's hands.
 
    Written as a list of endings, with everything else counted as open, so a new

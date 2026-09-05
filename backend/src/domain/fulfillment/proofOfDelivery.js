@@ -1,11 +1,11 @@
 /* What HungerHunt keeps as proof that a package left the warehouse and reached
- * the hostel — that is, who the storeroom handed it to at the door.
+ * the room — that is, who the storeroom handed it to at the door.
  *
  * The policy records the receiver's name and callback number, plus the staff
  * account that recorded the handoff and when.
  * The authenticated actor and the timestamp are the parts that carry weight —
  * they come from the session and the clock, not from whoever is typing — and
- * the note is only there to say which caretaker at the hostel it was.
+ * the note is only there to say which caretaker at the room it was.
  *
  * This is no longer the end of the package's life. The student taking it from
  * the caretaker is a separate step, proved by the student's own purchase code
@@ -34,7 +34,7 @@ export const proofOfDeliveryProblem = (receivedBy) => {
   const value = String(receivedBy ?? '').trim();
 
   if (value.length < RECEIVER_MIN_LENGTH) {
-    return 'Record who at the hostel took the package — the caretaker who signed for it.';
+    return 'Record who at the room took the package — the caretaker who signed for it.';
   }
 
   if (value.length > RECEIVER_MAX_LENGTH) {

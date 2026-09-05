@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { signStaffToken, STAFF_ROLES } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/resetToken.js';
-import Hostel from '../models/Hostel.js';
+import Room from '../models/Room.js';
 import Student from '../models/Student.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 
@@ -54,26 +54,30 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    let hostelId = null;
+    let roomIds = [];
     if (role === 'caretaker') {
-      hostelId = req.body?.hostelId;
-      const hostel = hostelId ? await Hostel.findOne({ _id: hostelId, active: true }) : null;
-      if (!hostel) {
-        return res.status(400).json({ message: 'Choose an active hostel for the caretaker.' });
+      const requestedRoomIds = [...new Set(
+        (Array.isArray(req.body?.roomIds) ? req.body.roomIds : []).map(String)
+      )];
+      const rooms = requestedRoomIds.length
+        ? await Room.find({ _id: { $in: requestedRoomIds }, active: true })
+        : [];
+      if (!requestedRoomIds.length || rooms.length !== requestedRoomIds.length) {
+        return res.status(400).json({ message: 'Choose at least one active room for the caretaker.' });
       }
-      hostelId = hostel._id;
+      roomIds = rooms.map((room) => room._id);
 
       const [unlinkedStudent, unlinkedOrder] = await Promise.all([
-        Student.exists({ hostelId: { $exists: false } }),
-        FulfillmentOrder.exists({ 'studentSnapshot.hostelId': { $exists: false } }),
+        Student.exists({ roomId: { $exists: false } }),
+        FulfillmentOrder.exists({ 'studentSnapshot.roomId': { $exists: false } }),
       ]);
       if (unlinkedStudent || unlinkedOrder) {
         return res.status(409).json({
-          message: 'Run and verify the hostel backfill before creating a caretaker account.',
+          message: 'Run and verify the room backfill before creating a caretaker account.',
         });
       }
-    } else if (req.body?.hostelId) {
-      return res.status(400).json({ message: 'Only caretaker accounts may be assigned a hostel.' });
+    } else if (req.body?.roomIds?.length) {
+      return res.status(400).json({ message: 'Only caretaker accounts may be assigned rooms.' });
     }
 
     const existingAdmin = await Admin.findOne({ email });
@@ -83,7 +87,7 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const admin = new Admin({ name, phone, email, password, role, hostelId });
+    const admin = new Admin({ name, phone, email, password, role, roomIds });
     await admin.save();
 
     return res.status(201).json({
@@ -133,26 +137,26 @@ export const loginAdmin = async (req, res) => {
     // The role is returned as well as signed in, so each front door can turn
     // away an account that belongs at a different one, rather than signing it
     // in to a console where every screen answers 403.
-    let hostel = null;
+    let rooms = [];
     if (role === 'caretaker') {
-      if (!admin.hostelId) {
-        return res.status(403).json({ message: 'This caretaker account has no hostel assignment.' });
+      if (!admin.roomIds?.length) {
+        return res.status(403).json({ message: 'This caretaker account has no room assignment.' });
       }
 
-      hostel = await Hostel.findById(admin.hostelId).select('code name').lean();
-      if (!hostel) {
-        return res.status(403).json({ message: 'This caretaker account is assigned to a missing hostel.' });
+      rooms = await Room.find({ _id: { $in: admin.roomIds } }).select('code name').lean();
+      if (rooms.length !== admin.roomIds.length) {
+        return res.status(403).json({ message: 'This caretaker account is assigned to missing rooms.' });
       }
     }
+
+    const roomList = rooms.map((room) => ({ id: String(room._id), code: room.code, name: room.name }));
 
     const staff = {
       name: admin.name,
       phone: admin.phone,
       email: admin.email,
       role,
-      ...(hostel ? {
-        hostel: { id: String(hostel._id), code: hostel.code, name: hostel.name || '' },
-      } : {}),
+      ...(role === 'caretaker' ? { rooms: roomList } : {}),
     };
 
     res.json({
@@ -162,10 +166,7 @@ export const loginAdmin = async (req, res) => {
       name: admin.name,
       phone: admin.phone,
       staff,
-      ...(hostel ? {
-        hostelId: String(hostel._id),
-        hostel: staff.hostel,
-      } : {}),
+      ...(role === 'caretaker' ? { rooms: roomList } : {}),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

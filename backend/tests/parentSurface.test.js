@@ -20,6 +20,7 @@ const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const firebasePhoneAuth = (await import('../utils/firebasePhoneAuth.js')).default;
+const { authLimiter } = await import('../middleware/rateLimit.js');
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -48,6 +49,15 @@ before(async () => {
 // it is no is in parentSessions.test.js.
 beforeEach(() => {
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+
+  // Every request in this suite arrives from loopback, so the whole file
+  // shares one authLimiter bucket (10 per 15 min) — and its auth-route tests
+  // together sit right at that cap. Limiter behavior has its own suite
+  // (rateLimit.test.js); here it is background, so start each test with a
+  // clean bucket instead of letting the test count silently become the limit.
+  for (const key of ['127.0.0.1', '::ffff:127.0.0.1', '::1']) {
+    authLimiter.resetKey(key);
+  }
 });
 
 afterEach(() => mock.restoreAll());
@@ -124,7 +134,7 @@ describe('the dashboard sends what the dashboard renders', () => {
             lean: async () => [{
               _id: '507f191e810c19729de860ef',
               studentId: STUDENT_ID,
-              studentSnapshot: { name: 'Child', hostelNumber: 'D-4' },
+              studentSnapshot: { name: 'Child', roomNumber: 'D-4' },
               status: 'PACKED',
               items: [{ name: 'Notebook', quantity: 1, price: 100 }],
               totalAmount: 100,
@@ -287,16 +297,23 @@ describe('phone-first login and first password setup', () => {
     assert.equal((await res.json()).next, 'VERIFY_PHONE');
   });
 
-  test('an existing password and an unknown number both use the password step', async () => {
+  test('only an active account with a password is offered the password step', async () => {
     mock.method(Parent, 'findOne', async () => ({ activationRequired: false, password: 'hash' }));
     const existing = await post('/api/parent/login-step', { parentPhoneNumber: '9876543210' });
 
-    mock.restoreAll();
+    assert.equal((await existing.json()).next, 'PASSWORD');
+  });
+
+  test('an unknown number and an archived account are both told to contact the school', async () => {
     mock.method(Parent, 'findOne', async () => null);
     const unknown = await post('/api/parent/login-step', { parentPhoneNumber: '9000000000' });
 
-    assert.equal((await existing.json()).next, 'PASSWORD');
-    assert.equal((await unknown.json()).next, 'PASSWORD');
+    mock.restoreAll();
+    mock.method(Parent, 'findOne', async () => ({ active: false, password: 'hash' }));
+    const archived = await post('/api/parent/login-step', { parentPhoneNumber: '9876543210' });
+
+    assert.equal((await unknown.json()).next, 'NO_ACCOUNT');
+    assert.equal((await archived.json()).next, 'NO_ACCOUNT');
   });
 
   test('a short password is refused before any lookup', async () => {

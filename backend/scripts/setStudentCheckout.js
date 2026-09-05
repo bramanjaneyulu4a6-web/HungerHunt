@@ -7,8 +7,8 @@
 // purchase code is a child's only secret at the till, and a tool that could
 // rewrite them in bulk is not one worth having.
 //
-//   npm run student:checkout -- --student "Test Student" --hostel TEST --prod
-//   npm run student:checkout -- --student "Test Student" --hostel TEST --code 0000 \
+//   npm run student:checkout -- --student "Test Student" --room TEST --prod
+//   npm run student:checkout -- --student "Test Student" --room TEST --code 0000 \
 //     --no-limit --no-approval --prod --apply
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
@@ -26,7 +26,7 @@ const valueOf = (flag) => {
 };
 
 const name = valueOf('--student');
-const hostel = valueOf('--hostel');
+const room = valueOf('--room');
 const code = valueOf('--code');
 
 if (!name) throw new Error('Pass --student "<full name>".');
@@ -40,20 +40,20 @@ if (code !== null) {
 await connectForScript();
 
 try {
-  const query = { name, ...(hostel ? { hostelNumber: hostel } : {}) };
+  const query = { name, ...(room ? { roomNumber: room } : {}) };
   const matches = await Student.find(query)
-    .select('_id name hostelNumber admissionNumber active requiresParentApproval walletControl purchaseCodeIsPin')
+    .select('_id name roomNumber admissionNumber active requiresParentApproval walletControl purchaseCodeIsPin')
     .lean();
 
   if (!matches.length) {
-    throw new Error(`No student named "${name}"${hostel ? ` in hostel ${hostel}` : ''}.`);
+    throw new Error(`No student named "${name}"${room ? ` in room ${room}` : ''}.`);
   }
 
   // Names are not unique — the roster's uniqueness is name+father+phone — so a
   // second match is a question for a person, not something to guess at.
   if (matches.length > 1) {
-    console.log('More than one student matches. Narrow it with --hostel:');
-    for (const s of matches) console.log(`  ${s.name} — hostel ${s.hostelNumber}, admission ${s.admissionNumber ?? '(none)'}`);
+    console.log('More than one student matches. Narrow it with --room:');
+    for (const s of matches) console.log(`  ${s.name} — room ${s.roomNumber}, admission ${s.admissionNumber ?? '(none)'}`);
     throw new Error('Refusing to guess which student was meant.');
   }
 
@@ -66,7 +66,7 @@ try {
   if (args.includes('--no-approval')) changes.push('parent approval -> off');
   if (args.includes('--approval')) changes.push('parent approval -> on');
 
-  console.log(`${student.name} — hostel ${student.hostelNumber}, admission ${student.admissionNumber ?? '(none)'}${student.active === false ? ' [ARCHIVED]' : ''}`);
+  console.log(`${student.name} — room ${student.roomNumber}, admission ${student.admissionNumber ?? '(none)'}${student.active === false ? ' [ARCHIVED]' : ''}`);
   console.log(`  now: limit ${student.walletControl?.enabled ? 'on' : 'off'}, approval ${student.requiresParentApproval ? 'on' : 'off'}, code ${student.purchaseCodeIsPin ? 'set (4-digit)' : 'not known to be a 4-digit code'}\n`);
 
   if (!changes.length) {

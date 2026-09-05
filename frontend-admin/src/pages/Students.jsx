@@ -32,7 +32,7 @@ const EMPTY_FORM = {
   name: '',
   admissionNumber: '',
   fatherName: '',
-  hostelId: '',
+  roomId: '',
   grade: '',
   parentPhoneNumber: '',
 };
@@ -41,7 +41,7 @@ const SORTABLE_COLUMNS = [
   { key: 'admissionNumber', label: 'Admission No.' },
   { key: 'name', label: 'Name' },
   { key: 'grade', label: 'Grade' },
-  { key: 'hostelNumber', label: 'Hostel' },
+  { key: 'roomNumber', label: 'Room' },
   { key: 'pocketMoney', label: 'Wallet', align: 'right' },
 ];
 const PAGE_SIZE = 50;
@@ -97,7 +97,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [searchParams] = useSearchParams();
   const focusedStudentId = searchParams.get('focus') || '';
   const [students, setStudents] = useState([]);
-  const [hostels, setHostels] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
@@ -105,7 +105,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [total, setTotal] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
-  const [hostelFilter, setHostelFilter] = useState('');
+  const [roomFilter, setRoomFilter] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
   // Which dialog is open, if any: 'editor' | 'import' | 'topup'.
@@ -135,7 +135,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
         limit: PAGE_SIZE,
         status: 'active',
         q: searchQuery.trim() || undefined,
-        hostelId: hostelFilter || undefined,
+        roomId: roomFilter || undefined,
         sort: sortConfig.key,
         direction: sortConfig.direction,
       } });
@@ -149,7 +149,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
     } finally {
       setLoading(false);
     }
-  }, [hostelFilter, searchQuery, sortConfig.direction, sortConfig.key]);
+  }, [roomFilter, searchQuery, sortConfig.direction, sortConfig.key]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => fetchStudents(1), 250);
@@ -159,8 +159,8 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   useEffect(() => {
     const timer = window.setTimeout(async () => {
       try {
-        const { data } = await api.get('/hostels');
-        setHostels(data || []);
+        const { data } = await api.get('/rooms');
+        setRooms(data || []);
       } catch (error) {
         console.error(error);
         setLoadError(true);
@@ -189,7 +189,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
       name: student.name || '',
       admissionNumber: student.admissionNumber || '',
       fatherName: student.fatherName || '',
-      hostelId: student.hostelId || '',
+      roomId: student.roomId || '',
       grade: student.grade || '',
       parentPhoneNumber: student.parentPhoneNumber || '',
     });
@@ -383,18 +383,18 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   };
 
   const visible = students;
-  const filtering = Boolean(searchQuery.trim() || hostelFilter);
+  const filtering = Boolean(searchQuery.trim() || roomFilter);
   const editingStudent = editingId ? students.find((row) => row._id === editingId) : null;
 
-  const hostelOptions = hostels.map((hostel) => (
+  const roomOptions = rooms.map((room) => (
     <option
-      key={hostel._id}
-      value={hostel._id}
-      disabled={!hostel.active && hostel._id !== formData.hostelId}
+      key={room._id}
+      value={room._id}
+      disabled={!room.active && room._id !== formData.roomId}
     >
-      {hostel.code}
-      {hostel.name ? ` — ${hostel.name}` : ''}
-      {hostel.active ? '' : ' (inactive)'}
+      {room.code}
+      {room.name ? ` — ${room.name}` : ''}
+      {room.active ? '' : ' (inactive)'}
     </option>
   ));
 
@@ -424,7 +424,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             type="search"
             className="toolbar-input"
             aria-label="Search students"
-            placeholder="Search by name, admission number or hostel…"
+            placeholder="Search by name, admission number or room…"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
@@ -432,14 +432,14 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
 
         <select
           className="input toolbar-select"
-          aria-label="Filter by hostel"
-          value={hostelFilter}
-          onChange={(event) => setHostelFilter(event.target.value)}
+          aria-label="Filter by room"
+          value={roomFilter}
+          onChange={(event) => setRoomFilter(event.target.value)}
         >
-          <option value="">All hostels</option>
-          {hostels.map((hostel) => (
-            <option key={hostel._id} value={hostel._id}>
-              {hostel.code}{hostel.name ? ` — ${hostel.name}` : ''}
+          <option value="">All rooms</option>
+          {rooms.map((room) => (
+            <option key={room._id} value={room._id}>
+              {room.code}{room.name ? ` — ${room.name}` : ''}
             </option>
           ))}
         </select>
@@ -476,7 +476,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             filtering ? (
               <Button
                 variant="ghost"
-                onClick={() => { setSearchQuery(''); setHostelFilter(''); }}
+                onClick={() => { setSearchQuery(''); setRoomFilter(''); }}
               >
                 Clear filters
               </Button>
@@ -486,7 +486,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           }
         >
           {filtering
-            ? 'Nothing matches the current search and hostel filter.'
+            ? 'Nothing matches the current search and room filter.'
             : 'Add one at a time, or import the roll from a spreadsheet.'}
         </EmptyState>
       ) : (
@@ -546,9 +546,9 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                     <span className="cell-name">{student.name}</span>
                   </td>
                   <td data-label="Grade">{student.grade || '—'}</td>
-                  <td data-label="Hostel">
-                    {student.hostelNumber
-                      ? <span className="badge badge--neutral">{student.hostelNumber}</span>
+                  <td data-label="Room">
+                    {student.roomNumber
+                      ? <span className="badge badge--neutral">{student.roomNumber}</span>
                       : <span className="cell-unset">Not set</span>}
                   </td>
                   <td data-label="Wallet" className="cell-right">
@@ -643,16 +643,16 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
               ))}
 
               <div>
-                <label className="field-label" htmlFor="student-hostelId">Hostel</label>
+                <label className="field-label" htmlFor="student-roomId">Room</label>
                 <select
-                  id="student-hostelId"
+                  id="student-roomId"
                   className="input"
                   required
-                  value={formData.hostelId}
-                  onChange={(event) => setFormData({ ...formData, hostelId: event.target.value })}
+                  value={formData.roomId}
+                  onChange={(event) => setFormData({ ...formData, roomId: event.target.value })}
                 >
-                  <option value="">Choose a hostel</option>
-                  {hostelOptions}
+                  <option value="">Choose a room</option>
+                  {roomOptions}
                 </select>
               </div>
             </div>
@@ -722,8 +722,8 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
 
             <p className="modal-note">
               Columns read: <strong>name</strong>, <strong>admissionNumber</strong>,{' '}
-              <strong>fatherName</strong>, <strong>hostelNumber</strong>, <strong>grade</strong> and{' '}
-              <strong>parentPhoneNumber</strong>. Every hostel in the sheet must already exist and be
+              <strong>fatherName</strong>, <strong>roomNumber</strong>, <strong>grade</strong> and{' '}
+              <strong>parentPhoneNumber</strong>. Every room in the sheet must already exist and be
               active, or the import is refused before anything is written.
             </p>
 

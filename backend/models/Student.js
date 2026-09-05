@@ -3,10 +3,10 @@ import mongoose from 'mongoose';
 const studentSchema = new mongoose.Schema({
   name: { type: String, required: true },
   fatherName: { type: String, required: true },
-  hostelNumber: { type: String, required: true },
-  hostelId: {
+  roomNumber: { type: String, required: true },
+  roomId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Hostel',
+    ref: 'Room',
     required: true,
     index: true,
   },
@@ -106,6 +106,9 @@ walletControl: {
 
   limitType: {
     type: String,
+    // New writes are WEEKLY only (updateWalletControl refuses the rest), but
+    // DAILY and MONTHLY stay in the enum so students saved before that rule
+    // still validate — save() checks every path, not just the changed one.
     enum: ["DAILY", "WEEKLY", "MONTHLY"],
     default: "WEEKLY"
   }

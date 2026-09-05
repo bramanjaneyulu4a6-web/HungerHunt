@@ -690,7 +690,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             </span>
             <span>
               <b>{student.name || 'Your child'}</b>
-              <small>Grade {student.grade || '—'} · Room {student.hostelNumber || '—'}</small>
+              <small>Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</small>
             </span>
           </button>
         ) : (
@@ -700,7 +700,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             </span>
             <span>
               <b>{student.name || 'Your child'}</b>
-              <small>Grade {student.grade || '—'} · Room {student.hostelNumber || '—'}</small>
+              <small>Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</small>
             </span>
           </div>
         )}

@@ -34,6 +34,11 @@ const QUICK_TOPUP_AMOUNTS = [100, 200, 500];
 // How long a wallet tile stays pressed after its sheet closes.
 const TILE_PRESS_HOLD_MS = 200;
 
+// The weekly spending cap's allowed range, matched by updateWalletControl on
+// the server — a limit outside it is refused there too.
+const WALLET_LIMIT_MIN = 30;
+const WALLET_LIMIT_MAX = 250;
+
 // Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
 // same language wherever a payment lands.
 const TOPUP_TERMINAL_COPY = {
@@ -236,7 +241,10 @@ export default function ChildDetails() {
   const [pendingNotice, setPendingNotice] = useState('');
 
   const [walletEnabled, setWalletEnabled] = useState(false);
-  const [walletLimit, setWalletLimit] = useState(500);
+  const [walletLimit, setWalletLimit] = useState(WALLET_LIMIT_MAX);
+  /* Only shown, never chosen: new limits are always weekly, but a control
+     saved before that rule may still be daily or monthly, and the tile
+     should not claim "weekly" for a cap the server is enforcing per day. */
   const [walletType, setWalletType] = useState('WEEKLY');
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   // null | 'topup' | 'control' — which of the two wallet actions is open.
@@ -322,7 +330,7 @@ export default function ChildDetails() {
 
         if (control) {
           setWalletEnabled(control.enabled);
-          setWalletLimit(control.limitAmount || 500);
+          setWalletLimit(control.limitAmount || WALLET_LIMIT_MAX);
           setWalletType(control.limitType || 'WEEKLY');
         }
 
@@ -425,10 +433,15 @@ export default function ChildDetails() {
   const saveWalletControl = async () => {
     setWalletBanner({ type: '', message: '' });
 
-    if (walletEnabled && (!Number.isFinite(walletLimit) || walletLimit <= 0)) {
+    if (
+      walletEnabled &&
+      (!Number.isFinite(walletLimit) ||
+        walletLimit < WALLET_LIMIT_MIN ||
+        walletLimit > WALLET_LIMIT_MAX)
+    ) {
       setWalletBanner({
         type: 'error',
-        message: 'Enter a spending limit greater than ₹0.',
+        message: `Enter a weekly limit between ₹${WALLET_LIMIT_MIN} and ₹${WALLET_LIMIT_MAX}.`,
       });
       return;
     }
@@ -439,9 +452,12 @@ export default function ChildDetails() {
       await API.put(`/parent/wallet-control/${id}`, {
         enabled: walletEnabled,
         limitAmount: walletLimit,
-        limitType: walletType,
+        limitType: 'WEEKLY',
       });
 
+      // A pre-rule daily or monthly control has just been rewritten weekly,
+      // and the summary tile should say so without a reload.
+      setWalletType('WEEKLY');
       setWalletBanner({ type: 'success', message: 'Wallet control updated.' });
     } catch (err) {
       setWalletBanner({
@@ -560,20 +576,21 @@ export default function ChildDetails() {
         inactiveLabel="Off"
         activeIcon={<Icon name="shield" size={24} />}
         inactiveIcon={<Icon name="wallet" size={24} />}
-        activeDescription={`Wallet spending is capped for ${student.name}. Set the amount and period below.`}
+        activeDescription={`Wallet spending is capped each week for ${student.name}. Set the amount below.`}
         inactiveDescription={`${student.name} can spend the whole balance. Tap to set a limit.`}
       />
 
       <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
         <div>
           <label className="field-label" htmlFor="wallet-limit">
-            Limit Amount (₹)
+            Weekly limit (₹{WALLET_LIMIT_MIN}–₹{WALLET_LIMIT_MAX})
           </label>
           <input
             id="wallet-limit"
             className={`input${walletBanner.type === 'error' ? ' field-has-error' : ''}`}
             type="number"
-            min="0"
+            min={WALLET_LIMIT_MIN}
+            max={WALLET_LIMIT_MAX}
             value={walletLimit}
             disabled={!walletEnabled || saving}
             onChange={(e) => setWalletLimit(Number(e.target.value))}
@@ -581,26 +598,9 @@ export default function ChildDetails() {
             aria-invalid={walletBanner.type === 'error'}
             aria-describedby={walletBanner.type === 'error' ? 'wallet-limit-error' : undefined}
           />
-          {walletBanner.type === 'error' && walletBanner.message === 'Enter a spending limit greater than ₹0.' && (
+          {walletBanner.type === 'error' && walletBanner.message.startsWith('Enter a weekly limit') && (
             <InlineFieldError id="wallet-limit-error">{walletBanner.message}</InlineFieldError>
           )}
-        </div>
-
-        <div>
-          <label className="field-label" htmlFor="wallet-frequency">
-            Frequency
-          </label>
-          <select
-            id="wallet-frequency"
-            className="select"
-            value={walletType}
-            disabled={!walletEnabled || saving}
-            onChange={(e) => setWalletType(e.target.value)}
-          >
-            <option value="DAILY">Daily</option>
-            <option value="WEEKLY">Weekly</option>
-            <option value="MONTHLY">Monthly</option>
-          </select>
         </div>
       </div>
 
@@ -791,7 +791,7 @@ export default function ChildDetails() {
           <div>
             <h1 style={{ fontSize: 25, fontWeight: 850 }}>{student.name}</h1>
             <p className="student-meta">
-              Grade {student.grade || '—'} · Room {student.hostelNumber || '—'}
+              Grade {student.grade || '—'} · Room {student.roomNumber || '—'}
             </p>
           </div>
         </div>

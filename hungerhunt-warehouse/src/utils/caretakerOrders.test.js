@@ -19,7 +19,7 @@ const orders = [
   },
 ];
 
-test('groups the whole hostel order by product and totals each quantity', () => {
+test('groups the whole unit order by product and totals each quantity', () => {
   assert.deepEqual(caretakerProductTotals(orders), [
     { id: 'juice', name: 'Apple Juice', quantity: 3 },
     { id: 'chips', name: 'Banana Chips', quantity: 3 },

@@ -8,7 +8,6 @@ process.env.FEATURE_V1_PROCUREMENT = 'true';
 
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
-const Hostel = (await import('../models/Hostel.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const StaffReport = (await import('../models/StaffReport.js')).default;
 const Counter = (await import('../models/Counter.js')).default;
@@ -18,7 +17,8 @@ const app = (await import('../app.js')).default;
 mongoose.set('bufferTimeoutMS', 200);
 
 const STAFF_ID = '507f1f77bcf86cd799439011';
-const HOSTEL_ID = '507f191e810c19729de860e1';
+const ROOM_ID = '507f191e810c19729de860e1';
+const SECOND_ROOM_ID = '507f191e810c19729de860e2';
 const ORDER_ID = '507f191e810c19729de860e3';
 const REPORT_ID = '507f191e810c19729de860e9';
 const JUICE_ID = '507f191e810c19729de860a1';
@@ -39,7 +39,7 @@ before(async () => {
 after(() => new Promise((resolve) => server.close(resolve)));
 afterEach(() => mock.restoreAll());
 
-const asCaretaker = () => {
+const asCaretaker = (roomIds = [ROOM_ID]) => {
   mock.method(Admin, 'exists', async (filter) => {
     const allowed = filter.$or?.find((branch) => branch.role?.$in)?.role.$in || [];
     return String(filter._id) === STAFF_ID && allowed.includes('caretaker') ? { _id: STAFF_ID } : null;
@@ -50,7 +50,7 @@ const asCaretaker = () => {
         _id: STAFF_ID,
         name: 'Meena Rao',
         email: 'd4.caretaker@example.com',
-        hostelId: HOSTEL_ID,
+        roomIds,
       }),
     }),
   }));
@@ -70,11 +70,6 @@ const report = (body) => send(`/api/v1/caretaker/fulfillment-orders/${ORDER_ID}/
 
 const noOpenReports = () => mock.method(StaffReport, 'countDocuments', async () => 0);
 
-const hostelFound = () =>
-  mock.method(Hostel, 'findById', () => ({
-    select: () => ({ lean: async () => ({ _id: HOSTEL_ID, code: 'D-4', name: 'Dorm 4' }) }),
-  }));
-
 const deliveredPackage = (overrides = {}) => {
   let filter;
   mock.method(FulfillmentOrder, 'findOne', (requested) => {
@@ -83,7 +78,9 @@ const deliveredPackage = (overrides = {}) => {
       select: () => ({
         lean: async () => ({
           _id: ORDER_ID,
-          studentSnapshot: { name: 'Asha Verma', hostelNumber: 'D-4', admissionNumber: 'ADM-113' },
+          studentSnapshot: {
+            name: 'Asha Verma', roomNumber: 'D-4', roomId: ROOM_ID, admissionNumber: 'ADM-113',
+          },
           status: 'DELIVERED',
           items: [
             { productId: JUICE_ID, name: 'Apple Juice', quantity: 2 },
@@ -119,7 +116,6 @@ describe('what a student may report at handover', () => {
   test('files the report as the student, with the affected items snapshotted', async () => {
     asCaretaker();
     noOpenReports();
-    hostelFound();
     deliveredPackage();
     nextNumber(42);
     const captured = capturingCreate();
@@ -139,7 +135,7 @@ describe('what a student may report at handover', () => {
     assert.equal(String(captured.raisedBy), STAFF_ID);
     assert.equal(captured.raiser.name, 'Asha Verma');
     assert.equal(captured.raiser.role, 'student');
-    assert.equal(captured.raiser.hostelNumber, 'D-4');
+    assert.equal(captured.raiser.roomNumbers, 'D-4');
     assert.equal(captured.status, 'OPEN');
     assert.equal(captured.order.statusAtReport, 'DELIVERED');
     assert.equal(captured.reportNumber, 42);
@@ -156,6 +152,27 @@ describe('what a student may report at handover', () => {
     const body = await response.json();
     assert.equal(body.data.reportNumber, 42);
     assert.equal(body.data.status, 'OPEN');
+  });
+
+  /* A student stands in one room. Stamping the caretaker's whole set would let
+     a colleague who shares only one of those rooms read this student's name and
+     complaint about a room they do not hold, because the read-back filter
+     matches on any overlap. */
+  test("is stamped with the order's own room, not the caretaker's whole set", async () => {
+    asCaretaker([ROOM_ID, SECOND_ROOM_ID]);
+    noOpenReports();
+    deliveredPackage();
+    nextNumber(43);
+    const captured = capturingCreate();
+
+    const response = await report({
+      category: 'OTHER',
+      note: 'The box was left open on the shelf before I arrived.',
+    });
+
+    assert.equal(response.status, 201);
+    assert.deepEqual(captured.roomIds.map(String), [ROOM_ID]);
+    assert.equal(captured.raiser.roomNumbers, 'D-4');
   });
 
   test('an item category with no items selected is refused', async () => {
@@ -209,7 +226,6 @@ describe('what a student may report at handover', () => {
   test('OTHER needs no item list', async () => {
     asCaretaker();
     noOpenReports();
-    hostelFound();
     deliveredPackage();
     nextNumber(7);
     const captured = capturingCreate();
@@ -237,7 +253,7 @@ describe('what a student may report at handover', () => {
     assert.equal(response.status, 409);
   });
 
-  test("another hostel's package is a 404, not a refusal", async () => {
+  test("another room's package is a 404, not a refusal", async () => {
     asCaretaker();
     noOpenReports();
     missingPackage();
@@ -287,7 +303,7 @@ describe('what the handover screen shows back', () => {
                 reportNumber: 42,
                 affectedItems: [{ productId: CHIPS_ID, name: 'Banana Chips', quantity: 1 }],
                 raisedBy: STAFF_ID,
-                raiser: { name: 'Asha Verma', role: 'student', hostelNumber: 'D-4' },
+                raiser: { name: 'Asha Verma', role: 'student', roomNumbers: 'D-4' },
                 createdAt: new Date('2026-08-25T09:00:00Z'),
               },
             ],
@@ -301,10 +317,10 @@ describe('what the handover screen shows back', () => {
     );
 
     assert.equal(response.status, 200);
-    // The three walls of the query: this order, this caretaker's hostel, and
+    // The three walls of the query: this order, this caretaker's rooms, and
     // only what a student raised — the caretaker's own channel stays theirs.
     assert.equal(String(filter['order.orderId']), ORDER_ID);
-    assert.equal(String(filter.hostelId), HOSTEL_ID);
+    assert.deepEqual(filter.roomIds, { $in: [ROOM_ID] });
     assert.equal(filter['raiser.role'], 'student');
 
     const body = await response.json();

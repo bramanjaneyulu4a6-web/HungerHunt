@@ -1,8 +1,8 @@
 /* Closes the packages that were delivered under the old rule.
  *
  * Until this deploy, DELIVERED meant a caretaker had pressed "received" — one
- * button that closed every package at their hostel at once. It now means the
- * warehouse handed the package over at the hostel door, and the package is
+ * button that closed every package at their room at once. It now means the
+ * warehouse handed the package over at the room door, and the package is
  * finished only when its student types their purchase code for it.
  *
  * So every DELIVERED row written before the cutover is ambiguous: the students
@@ -50,7 +50,7 @@ try {
   };
 
   const stale = await FulfillmentOrder.find(filter)
-    .select('_id studentSnapshot.name studentSnapshot.hostelNumber deliveredAt')
+    .select('_id studentSnapshot.name studentSnapshot.roomNumber deliveredAt')
     .sort({ deliveredAt: 1 })
     .lean();
 
@@ -67,7 +67,7 @@ try {
     for (const order of stale.slice(0, 10)) {
       console.log(
         `  ${order.studentSnapshot?.name || 'Unknown student'}` +
-          ` — hostel ${order.studentSnapshot?.hostelNumber || '?'}` +
+          ` — room ${order.studentSnapshot?.roomNumber || '?'}` +
           ` — delivered ${order.deliveredAt ? new Date(order.deliveredAt).toISOString() : 'at an unrecorded time'}`
       );
     }

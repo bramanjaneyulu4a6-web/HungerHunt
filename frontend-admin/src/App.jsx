@@ -53,7 +53,7 @@ function App() {
             <Route path="/users" element={<Navigate to="/users/students" replace />} />
             <Route path="/users/:section" element={<Users />} />
             <Route path="/students" element={<Navigate to="/users/students" replace />} />
-            <Route path="/hostels" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/rooms" element={<Navigate to="/dashboard" replace />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/recharge-history" element={<RechargeHistory />} />
             <Route path="/accounting-export" element={<AccountingExport />} />

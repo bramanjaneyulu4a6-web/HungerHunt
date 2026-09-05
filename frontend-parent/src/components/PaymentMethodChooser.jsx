@@ -9,6 +9,7 @@ import {
   PaymentSuccessStage,
   WalletMark,
 } from './PaymentStage';
+import { ProviderMark } from './ProviderMarks';
 
 const PROCESSING_MS = 1700;
 const SUCCESS_HOLD_MS = 2000;
@@ -179,7 +180,7 @@ export default function PaymentMethodChooser({
                       style={{ '--provider-color': option.color, '--provider-tint': option.tint }}
                       aria-hidden="true"
                     >
-                      {option.mark}
+                      <ProviderMark provider={option} />
                     </span>
                     <span>
                       <strong>{option.name}</strong>
@@ -224,7 +225,7 @@ export default function PaymentMethodChooser({
 
         {stage === 'upi-paying' && (
           <PaymentProcessingStage
-            mark={<PaymentMark color={provider.color} tint={provider.tint}>{provider.mark}</PaymentMark>}
+            mark={<PaymentMark color={provider.color} tint={provider.tint}><ProviderMark provider={provider} /></PaymentMark>}
             title={`Opening ${provider.name}…`}
             message="Waiting for confirmation from your UPI app. Please wait."
             amount={amount}

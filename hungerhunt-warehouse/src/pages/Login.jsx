@@ -32,7 +32,8 @@ const Login = () => {
         phone: res.data.phone,
         email: res.data.email,
         role: res.data.role,
-        hostel: res.data.hostel,
+        // Caretakers only; other staff logins omit it entirely.
+        rooms: res.data.rooms,
       }));
       navigate("/", { replace: true });
     } catch (err) {

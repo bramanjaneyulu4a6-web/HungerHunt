@@ -25,6 +25,11 @@ export default function Login() {
   // on a sentence about what they just did rather than the expired-session one.
   const deleted = searchParams.get('deleted') === '1';
 
+  // Set by the create-password screen when the account turned out to already
+  // have its password (a lost race with another device, or a retried request
+  // that had landed). The way in is the password box below, not another SMS.
+  const passwordSet = searchParams.get('password-set') === '1';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -45,6 +50,15 @@ export default function Login() {
         if (response.data.next === 'VERIFY_PHONE') {
           sessionStorage.setItem('firstPasswordPhone', formData.parentPhoneNumber);
           navigate('/create-password');
+          return;
+        }
+
+        // No account behind this number (never registered, or archived by the
+        // school or the parent). A password box would be a dead end, so say so
+        // here and leave the parent on the phone step.
+        if (response.data.next === 'NO_ACCOUNT') {
+          setError('Invalid credentials — please contact the school office.');
+          setSubmitting(false);
           return;
         }
 
@@ -93,6 +107,13 @@ export default function Login() {
       {deleted && !error && (
         <Banner variant="success" icon="✅" style={{ marginBottom: 28 }}>
           Your account has been deleted. Ask your school office if you want it back.
+        </Banner>
+      )}
+
+      {passwordSet && !error && (
+        <Banner variant="success" icon="🔑" style={{ marginBottom: 28 }}>
+          This account already has a password. Sign in with it below, or use
+          &ldquo;Forgot password?&rdquo; if you don&apos;t know it.
         </Banner>
       )}
 

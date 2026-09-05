@@ -9,9 +9,9 @@ const Register = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: '', phone: '', email: '', password: '', role: 'admin', hostelId: '',
+    name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [],
   });
-  const [hostels, setHostels] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -29,9 +29,9 @@ const Register = () => {
 
   useEffect(() => {
     if (!canChooseRole) return;
-    api.get('/hostels?active=1')
-      .then((response) => setHostels(response.data))
-      .catch(() => setError('Could not load hostels. Add a hostel before creating a caretaker.'));
+    api.get('/rooms?active=1')
+      .then((response) => setRooms(response.data))
+      .catch(() => setError('Could not load rooms.'));
   }, [canChooseRole]);
 
   const handleChange = (e) => {
@@ -42,8 +42,17 @@ const Register = () => {
       ? digitsOnly(e.target.value, 10)
       : e.target.value;
     const next = { ...formData, [e.target.name]: value };
-    if (e.target.name === 'role' && e.target.value !== 'caretaker') next.hostelId = '';
+    if (e.target.name === 'role' && e.target.value !== 'caretaker') next.roomIds = [];
     setFormData(next);
+  };
+
+  const toggleRoom = (roomId) => {
+    setFormData((current) => ({
+      ...current,
+      roomIds: current.roomIds.includes(roomId)
+        ? current.roomIds.filter((id) => id !== roomId)
+        : [...current.roomIds, roomId],
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -54,6 +63,11 @@ const Register = () => {
     // could register a password that screen would refuse to set.
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (canChooseRole && formData.role === 'caretaker' && !formData.roomIds.length) {
+      setError('Choose at least one room.');
       return;
     }
 
@@ -79,7 +93,7 @@ const Register = () => {
       title={canChooseRole ? 'New Account' : 'Admin Registration'}
       subtitle={
         canChooseRole
-          ? 'Create an account for the back office, warehouse or a hostel'
+          ? 'Create an account for the back office, warehouse or rooms'
           : 'Create the first admin account'
       }
       footer={
@@ -162,30 +176,33 @@ const Register = () => {
             >
               <option value="admin">Admin — full back office</option>
               <option value="warehouse">Warehouse — goods in only</option>
-              <option value="caretaker">Caretaker — one hostel’s deliveries</option>
+              <option value="caretaker">Caretaker — assigned room deliveries</option>
             </select>
 
             <p className="auth-hint">
               {formData.role === 'warehouse'
                 ? 'Can raise purchase orders and receive deliveries in the warehouse app. Cannot touch students, wallets or prices.'
                 : formData.role === 'caretaker'
-                  ? 'Can see packages on the way to one hostel and confirm delivery. Cannot access stock, suppliers, orders or prices.'
+                  ? 'Can see packages on the way to assigned rooms and confirm delivery. Cannot access stock, suppliers, orders or prices.'
                 : 'Full access, including student records, wallet top-ups, billing and creating other accounts.'}
             </p>
           </div>
         )}
 
         {canChooseRole && formData.role === 'caretaker' && (
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="hostelId">Assigned hostel</label>
-            <select id="hostelId" name="hostelId" className="auth-input" required
-              value={formData.hostelId} onChange={handleChange}>
-              <option value="">Choose a hostel</option>
-              {hostels.map((hostel) => (
-                <option key={hostel._id} value={hostel._id}>{hostel.code}{hostel.name ? ` — ${hostel.name}` : ''}</option>
-              ))}
-            </select>
-          </div>
+          <fieldset className="student-picker">
+            <legend>Assigned rooms</legend>
+            {rooms.map((room) => (
+              <label key={room._id} className="student-picker__row">
+                <input
+                  type="checkbox"
+                  checked={formData.roomIds.includes(room._id)}
+                  onChange={() => toggleRoom(room._id)}
+                />
+                <span><strong>{room.code}</strong>{room.name && <small>{room.name}</small>}</span>
+              </label>
+            ))}
+          </fieldset>
         )}
 
         <Button
@@ -193,7 +210,7 @@ const Register = () => {
           variant="dark"
           block
           className="auth-submit"
-          disabled={submitting}
+          disabled={submitting || (canChooseRole && formData.role === 'caretaker' && !formData.roomIds.length)}
         >
           {submitting ? 'Creating account…' : 'Create Account'}
         </Button>

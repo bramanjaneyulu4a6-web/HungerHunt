@@ -1,17 +1,22 @@
 import { useEffect } from "react";
 
+/* Delivered means the student has ended the package with their own code
+   (COLLECTED). The warehouse handing it to the room (DELIVERED) is still
+   out for delivery, so that status holds the third step. */
 const ORDER_STEPS = [
   ["PENDING", "Order confirmed"],
   ["PACKED", "Packed"],
   ["OUT_FOR_DELIVERY", "Out for delivery"],
-  ["DELIVERED", "Delivered"],
+  ["COLLECTED", "Delivered"],
 ];
 
 const ORDER_STATUS_LABELS = Object.fromEntries(ORDER_STEPS);
-ORDER_STATUS_LABELS.COLLECTED = "Delivered";
+ORDER_STATUS_LABELS.DELIVERED = "Out for delivery";
 
 const progressIndex = (status) => {
-  if (status === "COLLECTED") return ORDER_STEPS.length - 1;
+  if (status === "DELIVERED") {
+    return ORDER_STEPS.findIndex(([value]) => value === "OUT_FOR_DELIVERY");
+  }
   return ORDER_STEPS.findIndex(([value]) => value === status);
 };
 

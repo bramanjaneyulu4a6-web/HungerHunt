@@ -34,6 +34,7 @@ import {
 } from '../../../shared/errors/applicationError.js';
 import { parseBusinessDateRange } from '../../../shared/http/businessDateRange.js';
 import { cancelAndRefundFulfillment } from '../../../../utils/refunds.js';
+import { buildRoomUnits } from '../../../../utils/roomUnits.js';
 
 const transitionFields = Object.freeze({
   [OrderStatus.PACKED]: ['packedAt', 'packedBy'],
@@ -117,6 +118,11 @@ const readObjectId = (value) => {
    student has actually taken the package. */
 const CARETAKER_LIVE_STATUSES = Object.freeze([...OPEN_STATUSES, OrderStatus.DELIVERED]);
 
+/* A caretaker may hold more than one room, and holds all of them at once: their
+   queue is every package for any of their rooms, not one room at a time. Hence
+   $in rather than equality on every caretaker-scoped read and write in this
+   file. Getting one of them wrong does not fail loudly — it silently hides half
+   their work, or shows them somebody else's. */
 export const list = async (req, res) => {
   const caretaker = req.staff.role === 'caretaker';
   const status = caretaker ? null : readStatus(req.query);
@@ -125,35 +131,40 @@ export const list = async (req, res) => {
     ...(status
       ? { status }
       : { status: { $in: caretaker ? CARETAKER_LIVE_STATUSES : OPEN_STATUSES } }),
-    ...(caretaker ? { 'studentSnapshot.hostelId': req.staff.hostelId } : {}),
+    ...(caretaker ? { 'studentSnapshot.roomId': { $in: req.staff.roomIds } } : {}),
   };
   const ordersQuery = FulfillmentOrder.find(filter)
     .sort({ deliverBy: 1 })
     .limit(MAX_ACTIVE)
     .lean();
-  const [orders, awaitingCollection] = caretaker
-    ? await Promise.all([
-        ordersQuery,
-        FulfillmentOrder.countDocuments({
+
+  /* The units are the warehouse's map of which rooms travel together, and
+     nothing a caretaker does with them — they already know their own rooms,
+     and the grouping of everybody else's is not theirs to see. */
+  const [orders, awaitingCollection, roomUnits] = await Promise.all([
+    ordersQuery,
+    caretaker
+      ? FulfillmentOrder.countDocuments({
           status: OrderStatus.DELIVERED,
-          'studentSnapshot.hostelId': req.staff.hostelId,
-        }),
-      ])
-    : [await ordersQuery, undefined];
+          'studentSnapshot.roomId': { $in: req.staff.roomIds },
+        })
+      : undefined,
+    caretaker ? undefined : buildRoomUnits(),
+  ]);
 
   res.json({
     data: orders.map((order) => serialize(order, { includeMoney: !caretaker })),
     meta: {
       requestId: req.context.requestId,
       count: orders.length,
-      ...(caretaker ? { awaitingCollection } : {}),
+      ...(caretaker ? { awaitingCollection } : { roomUnits }),
     },
   });
 };
 
-/* The caretaker's history has no date window: it is a receipt log for the
-   hostel, not an operational report. It stays bounded through pagination and
-   never includes prices or another hostel's packages.
+/* The caretaker's history has no date window: it is a receipt log for the rooms
+   they hold, not an operational report. It stays bounded through pagination and
+   never includes prices or a room that is not theirs.
 
    It logs collections, not deliveries — a package the caretaker is still
    holding has not left their hands, and belongs on the queue they work from
@@ -162,7 +173,7 @@ export const caretakerHistory = async (req, res) => {
   const { page, limit, skip } = readPaging(req.query);
   const filter = {
     status: OrderStatus.COLLECTED,
-    'studentSnapshot.hostelId': req.staff.hostelId,
+    'studentSnapshot.roomId': { $in: req.staff.roomIds },
   };
 
   const [orders, total] = await Promise.all([
@@ -191,7 +202,7 @@ export const caretakerHistory = async (req, res) => {
  *
  * A package is collected when the student it belongs to types their own
  * purchase code on the caretaker's screen. The caretaker's account is what
- * gets the request through the door and says which hostel is asking; the code
+ * gets the request through the door and says which rooms are asking; the code
  * is what says the right student is standing there. Neither alone is enough,
  * which is the whole point of having replaced "received all" with this: one
  * tap used to close a hundred packages nobody had handed to anybody.
@@ -210,7 +221,7 @@ export const confirmCollection = async (req, res) => {
      should not spend one of five attempts finding that out. */
   const current = await FulfillmentOrder.findOne({
     _id: id,
-    'studentSnapshot.hostelId': req.staff.hostelId,
+    'studentSnapshot.roomId': { $in: req.staff.roomIds },
   }).lean();
   if (!current) throw new NotFoundError('Fulfilment order');
 
@@ -218,7 +229,7 @@ export const confirmCollection = async (req, res) => {
     throw new ConflictError(
       current.status === OrderStatus.COLLECTED
         ? 'This package has already been collected.'
-        : `Package is ${current.status}; it can only be collected once the warehouse has delivered it to your hostel.`,
+        : `Package is ${current.status}; it can only be collected once the warehouse has handed it to your room.`,
       { currentStatus: current.status, requestedStatus: OrderStatus.COLLECTED }
     );
   }
@@ -243,7 +254,7 @@ export const confirmCollection = async (req, res) => {
     {
       _id: current._id,
       status: OrderStatus.DELIVERED,
-      'studentSnapshot.hostelId': req.staff.hostelId,
+      'studentSnapshot.roomId': { $in: req.staff.roomIds },
     },
     {
       $set: {
@@ -390,9 +401,15 @@ export const history = async (req, res) => {
         : {}),
   };
 
-  const [orders, total] = await Promise.all([
+  /* This route is the warehouse's alone (the caretaker's own history is
+     caretakerHistory, on its own door), so the unit map travels with it. The
+     Records screen groups its blocks from this response rather than from the
+     live list, and without the map it would have to invent a grouping of its
+     own from room codes — which is exactly the guess this exists to stop. */
+  const [orders, total, roomUnits] = await Promise.all([
     FulfillmentOrder.find(filter).sort({ orderedAt: -1 }).skip(skip).limit(limit).lean(),
     FulfillmentOrder.countDocuments(filter),
+    buildRoomUnits(),
   ]);
 
   res.json({
@@ -404,6 +421,7 @@ export const history = async (req, res) => {
       page,
       pages: Math.ceil(total / limit) || 1,
       hasMore: page * limit < total,
+      roomUnits,
       ...(range
         ? { range: { from: range.from, to: range.to, timeZone: range.timeZone } }
         : { allTime: true }),
@@ -414,10 +432,13 @@ export const history = async (req, res) => {
 export const report = async (req, res) => {
   const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
 
-  const orders = await FulfillmentOrder.find({ orderedAt: { $gte: from, $lt: to } })
-    .select('status orderedAt deliverBy packedAt dispatchedAt deliveredAt collectedAt proofOfDelivery.receivedBy')
-    .limit(MAX_REPORT_ORDERS + 1)
-    .lean();
+  const [orders, roomUnits] = await Promise.all([
+    FulfillmentOrder.find({ orderedAt: { $gte: from, $lt: to } })
+      .select('status orderedAt deliverBy packedAt dispatchedAt deliveredAt collectedAt proofOfDelivery.receivedBy')
+      .limit(MAX_REPORT_ORDERS + 1)
+      .lean(),
+    buildRoomUnits(),
+  ]);
 
   // Refused rather than silently computed from a truncated read: a report that
   // quietly covers part of its own range is worse than no report.
@@ -430,7 +451,7 @@ export const report = async (req, res) => {
 
   res.json({
     data: buildDeliveryReport({ orders, from, to, now: new Date(), timeZone }),
-    meta: { requestId: req.context.requestId, deterministic: true },
+    meta: { requestId: req.context.requestId, deterministic: true, roomUnits },
   });
 };
 
@@ -542,7 +563,7 @@ export const transition = async (req, res) => {
         : {}
     : {};
 
-  /* Delivery is the warehouse handing the package over at the hostel. The
+  /* Delivery is the warehouse handing the package over at the room. The
      receiver name and callback number come from the handoff form; the staff
      account and time come from the authenticated session and server clock. */
   if (to === OrderStatus.DELIVERED) {

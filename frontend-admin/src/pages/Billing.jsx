@@ -78,7 +78,7 @@ const Billing = () => {
 
   const handleStudentSearch = async () => {
     if (!searchQuery.trim()) {
-      toast.error("Enter a student name or hostel number");
+      toast.error("Enter a student name or room number");
       return;
     }
 
@@ -103,7 +103,7 @@ const Billing = () => {
       // selected student and the cart alone.
       if (res.data.length === 0) {
         setSearchResults([]);
-        toast.error("No student found matching that name or hostel number");
+        toast.error("No student found matching that name or room number");
         return;
       }
 
@@ -331,7 +331,7 @@ const Billing = () => {
           <input
             className="input"
             aria-label="Search student"
-            placeholder="Search student by name or hostel number…"
+            placeholder="Search student by name or room number…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleStudentSearch()}
@@ -358,7 +358,7 @@ const Billing = () => {
                 <thead>
                   <tr>
                     <th>Student Name</th>
-                    <th>Hostel No.</th>
+                    <th>Room No.</th>
                     <th>Father's Name</th>
                     <th>Wallet Balance</th>
                     <th style={{ textAlign: "right" }}>Action</th>
@@ -370,8 +370,8 @@ const Billing = () => {
                       <td data-label="Name">
                         <strong>{student.name}</strong>
                       </td>
-                      <td data-label="Hostel No.">
-                        {student.hostelNumber || "N/A"}
+                      <td data-label="Room No.">
+                        {student.roomNumber || "N/A"}
                       </td>
                       <td data-label="Father's Name">{student.fatherName}</td>
                       <td data-label="Wallet">
@@ -424,7 +424,7 @@ const Billing = () => {
                   color: "var(--ink-soft)",
                 }}
               >
-                Hostel: {selectedStudent.hostelNumber || "N/A"}
+                Room: {selectedStudent.roomNumber || "N/A"}
               </span>
               <span style={{ color: "var(--border-strong)", margin: "0 8px" }}>
                 |
@@ -461,7 +461,7 @@ const Billing = () => {
           <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>
             {isSearched
               ? "No student profile is currently selected. Locate a student above to activate checkout."
-              : "Search for a student above by name or hostel number to start a billing session."}
+              : "Search for a student above by name or room number to start a billing session."}
           </p>
         </Card>
       ) : (
@@ -639,7 +639,7 @@ const Billing = () => {
                 <strong>Student:</strong> {selectedStudent.name}
               </div>
               <div>
-                <strong>Hostel:</strong> {selectedStudent.hostelNumber || "N/A"}
+                <strong>Room:</strong> {selectedStudent.roomNumber || "N/A"}
               </div>
             </div>
 

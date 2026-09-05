@@ -66,7 +66,15 @@ if (apiUrl.search || apiUrl.hash) {
 if (apiUrl.pathname.replace(/\/$/, '') !== '/api') {
   throw new Error('VITE_API_BASE_URL must end with /api.');
 }
-/* The two payment flags decide whether a store build ships a working checkout
+/* The payment flags are asked of the app that actually has a checkout, and only
+   of it. `--payments` is passed by frontend-parent's build:release; the admin,
+   warehouse and kiosk bundles read neither variable, and demanding them there
+   meant three Vercel projects carrying two values that mean nothing to them —
+   which is how a deploy came to fail on a flag about a feature the app does not
+   have. An app that ships a checkout declares it, rather than every app paying
+   for one app's rule.
+
+   The two flags decide whether a store build ships a working checkout
    or a labelled demo, and both default the wrong way round for a release.
    `frontend-parent/src/services/payments.js` turns payments on only when
    VITE_PAYMENTS_ENABLED is exactly 'true' (line 34), and leaves the demo
@@ -85,10 +93,11 @@ if (apiUrl.pathname.replace(/\/$/, '') !== '/api') {
    decision — the listing copy just has to match it — so this does not demand
    'true'. What it refuses is shipping on a default nobody chose. The demo
    checkout is not a decision at all: it must never leave the building. */
+const shipsPayments = process.argv.includes('--payments');
 const demoUpi = env.VITE_DEMO_UPI_ENABLED;
 const paymentsEnabled = env.VITE_PAYMENTS_ENABLED;
 
-if (demoUpi !== 'false') {
+if (shipsPayments && demoUpi !== 'false') {
   throw new Error(
     'VITE_DEMO_UPI_ENABLED must be exactly false for a release build. Anything else, ' +
       'including leaving it unset, ships the demo UPI checkout to parents. ' +
@@ -96,7 +105,7 @@ if (demoUpi !== 'false') {
   );
 }
 
-if (paymentsEnabled !== 'true' && paymentsEnabled !== 'false') {
+if (shipsPayments && paymentsEnabled !== 'true' && paymentsEnabled !== 'false') {
   throw new Error(
     'VITE_PAYMENTS_ENABLED must be set to exactly true or false for a release build. ' +
       'Shipping without payments is a legitimate choice; shipping on an unset default is ' +
@@ -107,7 +116,9 @@ if (paymentsEnabled !== 'true' && paymentsEnabled !== 'false') {
 }
 
 console.log(`Release API target validated: ${apiUrl.origin}/api`);
-console.log(
-  `Release payment flags validated: demo checkout off, live payments ` +
-    `${paymentsEnabled === 'true' ? 'on' : 'off'}.`,
-);
+if (shipsPayments) {
+  console.log(
+    `Release payment flags validated: demo checkout off, live payments ` +
+      `${paymentsEnabled === 'true' ? 'on' : 'off'}.`,
+  );
+}

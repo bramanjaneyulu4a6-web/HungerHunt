@@ -68,6 +68,37 @@ test('an admin-created parent waits for phone verification and has no password',
   assert.equal(created.activationCodeHash, undefined);
 });
 
+test('an admin can create a parent without an email address', async () => {
+  mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+  mock.method(Student, 'find', async () => [{
+    _id: STUDENT_ID, name: 'Asha', admissionNumber: '10425', roomNumber: 'D-4', active: true,
+  }]);
+  mock.method(Parent, 'findOne', () => ({ populate: async () => null }));
+  mock.method(Parent, 'exists', async () => null);
+  let created;
+  mock.method(Parent, 'create', async (fields) => {
+    created = fields;
+    return {
+      _id: PARENT_ID,
+      ...fields,
+      toObject() { return { _id: this._id, ...fields }; },
+    };
+  });
+  mock.method(Student, 'updateMany', async () => ({ modifiedCount: 1 }));
+
+  const response = await fetch(`${base}/api/admin/users/parents`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fatherName: 'Dev Rao', phone: '9876543210', studentIds: [STUDENT_ID],
+    }),
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(created.email, undefined);
+  assert.equal((await response.json()).parent.email, '');
+});
+
 test('a verified registered phone sets the password and signs the parent in', async () => {
   const account = {
     _id: PARENT_ID,

@@ -62,6 +62,30 @@ test('every staff role requires a name and phone number', () => {
   }
 });
 
+test('warehouse registration accepts a phone and password without email', async () => {
+  authenticate();
+  mock.method(Admin, 'countDocuments', async (filter) => filter?.role === 'warehouse' ? 0 : 1);
+  mock.method(Admin, 'findOne', async () => null);
+  mock.method(Admin.prototype, 'save', async function () { return this; });
+
+  const response = await post('/api/admin/register', {
+    name: 'Ravi Kumar', phone: '9876543211', password: 'longenough1', role: 'warehouse',
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).role, 'warehouse');
+});
+
+test('admin registration still requires email', async () => {
+  authenticate();
+  mock.method(Admin, 'countDocuments', async () => 1);
+
+  const response = await post('/api/admin/register', {
+    name: 'Asha Rao', phone: '9876543212', password: 'longenough1', role: 'admin',
+  });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).message, /email is required/i);
+});
+
 test('caretaker registration is refused with no room at all', async () => {
   authenticate();
   mock.method(Admin, 'countDocuments', async (filter) => filter?.role === 'caretaker' ? 0 : 1);

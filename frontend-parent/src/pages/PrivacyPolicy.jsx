@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
         <h2>2. Information we collect</h2>
         <p>
           We collect what the school gives us when it creates your account, and what you do in the app
-          afterwards. That is your name, your mobile number and your email address; the children linked
+          afterwards. That is your name, your mobile number and, if provided, your email address; the children linked
           to you, with their names, class, hostel room and wallet balance; the orders placed on those
           wallets and the money moving in and out of them; the settings you choose, such as a spending
           limit or whether a purchase needs your approval; and a notification token for each device you

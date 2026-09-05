@@ -27,7 +27,7 @@ export default function ShippingPolicy() {
         <h2>3. Delivery address and confirmation</h2>
         <p>
           Orders will be delivered to the address supplied by the buyer at the time of purchase. Delivery
-          of services will be confirmed using the email address provided during registration.
+          of services will be confirmed using the contact details registered with the school.
         </p>
       </section>
 

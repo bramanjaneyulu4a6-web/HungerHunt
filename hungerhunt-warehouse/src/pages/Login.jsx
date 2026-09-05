@@ -5,7 +5,7 @@ import { AuthField, AuthLayout, Banner, Button } from "../components/ui";
 
 const Login = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ const Login = () => {
 
     try {
       setLoading(true);
-      const res = await api.post("/admin/login", { email, password });
+      const res = await api.post("/admin/login", { phone, password });
 
       // Warehouse staff and caretakers share this front door, then get separate
       // route trees. The caretaker tree never mounts procurement screens.
@@ -40,7 +40,7 @@ const Login = () => {
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||
-          "Invalid email or password."
+          "Invalid phone number or password."
       );
       setLoading(false);
     }
@@ -67,14 +67,17 @@ const Login = () => {
 
       <form onSubmit={handleSubmit} className="auth-form">
         <AuthField
-          id="email"
-          label="Email"
-          type="email"
+          id="phone"
+          label="Phone number"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]{10}"
+          maxLength="10"
           autoComplete="username"
           required
-          placeholder="store@hungerhunt.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          placeholder="9876543210"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
         />
 
         <AuthField

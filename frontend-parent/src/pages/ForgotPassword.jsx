@@ -35,7 +35,7 @@ export default function ForgotPassword() {
       logo="/Logo.jpeg"
       eyebrow="Hunger Hunt Parent"
       title="Forgot Password"
-      subtitle="Enter your email address to receive a secure password reset link"
+      subtitle="Enter the email on your account to receive a secure password reset link. If no email was added, ask your school to reset your access."
       footer={
         <>
           Remembered your credentials? <Link to="/login">Back to Sign In</Link>

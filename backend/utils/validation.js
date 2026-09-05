@@ -68,3 +68,6 @@ export const emailProblem = (email) => {
 
   return null;
 };
+
+export const optionalEmailProblem = (email) =>
+  email ? emailProblem(email) : null;

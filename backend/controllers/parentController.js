@@ -24,7 +24,7 @@ const parentSessionView = (parent) => ({
   id: parent._id,
   fatherName: parent.fatherName,
   phone: parent.phone,
-  email: parent.email,
+  email: parent.email || '',
   studentIds: parent.studentIds,
 });
 

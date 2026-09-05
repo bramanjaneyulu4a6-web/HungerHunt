@@ -79,7 +79,7 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
           <tbody>{staff.map((account) => (
             <tr key={account.id}>
               <td data-label="Name"><strong>{account.name}</strong></td>
-              <td data-label="Contact"><div>{account.phone}</div><small>{account.email}</small></td>
+              <td data-label="Contact"><div>{account.phone}</div><small>{account.email || 'No email'}</small></td>
               <td data-label="Role">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}</td>
               <td data-label="Assignment">{(account.rooms || []).map((room) => room.code).join(' · ') || '—'}</td>
               <td data-label="Status"><Badge variant={account.active ? 'success' : 'neutral'}>{account.active ? 'Active' : 'Inactive'}</Badge></td>
@@ -99,7 +99,7 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
             <div className="modal-fields">
               <label><span className="field-label">Full name</span><input className="input" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
               <label><span className="field-label">Phone</span><input className="input" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
-              <label><span className="field-label">Email</span><input className="input" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+              <label><span className="field-label">Email{form.role === 'admin' ? '' : ' (optional)'}</span><input className="input" type="email" required={form.role === 'admin'} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
               {!editing && <label><span className="field-label">Temporary password</span><input className="input" type="password" minLength={8} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>}
               <label><span className="field-label">Role</span><select className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [] })}>
                 <option value="admin">Admin — full back office</option><option value="warehouse">Warehouse</option><option value="caretaker">Caretaker</option>

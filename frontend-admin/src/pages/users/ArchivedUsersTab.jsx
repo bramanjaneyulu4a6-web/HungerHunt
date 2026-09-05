@@ -180,7 +180,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                   key={`parent-${parent.id}`}
                   className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
                 >
-                  <td data-label="User"><strong>{parent.fatherName}</strong><small>{parent.email}</small></td>
+                  <td data-label="User"><strong>{parent.fatherName}</strong><small>{parent.email || 'No email'}</small></td>
                   <td data-label="Type">Parent</td>
                   <td data-label="Details">{parent.phone} · {(parent.students || []).map((student) => student.name).join(', ') || 'No linked students'}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>

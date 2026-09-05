@@ -201,7 +201,7 @@ Money you add is real money, paid by UPI through PhonePe, and it is spent on rea
 
 PRIVACY
 
-This app serves one school. It holds your name, your phone number and your email address, and your children's names, wallet balances and purchase history. It carries no advertising, no analytics and no tracking of any kind. You can delete your account from inside the app, at Account then Delete my account.
+This app serves one school. It holds your name, your phone number and, if provided, your email address, plus your children's names, wallet balances and purchase history. It carries no advertising, no analytics and no tracking of any kind. You can delete your account from inside the app, at Account then Delete my account.
 ```
 
 Every claim above is a screen that exists: balances and grade/room on
@@ -381,7 +381,7 @@ Functionality**.
 |---|---|---|
 | Contact Info → Name | Yes | Two people's names, not one. The parent's own (`Parent.fatherName`, set by the school office, returned by `parentSessionView` in `parentController.js`) **and each linked child's** — `getParentDashboardDetails` selects `name` for every child and `Accounts.jsx` renders it, and `parentPackageView` returns `studentName` on every order. |
 | Contact Info → Phone Number | Yes | `Parent.phone`. The sign-in identifier, and the number Firebase texts a verification code to on first sign-in. |
-| Contact Info → Email Address | Yes | `Parent.email`, required by the schema. Used only for the password-reset link (`forgotPassword`). |
+| Contact Info → Email Address | Yes | Optional `Parent.email`. When supplied, it is used for password-reset links (`forgotPassword`); parents without one recover access through the school’s phone-verification reset flow. |
 | Purchases → Purchase History | Yes | The child's orders and wallet ledger, read by `getChildBills`, `getChildRecharges` and `getChildPackages`. |
 | Financial Info → Other Financial Info | Yes | Wallet balance, top-up amounts and payment outcome — `Student.pocketMoney` and the `PaymentIntent` row. |
 | Identifiers → User ID | Yes | The parent account id, carried in the session token. |
@@ -587,7 +587,7 @@ Money you add is real money, paid by UPI through PhonePe, and it is spent on rea
 
 PRIVACY
 
-This app serves one school. It holds your name, phone number and email address, and your children's names, wallet balances and purchase history. No advertising, no analytics, no tracking. You can delete your account from inside the app, at Account then Delete my account.
+This app serves one school. It holds your name, phone number and, if provided, your email address, plus your children's names, wallet balances and purchase history. No advertising, no analytics, no tracking. You can delete your account from inside the app, at Account then Delete my account.
 ```
 
 ### Target audience and content
@@ -997,7 +997,7 @@ Currently (lines 23-27):
 
 Replace with:
 
-> We collect what the school gives us when it creates your account, and what you do in the app afterwards. That is your name, your mobile number and your email address; the children linked to you, with their names, class, hostel room and wallet balance; the orders placed on those wallets and the money moving in and out of them; the settings you choose, such as a spending limit or whether a purchase needs your approval; and a notification token for each device you sign in on, so that we can reach it. We do not ask for your date of birth, your address, or any identity document.
+> We collect what the school gives us when it creates your account, and what you do in the app afterwards. That is your name, your mobile number and, if provided, your email address; the children linked to you, with their names, class, hostel room and wallet balance; the orders placed on those wallets and the money moving in and out of them; the settings you choose, such as a spending limit or whether a purchase needs your approval; and a notification token for each device you sign in on, so that we can reach it. We do not ask for your date of birth, your address, or any identity document.
 
 ---
 

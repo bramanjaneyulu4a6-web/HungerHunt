@@ -9,11 +9,13 @@ const parentSchema = new mongoose.Schema(
     unique: true
   },
 
-  // ✅ ADD THIS
   email: {
     type: String,
     unique: true,
-    required: true
+    sparse: true,
+    trim: true,
+    lowercase: true,
+    set: (value) => String(value ?? '').trim().toLowerCase() || undefined,
   },
 
   password: String,

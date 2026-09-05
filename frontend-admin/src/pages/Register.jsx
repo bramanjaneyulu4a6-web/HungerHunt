@@ -139,11 +139,11 @@ const Register = () => {
 
         <AuthField
           id="email"
-          label="Email Address"
+          label={formData.role === 'admin' ? 'Email Address' : 'Email Address (optional)'}
           type="email"
           name="email"
           autoComplete="email"
-          required
+          required={formData.role === 'admin'}
           placeholder="admin@email.com"
           value={formData.email}
           onChange={handleChange}

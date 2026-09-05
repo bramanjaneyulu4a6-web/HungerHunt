@@ -3,8 +3,16 @@ import bcrypt from 'bcryptjs';
 
 const adminSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 100 },
-  phone: { type: String, required: true, trim: true, maxlength: 30 },
-  email: { type: String, required: true, unique: true },
+  phone: { type: String, required: true, unique: true, trim: true, maxlength: 30 },
+  email: {
+    type: String,
+    required() { return (this.role || 'admin') === 'admin'; },
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true,
+    set: (value) => String(value ?? '').trim().toLowerCase() || undefined,
+  },
   password: { type: String, required: true },
   active: { type: Boolean, default: true, index: true },
 

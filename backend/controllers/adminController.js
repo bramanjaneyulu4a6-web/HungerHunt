@@ -6,6 +6,7 @@ import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from '../utils/r
 import Room from '../models/Room.js';
 import Student from '../models/Student.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
+import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -14,9 +15,9 @@ export const registerAdmin = async (req, res) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     const password = req.body?.password;
 
-    if (!name || !phone || !email || !password) {
+    if (!name || !phone || !password) {
       return res.status(400).json({
-        message: "Name, phone, email and password are required"
+        message: "Name, phone and password are required"
       });
     }
 
@@ -43,6 +44,10 @@ export const registerAdmin = async (req, res) => {
 
     const requested = req.body?.role;
     const role = adminCount > 0 && LIMITS[requested] ? requested : 'admin';
+
+    const contactProblem = phoneProblem(phone)
+      || (role === 'admin' ? emailProblem(email) : optionalEmailProblem(email));
+    if (contactProblem) return res.status(400).json({ message: contactProblem });
 
     const existing = role === 'admin'
       ? adminCount
@@ -80,14 +85,16 @@ export const registerAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Only caretaker accounts may be assigned rooms.' });
     }
 
-    const existingAdmin = await Admin.findOne({ email });
+    const existingAdmin = await Admin.findOne({
+      $or: [{ phone }, ...(email ? [{ email }] : [])],
+    });
     if (existingAdmin) {
       return res.status(400).json({
         message: "Admin already exists"
       });
     }
 
-    const admin = new Admin({ name, phone, email, password, role, roomIds });
+    const admin = new Admin({ name, phone, email: email || undefined, password, role, roomIds });
     await admin.save();
 
     return res.status(201).json({
@@ -98,8 +105,10 @@ export const registerAdmin = async (req, res) => {
     });
 
   } catch (error) {
-    return res.status(500).json({
-      message: error.message
+    return res.status(error.code === 11000 ? 409 : 500).json({
+      message: error.code === 11000
+        ? `That ${error.keyPattern?.phone ? 'phone number' : 'email'} is already in use.`
+        : error.message
     });
   }
 };
@@ -107,8 +116,14 @@ export const registerAdmin = async (req, res) => {
 export const loginAdmin = async (req, res) => {
   try {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
+    const phone = String(req.body?.phone ?? '').trim();
     const password = req.body?.password;
-    const admin = await Admin.findOne({ email });
+    if (!password) return res.status(401).json({ message: 'Invalid credentials' });
+    const admin = phone
+      ? await Admin.findOne({ phone, role: { $in: ['warehouse', 'caretaker'] } })
+      : email
+        ? await Admin.findOne({ email, ...FULL_ADMIN })
+        : null;
     if (!admin || admin.active === false || !(await bcrypt.compare(password, admin.password))) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -154,14 +169,14 @@ export const loginAdmin = async (req, res) => {
     const staff = {
       name: admin.name,
       phone: admin.phone,
-      email: admin.email,
+      email: admin.email || '',
       role,
       ...(role === 'caretaker' ? { rooms: roomList } : {}),
     };
 
     res.json({
       token: signStaffToken(admin._id, role),
-      email: admin.email,
+      email: admin.email || '',
       role,
       name: admin.name,
       phone: admin.phone,
@@ -181,7 +196,10 @@ export const forgotPassword = async (req, res) => {
       return res.status(400).json({ message: 'Email required' });
     }
 
-    const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
+    const admin = await Admin.findOne({
+      email: email.toLowerCase().trim(),
+      ...FULL_ADMIN,
+    });
 
     // Always report success so this endpoint cannot be used to enumerate admins.
     const genericResponse = {

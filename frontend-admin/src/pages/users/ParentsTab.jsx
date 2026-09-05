@@ -175,7 +175,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
                 >
                   <td data-label="Parent"><strong>{parent.fatherName}</strong></td>
-                  <td data-label="Contact"><div>{parent.phone}</div><small>{parent.email}</small></td>
+                  <td data-label="Contact"><div>{parent.phone}</div><small>{parent.email || 'No email'}</small></td>
                   <td data-label="Students">
                     {(parent.students || []).length ? (parent.students || []).map((student, index) => (
                       <Fragment key={student.id}>
@@ -211,7 +211,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
             <div className="modal-fields">
               <label><span className="field-label">Parent name</span><input className="input" required value={form.fatherName} onChange={(event) => setForm({ ...form, fatherName: event.target.value })} /></label>
               <label><span className="field-label">Phone number</span><input className="input" required inputMode="numeric" maxLength={10} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
-              <label><span className="field-label">Email</span><input className="input" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+              <label><span className="field-label">Email (optional)</span><input className="input" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
             </div>
             <fieldset className="student-picker"><legend>Linked students</legend>
               <input className="input" type="search" placeholder="Search by student, admission number, parent or room…" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} />

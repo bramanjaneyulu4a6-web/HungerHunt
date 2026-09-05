@@ -28,6 +28,24 @@ test('every staff role requires a name and phone number', () => {
   }
 });
 
+test('email is required only for administrators', () => {
+  const warehouse = new Admin({
+    name: 'Ravi Kumar', phone: '9876543211', password: 'password', role: 'warehouse',
+  });
+  assert.equal(warehouse.validateSync(), undefined);
+
+  const caretaker = new Admin({
+    name: 'Meera Nair', phone: '9876543212', password: 'password', role: 'caretaker',
+    roomIds: [ROOM_ID],
+  });
+  assert.equal(caretaker.validateSync(), undefined);
+
+  const admin = new Admin({
+    name: 'Asha Rao', phone: '9876543213', password: 'password', role: 'admin',
+  });
+  assert.match(admin.validateSync().errors.email.message, /required/i);
+});
+
 /* The room validator reads `this.role`, which only binds correctly when
    mongoose runs it as a document validator — so it is exercised here against a
    real document rather than read off the schema. Both halves matter: a
@@ -74,7 +92,10 @@ test('a caretaker holding rooms and a warehouse account holding none both valida
 test('caretaker login returns identity and every readable room', async () => {
   const password = 'caretaker-password';
   const hash = await bcrypt.hash(password, 4);
-  mock.method(Admin, 'findOne', async () => ({
+  let loginFilter;
+  mock.method(Admin, 'findOne', async (filter) => {
+    loginFilter = filter;
+    return ({
     _id: STAFF_ID,
     name: 'Meera Nair',
     phone: '9876543210',
@@ -82,7 +103,8 @@ test('caretaker login returns identity and every readable room', async () => {
     password: hash,
     role: 'caretaker',
     roomIds: [ROOM_ID, SECOND_ROOM_ID],
-  }));
+    });
+  });
   mock.method(Room, 'find', () => ({
     select: () => ({
       lean: async () => [
@@ -98,9 +120,13 @@ test('caretaker login returns identity and every readable room', async () => {
     status(value) { status = value; return this; },
     json(value) { body = value; return this; },
   };
-  await loginAdmin({ body: { email: ' D4.CARETAKER@example.com ', password } }, res);
+  await loginAdmin({ body: { phone: '9876543210', password } }, res);
 
   assert.equal(status, 200);
+  assert.deepEqual(loginFilter, {
+    phone: '9876543210',
+    role: { $in: ['warehouse', 'caretaker'] },
+  });
   const rooms = [
     { id: ROOM_ID, code: 'D-4', name: 'East Residence' },
     { id: SECOND_ROOM_ID, code: 'D-5', name: 'West Residence' },
@@ -125,7 +151,6 @@ test('a warehouse login carries no rooms key at all', async () => {
     _id: STAFF_ID,
     name: 'Ravi Kumar',
     phone: '9876543211',
-    email: 'store@example.com',
     password: hash,
     role: 'warehouse',
   }));
@@ -137,9 +162,25 @@ test('a warehouse login carries no rooms key at all', async () => {
     status(value) { status = value; return this; },
     json(value) { body = value; return this; },
   };
-  await loginAdmin({ body: { email: 'store@example.com', password } }, res);
+  await loginAdmin({ body: { phone: '9876543211', password } }, res);
 
   assert.equal(status, 200);
+  assert.equal(body.staff.email, '');
   assert.equal(Object.hasOwn(body, 'rooms'), false);
   assert.equal(Object.hasOwn(body.staff, 'rooms'), false);
+});
+
+test('staff email is not accepted as a login identifier', async () => {
+  const findOne = mock.method(Admin, 'findOne', async () => null);
+  let status = 200;
+  await loginAdmin({ body: { email: 'store@example.com', password: 'password' } }, {
+    status(value) { status = value; return this; },
+    json() { return this; },
+  });
+  assert.equal(status, 401);
+  assert.equal(findOne.mock.callCount(), 1);
+  assert.deepEqual(findOne.mock.calls[0].arguments[0], {
+    email: 'store@example.com',
+    $or: [{ role: 'admin' }, { role: { $exists: false } }],
+  });
 });

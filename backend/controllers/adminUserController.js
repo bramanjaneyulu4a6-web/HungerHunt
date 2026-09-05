@@ -6,7 +6,7 @@ import Parent from '../models/Parent.js';
 import PendingOrder from '../models/PendingOrder.js';
 import Student from '../models/Student.js';
 import { syncStudentRegistration } from '../utils/studentRegistration.js';
-import { emailProblem, phoneProblem } from '../utils/validation.js';
+import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
 
 const STAFF_ROLES = ['admin', 'warehouse', 'caretaker'];
 
@@ -16,7 +16,7 @@ const parentView = (parent) => ({
   id: String(parent._id),
   fatherName: parent.fatherName,
   phone: parent.phone,
-  email: parent.email,
+  email: parent.email || '',
   active: parent.active !== false,
   activationRequired: Boolean(parent.activationRequired),
   activatedAt: parent.activatedAt || null,
@@ -79,19 +79,21 @@ export const createParent = async (req, res) => {
     const fatherName = String(req.body?.fatherName ?? '').trim();
     const phone = String(req.body?.phone ?? '').trim();
     const email = String(req.body?.email ?? '').trim().toLowerCase();
-    const problem = (!fatherName ? 'Parent name is required.' : null) || phoneProblem(phone) || emailProblem(email);
+    const problem = (!fatherName ? 'Parent name is required.' : null)
+      || phoneProblem(phone)
+      || optionalEmailProblem(email);
     if (problem) return res.status(400).json({ message: problem });
 
     const students = await loadStudents(req.body?.studentIds);
     await assertStudentsAvailable(students.map((student) => student._id));
-    if (await Parent.exists({ $or: [{ phone }, { email }] })) {
+    if (await Parent.exists({ $or: [{ phone }, ...(email ? [{ email }] : [])] })) {
       return res.status(409).json({ message: 'A parent account already uses that phone number or email.' });
     }
 
     const parent = await Parent.create({
       fatherName,
       phone,
-      email,
+      email: email || undefined,
       studentIds: students.map((student) => student._id),
       active: true,
       activationRequired: true,
@@ -102,7 +104,11 @@ export const createParent = async (req, res) => {
     );
     res.status(201).json({ parent: parentView({ ...parent.toObject(), studentIds: students }) });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    res.status(error.code === 11000 ? 409 : error.status || 500).json({
+      message: error.code === 11000
+        ? `That ${error.keyPattern?.phone ? 'phone number' : 'email'} is already in use.`
+        : error.message,
+    });
   }
 };
 
@@ -114,22 +120,27 @@ export const updateParent = async (req, res) => {
 
     const fatherName = String(req.body?.fatherName ?? parent.fatherName).trim();
     const phone = String(req.body?.phone ?? parent.phone).trim();
-    const email = String(req.body?.email ?? parent.email).trim().toLowerCase();
-    const problem = (!fatherName ? 'Parent name is required.' : null) || phoneProblem(phone) || emailProblem(email);
+    const email = String(req.body?.email ?? parent.email ?? '').trim().toLowerCase();
+    const problem = (!fatherName ? 'Parent name is required.' : null)
+      || phoneProblem(phone)
+      || optionalEmailProblem(email);
     if (problem) return res.status(400).json({ message: problem });
 
     const students = req.body?.studentIds === undefined
       ? await Student.find({ _id: { $in: parent.studentIds }, active: { $ne: false } })
       : await loadStudents(req.body.studentIds);
     await assertStudentsAvailable(students.map((student) => student._id), parent._id);
-    if (await Parent.exists({ _id: { $ne: parent._id }, $or: [{ phone }, { email }] })) {
+    if (await Parent.exists({
+      _id: { $ne: parent._id },
+      $or: [{ phone }, ...(email ? [{ email }] : [])],
+    })) {
       return res.status(409).json({ message: 'A parent account already uses that phone number or email.' });
     }
 
     const previousIds = parent.studentIds.map(String);
     parent.fatherName = fatherName;
     parent.phone = phone;
-    parent.email = email;
+    parent.email = email || undefined;
     parent.studentIds = students.map((student) => student._id);
     if (parent.activationRequired) {
       parent.activationCodeHash = undefined;
@@ -143,7 +154,11 @@ export const updateParent = async (req, res) => {
     await syncStudentRegistration([...previousIds, ...parent.studentIds.map(String)]);
     res.json({ parent: parentView({ ...parent.toObject(), studentIds: students }) });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    res.status(error.code === 11000 ? 409 : error.status || 500).json({
+      message: error.code === 11000
+        ? `That ${error.keyPattern?.phone ? 'phone number' : 'email'} is already in use.`
+        : error.message,
+    });
   }
 };
 
@@ -212,7 +227,7 @@ const staffView = async (account) => {
     id: String(account._id),
     name: account.name,
     phone: account.phone,
-    email: account.email,
+    email: account.email || '',
     role: account.role || 'admin',
     active: account.active !== false,
     rooms: rooms.map((room) => ({
@@ -240,6 +255,11 @@ export const updateStaff = async (req, res) => {
   if (update.email) update.email = update.email.toLowerCase();
   const role = req.body?.role ?? account.role ?? 'admin';
   if (!STAFF_ROLES.includes(role)) return res.status(400).json({ message: 'Unknown staff role.' });
+  const contactProblem = phoneProblem(update.phone ?? account.phone)
+    || (role === 'admin'
+      ? emailProblem(update.email ?? account.email)
+      : optionalEmailProblem(update.email ?? account.email));
+  if (contactProblem) return res.status(400).json({ message: contactProblem });
   if (String(account._id) === String(req.staff.id) && role !== (account.role || 'admin')) {
     return res.status(409).json({ message: 'You cannot change the role of the account you are currently using.' });
   }
@@ -288,7 +308,9 @@ export const updateStaff = async (req, res) => {
     res.json({ message: 'Staff account updated.', staff: await staffView(account) });
   } catch (error) {
     res.status(error.code === 11000 ? 409 : 400).json({
-      message: error.code === 11000 ? 'That email is already in use.' : error.message,
+      message: error.code === 11000
+        ? `That ${error.keyPattern?.phone ? 'phone number' : 'email'} is already in use.`
+        : error.message,
     });
   }
 };

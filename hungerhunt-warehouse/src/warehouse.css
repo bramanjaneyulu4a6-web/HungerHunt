@@ -1455,6 +1455,38 @@
   cursor: pointer;
 }
 .wh-work-dialog .wh-report-choices button.active { color: var(--wh-amber); border-color: var(--wh-amber); background: rgba(245, 166, 35, .1); }
+/* The print dialog's stage picker: one tappable row per stage, its checkmark
+   drawn large enough to read as state at arm's length. */
+.wh-print-choices { display: grid; gap: 8px; margin-top: 14px; }
+.wh-print-choices button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  text-align: left;
+  color: var(--wh-ink);
+  background: var(--wh-panel-raised);
+  border: 1px solid var(--wh-line);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wh-print-choices button.active { border-color: var(--wh-amber); background: rgba(245, 166, 35, .08); }
+.wh-print-choices button small { margin-left: auto; color: var(--wh-ink-soft, var(--wh-ink)); opacity: .7; }
+.wh-print-check {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  color: var(--wh-amber);
+  font-size: 16px;
+  font-weight: 900;
+  border: 2px solid var(--wh-line);
+  border-radius: 6px;
+}
+.wh-print-choices button.active .wh-print-check { border-color: var(--wh-amber); }
 .wh-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .wh-dialog-actions .wh-cta,
 .wh-dialog-actions .wh-cancel { margin: 0; }

@@ -25,6 +25,7 @@ import {
   proofOfDeliveryProblem,
   receiverPhoneProblem,
 } from '../../../domain/fulfillment/proofOfDelivery.js';
+import { PRINTABLE_STATUSES, buildPrintSheet } from '../../../domain/fulfillment/printSheet.js';
 import { checkPurchaseCode } from '../../../domain/students/purchaseCodeCheck.js';
 import {
   ApplicationError,
@@ -34,6 +35,7 @@ import {
 } from '../../../shared/errors/applicationError.js';
 import { parseBusinessDateRange } from '../../../shared/http/businessDateRange.js';
 import { cancelAndRefundFulfillment } from '../../../../utils/refunds.js';
+import { renderOrdersPrintSheet } from '../../../../utils/ordersPrintSheetPdf.js';
 import { buildRoomUnits } from '../../../../utils/roomUnits.js';
 
 const transitionFields = Object.freeze({
@@ -160,6 +162,56 @@ export const list = async (req, res) => {
       ...(caretaker ? { awaitingCollection } : { roomUnits }),
     },
   });
+};
+
+/* The active-orders board as a PDF work sheet: the board's stages, the same
+   block → unit grouping, with a Packed and an Out-for-delivery checkbox per
+   unit for whoever is walking the round with a printout and a pen. Stages a
+   unit has already passed print pre-ticked, so paper and board agree at the
+   moment of printing. ?sections=PACKED,OUT_FOR_DELIVERY narrows the sheet to
+   the stages named; no filter prints the whole board. A plain read —
+   printing moves nothing. */
+export const print = async (req, res) => {
+  if (req.staff.role === 'caretaker') {
+    throw new ApplicationError('The orders list is storeroom work.', {
+      status: 403,
+      code: 'FORBIDDEN',
+    });
+  }
+
+  const sections = String(req.query.sections || '')
+    .split(',')
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  const unknown = sections.find((value) => !PRINTABLE_STATUSES.includes(value));
+  if (unknown) {
+    throw new ValidationError(`"${unknown}" is not a printable stage.`);
+  }
+
+  const [orders, roomUnits] = await Promise.all([
+    FulfillmentOrder.find({ status: { $in: OPEN_STATUSES } })
+      .sort({ deliverBy: 1 })
+      .limit(MAX_ACTIVE)
+      .lean(),
+    buildRoomUnits(),
+  ]);
+
+  const generatedAt = new Date();
+  const timeZone = process.env.BUSINESS_TIME_ZONE || 'Asia/Kolkata';
+  // en-CA prints YYYY-MM-DD, which files chronologically in a folder.
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone }).format(generatedAt);
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  })
+    .format(generatedAt)
+    .replace(':', '');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="orders-list-${day}-${clock}.pdf"`);
+  renderOrdersPrintSheet(buildPrintSheet(orders, roomUnits, { generatedAt, sections }), res);
 };
 
 /* The caretaker's history has no date window: it is a receipt log for the rooms

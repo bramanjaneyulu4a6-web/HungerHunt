@@ -14,6 +14,7 @@ router.get('/', protectWarehouse, asyncHandler(controller.list));
 router.get('/alerts', protectWarehouse, asyncHandler(controller.alerts));
 router.get('/history', protectWarehouse, asyncHandler(controller.history));
 router.get('/report', protectWarehouse, asyncHandler(controller.report));
+router.get('/print', protectWarehouse, asyncHandler(controller.print));
 router.post('/warehouse-reports', protectWarehouse, asyncHandler(createWarehouseOrderIssue));
 router.post('/:id/transition', protectWarehouse, asyncHandler(controller.transition));
 router.post('/:id/alerts/acknowledge', protectWarehouse, asyncHandler(controller.acknowledgeAlert));

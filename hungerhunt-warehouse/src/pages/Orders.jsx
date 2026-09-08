@@ -5,6 +5,7 @@ import Icon from "../components/Icon";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 import api from "../utils/api";
 import { groupOrdersByBlock } from "../utils/orderGroups";
+import { isShareCancel, openOrdersPrintSheet } from "../utils/ordersPrintSheet";
 
 const VIEWS = [
   ["PENDING", "New orders"],
@@ -83,6 +84,9 @@ const Orders = () => {
   const [busyKey, setBusyKey] = useState("");
   const [reporting, setReporting] = useState(null);
   const [delivery, setDelivery] = useState(null);
+  const [printing, setPrinting] = useState(false);
+  // null while closed; while open, which stages the sheet should carry.
+  const [printChoice, setPrintChoice] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -227,6 +231,26 @@ const Orders = () => {
     return openDelivery([unit]);
   };
 
+  /* The sheet is carried on a round, so the print dialog asks which stages to
+     take along — all three by default. Its checkboxes arrive pre-ticked to
+     match what the board says at this moment. */
+  const printOrdersList = async (event) => {
+    event.preventDefault();
+    const sections = VIEWS.map(([status]) => status).filter((status) => printChoice[status]);
+    setPrintChoice(null);
+    setPrinting(true);
+    try {
+      await openOrdersPrintSheet(sections);
+    } catch (error) {
+      if (!isShareCancel(error)) {
+        console.error(error);
+        toast.error("Could not create the orders list. Try again.");
+      }
+    } finally {
+      setPrinting(false);
+    }
+  };
+
   return (
     <div className="wh-page wh-active-orders">
       <div className="wh-row">
@@ -234,6 +258,10 @@ const Orders = () => {
           <h1 className="wh-title">Active orders</h1>
           <p className="wh-subtitle">Pack and deliver by block and room</p>
         </div>
+        <button type="button" className="wh-block-action" disabled={printing || loading}
+          onClick={() => setPrintChoice({ PENDING: true, PACKED: true, OUT_FOR_DELIVERY: true })}>
+          {printing ? "Preparing…" : "Print orders list"}
+        </button>
       </div>
 
       <div className="wh-view-tabs wh-order-tabs" role="tablist" aria-label="Active order stages">
@@ -305,6 +333,34 @@ const Orders = () => {
               </div>
             </section>
           ))}
+        </div>
+      )}
+
+      {printChoice && (
+        <div className="wh-dialog-backdrop">
+          <form className="wh-work-dialog" role="dialog" aria-modal="true" onSubmit={printOrdersList}>
+            <span className="wh-dialog-kicker">Orders list</span>
+            <h2>What should print?</h2>
+            <p className="wh-remaining">Each stage starts on its own page of the PDF.</p>
+            <div className="wh-print-choices">
+              {VIEWS.map(([status, label]) => (
+                <button key={status} type="button" role="checkbox" aria-checked={printChoice[status]}
+                  className={printChoice[status] ? "active" : ""}
+                  onClick={() => setPrintChoice((current) => ({ ...current, [status]: !current[status] }))}>
+                  <span className="wh-print-check" aria-hidden="true">{printChoice[status] ? "✓" : ""}</span>
+                  <span>{label}</span>
+                  <small className="wh-num">{counts[status] || 0}</small>
+                </button>
+              ))}
+            </div>
+            <div className="wh-dialog-actions">
+              <button type="button" className="wh-cancel" onClick={() => setPrintChoice(null)}>Cancel</button>
+              <button type="submit" className="wh-cta"
+                disabled={!VIEWS.some(([status]) => printChoice[status])}>
+                Print
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

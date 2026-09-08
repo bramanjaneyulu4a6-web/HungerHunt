@@ -13,6 +13,9 @@ export default function WalletDialog({
   description,
   busy = false,
   onClose,
+  /* Extra header controls, drawn beside the close button — the receipt's
+     download icon rides here. Close always stays the outermost control. */
+  actions = null,
   children,
 }) {
   const dialogRef = useRef(null);
@@ -58,15 +61,18 @@ export default function WalletDialog({
             <h2 id="wallet-dialog-title">{title}</h2>
             {description && <p>{description}</p>}
           </div>
-          <button
-            type="button"
-            className="review-modal__close"
-            onClick={onClose}
-            disabled={busy}
-            aria-label={`Close ${title.toLowerCase()}`}
-          >
-            <Icon name="close" size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            {actions}
+            <button
+              type="button"
+              className="review-modal__close"
+              onClick={onClose}
+              disabled={busy}
+              aria-label={`Close ${title.toLowerCase()}`}
+            >
+              <Icon name="close" size={20} />
+            </button>
+          </div>
         </header>
 
         {children}

@@ -20,6 +20,8 @@ const paths = {
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
   trash: <><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7v13h12V7"/><path d="M10 11v6M14 11v6"/></>,
   upload: <><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 17v3h16v-3"/></>,
+  download: <><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 17v3h16v-3"/></>,
+  printer: <><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></>,
   trendDown: <><path d="m3 7 6 6 4-4 5 5"/><path d="M18 14h4v-4"/></>,
   // Points down for descending and is flipped in CSS for ascending, so one
   // glyph carries both directions and only the sorted column shows it.

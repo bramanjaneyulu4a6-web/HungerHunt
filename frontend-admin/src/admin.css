@@ -1681,17 +1681,23 @@
   font-weight: 600;
 }
 
-/* The receipt popup (components/ReceiptButton.jsx): the PDF itself in a
-   frame, sized so a full receipt reads without scrolling, with the print and
-   download the old new-tab flow left to the browser toolbar. */
+/* The receipt popup (components/ReceiptButton.jsx): the header carries the
+   download/print/close icons, and the PDF frame takes every remaining pixel
+   down to the modal's bottom edge — only the modal's own padding around it,
+   no action bar underneath. */
 .modal--receipt {
+  display: flex;
+  flex-direction: column;
   max-width: 720px;
+  height: 90svh;
+  overflow: hidden;
 }
 
 .receipt-frame {
   display: block;
   width: 100%;
-  height: min(64svh, 760px);
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-subtle);

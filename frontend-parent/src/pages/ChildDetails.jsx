@@ -1241,7 +1241,7 @@ export default function ChildDetails() {
                                 }}
                                 style={{ marginTop: 12 }}
                               >
-                                Download receipt
+                                View receipt
                               </Button>
                             )}
                           </div>

@@ -136,13 +136,13 @@ const EntryRow = ({ entry, studentId, showStudent }) => {
       aria-expanded={expandable ? open : undefined}
       onClick={expandable ? () => setOpen((was) => !was) : undefined}
     >
-      <td data-label="When" style={{ fontSize: 13, color: 'var(--muted)' }}>
+      <td data-label="Date/Time" style={{ fontSize: 13, color: 'var(--muted)' }}>
         {new Date(entry.date).toLocaleString()}
       </td>
       {showStudent && (
         <td data-label="Student">{entry.student?.name || 'Deleted account'}</td>
       )}
-      <td data-label="Type">
+      <td data-label="Status">
         <Badge variant={variant}>{label}</Badge>
       </td>
       <td data-label="Reference" className="ledger-mono">
@@ -189,12 +189,12 @@ export const LedgerTable = ({ entries, studentId, showStudent = false }) => (
     <table className="table table--stack table--hover">
       <thead>
         <tr>
-          <th>When</th>
+          <th>Date/Time</th>
           {showStudent && <th>Student</th>}
-          <th style={{ width: 150 }}>Type</th>
+          <th style={{ width: 150 }}>Status</th>
           <th>Reference</th>
           <th style={{ textAlign: 'right', width: 130 }}>Amount</th>
-          <th style={{ textAlign: 'right', width: 130 }}>Balance after</th>
+          <th style={{ textAlign: 'right', width: 130 }}>Balance</th>
           <th />
         </tr>
       </thead>

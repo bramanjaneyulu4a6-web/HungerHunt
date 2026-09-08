@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { Banner, Button, Skeleton } from './ui';
+import { Banner, Skeleton } from './ui';
+import Icon from './Icon';
 import WalletDialog from './WalletDialog';
-import { fetchReceipt, isShareCancel, openReceiptPdf, saveReceiptPdf } from '../services/receipts';
+import { fetchReceipt, isShareCancel, saveReceiptPdf } from '../services/receipts';
 import { formatINR } from '../utils/format';
 
 /* One recharge, shown the way the office would hand it over the desk: the
@@ -54,15 +54,13 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
     };
   }, [adjustmentId]);
 
-  // 'open' or 'share' while its request runs — each button disables both.
-  const runPdfAction = async (kind) => {
+  // The one PDF action, behind the header's download icon: the share sheet
+  // on a phone, a plain download in a browser.
+  const downloadPdf = async () => {
     setShareError('');
-    setSharing(kind);
+    setSharing(true);
     try {
-      await (kind === 'open' ? openReceiptPdf : saveReceiptPdf)(
-        adjustmentId,
-        receipt?.receiptNumber
-      );
+      await saveReceiptPdf(adjustmentId, receipt?.receiptNumber);
     } catch (err) {
       // Closing the share sheet is a decision, not a failure to report.
       if (!isShareCancel(err)) {
@@ -81,6 +79,19 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
       title="Payment receipt"
       busy={Boolean(sharing)}
       onClose={onClose}
+      actions={
+        receipt && (
+          <button
+            type="button"
+            className="review-modal__close"
+            onClick={downloadPdf}
+            disabled={Boolean(sharing)}
+            aria-label="Download receipt PDF"
+          >
+            <Icon name="download" size={20} />
+          </button>
+        )
+      }
     >
       {error && (
         <Banner variant="alert" icon="⚠️" style={{ marginBottom: 20 }}>
@@ -193,28 +204,6 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
               {shareError}
             </Banner>
           )}
-
-          <Button
-            block
-            onClick={() => runPdfAction('open')}
-            disabled={Boolean(sharing)}
-            style={{ marginTop: 20 }}
-          >
-            {sharing === 'open' ? 'Opening PDF…' : 'Open PDF'}
-          </Button>
-          <Button
-            variant="ghost"
-            block
-            onClick={() => runPdfAction('share')}
-            disabled={Boolean(sharing)}
-            style={{ marginTop: 10 }}
-          >
-            {sharing === 'share'
-              ? 'Preparing PDF…'
-              : Capacitor.isNativePlatform()
-                ? 'Share PDF'
-                : 'Download PDF'}
-          </Button>
         </>
       )}
     </WalletDialog>

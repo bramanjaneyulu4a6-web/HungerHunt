@@ -47,11 +47,16 @@ export const isTransaction = (entry) => !isOrder(entry);
 
 /* One reference per row, and only one: an order row is looked up by its order
    number, a transaction by its transaction id. A refund is asked about by the
-   order it belongs to, so it carries that here and its own ids in the detail. */
-export const entryReference = (entry) =>
-  isOrder(entry) || entry.kind === 'ORDER_CANCELLATION_REFUND'
-    ? entry.orderId || entry.order?.reference || null
-    : entry.transactionId || null;
+   order it belongs to, so it carries that here and its own ids in the detail.
+   Order references arrive spelled "#E860AB" (the orders tab's form); the
+   ledger column prints the bare number. */
+export const entryReference = (entry) => {
+  const reference =
+    isOrder(entry) || entry.kind === 'ORDER_CANCELLATION_REFUND'
+      ? entry.orderId || entry.order?.reference || null
+      : entry.transactionId || null;
+  return reference ? String(reference).replace(/^#/, '') : null;
+};
 
 /* An order row is labelled by where the package actually is — the live status
    for one still moving, the last one for one that is finished. A refunded

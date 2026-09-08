@@ -80,21 +80,44 @@ export const ReceiptButton = ({ studentId, entry }) => {
                   </p>
                 )}
               </div>
-              <button type="button" className="modal-close" onClick={close} aria-label="Close receipt">
-                <Icon name="close" size={20} />
-              </button>
+              {/* The document's actions ride the header, set a step apart
+                  from close so saving a receipt is never a slip away from
+                  dismissing it. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  type="button"
+                  className="modal-close"
+                  onClick={download}
+                  aria-label="Download receipt PDF"
+                >
+                  <Icon name="download" size={20} />
+                </button>
+                <button
+                  type="button"
+                  className="modal-close"
+                  onClick={print}
+                  aria-label="Print receipt"
+                >
+                  <Icon name="printer" size={20} />
+                </button>
+                <button
+                  type="button"
+                  className="modal-close"
+                  style={{ marginLeft: 12 }}
+                  onClick={close}
+                  aria-label="Close receipt"
+                >
+                  <Icon name="close" size={20} />
+                </button>
+              </div>
             </header>
-            {/* #toolbar=0 hides Chrome's own PDF chrome; the actions below replace it. */}
+            {/* #toolbar=0 hides Chrome's own PDF chrome; the header icons replace it. */}
             <iframe
               ref={frameRef}
               className="receipt-frame"
               src={`${receipt.url}#toolbar=0&navpanes=0`}
               title="Receipt PDF"
             />
-            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onClick={download}>Download</Button>
-              <Button variant="primary" onClick={print}>Print</Button>
-            </div>
           </div>
         </div>
       )}

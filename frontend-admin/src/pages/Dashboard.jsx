@@ -112,15 +112,15 @@ const Dashboard = () => {
       "S.No.",
       "Entry ID",
       "Student Name",
-      "Timestamp",
-      "Type",
+      "Date/Time",
+      "Status",
       "Reference",
       "Receipt No.",
       "UTR",
       "Purchased Items (Qty x Price)",
       "Money In",
       "Money Out",
-      "Balance After",
+      "Balance",
     ];
 
     const csvRows = [
@@ -290,11 +290,11 @@ const Dashboard = () => {
                 <tr>
                   <th style={{ width: 60 }}>S.No.</th>
                   <th>Student Name</th>
-                  <th>Timestamp</th>
-                  <th style={{ width: 170 }}>Type</th>
+                  <th>Date/Time</th>
+                  <th style={{ width: 170 }}>Status</th>
                   <th>Reference</th>
                   <th style={{ textAlign: "right" }}>Amount</th>
-                  <th style={{ textAlign: "right", width: 130 }}>Balance After</th>
+                  <th style={{ textAlign: "right", width: 130 }}>Balance</th>
                   <th style={{ width: 132 }} />
                 </tr>
               </thead>
@@ -335,12 +335,12 @@ const Dashboard = () => {
                         </td>
                         <td data-label="Student">{studentName}</td>
                         <td
-                          data-label="Timestamp"
+                          data-label="Date/Time"
                           style={{ fontSize: 13, color: "var(--muted)" }}
                         >
                           {new Date(entry.date).toLocaleString()}
                         </td>
-                        <td data-label="Type">
+                        <td data-label="Status">
                           <Badge variant={variant}>{label}</Badge>
                         </td>
                         <td data-label="Reference" className="ledger-mono">
@@ -359,7 +359,7 @@ const Dashboard = () => {
                           {entryAmount(entry)}
                         </td>
                         <td
-                          data-label="Balance After"
+                          data-label="Balance"
                           style={{
                             textAlign: "right",
                             fontSize: 13,

@@ -9,6 +9,8 @@
  * the conditional that decides whether production comes up at all.
  */
 
+import { allowlistedPhones } from './paymentAccess.js';
+
 /* Every one of these is needed to take a payment and hear the outcome. Note
  * what is NOT here: PHONEPE_IOS_APP_ID belongs to the iOS SDK contract alone
  * — PhonePe issues it only once an Apple Team ID is registered, and neither
@@ -25,6 +27,45 @@ const REQUIRED = Object.freeze([
   'PHONEPE_WEBHOOK_PASSWORD',
   'PHONEPE_REDIRECT_BASE_URL',
 ]);
+
+/* A sandbox gateway on a production service would put a checkout that moves
+ * no money in front of parents who believe it does. That is the whole danger,
+ * and it needs an audience: PHONEPE_TEST_PARENT_PHONES removes one, because
+ * every parent not named there is shown no UPI at all.
+ *
+ * So the rule is not "never", it is "only while nobody real can reach it".
+ * PhonePe reviews the app in Test Mode before it will approve the merchant,
+ * and until it does there are no production credentials to run — the live
+ * host answers a Test Mode client id with 404 Key_not_configured, which is a
+ * checkout that fails rather than one that pretends.
+ *
+ * The direction that matters is the other one: deleting the phones is how
+ * payments are opened to the school, and if that ever happens while the
+ * gateway is still sandbox, this refuses the boot instead of selling 222
+ * families food with test money. Switching PHONEPE_ENV to production, with
+ * live credentials, is the thing that has to happen first.
+ */
+const sandboxGatewayProblems = (env) => {
+  if (env.NODE_ENV !== 'production' || env.PHONEPE_ENV === 'production') return [];
+
+  if (env.PHONEPE_ENV === 'sandbox') {
+    return allowlistedPhones(env).size > 0
+      ? []
+      : [
+        'PHONEPE_ENV=sandbox on a production service is only allowed while '
+          + 'PHONEPE_TEST_PARENT_PHONES names the accounts that may pay; set it, '
+          + 'or move to PHONEPE_ENV=production with live credentials',
+      ];
+  }
+
+  return ['PHONEPE_ENV must be production'];
+};
+
+/* What the boot banner is printed on — see app.js. A sandbox gateway that
+   boots looking like every other boot is how a service is left taking test
+   money for a week without anyone noticing. */
+export const sandboxOnProductionService = (env = process.env) =>
+  env.NODE_ENV === 'production' && env.PHONEPE_ENV === 'sandbox';
 
 export const paymentConfigurationProblems = (env = process.env) => {
   const missing = REQUIRED.filter((name) => !env[name]?.trim());
@@ -44,11 +85,7 @@ export const paymentConfigurationProblems = (env = process.env) => {
     ...(!['sandbox', 'production'].includes(env.PHONEPE_ENV)
       ? ['PHONEPE_ENV must be sandbox or production']
       : []),
-    // A sandbox gateway on a production service would put a checkout that
-    // moves no money in front of parents who believe it does.
-    ...(production && env.PHONEPE_ENV !== 'production'
-      ? ['PHONEPE_ENV must be production']
-      : []),
+    ...sandboxGatewayProblems(env),
     ...(!redirectValid
       ? ['PHONEPE_REDIRECT_BASE_URL must be a valid HTTPS URL in production']
       : []),

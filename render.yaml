@@ -78,8 +78,22 @@ services:
       # (app.js), so set the whole block in the dashboard before flipping it.
       - key: PHONEPE_PAYMENTS_ENABLED
         value: "false"
+      # TEMPORARY — sandbox, because the PhonePe merchant is still in Test Mode
+      # and unapproved. The live host answers a Test Mode client id with 404
+      # Key_not_configured, so `production` here is a checkout that cannot
+      # complete at all; sandbox is one PhonePe can review end to end, with
+      # test money.
+      #
+      # app.js permits this ONLY while PHONEPE_TEST_PARENT_PHONES is non-empty
+      # (config/paymentConfig.js) — that variable is what keeps a checkout
+      # moving no money away from the 222 real families. Clearing it while this
+      # says sandbox REFUSES THE BOOT, on purpose.
+      #
+      # ON APPROVAL: set this to production, replace CLIENT_ID/CLIENT_SECRET/
+      # CLIENT_VERSION with the live V2 credentials from the PhonePe dashboard,
+      # and change the reconcile cron below in the same deploy.
       - key: PHONEPE_ENV
-        value: production
+        value: sandbox
       - key: PHONEPE_CLIENT_VERSION
         value: "1"
       - key: PHONEPE_HTTP_TIMEOUT_MS
@@ -90,8 +104,13 @@ services:
         value: https://hunger-hunt-parent.vercel.app
       # Comma-separated parent phones allowed to reach the checkout. Empty
       # means every parent may pay. Set it and only those accounts can — the
-      # switch that lets PhonePe review a live checkout while the roll sees
-      # none. It limits who may pay, not whether the money is real.
+      # switch that lets PhonePe review a working checkout while the roll sees
+      # none.
+      #
+      # LOAD-BEARING FOR BOOT while PHONEPE_ENV is sandbox: it is the only
+      # thing standing between test money and the real roll, so the service
+      # refuses to start without it. It limits who may pay; PHONEPE_ENV decides
+      # whether the money is real.
       - key: PHONEPE_TEST_PARENT_PHONES
         sync: false
       - key: PHONEPE_MERCHANT_ID
@@ -135,8 +154,14 @@ services:
         value: production
       - key: MONGO_URI
         sync: false
+      # MUST MATCH the web service's PHONEPE_ENV, and be changed in the same
+      # deploy. A sweep pointed at the live host reads orders that only exist
+      # in sandbox, gets an order-not-found code back, and after AGE_OUT_DAYS
+      # ages out intents that were never lost — reconcilePolicy.shouldAgeOut
+      # cannot tell "wrong gateway" from "never registered". The script prints
+      # which gateway it is on at every run; the two lines must agree.
       - key: PHONEPE_ENV
-        value: production
+        value: sandbox
       - key: PHONEPE_CLIENT_VERSION
         value: "1"
       - key: PHONEPE_HTTP_TIMEOUT_MS

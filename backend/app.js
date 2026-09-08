@@ -36,7 +36,7 @@ import { requestContext } from './src/interfaces/http/middleware/requestContext.
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
 import { paymentAccessSummary } from './config/paymentAccess.js';
-import { paymentConfigurationProblems } from './config/paymentConfig.js';
+import { paymentConfigurationProblems, sandboxOnProductionService } from './config/paymentConfig.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 import { currentDataRevision, dataRevision } from './middleware/dataRevision.js';
@@ -124,6 +124,21 @@ if (phonepePaymentsEnabled && problems.length) {
    PHONEPE_TEST_PARENT_PHONES leaves payments open to every family on the
    roll, and nothing else would report it. */
 if (phonepePaymentsEnabled) console.log(paymentAccessSummary());
+
+/* Said as loudly as the log allows, because everything else about this boot
+   looks normal. A production service on the sandbox gateway completes
+   checkouts with test money: intents settle, wallets are credited, receipts
+   print, and not one rupee has moved. It is allowed only while
+   PHONEPE_TEST_PARENT_PHONES keeps real families away from it (see
+   paymentConfig), and it is a state to leave, not to live in. */
+if (phonepePaymentsEnabled && sandboxOnProductionService()) {
+  console.warn(
+    'PhonePe gateway: SANDBOX on a production service. Checkouts complete with TEST money'
+    + ' and NO real rupees move. Permitted only while PHONEPE_TEST_PARENT_PHONES is set.'
+    + ' Switch PHONEPE_ENV to production, with live credentials, before opening payments'
+    + ' to the roll — and point the reconcile cron at the same gateway.'
+  );
+}
 
 app.use(helmet());
 

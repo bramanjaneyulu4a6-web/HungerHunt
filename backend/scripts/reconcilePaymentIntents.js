@@ -23,6 +23,14 @@ const BATCH_LIMIT = 500;
 
 await connectForScript();
 
+/* Which PhonePe this sweep is about to ask. Printed beside the database
+   banner because the failure it catches is silent and destructive: pointed at
+   a different gateway than the one that created these orders, every status
+   read comes back order-not-found, and shouldAgeOut cannot tell that from an
+   order PhonePe genuinely never registered — so intents that are perfectly
+   healthy age out. This line and the web service's PHONEPE_ENV must agree. */
+console.log(`PhonePe gateway: ${process.env.PHONEPE_ENV || 'sandbox (unset)'}`);
+
 try {
   const cutoff = new Date(Date.now() - STALE_MINUTES * 60 * 1000);
 

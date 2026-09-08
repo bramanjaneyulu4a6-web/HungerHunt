@@ -11,13 +11,21 @@
  * without fighting module-load caching.
  */
 
-const allowlist = () =>
+/* Exported because paymentConfig asks the same question for a different
+   reason: whether anyone at all is restricted decides, at boot, if a sandbox
+   gateway may run on a production service. Takes an env so that check stays
+   testable without touching process.env. A list of nothing but commas and
+   spaces names nobody, and filter(Boolean) is what makes it an empty set
+   rather than a restriction that blocks everyone. */
+export const allowlistedPhones = (env = process.env) =>
   new Set(
-    String(process.env.PHONEPE_TEST_PARENT_PHONES ?? '')
+    String(env.PHONEPE_TEST_PARENT_PHONES ?? '')
       .split(',')
       .map((entry) => entry.trim())
       .filter(Boolean)
   );
+
+const allowlist = () => allowlistedPhones();
 
 export const paymentsAllowedFor = (phone) => {
   const allowed = allowlist();

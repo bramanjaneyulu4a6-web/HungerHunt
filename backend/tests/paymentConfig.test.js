@@ -9,7 +9,9 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { paymentConfigurationProblems } = await import('../config/paymentConfig.js');
+const { paymentConfigurationProblems, sandboxOnProductionService } = await import(
+  '../config/paymentConfig.js'
+);
 
 const COMPLETE = Object.freeze({
   NODE_ENV: 'production',
@@ -47,10 +49,61 @@ describe('paymentConfigurationProblems', () => {
     assert.match(problem, /PHONEPE_WEBHOOK_PASSWORD/);
   });
 
-  test('refuses the sandbox gateway on a production service', () => {
+  /* The original rule was absolute: sandbox on a production service, never.
+     What it was actually protecting against is narrower — a checkout that
+     moves no money appearing in front of families who believe it does — and
+     that danger needs an audience. PHONEPE_TEST_PARENT_PHONES removes the
+     audience, so sandbox is permitted exactly while it is set, and forbidden
+     the moment payments are open to the roll. */
+  test('refuses the sandbox gateway on a production service open to every parent', () => {
     const problems = paymentConfigurationProblems({ ...COMPLETE, PHONEPE_ENV: 'sandbox' });
 
-    assert.ok(problems.some((p) => /must be production/.test(p)), problems.join('; '));
+    assert.ok(
+      problems.some((p) => /PHONEPE_TEST_PARENT_PHONES/.test(p)),
+      problems.join('; ')
+    );
+  });
+
+  test('allows the sandbox gateway on a production service restricted to test accounts', () => {
+    assert.deepEqual(
+      paymentConfigurationProblems({
+        ...COMPLETE,
+        PHONEPE_ENV: 'sandbox',
+        PHONEPE_TEST_PARENT_PHONES: '9000000021',
+      }),
+      []
+    );
+  });
+
+  /* Deleting the phones is how payments are opened to the school. If that
+     leaves a sandbox gateway behind, the service must refuse to start rather
+     than sell 222 families food with test money. A list that is only commas
+     and spaces names nobody and must not count as a restriction. */
+  test('treats an empty or blank allowlist as no restriction at all', () => {
+    for (const PHONEPE_TEST_PARENT_PHONES of ['', '   ', ' , ,  ']) {
+      const problems = paymentConfigurationProblems({
+        ...COMPLETE,
+        PHONEPE_ENV: 'sandbox',
+        PHONEPE_TEST_PARENT_PHONES,
+      });
+
+      assert.ok(
+        problems.some((p) => /PHONEPE_TEST_PARENT_PHONES/.test(p)),
+        `accepted ${JSON.stringify(PHONEPE_TEST_PARENT_PHONES)}`
+      );
+    }
+  });
+
+  /* The allowlist buys sandbox its exemption and nothing else: a name that is
+     neither gateway is still a name PhonePe has no host for. */
+  test('does not let the allowlist excuse an unknown environment name', () => {
+    const problems = paymentConfigurationProblems({
+      ...COMPLETE,
+      PHONEPE_ENV: 'uat',
+      PHONEPE_TEST_PARENT_PHONES: '9000000021',
+    });
+
+    assert.ok(problems.some((p) => /sandbox or production/.test(p)), problems.join('; '));
   });
 
   test('allows the sandbox gateway anywhere else', () => {
@@ -73,5 +126,18 @@ describe('paymentConfigurationProblems', () => {
       const problems = paymentConfigurationProblems({ ...COMPLETE, PHONEPE_REDIRECT_BASE_URL });
       assert.ok(problems.some((p) => /HTTPS/.test(p)), `accepted ${PHONEPE_REDIRECT_BASE_URL}`);
     }
+  });
+});
+
+/* What app.js prints the sandbox banner on. A boot that quietly looks like
+   every other boot is how a service is left on test money for a week. */
+describe('sandboxOnProductionService', () => {
+  test('is true only for a sandbox gateway on a production service', () => {
+    assert.equal(sandboxOnProductionService(COMPLETE), false);
+    assert.equal(sandboxOnProductionService({ ...COMPLETE, PHONEPE_ENV: 'sandbox' }), true);
+    assert.equal(
+      sandboxOnProductionService({ ...COMPLETE, NODE_ENV: 'development', PHONEPE_ENV: 'sandbox' }),
+      false
+    );
   });
 });

@@ -101,7 +101,7 @@ const seed = async () => {
     fatherName: `Demo Parent ${String(index + 1).padStart(3, '0')}`,
     roomNumber: spec.room.code,
     roomId: spec.room._id,
-    grade: `${9 + (index % 4)}`,
+    className: `${9 + (index % 4)}`,
     parentPhoneNumber: String(8100000000 + index),
     admissionNumber: `${DEMO_ADMISSION_PREFIX}${String(index + 1).padStart(3, '0')}`,
     active: true,

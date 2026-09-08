@@ -11,9 +11,14 @@ const REQUIRED_COLUMNS = [
   'admissionNumber',
   'fatherName',
   'roomNumber',
-  'grade',
+  'className',
   'parentPhoneNumber',
 ];
+
+/* section is optional, and grade is the legacy combined column ("9-B") that
+   sheets made for the old importer still carry — the server splits it into
+   class and section when no className column is present. */
+const OPTIONAL_COLUMNS = ['section', 'grade'];
 
 const hasValue = (value) => value !== null && value !== undefined && value !== '';
 
@@ -29,14 +34,20 @@ export const studentRecordsFromRows = (rows) => {
     throw new Error('The first sheet contains duplicate column headings.');
   }
 
-  const missing = REQUIRED_COLUMNS.filter((column) => !namedHeaders.includes(column));
+  const missing = REQUIRED_COLUMNS.filter(
+    (column) => !namedHeaders.includes(column) &&
+      // A legacy grade column stands in for className.
+      !(column === 'className' && namedHeaders.includes('grade'))
+  );
   if (missing.length) {
     throw new Error(`Missing required columns: ${missing.join(', ')}.`);
   }
 
-  const unexpected = namedHeaders.filter((column) => !REQUIRED_COLUMNS.includes(column));
+  const unexpected = namedHeaders.filter(
+    (column) => !REQUIRED_COLUMNS.includes(column) && !OPTIONAL_COLUMNS.includes(column)
+  );
   if (unexpected.length) {
-    throw new Error(`Unexpected columns: ${unexpected.join(', ')}. Use only the six documented headings.`);
+    throw new Error(`Unexpected columns: ${unexpected.join(', ')}. Use only the documented headings.`);
   }
 
   const dataRows = rows.slice(1).filter((row) => row.some(hasValue));
@@ -101,7 +112,11 @@ export const studentRecordsFromRows = (rows) => {
     );
     check('fatherName', Boolean(record.fatherName), "Father's name is required.");
     check('roomNumber', Boolean(record.roomNumber), 'Room code is required.');
-    check('grade', Boolean(record.grade), 'Grade / class is required.');
+    check(
+      headers.includes('className') ? 'className' : 'grade',
+      Boolean(record.className || record.grade),
+      'Class is required.'
+    );
     check('parentPhoneNumber', /^\d{10}$/.test(record.parentPhoneNumber || ''), 'Parent phone number must be exactly 10 digits.');
     return record;
   });

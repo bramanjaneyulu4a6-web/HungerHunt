@@ -25,8 +25,8 @@ import {
 // pocketMoney to topUpWallet, which records the movement in rechargeHistory;
 // purchasePassword and walletControl to the parent. Handing a request body
 // straight to the driver let these routes quietly set any of them.
-const WRITABLE_FIELDS = ['name', 'fatherName', 'grade', 'parentPhoneNumber', 'admissionNumber'];
-const STUDENT_SORT_FIELDS = new Set(['admissionNumber', 'name', 'grade', 'roomNumber', 'pocketMoney', 'createdAt']);
+const WRITABLE_FIELDS = ['name', 'fatherName', 'className', 'section', 'parentPhoneNumber', 'admissionNumber'];
+const STUDENT_SORT_FIELDS = new Set(['admissionNumber', 'name', 'className', 'roomNumber', 'pocketMoney', 'createdAt']);
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const pickWritable = (body) => {
@@ -253,7 +253,10 @@ export const bulkImportStudents = async (req, res) => {
       admissionNumber: normalizeAdmissionNumber(row?.admissionNumber),
       fatherName: String(row?.fatherName ?? '').trim(),
       roomNumber: normalizeRoomCode(row?.roomNumber),
-      grade: String(row?.grade ?? '').trim(),
+      // A sheet made for the old importer has one combined grade column; its
+      // value serves as the class when no class column is present.
+      className: String(row?.className ?? row?.grade ?? '').trim(),
+      section: String(row?.section ?? '').trim(),
       parentPhoneNumber: String(row?.parentPhoneNumber ?? '').trim(),
     }));
 
@@ -264,7 +267,7 @@ export const bulkImportStudents = async (req, res) => {
       }
       if (!row.fatherName) addInvalid(students[index], index, 'fatherName', "Father's name is required.");
       if (!row.roomNumber) addInvalid(students[index], index, 'roomNumber', 'Room code is required.');
-      if (!row.grade) addInvalid(students[index], index, 'grade', 'Grade / class is required.');
+      if (!row.className) addInvalid(students[index], index, 'className', 'Class is required.');
       if (!/^\d{10}$/.test(row.parentPhoneNumber)) {
         addInvalid(students[index], index, 'parentPhoneNumber', 'Parent phone number must be exactly 10 digits.');
       }
@@ -363,7 +366,7 @@ export const bulkImportStudents = async (req, res) => {
 // whose parent has never registered, because nobody would be there to approve
 // the order, and the screen says so rather than letting the request fail.
 const SEARCH_FIELDS =
-  "_id name fatherName roomId roomNumber grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
+  "_id name fatherName roomId roomNumber className section grade parentPhoneNumber pocketMoney walletControl purchaseCodeIsPin admissionNumber isParentRegistered";
 
 export const searchStudents = async (req, res) => {
   try {

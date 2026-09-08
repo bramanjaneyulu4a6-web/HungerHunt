@@ -286,7 +286,7 @@ export const getParentPendingOrders = async (req, res) => {
       status: "PENDING",
       expiresAt: { $gt: new Date() },
     })
-      .populate("studentId", "name grade roomNumber pocketMoney")
+      .populate("studentId", "name className section grade roomNumber pocketMoney")
       .sort({ createdAt: -1 });
 
     res.json({ count: orders.length, orders });

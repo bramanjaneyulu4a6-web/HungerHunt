@@ -89,7 +89,7 @@ const seed = async () => {
     fatherName: parentDetails.fatherName,
     roomNumber: 'DEV-ROOM-01',
     roomId: room._id,
-    grade: 'DEV',
+    className: 'DEV',
     parentPhoneNumber: parentDetails.phone,
     admissionNumber: studentDetails.admissionNumber,
     active: true,

@@ -148,7 +148,7 @@ try {
         fatherName: PARENT.fatherName,
         roomNumber: room.code,
         roomId: room._id,
-        grade: 'TEST',
+        className: 'TEST',
         parentPhoneNumber: PARENT.phone,
         admissionNumber: s.admissionNumber,
         active: true,

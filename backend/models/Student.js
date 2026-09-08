@@ -17,7 +17,18 @@ const studentSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
-  grade: { type: String, required: true },
+  /* Class and section, split from the old combined grade ("9-B"). Required
+     only on new documents: rows the splitGradeToClassSection migration has
+     not reached yet must still save, and grade stays readable on them until
+     it runs. Nothing writes grade any more. */
+  className: {
+    type: String,
+    trim: true,
+    maxlength: 30,
+    required: function () { return this.isNew; },
+  },
+  section: { type: String, trim: true, maxlength: 30, default: '' },
+  grade: { type: String },
   parentPhoneNumber: { type: String, required: true },
 
   // Student records are referenced by financial ledgers and approvals, so

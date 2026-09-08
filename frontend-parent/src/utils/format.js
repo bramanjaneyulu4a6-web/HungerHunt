@@ -26,6 +26,16 @@ export const formatINR = (amount) => {
 // screen says "250 ml" the same way, and so the one rule that matters lives in
 // one place: a product with no recorded size prints nothing at all, never
 // "0 ml", because an unmeasured packet and an empty one are different claims.
+/* "9-B" from the split className/section pair, or from the legacy combined
+   grade a document the migration has not reached still carries. One rule for
+   every screen that names a student's class. */
+export const formatClass = (student) => {
+  if (student?.className) {
+    return [student.className, student.section].filter(Boolean).join('-');
+  }
+  return String(student?.grade ?? '').trim();
+};
+
 export const formatPackSize = (size, unitSymbol) => {
   const n = Number(size);
   const symbol = String(unitSymbol ?? '').trim();

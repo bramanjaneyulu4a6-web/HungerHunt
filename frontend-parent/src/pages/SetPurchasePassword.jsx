@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { Banner, Button, Card, EmptyState, Skeleton } from '../components/ui';
 import { PURCHASE_CODE_LENGTH, purchaseCodeProblem } from '../utils/validation';
+import { formatClass } from '../utils/format';
 import { ErrorFeedback } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
 
@@ -261,7 +262,7 @@ export default function SetPurchasePassword() {
             Purchase code
           </h1>
           <p className="card-meta" style={{ fontSize: 14 }}>
-            {student.name} · Grade {student.grade || '—'} · Room{' '}
+            {student.name} · Class {formatClass(student) || '—'} · Room{' '}
             {student.roomNumber || '—'}
           </p>
 

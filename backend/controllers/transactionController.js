@@ -106,7 +106,7 @@ export const getAllTransactions = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
 
     const query = Transaction.find()
-      .populate('studentId', 'name grade')
+      .populate('studentId', 'name className section grade')
       .sort({ createdAt: -1 });
 
     // Paginated only when asked for, so existing callers keep the full list.

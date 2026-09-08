@@ -22,7 +22,7 @@ export default function PrivacyPolicy() {
         <p>
           We collect what the school gives us when it creates your account, and what you do in the app
           afterwards. That is your name, your mobile number and, if provided, your email address; the children linked
-          to you, with their names, class, hostel room and wallet balance; the orders placed on those
+          to you, with their names, admission number, class, hostel room and wallet balance; the orders placed on
           wallets and the money moving in and out of them; the settings you choose, such as a spending
           limit or whether a purchase needs your approval; and a notification token for each device you
           sign in on, so that we can reach it. We do not ask for your date of birth, your address, or any
@@ -156,8 +156,10 @@ export default function PrivacyPolicy() {
         <p>
           We may update this policy when our information practices change and will provide notice of
           significant changes when required by law. Questions, privacy requests, and grievances may be
-          sent to HungerHunt at 120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool,
-          Andhra Pradesh 518003. Support is available Monday to Friday, 9:00 to 18:00.
+          sent to GRAARR MANAGEMENT SERVICES PRIVATE LIMITED (HungerHunt) by email at{' '}
+          <a href="mailto:dhruv.kamma04@gmail.com">dhruv.kamma04@gmail.com</a>, or by post at
+          120/3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh, India - 518003.
+          Support is available Monday to Friday, 9:00 to 18:00.
         </p>
       </section>
     </PolicyPage>

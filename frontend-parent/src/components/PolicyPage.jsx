@@ -22,14 +22,14 @@ export default function PolicyPage({ title, summary, children }) {
       <main className="policy-document">
         <p className="policy-eyebrow">Hunger Hunt Parent policy</p>
         <h1>{title}</h1>
-        <p className="policy-updated">Last updated: 3 September 2026</p>
+        <p className="policy-updated">Last updated: 7 September 2026</p>
         <p className="policy-summary">{summary}</p>
         <div className="policy-content">{children}</div>
       </main>
 
       <footer className="policy-footer">
-        <span>HungerHunt</span>
-        <span>120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh 518003</span>
+        <span>HungerHunt · GRAARR MANAGEMENT SERVICES PRIVATE LIMITED</span>
+        <span>120/3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh, India - 518003</span>
       </footer>
     </div>
   );

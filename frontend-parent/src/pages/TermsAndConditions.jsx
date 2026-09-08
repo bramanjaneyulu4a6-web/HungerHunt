@@ -16,8 +16,9 @@ export default function TermsAndConditions() {
         <p>
           The Hunger Hunt Parent platform at
           {' '}<a href="https://hunger-hunt-parent.vercel.app/">hunger-hunt-parent.vercel.app</a>,
-          including its related mobile application, is owned by HungerHunt, whose registered office is
-          at 120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh 518003.
+          including its related mobile application, is owned by GRAARR MANAGEMENT SERVICES PRIVATE
+          LIMITED (“HungerHunt”), whose registered office is at 120/3-M-I-S, Sainath Nagar, Revenue
+          Ward No. 120, Kurnool, Andhra Pradesh, India - 518003.
           In these terms, HungerHunt is referred to as “we”, “us”, “our”, or the “Platform Owner”.
         </p>
       </section>
@@ -116,8 +117,10 @@ export default function TermsAndConditions() {
       <section>
         <h2>11. Contact</h2>
         <p>
-          Questions or communications concerning these terms may be sent to HungerHunt at
-          120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh 518003.
+          Questions or communications concerning these terms may be sent to GRAARR MANAGEMENT
+          SERVICES PRIVATE LIMITED (HungerHunt) by email at{' '}
+          <a href="mailto:dhruv.kamma04@gmail.com">dhruv.kamma04@gmail.com</a>, or by post at
+          120/3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh, India - 518003.
           Support is available Monday to Friday, 9:00 to 18:00.
         </p>
       </section>

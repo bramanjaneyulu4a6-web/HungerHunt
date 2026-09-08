@@ -19,6 +19,10 @@ const Admin = (await import('../models/Admin.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
+const Student = (await import('../models/Student.js')).default;
+const Counter = (await import('../models/Counter.js')).default;
+const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
+const WalletReversal = (await import('../models/WalletReversal.js')).default;
 const StaffReport = (await import('../models/StaffReport.js')).default;
 const Room = (await import('../models/Room.js')).default;
 const { signStaffToken, signParentToken } = await import('../utils/tokens.js');
@@ -737,6 +741,11 @@ describe('what the parent is shown about a package', () => {
     ownsTheStudent();
     mock.method(FulfillmentOrder, 'find', () => query([orderFixture(overrides)]));
     mock.method(FulfillmentOrder, 'countDocuments', async () => 1);
+    // The payment behind the package, wallet-funded unless a test says
+    // otherwise.
+    mock.method(Transaction, 'find', () =>
+      query([{ _id: TRANSACTION_ID, sourceType: 'DIRECT_CHECKOUT' }])
+    );
   };
 
   test('shows the state, the order time, and the stored deadline', async () => {
@@ -797,6 +806,65 @@ describe('what the parent is shown about a package', () => {
     assert.equal(packages[0].overdue, false);
   });
 
+  test('a wallet-paid package names its payment mode and ledger reference', async () => {
+    listOneOrder({});
+
+    const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
+
+    // The same references wallet activity shows for this charge, so the two
+    // screens quote one story about how the order was paid.
+    assert.deepEqual(packages[0].payment, {
+      mode: 'WALLET',
+      transactionId: TRANSACTION_ID,
+    });
+  });
+
+  test('a UPI-paid package carries the gateway reference and the school receipt number', async () => {
+    listOneOrder({});
+    mock.method(Transaction, 'find', () =>
+      query([{
+        _id: TRANSACTION_ID,
+        sourceType: 'UPI_ORDER_PAYMENT',
+        idempotencyKey: 'HH-507f191e810c19729de860ba',
+        receiptNumber: 'GMS1008A010002',
+      }])
+    );
+
+    const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
+
+    assert.deepEqual(packages[0].payment, {
+      mode: 'UPI',
+      transactionId: 'HH-507f191e810c19729de860ba',
+      receiptNumber: 'GMS1008A010002',
+    });
+  });
+
+  test('a UPI payment not yet receipted is numbered so the card can show one', async () => {
+    listOneOrder({});
+    const upiCharge = {
+      _id: TRANSACTION_ID,
+      studentId: STUDENT_ID,
+      sourceType: 'UPI_ORDER_PAYMENT',
+      idempotencyKey: 'HH-507f191e810c19729de860ba',
+      receiptNumber: null,
+      createdAt: new Date('2026-08-10T10:00:00.000Z'),
+    };
+    // One mock, both reads: the payment fetch and the numbering sweep.
+    mock.method(Transaction, 'find', () => query([upiCharge]));
+    mock.method(Student, 'findById', () => query({ _id: STUDENT_ID, admissionNumber: 'A010' }));
+    mock.method(WalletAdjustment, 'find', () => query([]));
+    // The numbering sweep reads refunds too; this student has none.
+    mock.method(WalletReversal, 'find', () => query([]));
+    mock.method(Counter, 'nextSequence', async () => 3);
+    mock.method(Transaction, 'findOneAndUpdate', (filter, update) => ({
+      lean: async () => ({ _id: filter._id, receiptNumber: update.$set.receiptNumber }),
+    }));
+
+    const { packages } = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).json();
+
+    assert.equal(packages[0].payment.receiptNumber, 'GMS1008A010003');
+  });
+
   test('no staff account, audit trail, or ledger reference travels to the parent', async () => {
     listOneOrder({
       status: 'DELIVERED',
@@ -812,7 +880,10 @@ describe('what the parent is shown about a package', () => {
 
     const body = await (await asParent(`/api/parent/child/${STUDENT_ID}/packages`)).text();
 
-    for (const leak of [STAFF_ID, TRANSACTION_ID, 'transitions', 'deliveredBy', 'deliveryNote', 'Sundari']) {
+    // The transaction id itself is no longer a leak: the card quotes it
+    // deliberately, as payment.transactionId — the same reference this
+    // parent already reads in wallet activity.
+    for (const leak of [STAFF_ID, 'transitions', 'deliveredBy', 'deliveryNote', 'Sundari']) {
       assert.equal(body.includes(leak), false, `parent response leaked ${leak}`);
     }
   });

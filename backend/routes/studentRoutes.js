@@ -13,6 +13,8 @@ import {
   createKioskSession
 } from "../controllers/studentController.js";
 import { getWalletBalance } from '../controllers/walletController.js';
+import { getStudentLedger } from '../controllers/walletLedgerController.js';
+import { getStudentReceiptPdf } from '../controllers/walletReceiptController.js';
 
 import { protectAdmin, protectStaff, protectStudent } from '../middleware/authMiddleware.js';
 import { kioskSessionLimiter, searchLimiter } from '../middleware/rateLimit.js';
@@ -42,6 +44,10 @@ router.route('/')
 router.get('/count', protectAdmin, getStudentCount);
 router.get('/active-count', protectAdmin, getActiveStudentCount);
 router.get('/:id/wallet', protectAdmin, getWalletBalance);
+// Every movement on one student's wallet, and the receipt behind any top-up
+// on it. Admin only: a family's money is not the warehouse's business.
+router.get('/:id/ledger', protectAdmin, getStudentLedger);
+router.get('/:id/receipts/:adjustmentId/pdf', protectAdmin, getStudentReceiptPdf);
 
 router.route('/:id')
   .put(protectAdmin, updateStudent)

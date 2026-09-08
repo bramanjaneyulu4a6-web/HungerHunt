@@ -18,6 +18,11 @@ const transactionSchema = new mongoose.Schema({
   },
   sourceId: { type: mongoose.Schema.Types.ObjectId },
   idempotencyKey: { type: String },
+  // The school's numbered receipt, minted lazily by ensureReceiptNumbers.
+  // Only UPI_ORDER_PAYMENT charges get one — that money entered the school's
+  // books directly, like a top-up. Wallet-funded charges spend money that was
+  // receipted when it entered the wallet, and stay unnumbered.
+  receiptNumber: { type: String, default: null, maxlength: 40 },
 }, { timestamps: true });
 
 transactionSchema.index({ studentId: 1, createdAt: -1 });
@@ -38,6 +43,15 @@ transactionSchema.index(
     unique: true,
     partialFilterExpression: { sourceType: 'UPI_ORDER_PAYMENT' },
     name: 'one_transaction_per_upi_payment',
+  }
+);
+
+// One number, one payment — same guarantee WalletAdjustment gives its rows.
+transactionSchema.index(
+  { receiptNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { receiptNumber: { $type: 'string' } },
   }
 );
 

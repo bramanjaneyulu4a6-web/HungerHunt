@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
+import { describeEntry } from "../utils/walletActivity";
+import { ReceiptButton } from "../components/ReceiptButton";
 import {
   Badge,
   Banner,
@@ -12,8 +14,20 @@ import {
   Skeleton,
 } from "../components/ui";
 
+/* Top-ups only. The registry answers "what has been added to this wallet, and
+   what does the receipt say" — a refused attempt moved no money and belongs in
+   the dashboard feed and the student's own activity, where it is labelled as
+   the non-event it is. */
+const TOP_UP = "TOP_UP";
+
 const RechargeHistory = () => {
   const [students, setStudents] = useState([]);
+  /* One student's top-ups, keyed by id, fetched when their row is opened.
+     The roster used to carry a rechargeHistory array and this page used to
+     read it — but only the office's own top-ups ever wrote to it, so every
+     UPI recharge a parent made was missing from a page whose whole subject is
+     recharges. The ledger has both. */
+  const [ledgers, setLedgers] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
@@ -47,8 +61,39 @@ const RechargeHistory = () => {
     );
   });
 
+  const loadLedger = useCallback(async (studentId) => {
+    setLedgers((current) => ({
+      ...current,
+      [studentId]: { loading: true, failed: false, entries: current[studentId]?.entries || [] },
+    }));
+
+    try {
+      const { data } = await api.get(`/students/${studentId}/ledger`, {
+        params: { limit: 200 },
+      });
+      setLedgers((current) => ({
+        ...current,
+        [studentId]: {
+          loading: false,
+          failed: false,
+          entries: (data.entries || []).filter((entry) => entry.kind === TOP_UP),
+        },
+      }));
+    } catch (error) {
+      console.error(error);
+      setLedgers((current) => ({
+        ...current,
+        [studentId]: { loading: false, failed: true, entries: [] },
+      }));
+    }
+  }, []);
+
   const handleToggleDropdown = (id) => {
-    setSelectedStudentId(selectedStudentId === id ? null : id);
+    const opening = selectedStudentId !== id;
+    setSelectedStudentId(opening ? id : null);
+    // Re-reading on every open keeps a registry current while the desk is
+    // taking money at it; the response is small and the page is not a feed.
+    if (opening) loadLedger(id);
   };
 
   const downloadCsv = (rows, filename) => {
@@ -79,22 +124,22 @@ const RechargeHistory = () => {
     const headers = [
       "S.No.",
       "Student Name",
+      "Admission Number",
       "Room Number",
-      "Grade",
+      "Class",
       "Father's Name",
       "Current Wallet Balance (INR)",
-      "Total Transactions Logged",
     ];
 
     const rows = filteredStudents.map((st, index) =>
       [
         index + 1,
         esc(st.name),
+        esc(st.admissionNumber),
         esc(st.roomNumber),
-        esc(st.grade),
+        esc([st.className || st.grade, st.section].filter(Boolean).join("-")),
         esc(st.fatherName),
         st.pocketMoney ?? 0,
-        st.rechargeHistory ? st.rechargeHistory.length : 0,
       ].join(",")
     );
 
@@ -104,16 +149,18 @@ const RechargeHistory = () => {
   const downloadExcel = (e, student) => {
     e.stopPropagation();
 
-    if (!student?.rechargeHistory?.length) {
-      toast.error("No transaction history available to export");
+    const entries = ledgers[student._id]?.entries || [];
+    if (entries.length === 0) {
+      toast.error("No recharges to export for this student");
       return;
     }
 
     const metaRows = [
-      `"STUDENT TRANSACTION STATEMENT"`,
+      `"STUDENT RECHARGE STATEMENT"`,
       `"Student Name:",${esc(student.name)}`,
+      `"Admission Number:",${esc(student.admissionNumber)}`,
       `"Room Number:",${esc(student.roomNumber)}`,
-      `"Grade:",${esc(student.grade)}`,
+      `"Class:",${esc([student.className || student.grade, student.section].filter(Boolean).join("-"))}`,
       `"Father's Name:",${esc(student.fatherName)}`,
       `""`,
     ];
@@ -121,18 +168,22 @@ const RechargeHistory = () => {
     const tableHeaders = [
       "S.No.",
       "Timestamp",
+      "Type",
+      "Receipt No.",
       "Previous Balance (INR)",
-      "Credit Allocation (INR)",
+      "Amount Added (INR)",
       "Closing Balance (INR)",
     ];
 
-    const transactionRows = student.rechargeHistory.map((r, index) =>
+    const transactionRows = entries.map((entry, index) =>
       [
         index + 1,
-        `"${new Date(r.date).toLocaleString()}"`,
-        r.previousBalance,
-        r.amount,
-        r.newBalance,
+        `"${new Date(entry.date).toLocaleString()}"`,
+        esc(describeEntry(entry).label),
+        esc(entry.receiptNumber),
+        entry.previousBalance,
+        entry.amount,
+        entry.newBalance,
       ].join(",")
     );
 
@@ -147,7 +198,7 @@ const RechargeHistory = () => {
     <div className="page">
       <PageHeader
         title="Wallet Recharge Registry"
-        subtitle="Audit every top-up and current balance across the roster."
+        subtitle="Every top-up on a wallet — the desk’s and a parent’s own UPI payments alike — with the receipt for each."
         actions={
           students.length > 0 && (
             <Button onClick={downloadAllStudentsExcel}>
@@ -281,7 +332,7 @@ const RechargeHistory = () => {
                         >
                           Recharge History
                         </h4>
-                        {st.rechargeHistory?.length > 0 && (
+                        {(ledgers[st._id]?.entries.length || 0) > 0 && (
                           <button
                             type="button"
                             className="link-button"
@@ -293,79 +344,128 @@ const RechargeHistory = () => {
                         )}
                       </div>
 
-                      {!st.rechargeHistory || st.rechargeHistory.length === 0 ? (
-                        <p
-                          style={{
-                            margin: 0,
-                            padding: "24px 0",
-                            textAlign: "center",
-                            fontSize: 14,
-                            color: "var(--muted)",
-                          }}
-                        >
-                          No recharges recorded for this student yet.
-                        </p>
-                      ) : (
-                        <div className="table-wrap">
-                          <table className="table table--stack table--hover">
-                            <thead>
-                              <tr>
-                                <th style={{ width: 60 }}>#</th>
-                                <th>Timestamp</th>
-                                <th style={{ width: 180, textAlign: "right" }}>
-                                  Previous Balance
-                                </th>
-                                <th style={{ width: 180, textAlign: "center" }}>
-                                  Amount Added
-                                </th>
-                                <th style={{ width: 180, textAlign: "right" }}>
-                                  Closing Balance
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {st.rechargeHistory.map((r, index) => (
-                                <tr key={index}>
-                                  <td data-label="#" style={{ color: "var(--muted)" }}>
-                                    {index + 1}
-                                  </td>
-                                  <td data-label="Timestamp">
-                                    {new Date(r.date).toLocaleString()}
-                                  </td>
-                                  <td
-                                    data-label="Previous Balance"
-                                    style={{
-                                      textAlign: "right",
-                                      fontWeight: 700,
-                                      color: "var(--ink)",
-                                    }}
-                                  >
-                                    {formatINR(r.previousBalance)}
-                                  </td>
-                                  <td
-                                    data-label="Amount Added"
-                                    style={{ textAlign: "center" }}
-                                  >
-                                    <Badge variant="success">
-                                      + {formatINR(r.amount)}
-                                    </Badge>
-                                  </td>
-                                  <td
-                                    data-label="Closing Balance"
-                                    style={{
-                                      textAlign: "right",
-                                      fontWeight: 700,
-                                      color: "var(--ink)",
-                                    }}
-                                  >
-                                    {formatINR(r.newBalance)}
-                                  </td>
+                      {(() => {
+                        const ledger = ledgers[st._id];
+
+                        if (!ledger || (ledger.loading && ledger.entries.length === 0)) {
+                          return (
+                            <div>
+                              <Skeleton height={40} />
+                              <Skeleton height={40} style={{ marginTop: 8 }} />
+                            </div>
+                          );
+                        }
+
+                        if (ledger.failed) {
+                          return (
+                            <Banner variant="alert">
+                              That history could not be loaded.{" "}
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => loadLedger(st._id)}
+                              >
+                                Try again
+                              </button>
+                              .
+                            </Banner>
+                          );
+                        }
+
+                        if (ledger.entries.length === 0) {
+                          return (
+                            <p
+                              style={{
+                                margin: 0,
+                                padding: "24px 0",
+                                textAlign: "center",
+                                fontSize: 14,
+                                color: "var(--muted)",
+                              }}
+                            >
+                              No money has been added to this wallet yet.
+                            </p>
+                          );
+                        }
+
+                        return (
+                          <div className="table-wrap">
+                            <table className="table table--stack table--hover">
+                              <thead>
+                                <tr>
+                                  <th style={{ width: 60 }}>#</th>
+                                  <th>Timestamp</th>
+                                  <th style={{ width: 150 }}>Type</th>
+                                  <th>Receipt No.</th>
+                                  <th style={{ width: 150, textAlign: "right" }}>
+                                    Previous Balance
+                                  </th>
+                                  <th style={{ width: 150, textAlign: "center" }}>
+                                    Amount Added
+                                  </th>
+                                  <th style={{ width: 150, textAlign: "right" }}>
+                                    Closing Balance
+                                  </th>
+                                  <th style={{ width: 110 }} />
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                              </thead>
+                              <tbody>
+                                {ledger.entries.map((entry, index) => (
+                                  <tr key={entry._id}>
+                                    <td data-label="#" style={{ color: "var(--muted)" }}>
+                                      {index + 1}
+                                    </td>
+                                    <td data-label="Timestamp">
+                                      {new Date(entry.date).toLocaleString()}
+                                    </td>
+                                    <td data-label="Type">
+                                      <Badge variant="neutral">
+                                        {describeEntry(entry).label}
+                                      </Badge>
+                                    </td>
+                                    <td data-label="Receipt No." className="ledger-mono">
+                                      {entry.receiptNumber || "\u2014"}
+                                    </td>
+                                    <td
+                                      data-label="Previous Balance"
+                                      style={{
+                                        textAlign: "right",
+                                        fontWeight: 700,
+                                        color: "var(--ink)",
+                                      }}
+                                    >
+                                      {formatINR(entry.previousBalance)}
+                                    </td>
+                                    <td
+                                      data-label="Amount Added"
+                                      style={{ textAlign: "center" }}
+                                    >
+                                      <Badge variant="success">
+                                        + {formatINR(entry.amount)}
+                                      </Badge>
+                                    </td>
+                                    <td
+                                      data-label="Closing Balance"
+                                      style={{
+                                        textAlign: "right",
+                                        fontWeight: 700,
+                                        color: "var(--ink)",
+                                      }}
+                                    >
+                                      {formatINR(entry.newBalance)}
+                                    </td>
+                                    <td style={{ textAlign: "right" }}>
+                                      {entry.adjustmentId && (
+                                        <ReceiptButton studentId={st._id} entry={entry} />
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

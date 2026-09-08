@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
+import Icon from "../components/Icon";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import {
@@ -11,17 +12,20 @@ import {
   PageHeader,
   Skeleton,
 } from "../components/ui";
+import { EntryDetails } from "../components/WalletActivity";
+import {
+  describeEntry,
+  entryAmount,
+  entryLabel,
+  entryReference,
+  hasDetails,
+} from "../utils/walletActivity";
+import { ReceiptButton } from "../components/ReceiptButton";
 
-// Transaction model has no status field; every record is a completed debit.
-const TRANSACTION_STATUS = "Wallet Deducted";
-
-// Local calendar date (YYYY-MM-DD) — the date <input> is local, so comparing
-// against toISOString() would shift late-evening IST transactions a day back.
-const localDateString = (value) => {
-  const d = new Date(value);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
+/* The feed is the whole ledger now — money in as well as out. The day filter
+   moved to the server with it: a date is a business day in the school's
+   timezone, and the client cannot narrow to one it never fetched. */
+const FEED_LIMIT = 200;
 
 const Dashboard = () => {
   const [expandedTransaction, setExpandedTransaction] = useState(null);
@@ -54,8 +58,10 @@ const Dashboard = () => {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await api.get("/transactions/history");
-      setHistory(res.data);
+      const res = await api.get("/transactions/ledger", {
+        params: { limit: FEED_LIMIT, ...(selectedDate ? { date: selectedDate } : {}) },
+      });
+      setHistory(res.data.entries);
       setLoadError(false);
     } catch (err) {
       console.error(err);
@@ -65,7 +71,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   // Refresh transaction history every 30 seconds, plus whenever the window
   // regains focus.
@@ -82,22 +88,19 @@ const Dashboard = () => {
     };
   }, [fetchHistory]);
 
-  const filteredHistory = history.filter((transaction) => {
-    const matchesDate =
-      !selectedDate || localDateString(transaction.createdAt) === selectedDate;
-
-    const studentName = transaction.studentId?.name || "Deleted Account";
-    const matchesSearch = studentName
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-
-    return matchesDate && matchesSearch;
+  const filteredHistory = history.filter((entry) => {
+    const studentName = entry.student?.name || "Deleted Account";
+    return studentName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const totalSales = filteredHistory.reduce(
-    (sum, b) => sum + (b.totalAmount || 0),
+  // Spent and added are counted apart on purpose: one total covering both
+  // directions would net a day's sales against its recharges and mean nothing.
+  const sumWhere = (direction) => filteredHistory.reduce(
+    (sum, entry) => (describeEntry(entry).direction === direction ? sum + (entry.amount || 0) : sum),
     0
   );
+  const totalSales = sumWhere("out");
+  const totalAdded = sumWhere("in");
 
   const downloadExcel = () => {
     if (filteredHistory.length === 0) {
@@ -107,31 +110,44 @@ const Dashboard = () => {
 
     const headers = [
       "S.No.",
-      "Transaction ID",
+      "Entry ID",
       "Student Name",
       "Timestamp",
+      "Type",
+      "Reference",
+      "Receipt No.",
+      "UTR",
       "Purchased Items (Qty x Price)",
-      "Total Amount",
-      "Status",
+      "Money In",
+      "Money Out",
+      "Balance After",
     ];
 
     const csvRows = [
       headers.join(","),
-      ...filteredHistory.map((bill, index) => {
-        const studentName = `"${(bill.studentId?.name || "Deleted Account").replace(/"/g, '""')}"`;
-        const timestamp = `"${new Date(bill.createdAt).toLocaleString().replace(/"/g, '""')}"`;
-        const itemSummary = bill.items
-          ? `"${bill.items.map((i) => `${i.name} (${i.quantity}x₹${i.price})`).join(" | ")}"`
+      ...filteredHistory.map((entry, index) => {
+        const { label } = entryLabel(entry);
+        const { direction } = describeEntry(entry);
+        const studentName = `"${(entry.student?.name || "Deleted Account").replace(/"/g, '""')}"`;
+        const timestamp = `"${new Date(entry.date).toLocaleString().replace(/"/g, '""')}"`;
+        const itemSummary = entry.items?.length
+          ? `"${entry.items.map((i) => `${i.name} (${i.quantity}x₹${i.price})`).join(" | ")}"`
           : '""';
+        const reference = `"${(entryReference(entry) || "").replace(/"/g, '""')}"`;
 
         return [
           index + 1,
-          bill._id,
+          entry._id,
           studentName,
           timestamp,
+          `"${label}"`,
+          reference,
+          `"${entry.receiptNumber || ""}"`,
+          `"${entry.utr || ""}"`,
           itemSummary,
-          bill.totalAmount,
-          `"${TRANSACTION_STATUS}"`,
+          direction === "in" ? entry.amount : "",
+          direction === "out" ? entry.amount : "",
+          entry.newBalance ?? "",
         ].join(",");
       }),
     ];
@@ -156,13 +172,13 @@ const Dashboard = () => {
     <div className="page">
       <PageHeader
         title="School Wallet Dashboard"
-        subtitle="Real-time transactions and student wallet activity"
+        subtitle="Every movement on a student wallet — money in, money out, and what bounced"
       />
 
       <div className="card-grid" style={{ marginBottom: 24 }}>
         <Card className="card--tight">
           <div className="stat-label">
-            Total Transactions ({selectedDate ? "Selected Day" : "All"})
+            Wallet Entries ({selectedDate ? "Selected Day" : "All"})
           </div>
           <div className="stat-value">{filteredHistory.length}</div>
         </Card>
@@ -172,6 +188,13 @@ const Dashboard = () => {
             Total Sales ({selectedDate ? "Selected Day" : "All"})
           </div>
           <div className="stat-value">{formatINR(totalSales)}</div>
+        </Card>
+
+        <Card className="card--tight">
+          <div className="stat-label">
+            Money Added ({selectedDate ? "Selected Day" : "All"})
+          </div>
+          <div className="stat-value">{formatINR(totalAdded)}</div>
         </Card>
 
         <Card className="card--tight">
@@ -257,7 +280,7 @@ const Dashboard = () => {
             }
           >
             {history.length === 0
-              ? "Sales made at the kiosk will appear here in real time."
+              ? "Sales, top-ups and refunds appear here in real time."
               : "Try clearing the search or date filter."}
           </EmptyState>
         ) : (
@@ -268,16 +291,39 @@ const Dashboard = () => {
                   <th style={{ width: 60 }}>S.No.</th>
                   <th>Student Name</th>
                   <th>Timestamp</th>
-                  <th style={{ textAlign: "right" }}>Total Amount</th>
-                  <th style={{ textAlign: "center", width: 160 }}>Status</th>
+                  <th style={{ width: 170 }}>Type</th>
+                  <th>Reference</th>
+                  <th style={{ textAlign: "right" }}>Amount</th>
+                  <th style={{ textAlign: "right", width: 130 }}>Balance After</th>
+                  <th style={{ width: 132 }} />
                 </tr>
               </thead>
               <tbody>
-                {filteredHistory.map((bill, index) => {
-                  const isExpanded = expandedTransaction === bill._id;
+                {filteredHistory.map((entry, index) => {
+                  const { label, variant } = entryLabel(entry);
+                  const { direction } = describeEntry(entry);
+                  const rowKey = `${entry.kind}-${entry._id}`;
+                  const isExpanded = expandedTransaction === rowKey;
+                  // A charge or a refund has a basket and a package to open;
+                  // a top-up has its receipt and nothing more to say.
+                  const expandable = hasDetails(entry);
+                  const studentName = entry.student?.name || "Deleted Account";
+
                   return (
-                    <React.Fragment key={bill._id}>
+                    <React.Fragment key={rowKey}>
                       <tr
+                        className={
+                          expandable ? "ledger-row--expandable" : undefined
+                        }
+                        aria-expanded={expandable ? isExpanded : undefined}
+                        onClick={
+                          expandable
+                            ? () =>
+                                setExpandedTransaction(
+                                  isExpanded ? null : rowKey
+                                )
+                            : undefined
+                        }
                         style={{
                           background: isExpanded
                             ? "var(--bg-subtle)"
@@ -287,124 +333,64 @@ const Dashboard = () => {
                         <td data-label="S.No." style={{ color: "var(--muted)" }}>
                           {index + 1}
                         </td>
-                        <td data-label="Student">
-                          <button
-                            type="button"
-                            className="link-button"
-                            style={{
-                              color: "var(--primary)",
-                              textDecoration: "none",
-                            }}
-                            aria-expanded={isExpanded}
-                            onClick={() =>
-                              setExpandedTransaction(
-                                isExpanded ? null : bill._id
-                              )
-                            }
-                          >
-                            {bill.studentId?.name || "Deleted Account"}
-                          </button>
-                        </td>
+                        <td data-label="Student">{studentName}</td>
                         <td
                           data-label="Timestamp"
                           style={{ fontSize: 13, color: "var(--muted)" }}
                         >
-                          {new Date(bill.createdAt).toLocaleString()}
+                          {new Date(entry.date).toLocaleString()}
+                        </td>
+                        <td data-label="Type">
+                          <Badge variant={variant}>{label}</Badge>
+                        </td>
+                        <td data-label="Reference" className="ledger-mono">
+                          {entryReference(entry) || "—"}
                         </td>
                         <td
                           data-label="Amount"
+                          className={direction === "none" ? "amount-void" : undefined}
                           style={{
                             textAlign: "right",
                             fontWeight: 700,
-                            color: "var(--ink)",
+                            color:
+                              direction === "in" ? "var(--success)" : "var(--ink)",
                           }}
                         >
-                          {formatINR(bill.totalAmount)}
+                          {entryAmount(entry)}
                         </td>
-                        <td data-label="Status" style={{ textAlign: "center" }}>
-                          <Badge variant="success">{TRANSACTION_STATUS}</Badge>
+                        <td
+                          data-label="Balance After"
+                          style={{
+                            textAlign: "right",
+                            fontSize: 13,
+                            color: "var(--muted)",
+                          }}
+                        >
+                          {entry.newBalance === undefined
+                            ? "—"
+                            : formatINR(entry.newBalance)}
+                        </td>
+                        <td className="ledger-actions">
+                          {entry.kind === "TOP_UP" && entry.student?.id && (
+                            <ReceiptButton studentId={entry.student.id} entry={entry} />
+                          )}
+                          {expandable && (
+                            <span
+                              className={`ledger-chevron${
+                                isExpanded ? " ledger-chevron--open" : ""
+                              }`}
+                              aria-hidden="true"
+                            >
+                              <Icon name="caret" size={16} />
+                            </span>
+                          )}
                         </td>
                       </tr>
 
                       {isExpanded && (
-                        <tr>
-                          <td
-                            colSpan="5"
-                            style={{
-                              padding: "0 20px 12px",
-                              background: "var(--bg-subtle)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                padding: 16,
-                                marginTop: 4,
-                                background: "var(--surface)",
-                                border: "1px solid var(--border-strong)",
-                                borderRadius: "var(--radius)",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: "block",
-                                  marginBottom: 12,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: "var(--ink-strong)",
-                                }}
-                              >
-                                Purchased Items Summary
-                              </span>
-                              <table className="table">
-                                <thead>
-                                  <tr>
-                                    <th>Item Name</th>
-                                    <th style={{ textAlign: "center", width: 80 }}>
-                                      Quantity
-                                    </th>
-                                    <th style={{ textAlign: "right", width: 120 }}>
-                                      Unit Price
-                                    </th>
-                                    <th style={{ textAlign: "right", width: 140 }}>
-                                      Subtotal
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {bill.items?.map((item, subIndex) => (
-                                    <tr key={subIndex}>
-                                      <td style={{ fontWeight: 600 }}>
-                                        {item.name}
-                                      </td>
-                                      <td
-                                        style={{
-                                          textAlign: "center",
-                                          color: "var(--muted)",
-                                        }}
-                                      >
-                                        {item.quantity}
-                                      </td>
-                                      <td
-                                        style={{
-                                          textAlign: "right",
-                                          color: "var(--muted)",
-                                        }}
-                                      >
-                                        {formatINR(item.price)}
-                                      </td>
-                                      <td
-                                        style={{
-                                          textAlign: "right",
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        {formatINR(item.price * item.quantity)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                        <tr className="ledger-detail-row">
+                          <td colSpan="8">
+                            <EntryDetails entry={entry} />
                           </td>
                         </tr>
                       )}

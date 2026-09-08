@@ -20,6 +20,7 @@ import {
   deleteParentAccount
 } from "../controllers/parentController.js";
 import { getWalletBalance } from '../controllers/walletController.js';
+import { getWalletReceipt, getWalletReceiptPdf } from '../controllers/walletReceiptController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
 import { authLimiter, accountDeleteLimiter } from '../middleware/rateLimit.js';
@@ -38,6 +39,11 @@ router.get('/child/:id/wallet', protectParent, getWalletBalance);
 router.get('/child/:id/bills', protectParent, getChildBills);
 router.get('/child/:id/recharges', protectParent, getChildRecharges);
 router.get('/child/:id/packages', protectParent, getChildPackages);
+
+// One recharge, printed: the same data as the app's receipt view and the PDF
+// the parent saves or shares. Any recharge in the ledger can be reprinted.
+router.get('/receipts/:adjustmentId', protectParent, getWalletReceipt);
+router.get('/receipts/:adjustmentId/pdf', protectParent, getWalletReceiptPdf);
 
 router.post('/save-fcm-token', protectParent, savePushToken);
 router.post('/remove-fcm-token', protectParent, removePushToken);

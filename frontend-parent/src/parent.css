@@ -310,6 +310,135 @@ body {
   line-height: 1.5;
 }
 
+/* The receipt sheet, recreated from the office's paper receipt: GRAARR
+   SERVICES in orange over the blue Kurnool address inside a rounded frame,
+   the red currency note, and the red no-refund line at the foot. */
+.receipt-sheet {
+  padding: 18px 18px 14px;
+  border: 1.5px solid #111;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.receipt-letterhead {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.receipt-letterhead strong {
+  color: #f7941d;
+  font-size: 18px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.receipt-letterhead span {
+  color: #1f3b9b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.receipt-address {
+  white-space: pre-line;
+}
+
+.receipt-title {
+  margin: 12px 0 8px;
+  color: var(--parent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.receipt-marks {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1.5px solid #111;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--parent-ink);
+}
+
+.receipt-marks__note {
+  color: #d42b1e;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.receipt-row span:first-child {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.receipt-row span:last-child {
+  color: var(--parent-ink);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.receipt-amount {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(26, 18, 11, 0.05);
+  text-align: center;
+}
+
+.receipt-amount span {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.receipt-amount strong {
+  color: var(--parent-ink);
+  font-size: 24px;
+  letter-spacing: -0.5px;
+}
+
+.receipt-amount em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.receipt-footnote {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(26, 18, 11, 0.2);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.receipt-footnote__policy {
+  color: #d42b1e;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
 .payment-choice-overlay {
   position: fixed;
   inset: 0;

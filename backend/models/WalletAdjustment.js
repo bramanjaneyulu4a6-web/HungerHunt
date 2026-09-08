@@ -43,6 +43,10 @@ const walletAdjustmentSchema = new mongoose.Schema(
     previousBalance: { type: Number, required: true },
     newBalance: { type: Number, required: true },
     idempotencyKey: { type: String, required: true, maxlength: 100 },
+    // The quotable receipt number (GMS + ddmm + admission number + sequence),
+    // minted lazily the first time any receipt for the student is opened —
+    // utils/walletReceipts.js numbers a student's rows oldest first.
+    receiptNumber: { type: String, default: null, maxlength: 40 },
   },
   { timestamps: true }
 );
@@ -61,6 +65,17 @@ walletAdjustmentSchema.index(
     unique: true,
     partialFilterExpression: { paymentIntentId: { $type: 'objectId' } },
     name: 'one_wallet_adjustment_per_payment_intent',
+  }
+);
+
+// Sparse-by-filter rather than sparse-by-flag: rows minted before the receipt
+// feature carry null, and only real numbers must never repeat.
+walletAdjustmentSchema.index(
+  { receiptNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { receiptNumber: { $type: 'string' } },
+    name: 'one_adjustment_per_receipt_number',
   }
 );
 

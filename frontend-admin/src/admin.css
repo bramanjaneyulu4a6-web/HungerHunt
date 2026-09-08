@@ -1684,6 +1684,22 @@
   font-weight: 600;
 }
 
+/* The receipt popup (components/ReceiptButton.jsx): the PDF itself in a
+   frame, sized so a full receipt reads without scrolling, with the print and
+   download the old new-tab flow left to the browser toolbar. */
+.modal--receipt {
+  max-width: 720px;
+}
+
+.receipt-frame {
+  display: block;
+  width: 100%;
+  height: min(64svh, 760px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
 .file-input {
   padding: 10px 12px;
   font-size: 13px;
@@ -2064,5 +2080,165 @@
 @media (max-width: 640px) {
   .users-tab-head {
     flex-direction: column;
+  }
+}
+
+/* ---- wallet ledger rows ------------------------------------------------ */
+
+/* A row that opens. The cursor and the hover are the only invitation it gets:
+   an expand affordance on every row of a long feed reads as clutter, so the
+   chevron carries the state and the row carries the offer. */
+.ledger-row--expandable {
+  cursor: pointer;
+}
+
+.ledger-chevron {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--muted);
+  vertical-align: middle;
+  transition: transform 0.18s ease;
+}
+
+.ledger-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* The opened panel sits inside the table, so it is given the page's own
+   surface against the row's tinted ground rather than a border of its own. */
+.ledger-detail-row > td {
+  padding: 0 16px 14px;
+  background: var(--bg-subtle);
+}
+
+.ledger-detail {
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.ledger-detail__items {
+  margin-bottom: 4px;
+}
+
+/* The package's own facts: label above value, wrapping into as many columns as
+   the width allows. Only the facts that have happened are rendered, so this
+   grid is never a row of blanks. */
+.ledger-detail__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px 20px;
+  margin: 14px 0 0;
+}
+
+.ledger-detail__facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ledger-detail__facts dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-chevron {
+    transition: none;
+  }
+}
+
+/* The shared .ledger-mono is written for the parent app's activity cards,
+   where a reference is the last thing on a line and reads right-aligned
+   against it. In a wide table it is a column of its own, so it reads from the
+   left like the rest of the row — a long gateway reference otherwise wraps
+   into ragged pieces stacked against the right edge. It stays wrappable: an
+   admin chasing a payment needs the whole string to copy, not an ellipsis. */
+@media (min-width: 769px) {
+  .table td.ledger-mono {
+    text-align: left;
+    min-width: 190px;
+  }
+}
+
+/* Below that the table stacks, and each cell becomes one flex line of label
+   and value. A reference is the longest value in the row, so the label is
+   pinned to its own width — without this it is the label that gives way, and
+   "Reference" wraps to "Referenc / e" beside it. */
+@media (max-width: 768px) {
+  .table--stack td.ledger-mono::before {
+    flex: none;
+  }
+
+  .table--stack td.ledger-mono {
+    min-width: 0;
+  }
+}
+
+/* The opened panel is a cell of the table it belongs to, so below the stacking
+   breakpoint it inherits the row-card treatment: half-width, right-aligned,
+   and preceded by an empty label. It is a panel, not a field — this puts it
+   back to a full-width block. */
+@media (max-width: 768px) {
+  .table--stack tr.ledger-detail-row {
+    padding: 0;
+  }
+
+  .ledger-detail-row > td {
+    display: block;
+    padding: 0 12px 12px;
+    text-align: left;
+  }
+
+  .ledger-detail-row > td::before {
+    content: none;
+  }
+
+  .ledger-detail {
+    padding: 12px;
+  }
+
+  /* One column of label-and-value pairs, like every other stacked row. */
+  .ledger-detail__facts {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* A wallet history is long enough to scroll, and the dialog scrolls as a whole
+   — so without this the way out scrolls away with it, and closing means
+   scrolling back to the top first. The negative offset is the dialog's own
+   padding, so the header sits flush against the top edge when it sticks. */
+.modal--activity .modal-head {
+  position: sticky;
+  top: -28px;
+  z-index: 1;
+  padding-top: 4px;
+  padding-bottom: 12px;
+  background: var(--surface);
+}
+
+/* The receipt button and the open/close chevron are one control group at the
+   end of a row, not two stacked ones — without this the chevron wraps under
+   the button and the row grows a line for nothing. */
+.ledger-actions {
+  width: 132px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ledger-actions .btn {
+  vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+  .table--stack td.ledger-actions {
+    justify-content: flex-end;
+    width: auto;
   }
 }

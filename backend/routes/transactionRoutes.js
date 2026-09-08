@@ -6,6 +6,7 @@ import {
 } from "../controllers/transactionController.js";
 
 import { orStudent, protectAdmin, protectStaff } from "../middleware/authMiddleware.js";
+import { getLedgerFeed } from "../controllers/walletLedgerController.js";
 
 const router = express.Router();
 
@@ -21,5 +22,7 @@ const router = express.Router();
 router.post("/verify-payment", orStudent(protectStaff), verifyPayment);
 router.post("/bill", orStudent(protectStaff), generateBill);
 router.get("/history", protectAdmin, getAllTransactions);
+// The same feed with the money coming in as well as going out.
+router.get("/ledger", protectAdmin, getLedgerFeed);
 
 export default router;

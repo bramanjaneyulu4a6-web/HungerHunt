@@ -18,7 +18,10 @@ const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
+const Counter = (await import('../models/Counter.js')).default;
 const firebasePhoneAuth = (await import('../utils/firebasePhoneAuth.js')).default;
 const { authLimiter } = await import('../middleware/rateLimit.js');
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
@@ -199,25 +202,66 @@ describe('child history comes a page at a time', () => {
     assert.equal(asked, 100);
   });
 
+  /* One mock, both reversal reads: the ledger listing goes sort→limit→lean,
+     and ensureReceiptNumbers' sweep for unnumbered refunds goes sort→lean. */
   const noReversals = () =>
     mock.method(WalletReversal, 'find', () => ({
-      sort: () => ({ limit: () => ({ lean: async () => [] }) }),
+      sort: () => ({ limit: () => ({ lean: async () => [] }), lean: async () => [] }),
     }));
 
+  /* One mock, both charge reads: the ledger listing goes sort→limit→lean,
+     and ensureReceiptNumbers' sweep for unnumbered UPI charges goes
+     sort→lean. */
   const noCharges = () =>
     mock.method(Transaction, 'find', () => ({
-      sort: () => ({ limit: () => ({ lean: async () => [] }) }),
+      sort: () => ({
+        limit: () => ({ lean: async () => [] }),
+        lean: async () => [],
+      }),
     }));
+
+  /* One mock, both adjustment reads: the ledger listing goes
+     sort→limit→lean, and ensureReceiptNumbers' hunt for unnumbered rows goes
+     sort→lean with receiptNumber: null in its filter. */
+  const topupLedger = (rows) =>
+    mock.method(WalletAdjustment, 'find', (filter) => ({
+      sort: () => ({
+        limit: () => ({ lean: async () => rows }),
+        lean: async () =>
+          filter?.receiptNumber === null ? rows.filter((row) => !row.receiptNumber) : rows,
+      }),
+    }));
+
+  const noUpiTopups = () => topupLedger([]);
+
+  // The admission number every receipt number is built around. Every recharges
+  // test needs it now that the list numbers the rows it lists.
+  const studentIs = (student = { _id: STUDENT_ID, admissionNumber: '990123' }) =>
+    mock.method(Student, 'findById', () => ({ select: () => ({ lean: async () => student }) }));
+
+  // One mock, both intent reads: the failed-attempt listing goes
+  // select→sort→limit→lean, the merchantOrderId lookup goes select→lean.
+  const paymentIntents = ({ failed = [], byId = [] } = {}) =>
+    mock.method(PaymentIntent, 'find', (filter) => ({
+      select: () => ({
+        sort: () => ({ limit: () => ({ lean: async () => failed }) }),
+        lean: async () => (filter._id ? byId : failed),
+      }),
+    }));
+
+  const noFailedTopups = () => paymentIntents();
 
   test('recharges come newest first', async () => {
     ownsTheStudent();
     noReversals();
     noCharges();
-    mock.method(Student, 'findById', () => ({
-      select: async () => ({
-        rechargeHistory: [{ amount: 1 }, { amount: 2 }, { amount: 3 }],
-      }),
-    }));
+    noFailedTopups();
+    studentIs();
+    topupLedger([
+      { _id: 'c', source: 'ADMIN', amount: 3, receiptNumber: 'GMS2308990123003', createdAt: new Date('2026-08-23T08:00:00.000Z') },
+      { _id: 'b', source: 'PARENT_UPI', amount: 2, receiptNumber: 'GMS2208990123002', createdAt: new Date('2026-08-22T08:00:00.000Z') },
+      { _id: 'a', source: 'ADMIN', amount: 1, receiptNumber: 'GMS2108990123001', createdAt: new Date('2026-08-21T08:00:00.000Z') },
+    ]);
 
     const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
 
@@ -229,12 +273,70 @@ describe('child history comes a page at a time', () => {
     assert.equal(body.hasMore, false);
   });
 
+  test('top-ups come from the adjustment ledger, each carrying its receipt handle', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    noFailedTopups();
+    studentIs();
+
+    const adjustmentFilters = [];
+    mock.method(WalletAdjustment, 'find', (filter) => {
+      adjustmentFilters.push(filter);
+      return {
+        sort: () => ({
+          limit: () => ({
+            lean: async () => [
+              {
+                _id: '507f191e810c19729de860ac',
+                source: 'PARENT_UPI',
+                receiptNumber: 'GMS2108990123002',
+                amount: 250,
+                previousBalance: 100,
+                newBalance: 350,
+                createdAt: new Date('2026-08-21T08:00:00.000Z'),
+              },
+              {
+                _id: '507f191e810c19729de860ad',
+                source: 'ADMIN',
+                receiptNumber: 'GMS2008990123001',
+                amount: 100,
+                previousBalance: 0,
+                newBalance: 100,
+                createdAt: new Date('2026-08-20T08:00:00.000Z'),
+              },
+            ],
+          }),
+        }),
+      };
+    });
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    // Both provenances now come from the one ledger — every top-up row wrote
+    // an adjustment, and only adjustment rows can carry a receipt.
+    assert.equal(adjustmentFilters[0].source, undefined);
+    // Nothing was unnumbered, so no hunt for unnumbered rows was made.
+    assert.equal(adjustmentFilters.length, 1);
+
+    const [upi, cash] = body.recharges;
+    assert.equal(upi.kind, 'TOP_UP');
+    assert.equal(upi.mode, 'UPI');
+    assert.equal(upi.adjustmentId, '507f191e810c19729de860ac');
+    assert.equal(upi.amount, 250);
+    assert.equal(upi.previousBalance, 100);
+    assert.equal(upi.newBalance, 350);
+    assert.equal(new Date(upi.date).toISOString(), '2026-08-21T08:00:00.000Z');
+    assert.equal(cash.mode, 'CASH');
+    assert.equal(cash.adjustmentId, '507f191e810c19729de860ad');
+  });
+
   test('order payments appear as deductions naming their order', async () => {
     ownsTheStudent();
     noReversals();
-    mock.method(Student, 'findById', () => ({
-      select: async () => ({ rechargeHistory: [] }),
-    }));
+    noUpiTopups();
+    noFailedTopups();
+    studentIs();
 
     let chargeFilter;
     mock.method(Transaction, 'find', (filter) => {
@@ -264,16 +366,234 @@ describe('child history comes a page at a time', () => {
 
     const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
 
-    // A UPI-funded charge never moved the wallet, so it has no place here.
-    assert.equal(chargeFilter.sourceType.$ne, 'UPI_ORDER_PAYMENT');
+    // Wallet- and UPI-funded charges both belong here now; the kind and the
+    // balances are what tell them apart, not the query.
+    assert.equal(chargeFilter.sourceType, undefined);
 
     const [entry] = body.recharges;
     assert.equal(entry.kind, 'ORDER_PAYMENT');
     assert.equal(entry.amount, 60);
     assert.equal(entry.previousBalance, 500);
     assert.equal(entry.newBalance, 440);
-    // Named the way the orders tab names it: # plus the id's last six.
-    assert.equal(entry.reason, 'Order: #E860AB');
+    // The order it paid, named the way the orders tab names it: # plus the
+    // id's last six. A bare reference, not a sentence — no reason field.
+    assert.equal(entry.orderId, '#E860AB');
+    assert.equal(entry.reason, undefined);
+    // The ledger row's own id doubles as the reference the office looks a
+    // wallet charge up by.
+    assert.equal(entry.transactionId, '507f191e810c19729de860aa');
+  });
+
+  test('UPI-funded order payments list as their own kind, with no balances', async () => {
+    ownsTheStudent();
+    noReversals();
+    noUpiTopups();
+    noFailedTopups();
+    studentIs();
+
+    mock.method(Transaction, 'find', () => ({
+      sort: () => ({
+        limit: () => ({
+          lean: async () => [{
+            _id: '507f191e810c19729de860aa',
+            sourceType: 'UPI_ORDER_PAYMENT',
+            idempotencyKey: 'HH-507f191e810c19729de860ba',
+            // Numbered like a top-up: this money entered the school's books
+            // directly, so it carries a school receipt number too.
+            receiptNumber: 'GMS2008990123005',
+            totalAmount: 60,
+            // The wallet never moved: chargeCart snapshots the untouched
+            // balance on both sides of an EXTERNAL-funded charge.
+            previousBalance: 500,
+            remainingBalance: 500,
+            createdAt: new Date('2026-08-20T08:00:00.000Z'),
+          }],
+        }),
+      }),
+    }));
+    mock.method(FulfillmentOrder, 'find', () => ({
+      select: () => ({
+        lean: async () => [{
+          _id: '507f191e810c19729de860ab',
+          transactionId: '507f191e810c19729de860aa',
+        }],
+      }),
+    }));
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    const [entry] = body.recharges;
+    assert.equal(entry.kind, 'UPI_ORDER_PAYMENT');
+    assert.equal(entry.amount, 60);
+    assert.equal(entry.orderId, '#E860AB');
+    assert.equal(entry.reason, undefined);
+    // The gateway's reference, quotable at their support desk — and the
+    // school's own receipt number beside it, like a UPI top-up carries.
+    assert.equal(entry.transactionId, 'HH-507f191e810c19729de860ba');
+    assert.equal(entry.receiptNumber, 'GMS2008990123005');
+    // No balances: the money went gateway → school, never through the wallet,
+    // and printing an unchanged balance would read as the wallet paying.
+    assert.equal(entry.previousBalance, undefined);
+    assert.equal(entry.newBalance, undefined);
+  });
+
+  test('failed top-up attempts are listed flagged, with no balances to show', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    noUpiTopups();
+    studentIs();
+
+    let intentFilter;
+    mock.method(PaymentIntent, 'find', (filter) => {
+      intentFilter = filter;
+      return {
+        select: () => ({
+          sort: () => ({
+            limit: () => ({
+              lean: async () => [{
+                _id: '507f191e810c19729de860ba',
+                amountPaise: 25000,
+                merchantOrderId: 'HH-507f191e810c19729de860ba',
+                createdAt: new Date('2026-09-06T08:00:00.000Z'),
+              }],
+            }),
+          }),
+        }),
+      };
+    });
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    // Only refused payments belong here — expired abandonments are non-events.
+    assert.equal(intentFilter.status, 'FAILED');
+    assert.equal(intentFilter.purpose, 'TOPUP');
+
+    const [entry] = body.recharges;
+    assert.equal(entry.kind, 'TOPUP_FAILED');
+    assert.equal(entry.amount, 250);
+    assert.equal(entry.transactionId, 'HH-507f191e810c19729de860ba');
+    assert.equal(entry.previousBalance, undefined);
+    assert.equal(entry.newBalance, undefined);
+  });
+
+  /* Every top-up row is quoted to the office by its receipt number, not by
+     the gateway's own reference — that one still exists, on the receipt this
+     row can open. See the ledger rows in pages/ChildDetails. */
+  test('a UPI top-up carries both its receipt number and its gateway reference', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    studentIs();
+    topupLedger([{
+      _id: '507f191e810c19729de860ac',
+      source: 'PARENT_UPI',
+      paymentIntentId: '507f191e810c19729de860bb',
+      receiptNumber: 'GMS2108990123007',
+      amount: 250,
+      previousBalance: 100,
+      newBalance: 350,
+      createdAt: new Date('2026-08-21T08:00:00.000Z'),
+    }]);
+    paymentIntents({
+      byId: [{ _id: '507f191e810c19729de860bb', merchantOrderId: 'HH-507f191e810c19729de860bb' }],
+    });
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    const [entry] = body.recharges;
+    assert.equal(entry.kind, 'TOP_UP');
+    assert.equal(entry.receiptNumber, 'GMS2108990123007');
+    assert.equal(entry.transactionId, 'HH-507f191e810c19729de860bb');
+  });
+
+  test('a desk top-up has a receipt number but no gateway reference to carry', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    noFailedTopups();
+    studentIs();
+    topupLedger([{
+      _id: '507f191e810c19729de860ad',
+      source: 'ADMIN',
+      receiptNumber: 'GMS2008990123001',
+      amount: 100,
+      previousBalance: 0,
+      newBalance: 100,
+      createdAt: new Date('2026-08-20T08:00:00.000Z'),
+    }]);
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    const [entry] = body.recharges;
+    assert.equal(entry.receiptNumber, 'GMS2008990123001');
+    // No gateway was involved, so there is no reference — and the app leaves
+    // the row out rather than printing an empty one.
+    assert.equal(entry.transactionId, null);
+  });
+
+  test('a top-up not yet numbered is numbered so the list can show one', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    noFailedTopups();
+    studentIs();
+    topupLedger([{
+      _id: '507f191e810c19729de860ac',
+      source: 'ADMIN',
+      receiptNumber: null,
+      amount: 100,
+      previousBalance: 0,
+      newBalance: 100,
+      createdAt: new Date('2026-08-21T08:00:00.000Z'),
+    }]);
+
+    // Numbering is the receipt module's job; here it only has to be asked.
+    // Its own rules are pinned in walletReceipts.test.js.
+    let numberedFor;
+    mock.method(Counter, 'nextSequence', async (key) => {
+      numberedFor = key;
+      return 7;
+    });
+    mock.method(WalletAdjustment, 'findOneAndUpdate', (filter, update) => ({
+      lean: async () => ({ _id: filter._id, receiptNumber: update.$set.receiptNumber }),
+    }));
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    assert.equal(numberedFor, `walletReceipt:${STUDENT_ID}`);
+    assert.equal(body.recharges[0].receiptNumber, 'GMS2108990123007');
+  });
+
+  test('a failed attempt keeps the gateway reference, having no receipt to name', async () => {
+    ownsTheStudent();
+    noReversals();
+    noCharges();
+    noUpiTopups();
+    studentIs();
+    mock.method(PaymentIntent, 'find', () => ({
+      select: () => ({
+        sort: () => ({
+          limit: () => ({
+            lean: async () => [{
+              _id: '507f191e810c19729de860ba',
+              amountPaise: 25000,
+              merchantOrderId: 'HH-507f191e810c19729de860ba',
+              createdAt: new Date('2026-09-06T08:00:00.000Z'),
+            }],
+          }),
+        }),
+      }),
+    }));
+
+    const body = await (await get(`/api/parent/child/${STUDENT_ID}/recharges`)).json();
+
+    const [entry] = body.recharges;
+    assert.equal(entry.kind, 'TOPUP_FAILED');
+    // No money moved, so no adjustment and no receipt was ever written. The
+    // gateway reference is the only handle support can chase it by.
+    assert.equal(entry.transactionId, 'HH-507f191e810c19729de860ba');
+    assert.equal(entry.receiptNumber, undefined);
   });
 
   test('a student belonging to someone else is refused', async () => {

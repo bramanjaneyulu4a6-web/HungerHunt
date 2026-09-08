@@ -371,6 +371,178 @@
   color: var(--success);
 }
 
+/* A failed attempt's ledger line: flagged in alert red, its amount struck
+   through because the money never moved in either direction. */
+.ledger-flag--failed {
+  color: var(--alert);
+  font-weight: 700;
+}
+
+.amount-void {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* A wallet activity card reads in three passes: what happened (the head and
+   the amount), what it left the wallet at, and the codes to quote if the
+   payment ever has to be asked about. The groups below are what keeps the
+   third from being read as part of the second. */
+
+.ledger-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* What the movement did to the wallet, ruled off from the amount above it. */
+.ledger-group {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* The balance is the one figure in this group a parent is actually looking
+   for, so it carries the weight of an answer rather than of a detail. */
+.ledger-row--balance {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Reference codes, set apart on their own ground. Nothing here is money, and
+   a bare mono string in a plain row reads too much like an amount on a narrow
+   screen — the panel is what says "these are codes, not figures". */
+.ledger-refs {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+}
+
+.ledger-ref {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ledger-ref > :first-child {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---- wallet activity cards -------------------------------------------- */
+
+/* A bank-statement card: two lines and done. Kind against date, then the
+   signed amount against the balance the wallet was left at — the running
+   figure a statement prints in the margin, so it stays quiet. Everything
+   else folds away below a tap. */
+.tx-card[role='button'] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.tx-kind {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tx-kind--failed {
+  color: var(--alert);
+}
+
+.tx-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tx-figures {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.tx-amount {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-balance {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fold. A grid row sliding 0fr→1fr animates to the content's own
+   height without measuring it; the clip layer does the hiding, and the
+   body layer carries the rule and breathing room so neither leaks a pixel
+   while closed. Visibility trails the fold so the receipt button inside a
+   closed card can't be tabbed to. */
+.tx-details {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.tx-card--expanded .tx-details {
+  grid-template-rows: 1fr;
+}
+
+.tx-details-clip {
+  overflow: hidden;
+  min-height: 0;
+  visibility: hidden;
+  transition: visibility 0s 0.25s;
+}
+
+.tx-card--expanded .tx-details-clip {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.tx-details-body {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.tx-details-body .ledger-note {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-details,
+  .tx-details-clip {
+    transition: none;
+  }
+}
+
+/* Gateway references are long and letter-for-letter — read them in mono. */
+.ledger-mono {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  text-align: right;
+}
+
 /* ---- badge ------------------------------------------------------------ */
 
 .badge {

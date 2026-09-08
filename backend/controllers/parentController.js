@@ -1,7 +1,6 @@
 import FulfillmentOrder from "../models/FulfillmentOrder.js";
 import Student from "../models/Student.js";
 import Transaction from "../models/Transaction.js";
-import WalletReversal from '../models/WalletReversal.js';
 import Parent from "../models/Parent.js";
 import PendingOrder from "../models/PendingOrder.js";
 
@@ -13,6 +12,8 @@ import { sendPasswordResetMail } from "../utils/mailer.js";
 import { createResetToken, hashResetToken, RESET_TOKEN_TTL_MS } from "../utils/resetToken.js";
 import { flushQueuedPushes } from "../utils/sendNotification.js";
 import { syncStudentRegistration } from "../utils/studentRegistration.js";
+import { buildStudentLedger } from "../utils/studentLedger.js";
+import { ensureReceiptNumbers } from "../utils/walletReceipts.js";
 import firebasePhoneAuth from '../utils/firebasePhoneAuth.js';
 import {
   passwordProblem,
@@ -159,7 +160,7 @@ export const getParentDashboardDetails = async (req, res) => {
        fields the cards actually show. */
     const parent = await Parent.findById(req.parent.id).populate({
       path: "studentIds",
-      select: "name grade roomNumber pocketMoney"
+      select: "name className section grade roomNumber pocketMoney admissionNumber"
     });
 
     if (!parent) {
@@ -368,72 +369,7 @@ export const getChildRecharges = async (req, res) => {
     if (!(await assertOwnsStudent(req, res, req.params.id))) return;
 
     const { page, limit, skip } = readPaging(req);
-
-    const student = await Student.findById(req.params.id).select("rechargeHistory");
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const [refunds, charges] = await Promise.all([
-      WalletReversal.find({ studentId: req.params.id })
-        .sort({ createdAt: -1 })
-        .limit(500)
-        .lean(),
-      // The wallet's outgoings. UPI-funded orders are excluded because that
-      // money never touched the wallet — its balance snapshots are equal and
-      // a "deduction" of it would be a lie.
-      Transaction.find({
-        studentId: req.params.id,
-        sourceType: { $ne: 'UPI_ORDER_PAYMENT' },
-      })
-        .sort({ createdAt: -1 })
-        .limit(500)
-        .lean(),
-    ]);
-
-    // The order each charge paid for, so the ledger line can name it the way
-    // the orders tab does.
-    const orders = charges.length
-      ? await FulfillmentOrder.find({
-          transactionId: { $in: charges.map((charge) => charge._id) },
-        })
-          .select('transactionId')
-          .lean()
-      : [];
-    const orderIdByTransaction = new Map(
-      orders.map((order) => [String(order.transactionId), String(order._id)])
-    );
-
-    const all = [
-      ...(student.rechargeHistory || []).slice().reverse().map((entry) => ({
-        ...(entry.toObject?.() || entry),
-        kind: 'TOP_UP',
-      })),
-      ...refunds.map((entry) => ({
-        _id: entry._id,
-        kind: 'ORDER_CANCELLATION_REFUND',
-        amount: entry.amount,
-        previousBalance: entry.previousBalance,
-        newBalance: entry.newBalance,
-        date: entry.createdAt,
-        reason: entry.reason,
-      })),
-      ...charges.map((entry) => {
-        const orderId = orderIdByTransaction.get(String(entry._id));
-        return {
-          _id: entry._id,
-          kind: 'ORDER_PAYMENT',
-          amount: entry.totalAmount,
-          previousBalance: entry.previousBalance,
-          newBalance: entry.remainingBalance,
-          date: entry.createdAt,
-          reason: orderId
-            ? `Order: #${orderId.slice(-6).toUpperCase()}`
-            : 'Order',
-        };
-      }),
-    ].sort((left, right) => new Date(right.date) - new Date(left.date));
+    const all = await buildStudentLedger(req.params.id);
 
     res.json({
       recharges: all.slice(skip, skip + limit),
@@ -459,7 +395,7 @@ export const getChildRecharges = async (req, res) => {
  * stored at payment for exactly this reason, so the deadline the parent reads
  * is the deadline the storeroom is working to, and no client has to know the
  * 48-hour rule or the business timezone to display it. */
-const parentPackageView = (order, now) => ({
+const parentPackageView = (order, now, payment = null) => ({
   id: String(order._id),
   studentId: String(order.studentId),
   studentName: order.studentSnapshot?.name || "",
@@ -478,7 +414,57 @@ const parentPackageView = (order, now) => ({
      package is at the dorm, not with the child. */
   collectedAt: order.collectedAt || null,
   overdue: isOverdue(order, now),
+  /* How the order was paid, quoting the same references wallet activity
+     shows for the charge — one story across both screens. Null where the
+     caller did not look the payment up (the dashboard's ongoing orders). */
+  payment,
 });
+
+/* The payment behind each of the listed orders, keyed by transaction id.
+ * Mode plus the references wallet activity quotes: a wallet charge's own
+ * ledger row id, or for UPI the gateway's reference and the school receipt
+ * number — minted lazily here for the same reason the ledger mints on read:
+ * whichever screen the parent opens first must be able to show one. */
+const paymentsByTransaction = async (studentId, orders) => {
+  const transactions = orders.length
+    ? await Transaction.find({
+        _id: { $in: orders.map((order) => order.transactionId) },
+      })
+        .select('sourceType idempotencyKey receiptNumber')
+        .lean()
+    : [];
+
+  const unreceipted = transactions.some(
+    (txn) => txn.sourceType === 'UPI_ORDER_PAYMENT' && !txn.receiptNumber
+  );
+  let assigned = new Map();
+  if (unreceipted) {
+    const student = await Student.findById(studentId).select('admissionNumber').lean();
+    if (student?.admissionNumber) {
+      try {
+        assigned = await ensureReceiptNumbers(studentId, student.admissionNumber);
+      } catch (error) {
+        // Best-effort, like the ledger: a counter that will not answer must
+        // not cost a parent their orders list. The number comes on next read.
+        console.warn(`Could not number receipts for student ${studentId}: ${error.message}`);
+      }
+    }
+  }
+
+  return new Map(
+    transactions.map((txn) => [
+      String(txn._id),
+      txn.sourceType === 'UPI_ORDER_PAYMENT'
+        ? {
+            mode: 'UPI',
+            transactionId: txn.idempotencyKey || null,
+            receiptNumber:
+              txn.receiptNumber || assigned.get(String(txn._id)) || null,
+          }
+        : { mode: 'WALLET', transactionId: String(txn._id) },
+    ])
+  );
+};
 
 export const getChildPackages = async (req, res) => {
   try {
@@ -492,10 +478,13 @@ export const getChildPackages = async (req, res) => {
       FulfillmentOrder.countDocuments(filter)
     ]);
 
+    const payments = await paymentsByTransaction(req.params.id, orders);
     const now = new Date();
 
     res.json({
-      packages: orders.map((order) => parentPackageView(order, now)),
+      packages: orders.map((order) =>
+        parentPackageView(order, now, payments.get(String(order.transactionId)) || null)
+      ),
       ...paged(total, page, limit)
     });
 

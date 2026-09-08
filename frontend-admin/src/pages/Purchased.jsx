@@ -7,6 +7,7 @@ import {
   Banner,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   PageHeader,
   Skeleton,
@@ -14,6 +15,7 @@ import {
 
 const Purchased = () => {
   const [activeTab, setActiveTab] = useState("new");
+  const [confirming, setConfirming] = useState(null);
   const [newPurchases, setNewPurchases] = useState([]);
   const [completedPurchases, setCompletedPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,18 +144,20 @@ const Purchased = () => {
     }
   };
 
-  const cancelOrder = async (purchase) => {
+  const cancelOrder = (purchase) => {
     const started = purchase.items.some((item) => (item.received || 0) > 0);
+    setConfirming({
+      title: started ? "Cancel the rest of this order?" : "Cancel this order?",
+      message: started
+        ? "Deliveries already booked stay booked — only what is still outstanding is voided."
+        : "Nothing has been received against it.",
+      icon: "close",
+      variant: "danger",
+      action: () => runCancelOrder(purchase),
+    });
+  };
 
-    if (
-      !window.confirm(
-        started
-          ? "Cancel the rest of this order? Deliveries already booked stay booked — only what is still outstanding is voided."
-          : "Cancel this order? Nothing has been received against it."
-      )
-    )
-      return;
-
+  const runCancelOrder = async (purchase) => {
     setCancellingId(purchase._id);
 
     try {
@@ -569,6 +573,17 @@ const Purchased = () => {
         })
       )}
 
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
+      )}
     </div>
   );
 };

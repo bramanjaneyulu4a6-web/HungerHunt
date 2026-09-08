@@ -3,10 +3,11 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
 import { resolveAvailability } from "../utils/availability";
-import { Banner, Button, Card, PageHeader } from "../components/ui";
+import { Banner, Button, Card, ConfirmDialog, PageHeader } from "../components/ui";
 
 const Billing = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirming, setConfirming] = useState(null);
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
@@ -243,15 +244,20 @@ const Billing = () => {
     setCart((prevCart) => prevCart.filter((item) => item._id !== productId));
   };
 
-  const handleCancelPayment = () => {
-    if (!window.confirm("Cancel this payment and reset the terminal?")) return;
-    setCart([]);
-    setSelectedStudent(null);
-    setSearchResults([]);
-    setSearchQuery("");
-    setProductSearchQuery("");
-    setIsSearched(false);
-  };
+  const handleCancelPayment = () => setConfirming({
+    title: "Cancel this payment?",
+    message: "This clears the cart and resets the terminal.",
+    icon: "close",
+    variant: "danger",
+    action: () => {
+      setCart([]);
+      setSelectedStudent(null);
+      setSearchResults([]);
+      setSearchQuery("");
+      setProductSearchQuery("");
+      setIsSearched(false);
+    },
+  });
 
   // The cart priced as lines the server can charge. A cleared quantity box
   // bills as 1, the same way it prices.
@@ -877,6 +883,17 @@ const Billing = () => {
         </div>
       )}
 
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
+      )}
     </div>
   );
 };

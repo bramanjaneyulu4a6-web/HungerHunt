@@ -1576,13 +1576,10 @@
 .user-relationship-link {
   color: inherit;
   font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
-  text-underline-offset: 2px;
 }
 
 .user-relationship-link:hover {
-  text-decoration-color: currentColor;
+  color: var(--primary);
 }
 
 .user-row--focused {

@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
-import { Badge, Button, EmptyState, Skeleton } from '../../components/ui';
+import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
+import { ParentActivityModal } from '../../components/WalletActivity';
 
 const EMPTY = { fatherName: '', phone: '', email: '', studentIds: [] };
 
@@ -20,6 +21,9 @@ export default function ParentsTab({ parents, loading, onChanged }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState(null);
+  const [confirming, setConfirming] = useState(null);
+  // The parent whose children's wallets are open, if any.
+  const [activityParent, setActivityParent] = useState(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentOptions, setStudentOptions] = useState([]);
   const [studentOptionsLoading, setStudentOptionsLoading] = useState(false);
@@ -118,36 +122,45 @@ export default function ParentsTab({ parents, loading, onChanged }) {
     }
   };
 
-  const requirePasswordSetup = async (parent) => {
-    const message = parent.active
+  const requirePasswordSetup = (parent) => setConfirming({
+    title: parent.active ? 'Reset access?' : 'Reactivate account?',
+    message: parent.active
       ? `Require ${parent.fatherName} to verify their phone and create a new password? Every existing session will be signed out.`
-      : `Reactivate ${parent.fatherName}? They will verify their phone by SMS and create a password.`;
-    if (!window.confirm(message)) return;
-    setWorkingId(parent.id);
-    try {
-      await api.post(`/admin/users/parents/${parent.id}/require-password-setup`);
-      toast.success(parent.active ? 'New password setup required' : 'Parent account restored');
-      await onChanged();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not update password setup');
-    } finally {
-      setWorkingId(null);
-    }
-  };
+      : `Reactivate ${parent.fatherName}? They will verify their phone by SMS and create a password.`,
+    icon: 'refresh',
+    variant: 'primary',
+    action: async () => {
+      setWorkingId(parent.id);
+      try {
+        await api.post(`/admin/users/parents/${parent.id}/require-password-setup`);
+        toast.success(parent.active ? 'New password setup required' : 'Parent account restored');
+        await onChanged();
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Could not update password setup');
+      } finally {
+        setWorkingId(null);
+      }
+    },
+  });
 
-  const archive = async (parent) => {
-    if (!window.confirm(`Archive ${parent.fatherName}'s parent account? They will be signed out and cannot log in.`)) return;
-    setWorkingId(parent.id);
-    try {
-      await api.delete(`/admin/users/parents/${parent.id}`);
-      toast.success('Parent account archived');
-      await onChanged();
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Could not archive parent account');
-    } finally {
-      setWorkingId(null);
-    }
-  };
+  const archive = (parent) => setConfirming({
+    title: 'Archive parent account?',
+    message: `Archive ${parent.fatherName}'s parent account? They will be signed out and cannot log in.`,
+    icon: 'trash',
+    variant: 'danger',
+    action: async () => {
+      setWorkingId(parent.id);
+      try {
+        await api.delete(`/admin/users/parents/${parent.id}`);
+        toast.success('Parent account archived');
+        await onChanged();
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Could not archive parent account');
+      } finally {
+        setWorkingId(null);
+      }
+    },
+  });
 
   if (loading) return <Skeleton height={220} radius={14} />;
 
@@ -174,7 +187,17 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   key={parent.id}
                   className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
                 >
-                  <td data-label="Parent"><strong>{parent.fatherName}</strong></td>
+                  <td data-label="Parent">
+                    <button
+                      type="button"
+                      className="link-button"
+                      style={{ fontWeight: 700 }}
+                      onClick={() => setActivityParent(parent)}
+                      aria-label={`Open ${parent.fatherName}'s wallet activity`}
+                    >
+                      {parent.fatherName}
+                    </button>
+                  </td>
                   <td data-label="Contact"><div>{parent.phone}</div><small>{parent.email || 'No email'}</small></td>
                   <td data-label="Students">
                     {(parent.students || []).length ? (parent.students || []).map((student, index) => (
@@ -230,6 +253,29 @@ export default function ParentsTab({ parents, loading, onChanged }) {
         </div>
       )}
 
+      {confirming && (
+        <ConfirmDialog
+          title={confirming.title}
+          message={confirming.message}
+          icon={confirming.icon}
+          variant={confirming.variant}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            // Close first, like window.confirm did: the row's button goes
+            // disabled through workingId while the request runs, and the
+            // toast reports the outcome.
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
+      )}
+      {activityParent && (
+        <ParentActivityModal
+          parent={activityParent}
+          onClose={() => setActivityParent(null)}
+        />
+      )}
     </section>
   );
 }

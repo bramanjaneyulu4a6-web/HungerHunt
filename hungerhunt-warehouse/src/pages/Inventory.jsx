@@ -7,7 +7,7 @@ import { availabilityOf } from "../utils/availability";
 import Icon from "../components/Icon";
 import ProductThumb from "../components/ProductThumb";
 import OrderReviewSheet from "../components/OrderReviewSheet";
-import { Banner, EmptyState, Skeleton } from "../components/ui";
+import { Banner, ConfirmDialog, EmptyState, Skeleton } from "../components/ui";
 import { formatPackSize } from "../utils/format";
 
 /* The shelf, and the order raised off it.
@@ -62,6 +62,7 @@ const Inventory = () => {
   const [drafting, setDrafting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [justAdded, setJustAdded] = useState(null);
+  const [confirming, setConfirming] = useState(null);
   const flashTimer = useRef(null);
 
   useEffect(() => {
@@ -201,14 +202,21 @@ const Inventory = () => {
     return { label: "Remove", disabled: false, tone: "remove" };
   };
 
-  const suggest = async () => {
-    if (
-      cartIds.length > 0 &&
-      !window.confirm("Replace what is already in the cart with the suggested order?")
-    ) {
+  const suggest = () => {
+    if (cartIds.length > 0) {
+      setConfirming({
+        title: "Replace the cart?",
+        message: "Replace what is already in the cart with the suggested order?",
+        icon: "refresh",
+        variant: "primary",
+        action: runSuggest,
+      });
       return;
     }
+    runSuggest();
+  };
 
+  const runSuggest = async () => {
     setDrafting(true);
     try {
       const response = await api.post("/v1/replenishment-drafts");
@@ -234,13 +242,18 @@ const Inventory = () => {
     }
   };
 
-  const clearCart = () => {
-    if (!window.confirm("Empty the cart and start this order again?")) return;
-    setCart({});
-    setTyped({});
-    setDraft(null);
-    setReviewOpen(false);
-  };
+  const clearCart = () => setConfirming({
+    title: "Empty the cart?",
+    message: "Empty the cart and start this order again?",
+    icon: "trash",
+    variant: "danger",
+    action: () => {
+      setCart({});
+      setTyped({});
+      setDraft(null);
+      setReviewOpen(false);
+    },
+  });
 
   const submit = async () => {
     const items = cartIds
@@ -483,6 +496,18 @@ const Inventory = () => {
           onClear={clearCart}
           submitting={submitting}
           draft={draft}
+        />
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
         />
       )}
     </div>

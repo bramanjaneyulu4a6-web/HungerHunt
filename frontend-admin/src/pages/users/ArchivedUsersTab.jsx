@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
-import { Badge, Banner, Button, EmptyState, Skeleton } from '../../components/ui';
+import { Badge, Banner, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 
 const PAGE_SIZE = 50;
 
@@ -16,6 +16,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
   const [searchParams] = useSearchParams();
   const focusedParentId = searchParams.get('focus') || '';
   const [workingId, setWorkingId] = useState(null);
+  const [confirming, setConfirming] = useState(null);
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('all');
@@ -97,8 +98,15 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
     }
   };
 
-  const restoreParent = async (parent) => {
-    if (!window.confirm(`Restore ${parent.fatherName}'s account? They will verify their phone by SMS and create a password.`)) return;
+  const restoreParent = (parent) => setConfirming({
+    title: 'Restore parent account?',
+    message: `Restore ${parent.fatherName}'s account? They will verify their phone by SMS and create a password.`,
+    icon: 'refresh',
+    variant: 'primary',
+    action: () => runRestoreParent(parent),
+  });
+
+  const runRestoreParent = async (parent) => {
     setWorkingId(parent.id);
     try {
       await api.post(`/admin/users/parents/${parent.id}/require-password-setup`);
@@ -169,7 +177,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                 <tr key={`student-${student._id}`}>
                   <td data-label="User"><strong>{student.name}</strong><small>{student.admissionNumber || 'No admission number'}</small></td>
                   <td data-label="Type">Student</td>
-                  <td data-label="Details">Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</td>
+                  <td data-label="Details">Class {[student.className || student.grade, student.section].filter(Boolean).join('-') || '—'} · Room {student.roomNumber || '—'}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
                   <td data-label="Action"><Button className="btn--sm" disabled={workingId === student._id} onClick={() => restoreStudent(student)}>{workingId === student._id ? 'Restoring…' : 'Restore'}</Button></td>
                 </tr>
@@ -209,6 +217,17 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
         </nav>
       )}
 
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
+      )}
     </section>
   );
 }

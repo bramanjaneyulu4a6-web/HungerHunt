@@ -58,6 +58,42 @@ export function Button({
   );
 }
 
+/* An in-app stand-in for window.confirm. A question rather than a form, so
+   everything is centred: an icon chip tinted by `variant`, the question, and
+   two equal answers — always Cancel and Confirm. The caller owns the
+   open/closed state; this only renders the question and reports the answer. */
+export function ConfirmDialog({
+  title,
+  message,
+  icon = 'help',
+  variant = 'primary',
+  busy = false,
+  onCancel,
+  onConfirm,
+}) {
+  return (
+    <div className="modal-backdrop" onClick={() => !busy && onCancel()}>
+      <div
+        className="modal confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className={`confirm-dialog__icon confirm-dialog__icon--${variant}`} aria-hidden="true">
+          <Icon name={icon} size={24} />
+        </span>
+        <h3 className="modal-title" id="confirm-dialog-title">{title}</h3>
+        <p className="confirm-dialog__message">{message}</p>
+        <div className="confirm-dialog__actions">
+          <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
+          <Button variant={variant} disabled={busy} onClick={onConfirm}>Confirm</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Badge({ variant = 'neutral', className, children, ...rest }) {
   return (
     <span className={cx('badge', `badge--${variant}`, className)} {...rest}>

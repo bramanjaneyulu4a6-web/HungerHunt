@@ -49,6 +49,18 @@ p {
   margin: 0;
 }
 
+/* Links read as links by color, not underline: hover deepens the color to
+   say "this can be clicked". Component classes override where a link should
+   wear the surrounding ink instead. */
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
 button,
 input,
 select,

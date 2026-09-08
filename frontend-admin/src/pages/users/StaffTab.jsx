@@ -2,13 +2,14 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 import api from '../../utils/api';
-import { Badge, Button, EmptyState, Skeleton } from '../../components/ui';
+import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 
 const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [] };
 
 export default function StaffTab({ staff, rooms, loading, onChanged }) {
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
+  const [confirming, setConfirming] = useState(null);
   const [saving, setSaving] = useState(false);
   const [workingId, setWorkingId] = useState(null);
 
@@ -51,8 +52,21 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
     }
   };
 
-  const setActive = async (account, active) => {
-    if (!active && !window.confirm(`Archive ${account.name}? Their current session will stop working immediately.`)) return;
+  const setActive = (account, active) => {
+    if (active) {
+      applyActive(account, true);
+      return;
+    }
+    setConfirming({
+      title: 'Archive staff account?',
+      message: `Archive ${account.name}? Their current session will stop working immediately.`,
+      icon: 'trash',
+      variant: 'danger',
+      action: () => applyActive(account, false),
+    });
+  };
+
+  const applyActive = async (account, active) => {
     setWorkingId(account.id);
     try {
       if (active) await api.put(`/admin/users/staff/${account.id}`, { active: true, role: account.role, roomIds: (account.rooms || []).map((room) => room.id) });
@@ -125,6 +139,17 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
             <div className="modal-actions"><Button variant="ghost" disabled={saving} onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (form.role === 'caretaker' && !form.roomIds.length)}>{saving ? 'Saving…' : 'Save staff account'}</Button></div>
           </form>
         </div>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
       )}
     </section>
   );

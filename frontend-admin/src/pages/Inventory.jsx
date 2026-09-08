@@ -9,6 +9,7 @@ import {
   Badge,
   Banner,
   Button,
+  ConfirmDialog,
   EmptyState,
   PageHeader,
   Skeleton,
@@ -24,6 +25,7 @@ const FILTER_MATCHES = {
 const Inventory = () => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   // The availability filter lives in the URL so the overview tiles and the
@@ -135,16 +137,22 @@ const Inventory = () => {
     }
   };
 
-  const setArchived = async (product, archived) => {
+  const setArchived = (product, archived) => {
     if (!product?._id) return;
-    if (
-      archived &&
-      !window.confirm(
-        `Archive ${product.name}? It disappears from sale everywhere; its stock and history stay, and you can restore it from here or the Products page.`
-      )
-    )
+    if (!archived) {
+      applyArchived(product, false);
       return;
+    }
+    setConfirming({
+      title: `Archive ${product.name}?`,
+      message: "It disappears from sale everywhere; its stock and history stay, and you can restore it from here or the Products page.",
+      icon: "trash",
+      variant: "danger",
+      action: () => applyArchived(product, true),
+    });
+  };
 
+  const applyArchived = async (product, archived) => {
     try {
       await api.put(`/products/${product._id}`, { active: !archived });
       await fetchInventory();
@@ -563,6 +571,17 @@ const Inventory = () => {
             </tbody>
           </table>
         </div>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
       )}
     </div>
   );

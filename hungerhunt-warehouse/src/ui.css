@@ -564,6 +564,43 @@
   border-color: var(--warn);
 }
 
+/* A pill that is itself a control — the linked-parent badge on Students, the
+   status pill that opens the fulfillment menu — signals it on hover by
+   flooding the whole pill, background and text, with its own status color. */
+.badge-link,
+.fulfillment-status-trigger .badge {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.badge-link.badge--success:hover,
+.fulfillment-status-trigger:hover .badge--success {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.badge-link.badge--warn:hover,
+.fulfillment-status-trigger:hover .badge--warn {
+  background: var(--warn-ink);
+  border-color: var(--warn-ink);
+  color: #fff;
+}
+
+.badge-link.badge--neutral:hover,
+.fulfillment-status-trigger:hover .badge--neutral {
+  background: var(--ink-soft);
+  border-color: var(--ink-soft);
+  color: #fff;
+}
+
+.badge-link.badge--alert:hover,
+.fulfillment-status-trigger:hover .badge--alert {
+  background: var(--alert);
+  border-color: var(--alert);
+  color: #fff;
+}
+
 /* ---- banner ----------------------------------------------------------- */
 
 .banner {
@@ -608,6 +645,10 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--primary);
 }
 
 /* ---- app bar ---------------------------------------------------------- */
@@ -804,6 +845,10 @@ select.auth-input {
   color: var(--primary);
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.auth-footer a:hover {
+  color: var(--primary-hover);
 }
 
 /* Taller than the standard button, to match the input rhythm above it. */
@@ -1154,6 +1199,49 @@ select.auth-input {
   display: flex;
   gap: 10px;
   margin-top: 20px;
+}
+
+/* ---- confirm dialog ---------------------------------------------------- */
+
+/* A question, not a form: everything centred, two equal answers. */
+.confirm-dialog {
+  max-width: 400px;
+  padding: 32px 28px 24px;
+  text-align: center;
+}
+
+.confirm-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.confirm-dialog__icon--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.confirm-dialog .modal-title {
+  margin: 0 0 8px;
+}
+
+.confirm-dialog__message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.confirm-dialog__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 /* ---- admin sidebar ----------------------------------------------------- */

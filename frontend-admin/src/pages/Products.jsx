@@ -5,6 +5,7 @@ import {
   Badge,
   Banner,
   Button,
+  ConfirmDialog,
   EmptyState,
   PageHeader,
   Skeleton,
@@ -70,6 +71,7 @@ const limitLabel = (product) => {
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirming, setConfirming] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [stockGroups, setStockGroups] = useState([]);
   const [units, setUnits] = useState([]);
@@ -267,15 +269,21 @@ const Products = () => {
     setNudged(false);
   };
 
-  const setArchived = async (product, archived) => {
-    if (
-      archived &&
-      !window.confirm(
-        `Archive ${product.name}? It disappears from sale everywhere; its stock and history stay, and you can restore it any time.`
-      )
-    )
+  const setArchived = (product, archived) => {
+    if (!archived) {
+      applyArchived(product, false);
       return;
+    }
+    setConfirming({
+      title: `Archive ${product.name}?`,
+      message: 'It disappears from sale everywhere; its stock and history stay, and you can restore it any time.',
+      icon: 'trash',
+      variant: 'danger',
+      action: () => applyArchived(product, true),
+    });
+  };
 
+  const applyArchived = async (product, archived) => {
     try {
       await api.put(`/products/${product._id}`, { active: !archived });
       if (editingId === product._id) clearForm();
@@ -413,13 +421,20 @@ const Products = () => {
       toast.error('Move these products to another sub-category before removing it');
       return;
     }
-    if (!window.confirm(`Remove the empty sub-category “${name}”?`)) return;
-    try {
-      await saveSubCategories(category, categorySubCategories(category).filter((item) => item !== name));
-      toast.success('Sub-category removed');
-    } catch {
-      // saveSubCategories handles the error.
-    }
+    setConfirming({
+      title: 'Remove sub-category?',
+      message: `Remove the empty sub-category “${name}”?`,
+      icon: 'trash',
+      variant: 'danger',
+      action: async () => {
+        try {
+          await saveSubCategories(category, categorySubCategories(category).filter((item) => item !== name));
+          toast.success('Sub-category removed');
+        } catch {
+          // saveSubCategories handles the error.
+        }
+      },
+    });
   };
 
   const reorderSubCategory = async (category, source, target) => {
@@ -1631,6 +1646,17 @@ const Products = () => {
         </div>
         );
       })()}
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
+      )}
     </div>
   );
 };

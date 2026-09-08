@@ -12,13 +12,14 @@ import {
   sanitizeAdmissionNumberInput,
 } from '../utils/admissionNumber';
 import {
-  Badge,
   Banner,
   Button,
+  ConfirmDialog,
   EmptyState,
   PageHeader,
   Skeleton,
 } from '../components/ui';
+import { StudentActivityModal } from '../components/WalletActivity';
 
 /* The student directory.
  *
@@ -38,14 +39,15 @@ const EMPTY_FORM = {
   admissionNumber: '',
   fatherName: '',
   roomId: '',
-  grade: '',
+  className: '',
+  section: '',
   parentPhoneNumber: '',
 };
 
 const SORTABLE_COLUMNS = [
   { key: 'admissionNumber', label: 'Admission No.' },
   { key: 'name', label: 'Name' },
-  { key: 'grade', label: 'Grade' },
+  { key: 'className', label: 'Class' },
   { key: 'roomNumber', label: 'Room' },
   { key: 'pocketMoney', label: 'Wallet', align: 'right' },
 ];
@@ -66,8 +68,10 @@ const FORM_FIELDS = [
     required: true,
   },
   { key: 'fatherName', label: "Father's name", placeholder: 'e.g. Ramesh Rao', required: true },
-  // Free text: grades are written 9-B, not 9.
-  { key: 'grade', label: 'Grade / class', placeholder: 'e.g. 9-B', required: true },
+  // Split from the old combined "9-B" grade: class and section each get their
+  // own box, both free text — LKG is a class and a section can be blank.
+  { key: 'className', label: 'Class', placeholder: 'e.g. 9', required: true },
+  { key: 'section', label: 'Section', placeholder: 'e.g. B' },
   {
     key: 'parentPhoneNumber',
     label: 'Parent contact number',
@@ -77,6 +81,24 @@ const FORM_FIELDS = [
     required: true,
   },
 ];
+
+/* Class and section for any student document, old or new: a row the split
+   migration has not reached yet still carries the combined grade ("9-B"),
+   split here on its last hyphen the same way the migration does. */
+const studentClass = (student) => {
+  if (student?.className) {
+    return { className: student.className, section: student.section || '' };
+  }
+  const whole = String(student?.grade ?? '').trim();
+  const cut = whole.lastIndexOf('-');
+  if (cut <= 0 || cut === whole.length - 1) return { className: whole, section: '' };
+  return { className: whole.slice(0, cut).trim(), section: whole.slice(cut + 1).trim() };
+};
+
+const classLabel = (student) => {
+  const { className, section } = studentClass(student);
+  return [className, section].filter(Boolean).join('-');
+};
 
 const newIdempotencyKey = () =>
   globalThis.crypto?.randomUUID?.() ||
@@ -96,8 +118,11 @@ const ModalHead = ({ title, subtitle, onClose }) => (
 
 const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChanged }) => {
   const [searchParams] = useSearchParams();
+  // The student whose orders and receipts are open, if any.
+  const [activityStudent, setActivityStudent] = useState(null);
   const focusedStudentId = searchParams.get('focus') || '';
   const [students, setStudents] = useState([]);
+  const [confirming, setConfirming] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -191,7 +216,8 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
       admissionNumber: student.admissionNumber || '',
       fatherName: student.fatherName || '',
       roomId: student.roomId || '',
-      grade: student.grade || '',
+      className: studentClass(student).className,
+      section: studentClass(student).section,
       parentPhoneNumber: student.parentPhoneNumber || '',
     });
     setEditorOpen(true);
@@ -272,12 +298,16 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
       return;
     }
 
-    const confirmed = window.confirm(
-      `Archive ${student.name}? They stop appearing in the directory and cannot use the kiosk.` +
-        ' Their financial history is kept.'
-    );
-    if (!confirmed) return;
+    setConfirming({
+      title: `Archive ${student.name}?`,
+      message: 'They stop appearing in the directory and cannot use the kiosk. Their financial history is kept.',
+      icon: 'trash',
+      variant: 'danger',
+      action: () => runArchive(student),
+    });
+  };
 
+  const runArchive = async (student) => {
     setArchiving(true);
     try {
       await api.delete(`/students/${student._id}`);
@@ -544,9 +574,16 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       : <span className="cell-unset">Not set</span>}
                   </td>
                   <td data-label="Name">
-                    <span className="cell-name">{student.name}</span>
+                    <button
+                      type="button"
+                      className="link-button cell-name"
+                      onClick={() => setActivityStudent(student)}
+                      aria-label={`Open ${student.name}'s orders and receipts`}
+                    >
+                      {student.name}
+                    </button>
                   </td>
-                  <td data-label="Grade">{student.grade || '—'}</td>
+                  <td data-label="Class">{classLabel(student) || '—'}</td>
                   <td data-label="Room">
                     {student.roomNumber
                       ? <span className="badge badge--neutral">{student.roomNumber}</span>
@@ -563,15 +600,12 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                     const variant = !parent.active ? 'neutral' : parent.activationRequired ? 'warn' : 'success';
                     const status = !parent.active ? 'Inactive' : parent.activationRequired ? 'Password setup pending' : 'Active';
                     return (
-                      <Badge variant={variant}>
-                        {status} ·{' '}
-                        <Link
-                          className="user-relationship-link"
-                          to={`/users/${parent.active ? 'parents' : 'archived'}?focus=${encodeURIComponent(parent.id)}`}
-                        >
-                          {parent.fatherName}
-                        </Link>
-                      </Badge>
+                      <Link
+                        className={`badge badge--${variant} badge-link`}
+                        to={`/users/${parent.active ? 'parents' : 'archived'}?focus=${encodeURIComponent(parent.id)}`}
+                      >
+                        {status} · {parent.fatherName}
+                      </Link>
                     );
                   })()}</td>
                   <td data-label="Actions">
@@ -727,8 +761,10 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
 
             <p className="modal-note">
               Columns read: <strong>name</strong>, <strong>admissionNumber</strong>,{' '}
-              <strong>fatherName</strong>, <strong>roomNumber</strong>, <strong>grade</strong> and{' '}
-              <strong>parentPhoneNumber</strong>. Every room in the sheet must already exist and be
+              <strong>fatherName</strong>, <strong>roomNumber</strong>, <strong>className</strong>,{' '}
+              <strong>section</strong> (optional) and <strong>parentPhoneNumber</strong>. Older
+              sheets with a combined <strong>grade</strong> column (9-B) still import — the class
+              and section are split from it. Every room in the sheet must already exist and be
               active. Admission numbers must contain 4–8 letters or numbers. Invalid sheets are
               refused before anything is written.
             </p>
@@ -796,6 +832,23 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             </div>
           </form>
         </div>
+      )}
+      {activityStudent && (
+        <StudentActivityModal
+          student={activityStudent}
+          onClose={() => setActivityStudent(null)}
+        />
+      )}
+      {confirming && (
+        <ConfirmDialog
+          {...confirming}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            const { action } = confirming;
+            setConfirming(null);
+            action();
+          }}
+        />
       )}
     </div>
   );

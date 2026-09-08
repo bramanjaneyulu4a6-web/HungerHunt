@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# `dist` above is this app's own build output. It also matched the local
+# Capacitor plugin's dist/, which is not build output: it is three
+# hand-written lines that register the plugin, and it is the package's
+# declared entry point ("main": "dist/index.js"). Ignoring it meant a fresh
+# checkout installed the plugin with nothing to import, and the Vite build
+# failed to resolve it. Both lines are needed — git will not look inside an
+# excluded directory, so the directory has to be re-included before its
+# contents can be.
+!plugins/*/dist/
+!plugins/*/dist/**
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

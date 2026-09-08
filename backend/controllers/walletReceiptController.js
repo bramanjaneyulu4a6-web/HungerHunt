@@ -3,8 +3,11 @@ import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import Student from '../models/Student.js';
+import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import PaymentIntent from '../models/PaymentIntent.js';
+import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
+import WalletReversal from '../models/WalletReversal.js';
 import phonepe from '../src/domain/payments/providers/phonepe.js';
 import { amountInWords, ensureReceiptNumbers } from '../utils/walletReceipts.js';
 import { renderReceiptPdf } from '../utils/receiptPdf.js';
@@ -61,14 +64,19 @@ const findAdjustment = async (adjustmentId, res) => {
     return null;
   }
 
+  /* Adjustment first, because deposits are what most receipts are. A
+     cancellation writes to the other ledger and is documented the same way —
+     one URL, one button, and the row itself decides which document comes
+     back. The two collections never share an id, so trying both in order is
+     not ambiguous. */
   const adjustment = await WalletAdjustment.findById(adjustmentId).lean();
+  if (adjustment) return { row: adjustment, Model: WalletAdjustment, refund: false };
 
-  if (!adjustment) {
-    res.status(404).json({ message: 'Receipt not found' });
-    return null;
-  }
+  const reversal = await WalletReversal.findById(adjustmentId).lean();
+  if (reversal) return { row: reversal, Model: WalletReversal, refund: true };
 
-  return adjustment;
+  res.status(404).json({ message: 'Receipt not found' });
+  return null;
 };
 
 /* Loads everything one receipt says, or answers the request itself and
@@ -79,8 +87,9 @@ const findAdjustment = async (adjustmentId, res) => {
 const loadReceipt = async (req, res) => {
   const { adjustmentId } = req.params;
 
-  const adjustment = await findAdjustment(adjustmentId, res);
-  if (!adjustment) return null;
+  const found = await findAdjustment(adjustmentId, res);
+  if (!found) return null;
+  const adjustment = found.row;
 
   /* One parent read serves both the ownership gate and the "received from"
    * block. Same refusals as assertOwnsStudent, without a second query. */
@@ -102,7 +111,7 @@ const loadReceipt = async (req, res) => {
     return null;
   }
 
-  return composeReceipt(adjustment, {
+  return composeReceipt(found, {
     name: parent.fatherName || '',
     phone: parent.phone,
   }, res);
@@ -111,7 +120,7 @@ const loadReceipt = async (req, res) => {
 /* The document itself. `receivedFrom` is who the money came from, which the
  * parent route reads off the signed-in account and the staff route off the
  * student's registered parent — the receipt says the same thing either way. */
-const composeReceipt = async (adjustment, receivedFrom, res) => {
+const composeReceipt = async ({ row: adjustment, Model, refund }, receivedFrom, res) => {
   const adjustmentId = String(adjustment._id);
 
   const student = await Student.findById(adjustment.studentId)
@@ -135,7 +144,7 @@ const composeReceipt = async (adjustment, receivedFrom, res) => {
       assigned.get(String(adjustment._id)) ||
       // A concurrent request may have numbered this row first; its number is
       // on the document now.
-      (await WalletAdjustment.findById(adjustmentId).lean())?.receiptNumber;
+      (await Model.findById(adjustmentId).lean())?.receiptNumber;
   }
 
   if (!receiptNumber) {
@@ -150,7 +159,10 @@ const composeReceipt = async (adjustment, receivedFrom, res) => {
     amountInWords: amountInWords(adjustment.amount),
     previousBalance: adjustment.previousBalance,
     newBalance: adjustment.newBalance,
-    mode: adjustment.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
+    // A refund is its own kind of document: money the school gave back, not
+    // money it took in. The renderer titles and words it accordingly.
+    kind: refund ? 'REFUND' : 'RECHARGE',
+    mode: refund ? 'REFUND' : adjustment.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
     student: {
       name: student.name,
       admissionNumber: student.admissionNumber,
@@ -165,7 +177,41 @@ const composeReceipt = async (adjustment, receivedFrom, res) => {
     company: companyDetails(),
   };
 
-  if (adjustment.source === 'PARENT_UPI') {
+  if (refund) {
+    /* What the refund undid. The order is the handle the family and the
+       storeroom both use, and the reason is the note whoever cancelled it
+       wrote — the two things this document exists to record.
+     *
+     * The UTR is the one the money arrived on, not one of its own: giving
+     * money back to a wallet moves nothing through the gateway. It prints
+     * only where the order was paid by UPI directly, labelled as the original
+     * payment's, because that is the reference a parent's bank knows. */
+    const order = await FulfillmentOrder.findById(adjustment.fulfillmentOrderId)
+      .select('_id status')
+      .lean();
+    const charge = await Transaction.findById(adjustment.transactionId)
+      .select('sourceType idempotencyKey')
+      .lean();
+    const intent =
+      charge?.sourceType === 'UPI_ORDER_PAYMENT' && charge.idempotencyKey
+        ? await PaymentIntent.findOne({ merchantOrderId: charge.idempotencyKey })
+            .select('merchantOrderId utr')
+            .lean()
+        : null;
+
+    receipt.refund = {
+      orderReference: order ? `#${String(order._id).slice(-6).toUpperCase()}` : '',
+      orderStatus: order?.status || '',
+      reason: adjustment.reason || '',
+      originalUtr: intent?.utr || '',
+      originalOrderRef: intent?.merchantOrderId || '',
+    };
+
+    if (adjustment.performedBy) {
+      const admin = await Admin.findById(adjustment.performedBy).select('name').lean();
+      if (admin) receipt.receivedBy = { name: admin.name };
+    }
+  } else if (adjustment.source === 'PARENT_UPI') {
     if (adjustment.paymentIntentId) {
       const intent = await PaymentIntent.findById(adjustment.paymentIntentId)
         .select('provider merchantOrderId providerOrderId degradedToTopup upiApp upiVpa utr checkoutMode')
@@ -204,8 +250,9 @@ const composeReceipt = async (adjustment, receivedFrom, res) => {
  * the collection by guessing; naming the student means the console can only
  * open receipts for the record it is already looking at. */
 const loadStaffReceipt = async (req, res) => {
-  const adjustment = await findAdjustment(req.params.adjustmentId, res);
-  if (!adjustment) return null;
+  const found = await findAdjustment(req.params.adjustmentId, res);
+  if (!found) return null;
+  const adjustment = found.row;
 
   if (String(adjustment.studentId) !== String(req.params.id)) {
     res.status(404).json({ message: 'Receipt not found' });
@@ -221,7 +268,7 @@ const loadStaffReceipt = async (req, res) => {
     .lean();
 
   if (parent) {
-    return composeReceipt(adjustment, {
+    return composeReceipt(found, {
       name: parent.fatherName || '',
       phone: parent.phone,
     }, res);
@@ -231,7 +278,7 @@ const loadStaffReceipt = async (req, res) => {
     .select('fatherName parentPhoneNumber')
     .lean();
 
-  return composeReceipt(adjustment, {
+  return composeReceipt(found, {
     name: student?.fatherName || '',
     phone: student?.parentPhoneNumber || '',
   }, res);

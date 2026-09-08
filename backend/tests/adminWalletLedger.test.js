@@ -414,6 +414,7 @@ describe('the whole school, for the dashboard', () => {
 
 describe('reprinting a receipt', () => {
   const receiptExists = (studentId = STUDENT_ID) => {
+    mock.method(WalletReversal, 'findById', () => ({ lean: async () => null }));
     mock.method(WalletAdjustment, 'findById', () => ({
       lean: async () => ({
         _id: ADJUSTMENT_ID,
@@ -456,6 +457,59 @@ describe('reprinting a receipt', () => {
     assert.match(response.headers.get('content-disposition'), /^inline; /);
     assert.match(response.headers.get('content-disposition'), /GMS0709990123001\.pdf/);
     // A PDF, not an error page rendered with the wrong header.
+    const head = new Uint8Array(await response.arrayBuffer()).slice(0, 4);
+    assert.equal(Buffer.from(head).toString(), '%PDF');
+  });
+
+  test('a refund prints its own document from the same route', async () => {
+    authenticate();
+    // The id names no adjustment, so the loader falls through to the reversal
+    // ledger — one route, one button, whichever ledger the row is in.
+    mock.method(WalletAdjustment, 'findById', () => ({ lean: async () => null }));
+    mock.method(WalletReversal, 'findById', () => ({
+      lean: async () => ({
+        _id: ADJUSTMENT_ID,
+        studentId: STUDENT_ID,
+        transactionId: '507f191e810c19729de860aa',
+        fulfillmentOrderId: '507f191e810c19729de860ab',
+        amount: 58,
+        previousBalance: 978,
+        newBalance: 1036,
+        reason: 'Order cancelled',
+        receiptNumber: 'GMS0509990123014',
+        createdAt: new Date('2026-09-05T09:53:26.000Z'),
+      }),
+    }));
+    mock.method(Parent, 'findOne', () => ({
+      select: () => ({ lean: async () => ({ fatherName: 'Dev Parent', phone: '9000000001' }) }),
+    }));
+    mock.method(Student, 'findById', () => ({
+      select: () => ({
+        lean: async () => ({
+          _id: STUDENT_ID,
+          name: 'Asha Rao',
+          admissionNumber: '990123',
+          className: '9',
+          section: 'B',
+          roomNumber: 'A-1',
+        }),
+      }),
+    }));
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      select: () => ({ lean: async () => ({ _id: '507f191e810c19729de860ab', status: 'CANCELLED' }) }),
+    }));
+    mock.method(Transaction, 'findById', () => ({
+      select: () => ({ lean: async () => ({ sourceType: 'UPI_ORDER_PAYMENT', idempotencyKey: 'HH-9' }) }),
+    }));
+    mock.method(PaymentIntent, 'findOne', () => ({
+      select: () => ({ lean: async () => ({ merchantOrderId: 'HH-9', utr: '429812345678' }) }),
+    }));
+
+    const response = await get(`/api/students/${STUDENT_ID}/receipts/${ADJUSTMENT_ID}/pdf`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/pdf');
+    assert.match(response.headers.get('content-disposition'), /GMS0509990123014\.pdf/);
     const head = new Uint8Array(await response.arrayBuffer()).slice(0, 4);
     assert.equal(Buffer.from(head).toString(), '%PDF');
   });

@@ -371,7 +371,8 @@ const Dashboard = () => {
                             : formatINR(entry.newBalance)}
                         </td>
                         <td className="ledger-actions">
-                          {entry.kind === "TOP_UP" && entry.student?.id && (
+                          {(entry.adjustmentId || entry.reversalId) &&
+                            entry.student?.id && (
                             <ReceiptButton studentId={entry.student.id} entry={entry} />
                           )}
                           {expandable && (

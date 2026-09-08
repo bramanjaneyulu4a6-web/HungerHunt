@@ -26,6 +26,9 @@ const money = (n) => Number(n).toFixed(2);
  * it. Nothing here re-derives it: the in-app receipt renders the same field,
  * and two copies of the rule is how the two views came to disagree before. */
 export const paymentModeLine = (receipt) => {
+  // Money going back does not have a payment mode; it has a destination, and
+  // there is only one — the wallet it was taken from.
+  if (receipt.kind === 'REFUND') return "Student's wallet";
   if (receipt.mode === 'CASH') return 'Cash — at school office';
   const label = receipt.payment?.upiLabel;
   return label ? `UPI (${label})` : 'UPI';
@@ -35,6 +38,10 @@ export const paymentModeLine = (receipt) => {
  * a payment up by, so it wins; the app name is the consolation when a receipt
  * predates references, and naming nothing beats naming the wrong app. */
 export const itemDescription = (receipt) => {
+  if (receipt.kind === 'REFUND') {
+    const order = receipt.refund?.orderReference;
+    return order ? `Refund — Cancelled Order ${order}` : 'Refund — Cancelled Order';
+  }
   if (receipt.mode === 'CASH') return 'Wallet Recharge (Cash)';
   const detail = receipt.payment?.merchantOrderId || receipt.payment?.upiLabel;
   return detail ? `Wallet Recharge (UPI — ${detail})` : 'Wallet Recharge (UPI)';
@@ -71,9 +78,14 @@ export const renderReceiptPdf = (receipt, stream) => {
     for (const line of extras) doc.text(line, M, doc.y + 2, { width: contentW, align: 'center' });
   }
 
+  const isRefund = receipt.kind === 'REFUND';
+
   doc.moveDown(1.2);
   doc.font('Helvetica-Bold').fontSize(12).fillColor(INK)
-    .text('WALLET RECHARGE RECEIPT', M, doc.y, { width: contentW, align: 'center' });
+    .text(isRefund ? 'WALLET REFUND RECEIPT' : 'WALLET RECHARGE RECEIPT', M, doc.y, {
+      width: contentW,
+      align: 'center',
+    });
 
   // Currency note left, copy mark right, on one line above the first rule.
   const noteY = doc.y + 12;
@@ -108,9 +120,11 @@ export const renderReceiptPdf = (receipt, stream) => {
   });
 
   const paymentMode = paymentModeLine(receipt);
-  const rightDetail = receipt.mode === 'CASH'
-    ? ['Received By', receipt.receivedBy?.name || '—']
-    : ['PhonePe Ref', receipt.payment?.providerOrderId || receipt.payment?.merchantOrderId || '—'];
+  const rightDetail = receipt.kind === 'REFUND'
+    ? ['Refunded By', receipt.receivedBy?.name || '—']
+    : receipt.mode === 'CASH'
+      ? ['Received By', receipt.receivedBy?.name || '—']
+      : ['PhonePe Ref', receipt.payment?.providerOrderId || receipt.payment?.merchantOrderId || '—'];
 
   y += 12;
   field('Receipt No.', receipt.receiptNumber, M, y, colW);
@@ -143,10 +157,19 @@ export const renderReceiptPdf = (receipt, stream) => {
   field('Parent Contact', receipt.parent.phone || '—', M + colW, y, colW);
 
   y += gap + 4;
-  heading('Payment Info', y);
+  heading(isRefund ? 'Refund Info' : 'Payment Info', y);
   y += 16;
-  field('Payment Mode', paymentMode, M, y, colW);
+  field(isRefund ? 'Refunded To' : 'Payment Mode', paymentMode, M, y, colW);
   field(rightDetail[0], rightDetail[1], M + colW, y, colW);
+
+  /* What was refunded and why. The order is the handle the storeroom, the
+     family and this document all share; the reason is the note whoever
+     cancelled it left, which is the whole point of the piece of paper. */
+  if (isRefund) {
+    y += gap;
+    field('Order', receipt.refund?.orderReference || '—', M, y, colW);
+    field('Reason', receipt.refund?.reason || '—', M + colW, y, colW);
+  }
 
   /* The bank's reference, on its own row because it is the one identifier
      here a parent can also find on their own bank statement. Cash receipts
@@ -155,6 +178,16 @@ export const renderReceiptPdf = (receipt, stream) => {
   if (receipt.mode === 'UPI' && receipt.payment?.utr) {
     y += gap;
     field('UTR', receipt.payment.utr, M, y, colW);
+  }
+
+  /* A refund's UTR is the one the money came in on. Labelled as the original
+     payment's, because it is: nothing left the school through the gateway,
+     and a parent looking this up at their bank will find the payment, not
+     the refund. Absent for an order paid out of the wallet, which was funded
+     by earlier deposits with UTRs of their own. */
+  if (isRefund && receipt.refund?.originalUtr) {
+    y += gap;
+    field('Original UTR', receipt.refund.originalUtr, M, y, colW);
   }
 
   // ── The itemized table ─────────────────────────────────────────────────
@@ -199,6 +232,9 @@ export const renderReceiptPdf = (receipt, stream) => {
     receipt.mode === 'UPI' && receipt.payment?.merchantOrderId
       ? `Order Ref: ${receipt.payment.merchantOrderId}.`
       : '',
+    isRefund && receipt.refund?.originalOrderRef
+      ? `Original payment ref: ${receipt.refund.originalOrderRef}.`
+      : '',
     receipt.note || '',
   ].filter(Boolean).join(' ');
 
@@ -212,12 +248,21 @@ export const renderReceiptPdf = (receipt, stream) => {
   const signY = H - 88;
   doc.font('Helvetica-Bold').fontSize(10).fillColor(INK);
   doc.text("Parent's Signature", M + 16, signY, { width: 200 });
-  doc.text("Receiver's Signature", W - M - 216, signY, { width: 200, align: 'right' });
+  // A refund is signed off by the school, not receipted by it.
+  doc.text(isRefund ? 'Authorised Signature' : "Receiver's Signature", W - M - 216, signY, {
+    width: 200,
+    align: 'right',
+  });
 
   doc.font('Helvetica-Bold').fontSize(9).fillColor(RED)
-    .text('Wallet recharges are non-refundable and non-transferable', M, H - 48, {
-      width: contentW, align: 'center',
-    });
+    .text(
+      isRefund
+        ? 'Refunded to the student wallet; not payable in cash or transferable'
+        : 'Wallet recharges are non-refundable and non-transferable',
+      M,
+      H - 48,
+      { width: contentW, align: 'center' }
+    );
 
   // A digital copy carries its own provenance where the paper one has pen.
   doc.font('Helvetica').fontSize(7).fillColor('#777777')

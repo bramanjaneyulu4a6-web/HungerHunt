@@ -89,7 +89,9 @@ export const entryAmount = (entry) => {
 export const fetchReceipt = async (studentId, entry) => {
   try {
     const response = await api.get(
-      `/students/${studentId}/receipts/${entry.adjustmentId}/pdf`,
+      // A deposit is opened by its adjustment, a refund by its reversal; the
+      // route takes either and answers with the document that row deserves.
+      `/students/${studentId}/receipts/${entry.adjustmentId || entry.reversalId}/pdf`,
       { responseType: 'blob' }
     );
     const named = /filename="?([^";]+)"?/i.exec(

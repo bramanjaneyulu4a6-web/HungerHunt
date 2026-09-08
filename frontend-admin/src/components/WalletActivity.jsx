@@ -123,7 +123,8 @@ export const EntryDetails = ({ entry }) => {
 const EntryRow = ({ entry, studentId, showStudent }) => {
   const { label, variant } = entryLabel(entry);
   const { direction } = describeEntry(entry);
-  const canPrint = entry.kind === 'TOP_UP' && entry.adjustmentId && (studentId || entry.student?.id);
+  const canPrint =
+    Boolean(entry.adjustmentId || entry.reversalId) && (studentId || entry.student?.id);
   const [open, setOpen] = useState(false);
   const expandable = hasDetails(entry);
   const columns = showStudent ? 7 : 6;

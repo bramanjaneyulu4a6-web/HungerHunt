@@ -236,6 +236,7 @@ export const getLedgerFeed = async (req, res) => {
           return {
             order,
             orderId: order?.reference || null,
+            reversalId: String(entry._id),
             transactionId: String(entry._id),
             reversedTransactionId: entry.transactionId ? String(entry.transactionId) : null,
           };

@@ -236,6 +236,9 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
               // The order it belongs to, and the charge it gave back — the two
               // handles anyone asking about a refund has to hand.
               orderId: order?.reference || null,
+              // What the receipt route opens for this row, as adjustmentId is
+              // for a deposit.
+              reversalId: String(entry._id),
               transactionId: String(entry._id),
               reversedTransactionId: entry.transactionId ? String(entry.transactionId) : null,
               utr:

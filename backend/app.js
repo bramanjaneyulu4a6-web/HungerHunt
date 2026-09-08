@@ -36,6 +36,7 @@ import { requestContext } from './src/interfaces/http/middleware/requestContext.
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
 import { paymentAccessSummary } from './config/paymentAccess.js';
+import { paymentConfigurationProblems } from './config/paymentConfig.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 import { currentDataRevision, dataRevision } from './middleware/dataRevision.js';
@@ -108,36 +109,10 @@ if (unverifiedBillsAccepted()) {
    boot is safer than publishing a button that can create half an intent and
    then fail because a credential or return URL was omitted. */
 const phonepePaymentsEnabled = process.env.PHONEPE_PAYMENTS_ENABLED === 'true';
-const missingPaymentEnv = [
-  'PHONEPE_MERCHANT_ID',
-  'PHONEPE_IOS_APP_ID',
-  'PHONEPE_CLIENT_ID',
-  'PHONEPE_CLIENT_SECRET',
-  'PHONEPE_WEBHOOK_USERNAME',
-  'PHONEPE_WEBHOOK_PASSWORD',
-  'PHONEPE_REDIRECT_BASE_URL',
-].filter((name) => !process.env[name]?.trim());
+const problems = paymentConfigurationProblems();
 
-const phonepeEnvironmentValid = ['sandbox', 'production'].includes(process.env.PHONEPE_ENV);
-const phonepeRedirectValid = (() => {
-  try {
-    const url = new URL(process.env.PHONEPE_REDIRECT_BASE_URL);
-    return process.env.NODE_ENV !== 'production' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-})();
-
-const paymentConfigurationProblems = [
-  ...(missingPaymentEnv.length ? [`missing ${missingPaymentEnv.join(', ')}`] : []),
-  ...(!phonepeEnvironmentValid ? ['PHONEPE_ENV must be sandbox or production'] : []),
-  ...(process.env.NODE_ENV === 'production' && process.env.PHONEPE_ENV !== 'production'
-    ? ['PHONEPE_ENV must be production'] : []),
-  ...(!phonepeRedirectValid ? ['PHONEPE_REDIRECT_BASE_URL must be a valid HTTPS URL in production'] : []),
-];
-
-if (phonepePaymentsEnabled && paymentConfigurationProblems.length) {
-  const message = `PhonePe payments are enabled with invalid configuration: ${paymentConfigurationProblems.join('; ')}.`;
+if (phonepePaymentsEnabled && problems.length) {
+  const message = `PhonePe payments are enabled with invalid configuration: ${problems.join('; ')}.`;
   if (process.env.NODE_ENV === 'production') throw new Error(message);
   console.warn(
     `${message} Payment creation stays unavailable until the values in backend/.env.example are set.`

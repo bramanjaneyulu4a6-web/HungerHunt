@@ -98,6 +98,8 @@ services:
         sync: false
       # Public identifier issued by PhonePe for the iOS app after its Apple
       # Team ID is registered. This is distinct from the bundle identifier.
+      # Optional — the iOS SDK checkout is the only thing that reads it, so a
+      # web or Android launch can leave it unset and still boot.
       - key: PHONEPE_IOS_APP_ID
         sync: false
       - key: PHONEPE_CLIENT_ID

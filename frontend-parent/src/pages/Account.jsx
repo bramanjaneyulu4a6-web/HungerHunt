@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { useAuth } from '../context/auth';
 import Icon from '../components/Icon';
-import { Button, Card, PageHeader, PasswordField } from '../components/ui';
+import { formatClass, formatINR } from '../utils/format';
+import { Button, Card, PageHeader, PasswordField, Skeleton } from '../components/ui';
 
 const POLICIES = [
   { to: '/privacy-policy', label: 'Privacy policy' },
@@ -22,6 +23,39 @@ export default function Account() {
   const [deleting, setDeleting] = useState(false);
   const dialogRef = useRef(null);
   const deleteButtonRef = useRef(null);
+
+  // The same four-field children listing the accounts screen reads — this
+  // page only adds the admission number to what that endpoint already sends.
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsError, setStudentsError] = useState('');
+  const [studentsAttempt, setStudentsAttempt] = useState(0);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const response = await API.get('/parent/dashboard');
+        if (ignore) return;
+        setStudents(response.data.children || []);
+        setStudentsError('');
+      } catch (err) {
+        if (ignore) return;
+        setStudentsError(err.response?.data?.message || "Couldn't load your students.");
+      } finally {
+        if (!ignore) setStudentsLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [studentsAttempt]);
+
+  const retryStudents = () => {
+    setStudentsError('');
+    setStudentsLoading(true);
+    setStudentsAttempt((value) => value + 1);
+  };
 
   /* Hoisted above the effect and memoised so the effect can depend on it
      without being torn down and rebuilt on every render — rebuilding it would
@@ -108,9 +142,10 @@ export default function Account() {
   if (!parent) return null;
 
   return (
-    <>
-      <PageHeader title="Your account" subtitle="Your details, our policies, and how to leave." />
+    <div className="page">
+      <PageHeader title="Your account" subtitle="Your details, your students, our policies, and how to leave." />
 
+      <div className="account-stack">
       <Card>
         <h2 className="card-title">Your details</h2>
         <dl className="account-details">
@@ -130,6 +165,67 @@ export default function Account() {
         <p className="account-note">
           Your school keeps these details. Ask the office to change them.
         </p>
+      </Card>
+
+      <Card>
+        <h2 className="card-title">Your students</h2>
+        {studentsLoading && (
+          <div className="account-students">
+            <Skeleton height={92} radius={14} />
+          </div>
+        )}
+        {!studentsLoading && studentsError && (
+          <>
+            <p className="account-note">{studentsError}</p>
+            <Button variant="ghost" onClick={retryStudents} style={{ marginTop: 12 }}>
+              Try again
+            </Button>
+          </>
+        )}
+        {!studentsLoading && !studentsError && students.length === 0 && (
+          <p className="account-note">
+            No students are linked to this account yet. Contact the school office to link one.
+          </p>
+        )}
+        {!studentsLoading && !studentsError && students.length > 0 && (
+          <div className="account-students">
+            {students.map((child) => (
+              <section key={child._id} className="account-student" aria-label={child.name}>
+                <div className="account-student-head">
+                  <span className="student-avatar" aria-hidden="true">
+                    {child.name?.charAt(0).toUpperCase() || 'S'}
+                  </span>
+                  <strong>{child.name}</strong>
+                  <Link
+                    to={`/child/${child._id}`}
+                    className="account-student-link"
+                    aria-label={`View ${child.name}'s account`}
+                  >
+                    View account <Icon name="chevronRight" size={16} />
+                  </Link>
+                </div>
+                <dl className="account-details">
+                  <div>
+                    <dt>Admission number</dt>
+                    <dd>{child.admissionNumber || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Class</dt>
+                    <dd>{formatClass(child) || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Room</dt>
+                    <dd>{child.roomNumber || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Wallet balance</dt>
+                    <dd>{formatINR(Number(child.pocketMoney || 0))}</dd>
+                  </div>
+                </dl>
+              </section>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -169,6 +265,7 @@ export default function Account() {
           <Icon name="trash" size={18} /> Delete my account
         </button>
       </Card>
+      </div>
 
       {confirming && (
         <div className="parent-modal-backdrop" onClick={close}>
@@ -212,6 +309,6 @@ export default function Account() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

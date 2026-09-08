@@ -95,18 +95,19 @@ export default function Navbar() {
             <Icon name="home" size={18} /> Dashboard
           </NavLink>
           <NavLink to="/accounts" className={navClass}>
-            <Icon name="user" size={18} /> Accounts
-          </NavLink>
-          <NavLink to="/account" className={navClass}>
-            <Icon name="shield" size={18} /> Account
+            <Icon name="user" size={18} /> Students
           </NavLink>
         </nav>
 
         <div className="parent-account">
-          <span className="parent-account-avatar" aria-hidden="true">
-            {(parent.fatherName || 'P').charAt(0).toUpperCase()}
-          </span>
-          <span className="parent-account-name">{parent.fatherName || 'Parent'}</span>
+          {/* The avatar is the way into the parent's own account page; the
+              labelled tabs stay for the students. */}
+          <NavLink to="/account" className="parent-account-link" aria-label="Your account">
+            <span className="parent-account-avatar" aria-hidden="true">
+              {(parent.fatherName || 'P').charAt(0).toUpperCase()}
+            </span>
+            <span className="parent-account-name">{parent.fatherName || 'Parent'}</span>
+          </NavLink>
           <button
             ref={logoutButtonRef}
             type="button"
@@ -124,10 +125,7 @@ export default function Navbar() {
           <Icon name="home" size={21} /> <span>Dashboard</span>
         </NavLink>
         <NavLink to="/accounts" className={navClass}>
-          <Icon name="user" size={21} /> <span>Accounts</span>
-        </NavLink>
-        <NavLink to="/account" className={navClass}>
-          <Icon name="shield" size={21} /> <span>Account</span>
+          <Icon name="user" size={21} /> <span>Students</span>
         </NavLink>
       </nav>
 

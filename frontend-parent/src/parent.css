@@ -1418,6 +1418,22 @@ body {
   max-width: 100%;
 }
 
+/* The avatar and name are one link into the parent's own account page. */
+.parent-account-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.parent-account-link:focus-visible {
+  outline: 2px solid #8e351d;
+  outline-offset: 2px;
+}
+
 .parent-account-avatar,
 .parent-logout {
   flex-shrink: 0;
@@ -3199,9 +3215,15 @@ body {
 
 /* --- Account screen ------------------------------------------------- */
 
+/* One column, one rhythm: every card on the account page sits on the same
+   20px beat instead of butting against its neighbour. */
+.account-stack {
+  display: grid;
+  gap: 20px;
+}
+
 .account-details {
   display: grid;
-  gap: 14px;
   margin: 0;
 }
 
@@ -3209,6 +3231,17 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px dashed var(--parent-line);
+}
+
+.account-details div:first-child {
+  padding-top: 0;
+}
+
+.account-details div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .account-details dt {
@@ -3228,6 +3261,49 @@ body {
   margin: 16px 0 0;
   color: var(--parent-muted);
   font-size: 13px;
+}
+
+/* Each linked student is a soft inset panel of the card — the identity row
+   up top, the same detail rows the parent's own card uses below it. */
+.account-students {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.account-student {
+  padding: 16px;
+  border: 1px solid var(--parent-line);
+  border-radius: 14px;
+  background: var(--parent-soft);
+}
+
+.account-student-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--parent-line);
+}
+
+.account-student-head strong {
+  color: var(--parent-ink);
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+
+.account-student-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  min-height: 44px;
+  color: var(--parent-brand);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .account-policy-list {
@@ -3269,11 +3345,3 @@ body {
   font-size: 14px;
 }
 
-/* The bottom nav is laid out as a fixed column count, so a third tab has to
-   be given room or the three share two columns. Overriding here rather than
-   editing the rule above keeps this screen's styles in one block. */
-@media (max-width: 760px) {
-  .parent-bottom-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}

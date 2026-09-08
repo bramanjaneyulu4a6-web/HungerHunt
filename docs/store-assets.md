@@ -20,7 +20,7 @@ rather than the start — so re-check before a submission, not after.
 |---|---|---|---|
 | Apple | iPhone 6.9" screenshot | 1290 × 2796 portrait | Also accepted at that class: 1260 × 2736 and 1320 × 2868 |
 | Apple | iPhone 6.5" screenshot | 1242 × 2688 portrait | Also accepted: 1284 × 2778 |
-| Apple | iPad 13" screenshot | 2064 × 2752 portrait | **Required while the build targets iPad** — see below. Also accepted at that class: 2048 × 2732 |
+| Apple | iPad 13" screenshot | 2064 × 2752 portrait | **Not owed — the app is iPhone-only.** Listed for the day that changes; also accepted at that class: 2048 × 2732 |
 | Apple | Screenshot count | 1–10 across all device classes | |
 | Play | Phone screenshot | 1080 × 1920 portrait | Any side 320–3840px, longest side at most 2× the shortest |
 | Play | Screenshot count | 2–8 per device type | 2 is the minimum to publish at all; 4 at 1080px+ is the bar for store promotion |
@@ -34,22 +34,20 @@ assets](https://support.google.com/googleplay/android-developer/answer/9866151).
 
 Five things about that table are easy to get wrong.
 
-**The iPad row is there because the app is currently an iPad app.**
+**The iPad row is owed by nobody today.**
 `frontend-parent/ios/App/App.xcodeproj/project.pbxproj` sets
-`TARGETED_DEVICE_FAMILY = "1,2"` in both the Debug and the Release
-configuration (lines 328 and 351) — family 1 is iPhone, family 2 is iPad. While
-that is what the project says, App Store Connect will not accept the build for
-review without a 13" iPad screenshot set, and App Review runs the app on an
-iPad and files what it finds there against the submission.
+`TARGETED_DEVICE_FAMILY = "1"` in both the Debug and the Release configuration
+(lines 328 and 351) — family 1 is iPhone, and family 2, which Capacitor
+defaults to, has been removed deliberately. That deletes the whole obligation:
+no iPad set to capture, and no iPad in App Review. The decision is recorded in
+[RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md) under "Before the first
+release".
 
-Whether to keep iPad is an open decision, not a settled one, and it is recorded
-as such in [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md) under "Before the
-first release". Narrowing the value to `"1"` deletes the whole obligation:
-no iPad set, no iPad review. Keeping `"1,2"` means owing a full iPad set,
-captured on an iPad — which is the more expensive of the two answers and the
-one that happens by default if nobody chooses. `scripts/store-screenshots.mjs`
-emits the iPad size either way, because an unused directory costs seconds and a
-missing one costs a refused submission.
+The row stays in the table because putting family 2 back — a one-character
+edit — owes a full iPad set captured on an iPad before the build can be
+submitted at all, and the size is the thing nobody remembers.
+`scripts/store-screenshots.mjs` emits the iPad size either way, because an
+unused directory costs seconds and a missing one costs a refused submission.
 
 **Apple needs only one of the two iPhone sets.** Supplying 6.9" alone
 satisfies the requirement; Apple scales it down for every smaller class. The
@@ -117,14 +115,13 @@ for, which is the balance.
 Every shot is portrait. Both stores accept landscape; mixing orientations in
 one set looks like a mistake.
 
-**If the iPad target is kept, shoot the list again on an iPad.** Do not upscale
-the iPhone captures into the iPad slot: the app's layout is not the same at
-that width — the dashboard's child cards and the approval card both reflow —
-and a set of stretched phone screenshots is both obviously that and a poor
-description of what an iPad reviewer will actually see. Six shots on an iPad,
-same subjects, same fictional family, same portrait orientation. If instead
-`TARGETED_DEVICE_FAMILY` is narrowed to `"1"`, skip this entirely and ignore
-the `apple-ipad-13/` output directory.
+**No iPad set is needed** while `TARGETED_DEVICE_FAMILY` is `"1"`: shoot the
+list once on a phone and ignore the `apple-ipad-13/` output directory. If iPad
+is ever added back, shoot the whole list again on an iPad rather than upscaling
+the iPhone captures into the iPad slot — the app's layout is not the same at
+that width, the dashboard's child cards and the approval card both reflow, and
+a set of stretched phone screenshots is both obviously that and a poor
+description of what an iPad reviewer will actually see.
 
 ---
 

@@ -95,22 +95,20 @@ this paragraph.
 | Privacy policy URL | `https://hunger-hunt-parent.vercel.app/privacy-policy` |
 | Support URL | `https://hunger-hunt-parent.vercel.app/terms-and-conditions` |
 | Marketing URL | *(leave blank — there is no marketing site)* |
-| Support / contact email | `<<FILL IN>>` |
+| Support / contact email | `dhruv.kamma04@gmail.com` |
 | Support phone (Play requires email; phone optional) | `<<FILL IN, or omit>>` |
-| Registered address (already published in the app's policy pages) | 120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh 518003 |
+| Registered address (already published in the app's policy pages) | 120/3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh, India - 518003 — registered office of GRAARR MANAGEMENT SERVICES PRIVATE LIMITED |
 | Primary language | English (India) |
 | Price | Free |
 | Countries | India only |
 
 Three notes on that table.
 
-**There is no support email anywhere in the repo.** The policy pages give a
-postal address and office hours and nothing else. Apple requires a support URL
-that a user can actually reach support through, and Play requires a support
-email address as a listing field — so this has to be a real, monitored mailbox
-before either console will accept the record. Once it exists it belongs in
-`TermsAndConditions.jsx` and `PrivacyPolicy.jsx` too, so the app agrees with
-the listing.
+**The support email is `dhruv.kamma04@gmail.com`.** Apple requires a support
+URL that a user can actually reach support through, and Play requires a support
+email address as a listing field — so this has to stay a real, monitored
+mailbox. It is published in the Contact sections of `TermsAndConditions.jsx`
+and `PrivacyPolicy.jsx`, so the app agrees with the listing.
 
 **The support URL points at the Terms page** because that is the only page in
 the app carrying contact details today. If a proper support page is ever
@@ -174,7 +172,7 @@ Every student here has a school wallet. They buy food at the counter and at the 
 
 WHAT YOU SEE
 
-- Each child linked to you, their grade and room, and what is in their wallet right now.
+- Each child linked to you, their class and room, and what is in their wallet right now.
 - Every order: what was bought, what it cost, and how far it has got, from the moment it is paid for through to the package reaching the dorm.
 - Every movement of money in the wallet - top-ups you made, order payments taken out, refunds for cancelled orders - each one showing the balance before and after.
 - History arrives a page at a time, so a year of buying lunch does not have to load at once.
@@ -204,7 +202,7 @@ PRIVACY
 This app serves one school. It holds your name, your phone number and, if provided, your email address, plus your children's names, wallet balances and purchase history. It carries no advertising, no analytics and no tracking of any kind. You can delete your account from inside the app, at Account then Delete my account.
 ```
 
-Every claim above is a screen that exists: balances and grade/room on
+Every claim above is a screen that exists: balances and class/room on
 `Accounts.jsx`, orders and wallet activity on the two tabs of
 `ChildDetails.jsx`, the approval toggle and the spending limit in the same
 file, the four-digit code and its password-based reset in
@@ -230,17 +228,15 @@ are in [store-assets.md](store-assets.md): this file is the words of a listing,
 that one is the pictures. One fact about them belongs here, because it is
 settled in a build setting rather than behind a camera.
 
-**The app currently declares itself an iPad app as well as an iPhone app.**
+**The app declares itself an iPhone app and nothing else.**
 `frontend-parent/ios/App/App.xcodeproj/project.pbxproj` sets
-`TARGETED_DEVICE_FAMILY = "1,2"` in both configurations (lines 328 and 351).
-While that holds, App Store Connect will not let the build be submitted without
-a **13" iPad screenshot set at 2064 x 2752**, and App Review runs the app on an
-iPad. Whether to keep iPad or narrow the target to `"1"` is an open decision,
-recorded in [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md) under "Before the
-first release". It is not made here, and it changes what has to be uploaded:
-
-- Narrowed to iPhone: the two iPhone sets, and nothing else.
-- Left as it is: those, plus a full iPad set shot on an iPad.
+`TARGETED_DEVICE_FAMILY = "1"` in both configurations (lines 328 and 351), so
+what this listing owes App Store Connect is the iPhone screenshots and nothing
+else — no **13" iPad set at 2064 x 2752**, and no iPad in App Review. The
+decision is recorded in [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md) under
+"Before the first release"; if it is ever reversed, a full iPad set shot on an
+iPad becomes a condition of submitting at all, and this paragraph changes with
+it.
 
 ### Copyright — 15/100
 
@@ -249,14 +245,15 @@ Apple's format is the year the rights were obtained followed by the owner, with
 no `(c)` symbol — Apple draws one — and no URL.
 
 ```
-2026 HungerHunt
+2026 GRAARR MANAGEMENT SERVICES PRIVATE LIMITED
 ```
 
 The owner is not invented for the store record; it is the name the app already
 publishes as its own. `frontend-parent/src/pages/TermsAndConditions.jsx` §1
-says the platform "is owned by HungerHunt, whose registered office is at
-120-3-M-I-S, Sainath Nagar, Revenue Ward No. 120, Kurnool, Andhra Pradesh
-518003"; §5 says the platform's content is "owned by or licensed to
+says the platform "is owned by GRAARR MANAGEMENT SERVICES PRIVATE LIMITED
+(HungerHunt), whose registered office is at 120/3-M-I-S, Sainath Nagar, Revenue
+Ward No. 120, Kurnool, Andhra Pradesh, India - 518003"; §5 says the platform's
+content is "owned by or licensed to
 HungerHunt"; and the footer shared by every policy page,
 `frontend-parent/src/components/PolicyPage.jsx`, prints that same name above
 that same address — the address already in [Shared facts](#shared-facts). No
@@ -387,7 +384,7 @@ Functionality**.
 | Identifiers → User ID | Yes | The parent account id, carried in the session token. |
 | Identifiers → Device ID | Yes | The FCM push token and its platform, stored in `Parent.pushTokens` by `savePushToken`. |
 | Diagnostics → Other Diagnostic Data | Yes | The backend's HTTP access log (`morgan('combined')` in `app.js`): method, path, status, user agent, timestamp and originating IP, retained by the host. |
-| Other Data → Other Data Types | Yes | Two credentials and one school detail, none of which has a category of its own on this form. **The parent's account password** (`Parent.password`) and **the child's four-digit purchase code** (`Student.purchasePassword`, `select: false`), each stored only as a bcrypt hash — `bcrypt.hash(…, 10)` at `parentController.js:87`, `:254`, `:522`, `:575` and `:622`, never as plaintext, and never readable back. **Each child's grade and hostel room number** (`Student.grade`, `Student.hostelNumber`), shown on `Accounts.jsx`. |
+| Other Data → Other Data Types | Yes | Two credentials and one school detail, none of which has a category of its own on this form. **The parent's account password** (`Parent.password`) and **the child's four-digit purchase code** (`Student.purchasePassword`, `select: false`), each stored only as a bcrypt hash — `bcrypt.hash(…, 10)` at `parentController.js:87`, `:254`, `:522`, `:575` and `:622`, never as plaintext, and never readable back. **Each child's admission number, class and room number** (`Student.admissionNumber`, `Student.className` with `Student.section`, `Student.roomNumber`), shown on `Accounts.jsx` and `Account.jsx` and printed on a recharge receipt. |
 
 ### Data explicitly not collected
 
@@ -396,7 +393,7 @@ answers. Answer these, do not skip them.
 
 | Category | Types | Why not |
 |---|---|---|
-| Contact Info | Physical Address, Other User Contact Info | Never asked for, no field for it. The app does show each child's grade and hostel room number, which is neither a physical address nor contact information — it is declared above under Other Data → Other Data Types, which is where this form has room for it. |
+| Contact Info | Physical Address, Other User Contact Info | Never asked for, no field for it. The app does show each child's admission number, class and room number, which is neither a physical address nor contact information — it is declared above under Other Data → Other Data Types, which is where this form has room for it. |
 | Financial Info | Payment Info, Credit Info | The parent enters UPI details on PhonePe's own checkout, which the app hands off to. No card or UPI credential ever reaches this app or its backend. |
 | Health & Fitness | all | — |
 | Location | Precise, Coarse | No location permission is requested on either platform. |
@@ -560,7 +557,7 @@ Every student here has a wallet. They buy food at the canteen counter and at the
 
 SEE WHERE THE MONEY IS
 
-- Every child linked to you, their grade and room, and the balance in their wallet right now.
+- Every child linked to you, their class and room, and the balance in their wallet right now.
 - Every order: what was bought, what it cost, and how far it has got, from payment through to the package arriving at the dorm.
 - Every movement of money in the wallet - your top-ups, payments taken for orders, refunds for cancelled orders - each showing the balance before and after it.
 - History loads a page at a time, so a whole school year of lunches never has to load at once.
@@ -653,7 +650,7 @@ instructions and not into this file.
 - App or game: **App**
 - Free or paid: **Free**
 - Category: **Education**
-- Contact details: email `<<FILL IN>>`, website
+- Contact details: email `dhruv.kamma04@gmail.com`, website
   `https://hunger-hunt-parent.vercel.app`, phone optional
 - Privacy policy: `https://hunger-hunt-parent.vercel.app/privacy-policy`
 - Enrol in **Play App Signing at app creation**. It cannot be added later
@@ -718,7 +715,7 @@ an optional extra the parent opts into).
 | App activity → App interactions | App functionality — not collected in the app, but the backend's HTTP access log (`morgan('combined')`, `backend/app.js:136`) records the method, path and status of every request, and a path is a screen. Kept to run the service and to rate-limit sign-in and payment against abuse |
 | App activity → Other actions (approve/decline a purchase, spending-limit and approval settings) | App functionality |
 | Device or other IDs | App functionality — the FCM push token, so notifications can reach the right device |
-| Personal info → Other info | App functionality; Account management — the parent's account password and the child's four-digit purchase code, both held only as bcrypt hashes, plus each child's grade and hostel room number |
+| Personal info → Other info | App functionality; Account management — the parent's account password and the child's four-digit purchase code, both held only as bcrypt hashes, plus each child's admission number, class and room number |
 
 ### Declared as not collected
 
@@ -732,11 +729,11 @@ apps, other user-generated content; Web browsing history; App info and
 performance → **crash logs, diagnostics, other app performance data** (there
 is no crash reporter and no analytics SDK in the build).
 
-**On credentials, and on grade and room number.** Google's type list has no
+**On credentials, and on the school's own details.** Google's type list has no
 password row and no school-details row, and Personal info → **Other info** is
 the catch-all it provides — so that is where the account password, the child's
-four-digit purchase code and the child's grade and hostel room number are
-declared, rather than left undeclared for want of an exact label. Both
+four-digit purchase code and the child's admission number, class and room
+number are declared, rather than left undeclared for want of an exact label. Both
 credentials are bcrypt hashes; the form has no way to say so, which is why the
 privacy policy says it in §2 instead. Apple's equivalent is Other Data → Other
 Data Types, declared for the same three items. **The two forms and §2 of the
@@ -877,6 +874,15 @@ against the app and the policy against both.
 2026-09-02, A7–A9 and A12 on 2026-09-03 — and the page has been read back
 against this file end to end, in both directions: nothing the forms declare is
 missing from the policy, and nothing the policy admits is denied by a form.
+
+**A13, 2026-09-08: the admission number.** The app began showing each child's
+admission number to their parent — `Account.jsx` lists it above the class, and
+`ReceiptDialog.jsx` prints it on a wallet-recharge receipt — after §2 had been
+settled, so the list in §2 was silent about a school detail on screen. It is
+named there now, and in both privacy forms alongside the class and room number.
+This is the failure mode A7 records, arriving from the other direction: a new
+screen, not a cut sentence, and an exhaustive list is only exhaustive on the
+day it was written.
 They are kept below rather than deleted because each one records *why* a
 sentence reads as it does, and because the "currently" quote is what a future
 edit has to avoid reintroducing. Read them as standing constraints on that
@@ -997,7 +1003,7 @@ Currently (lines 23-27):
 
 Replace with:
 
-> We collect what the school gives us when it creates your account, and what you do in the app afterwards. That is your name, your mobile number and, if provided, your email address; the children linked to you, with their names, class, hostel room and wallet balance; the orders placed on those wallets and the money moving in and out of them; the settings you choose, such as a spending limit or whether a purchase needs your approval; and a notification token for each device you sign in on, so that we can reach it. We do not ask for your date of birth, your address, or any identity document.
+> We collect what the school gives us when it creates your account, and what you do in the app afterwards. That is your name, your mobile number and, if provided, your email address; the children linked to you, with their names, admission number, class, hostel room and wallet balance; the orders placed on those wallets and the money moving in and out of them; the settings you choose, such as a spending limit or whether a purchase needs your approval; and a notification token for each device you sign in on, so that we can reach it. We do not ask for your date of birth, your address, or any identity document.
 
 ---
 

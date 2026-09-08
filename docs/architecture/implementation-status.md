@@ -83,12 +83,27 @@ Updated: 2026-08-27
   wallet and inventory, cancels the package, releases its weekly slot, and
   preserves the original sale. Parents see the refund and Tally receives a
   Credit Note. Spending-limit calculations net reversals from gross purchases.
-- Parents can pay by UPI through PhonePe Standard Checkout v2, restricted to
-  UPI-only payment modes so the merchant fee stays at 0%. A `PaymentIntent`
+- Parents can pay by UPI through PhonePe Standard Checkout v2 on web. Native
+  builds use PhonePe Custom Checkout UPI Intent so the Hunger Hunt app owns
+  the PhonePe / Google Pay / Paytm chooser and returns to its own confirmation
+  UI. Native payments are restricted to UPI Intent; the browser checkout
+  permits UPI Intent and QR so desktop users, who have no installed UPI app
+  to launch, can still pay. Cards, wallets, net banking and UPI Collect remain
+  disabled. The flow forks by platform at intent creation (`checkoutMode`):
+  native builds request an app-specific `intentUrl` from `/payments/v2/pay`
+  and launch it through the local Capacitor bridge in `frontend-parent/plugins/
+  phonepe-payment`; the browser build still opens the hosted checkout page.
+  The older native Standard Checkout SDK path remains available behind its
+  explicit build flag. Either way a `PaymentIntent`
   row tracks every attempt from `CREATED` through `APPLIED` (or out to
   `FAILED`/`EXPIRED`/`AMOUNT_MISMATCH`), and only `settlePaymentIntent` ever
   moves money — it re-reads status from PhonePe's server API on every call,
-  never trusting a webhook body or a client's say-so. A UPI order payment
+  never trusting a webhook body or a client's say-so; the webhook itself is
+  acknowledged inside PhonePe's response deadline and settles afterwards,
+  with the reconcile sweep as recovery if the process dies in between.
+  Amounts are floored at PhonePe's ₹1 minimum in both the model and the
+  route, and every provider HTTP call carries a timeout
+  (`PHONEPE_HTTP_TIMEOUT_MS`). A UPI order payment
   bypasses the wallet entirely; a top-up credits it through the same
   `WalletAdjustment` ledger admin top-ups use. A captured payment whose order
   can no longer be bought is credited to the wallet instead
@@ -108,17 +123,21 @@ Updated: 2026-08-27
   reading the reconcile sweep's output. Nothing in the Admin app lists or
   searches them yet.
 - **iOS is configured but untested on real hardware**, the same status
-  `RELEASE-CHECKLIST.md` already records for native push: the UPI intent
-  schemes (`phonepe`, `gpay`, `paytm`, `bhim`, `tez`, `upi`) are declared in
-  `frontend-parent/ios/App/App/Info.plist` so the checkout page can hand off
-  to an installed UPI app, but that hand-off has only run on Android. It has
-  never been built and run on a physical iPhone, and the iOS Simulator cannot
-  install a UPI app to test against in the first place.
+  `RELEASE-CHECKLIST.md` already records for native push: the query schemes
+  PhonePe's SDK enumerates UPI apps with, and the `hungerhuntpay` return
+  scheme, are declared in `frontend-parent/ios/App/App/Info.plist`, but the
+  native SDK hand-off has only run on Android. It has never been built and
+  run on a physical iPhone, and the iOS Simulator cannot install a UPI app
+  to test against in the first place.
 - **Not live.** The feature is sandbox-ready, not production-ready: going
   live needs PhonePe Business production credentials, the production webhook
-  URL registered on the PhonePe dashboard, `PHONEPE_ENV=production` set, and
-  one real ₹1 transaction completed end to end before it is announced to
-  parents.
+  URL registered on the PhonePe dashboard, the `hungerhunt-reconcile-payments`
+  cron from `render.yaml` created in the Render dashboard, and one real ₹1
+  transaction completed end to end before it is announced to parents. The
+  backend enforces the rest: `PHONEPE_PAYMENTS_ENABLED` defaults to off (503
+  on payment creation), and turning it on in production with an incomplete
+  `PHONEPE_*` set—including the PhonePe-issued iOS application id—refuses to
+  boot rather than half-work.
 
 ## Required deployment actions
 

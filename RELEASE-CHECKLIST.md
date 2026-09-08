@@ -185,33 +185,25 @@ answer has to be findable at the moment the form does.
       [Google testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465),
       and [Google account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111).
 
-- [ ] **Decide whether this is an iPhone app or an iPhone-and-iPad app. It is
-      currently both, and nobody chose that.**
-      `frontend-parent/ios/App/App.xcodeproj/project.pbxproj` sets
-      `TARGETED_DEVICE_FAMILY = "1,2"` in both build configurations — Debug at
-      line 328, Release at line 351. Family 1 is iPhone, family 2 is iPad. That
-      is Capacitor's default, inherited rather than decided, and it is the more
-      expensive of the two answers. Nothing in this repo changes it for you:
-      it is a product call, not a build detail.
+- [x] **This is an iPhone app, not an iPad app — decided, and set in the
+      project.** `frontend-parent/ios/App/App.xcodeproj/project.pbxproj` sets
+      `TARGETED_DEVICE_FAMILY = "1"` in both build configurations — Debug at
+      line 328, Release at line 351. Family 1 is iPhone; family 2, which
+      Capacitor puts there by default and which nobody had chosen, is gone.
 
-      **Option A — narrow it to iPhone.** Set both lines to `"1"`. App Store
-      Connect then stops requiring iPad screenshots, and App Review stops
-      testing on an iPad. The app still installs and runs on one, in the iPhone
-      compatibility window, which is what most single-school apps do.
+      What that buys: App Store Connect does not ask for the 13" iPad
+      screenshot set, and App Review does not run the app on an iPad and file
+      what it finds there against the submission. The app still installs and
+      runs on one, in the iPhone compatibility window, which is what most
+      single-school apps do.
 
-      **Option B — keep iPad.** Then a **13" iPad screenshot set — 2064 × 2752,
-      portrait — is required before the build can be submitted at all**, and
-      App Review will run the entire app on an iPad and file whatever it finds
-      there against the submission. That means capturing the shot list a second
-      time on an iPad (see [docs/store-assets.md](docs/store-assets.md)) and
-      checking the layout at that width first, because no screen in this app
-      has been designed for it. The tooling is ready either way:
-      `scripts/store-screenshots.mjs` already emits an `apple-ipad-13/`
-      directory alongside the two iPhone sizes.
-
-      Leaving the file alone is not a way of avoiding the decision — it *is*
-      option B, taken by default. The moment that becomes expensive is the
-      upload, which is the worst moment to find out.
+      It stays on this page because it is a product call, and reversing it is
+      not free: adding family 2 back owes a full iPad set — 2064 × 2752,
+      portrait, captured on an iPad rather than upscaled — before the build can
+      be submitted at all, and no screen in this app has been designed for that
+      width. `scripts/store-screenshots.mjs` emits the `apple-ipad-13/`
+      directory either way; while the target is iPhone-only it is output
+      nobody uploads.
 
 - [ ] **Run Play's closed test: 12 opted-in testers, 14 continuous days.** Not
       a condition to check — this is a personal developer account created after
@@ -285,12 +277,25 @@ the build numbers still have to be incremented deliberately for each upload.
       default nobody chose. The demo checkout is not a choice at all — there is
       no combination of flags that ships it.
 
-      Setting the flags is still only half of it, and the half nothing checks:
-      real payments also need the backend's `PHONEPE_*` credentials (listed in
-      `backend/.env.example`), or the app offers a checkout the server cannot
-      start. The other way out is to submit with payments off and cut the
-      payments paragraphs from both descriptions and both sets of review notes
-      in [docs/store-listing.md](docs/store-listing.md), so the listing stops
+      Setting the flags is still only half of it: real payments also need the
+      backend switched on. That side now has its own explicit flag and its own
+      enforcement — `PHONEPE_PAYMENTS_ENABLED=false` serves 503 on payment
+      creation, and flipping it to `true` in production with any of the
+      `PHONEPE_*` values missing or invalid (the set is listed in
+      `backend/.env.example` and mirrored in [render.yaml](render.yaml))
+      refuses to boot rather than offer a checkout the server cannot finish.
+      So a frontend built with `VITE_PAYMENTS_ENABLED=true` requires, in
+      order: every `PHONEPE_*` production value set in the Render dashboard;
+      the PhonePe iOS application id issued after registering the Apple Team
+      ID (`PHONEPE_IOS_APP_ID`);
+      the webhook URL (`/api/payments/phonepe/webhook`) registered on the
+      PhonePe Business dashboard with the same basic-auth pair; the
+      `hungerhunt-reconcile-payments` cron from `render.yaml` created in the
+      dashboard; `PHONEPE_PAYMENTS_ENABLED=true`; and one real ₹1 top-up
+      completed end to end before parents are told anything. The other way out
+      is to submit with payments off and cut the payments paragraphs from both
+      descriptions and both sets of review notes in
+      [docs/store-listing.md](docs/store-listing.md), so the listing stops
       describing a feature the reviewer will not find. Either decision is fine.
       Not making one is now a failed build rather than a rejected submission,
       which is the cheaper place to find out.
@@ -317,6 +322,7 @@ node scripts/check-shared-files.mjs             # the files duplicated across ap
 VITE_API_BASE_URL=https://hungerhunt-dbat.onrender.com/api \
   VITE_PAYMENTS_ENABLED=true VITE_DEMO_UPI_ENABLED=false \
   npm run sync:release --prefix frontend-parent
+npm run check:native:compile --prefix frontend-parent # real Android + iOS compile
 ```
 
 - [ ] All of the above pass.

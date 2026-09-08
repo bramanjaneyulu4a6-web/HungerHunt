@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { PhonePePayment } from '@hungerhunt/phonepe-payment';
 import API from './api';
 import { checkoutContext } from '../utils/checkoutMode';
+import { paymentsVisible } from '../utils/paymentsAccess';
 import { wait } from '../utils/resumeAwareWait';
 
 /* THE GOLDEN RULE OF GATEWAYS
@@ -60,6 +62,40 @@ export const CUSTOM_UPI_INTENT_ENABLED = Capacitor.isNativePlatform();
  * launched — PhonePe rings whichever app owns that address — so unlike the
  * app picker above it is offered everywhere the gateway itself is. */
 export const UPI_COLLECT_ENABLED = PAYMENTS_ENABLED;
+
+/* Whether THIS parent may pay, which the build flag above cannot answer.
+ *
+ * The gateway can be fully live while only named accounts may reach it —
+ * how PhonePe reviews a working checkout in production without one appearing
+ * in front of the families on the roll. The allowlist lives in the backend's
+ * environment, so adding a reviewer's account is an env edit rather than four
+ * rebuilt frontends, and that makes availability a question to ask at runtime.
+ *
+ * Deliberately not cached across the session: the obvious cache is a
+ * module-level promise, and it would outlive a sign-out and hand the next
+ * parent to sign in on the same phone the previous parent's answer. The
+ * request is two booleans behind the auth gate, asked when a payment surface
+ * mounts, so paying for that correctness costs nothing worth counting.
+ *
+ * A failure resolves to "no". "We could not ask" and "you may not" lead to
+ * the same screen, and the alternative is a Pay button that 503s. */
+export const usePaymentsAvailable = () => {
+  const [answer, setAnswer] = useState(null);
+
+  useEffect(() => {
+    if (!PAYMENTS_ENABLED) return undefined;
+
+    let alive = true;
+    API.get('/payments/availability')
+      .then((res) => { if (alive) setAnswer(res.data?.paymentsEnabled === true); })
+      .catch(() => { if (alive) setAnswer(false); });
+
+    return () => { alive = false; };
+  }, []);
+
+  return paymentsVisible(PAYMENTS_ENABLED, answer);
+};
+
 
 /* A collect request is approved on a phone that may be in another room, so
  * the ordinary two-minute window would give up on payments that are simply

@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import { formatClass, formatINR } from '../utils/format';
+import { upiOffer } from '../utils/paymentsAccess';
 import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
 import PaymentMethodChooser from './PaymentMethodChooser';
 import { DEMO_UPI_PROVIDERS } from '../utils/demoUpi';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
-import { COLLECT_POLL_TIMEOUT_MS, createOrderPayment, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED } from '../services/payments';
+import { COLLECT_POLL_TIMEOUT_MS, createOrderPayment, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED, usePaymentsAvailable } from '../services/payments';
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -87,6 +88,11 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   const [confirming, setConfirming] = useState(null);
   const [reviewing, setReviewing] = useState(false);
   const [paymentChooserOpen, setPaymentChooserOpen] = useState(false);
+  /* Whether this account may reach the live gateway. False for every parent
+     but the marked test accounts, and false until the server has said so —
+     which lands this card on exactly the flow a build with payments switched
+     off has always shown. */
+  const paymentsAvailable = usePaymentsAvailable();
   const [demoOrderResult, setDemoOrderResult] = useState(null);
   const [error, setError] = useState(null);
   const [constraint, setConstraint] = useState(null);
@@ -401,7 +407,23 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   /* Demo and native Custom Checkout both use Hunger Hunt's app picker. Live
      web checkout stays a single UPI row because desktop users need PhonePe's
      hosted QR fallback rather than an installed-app intent. */
-  const demoCheckout = DEMO_UPI_ENABLED || !PAYMENTS_ENABLED;
+  /* Two separate questions, and keeping them separate is the point.
+
+     Whether this sheet offers UPI at all is a runtime fact about the account:
+     an ordinary parent gets the wallet and nothing else, because the gateway
+     is restricted to the accounts PhonePe is reviewing with.
+
+     Whether those rows are simulated is a build fact, and only a build fact.
+     Folding "this parent may not pay" into it — as `|| !paymentsAvailable`
+     did — answered a real parent's tap with a fabricated payment
+     confirmation, and made the mode change under an already-open sheet the
+     moment the availability answer landed: the confirmation timer cancels
+     itself on that flip and strands the parent on a spinner they cannot
+     dismiss. A build constant cannot flip. */
+  const { upiEnabled, demo: demoCheckout } = upiOffer({
+    canPay: paymentsAvailable,
+    demoEnabled: DEMO_UPI_ENABLED,
+  });
   const customIntentCheckout = !demoCheckout && CUSTOM_UPI_INTENT_ENABLED;
   // A typed UPI ID needs no installed app, so it is offered wherever the live
   // gateway is — including the browser, where the app rows are not.
@@ -463,6 +485,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           studentName={student.name || 'your child'}
           walletDisabled={insufficient || empty}
           busy={busy}
+          upiEnabled={upiEnabled}
           upiProviders={demoCheckout || customIntentCheckout ? DEMO_UPI_PROVIDERS : null}
           collectEnabled={collectCheckout}
           demoUpi={demoCheckout}

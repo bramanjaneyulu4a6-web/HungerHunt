@@ -23,7 +23,7 @@ import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedba
 import { presentError } from '../utils/errorPresentation';
 import { demoAmountProblem } from '../utils/demoUpi';
 import { tick } from '../utils/haptics';
-import { COLLECT_POLL_TIMEOUT_MS, createTopup, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED } from '../services/payments';
+import { COLLECT_POLL_TIMEOUT_MS, createTopup, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED, usePaymentsAvailable } from '../services/payments';
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
@@ -234,6 +234,13 @@ export default function ChildDetails() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+
+  /* Whether this account may reach the live gateway: false for every parent
+     but the marked test accounts, and false until the server has answered.
+     Both the Add money button and the checkout sheet below read it, so a
+     parent who may not pay sees the wallet screen a build with payments
+     switched off has always shown. */
+  const paymentsAvailable = usePaymentsAvailable();
 
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'wallet' ? 'wallet' : 'orders'
@@ -595,8 +602,8 @@ export default function ChildDetails() {
         inactiveLabel="Off"
         activeIcon={<Icon name="bell" size={24} />}
         inactiveIcon={<Icon name="cart" size={24} />}
-        activeDescription={`The counter can no longer charge ${student.name} directly. Each purchase is sent here for your approval, and nothing is taken from the wallet until you agree. Requests expire after three days.`}
-        inactiveDescription={`${student.name} can buy at the counter with their purchase code, and the wallet is charged there and then.`}
+        activeDescription="Every purchase waits for your approval. Nothing leaves the wallet until you say yes."
+        inactiveDescription={`${student.name} buys with their code and the wallet is charged right away.`}
       />
 
       <StatusToggleTile
@@ -792,7 +799,7 @@ export default function ChildDetails() {
       : null;
 
   const customIntentCheckout =
-    !DEMO_UPI_ENABLED && PAYMENTS_ENABLED && CUSTOM_UPI_INTENT_ENABLED;
+    !DEMO_UPI_ENABLED && paymentsAvailable && CUSTOM_UPI_INTENT_ENABLED;
 
   /* Shared by both history tabs: the first load shows skeletons, a failure
      offers to retry, and a full page offers the next one. */
@@ -924,7 +931,7 @@ export default function ChildDetails() {
       {activeTab === 'wallet' && (
         <div role="tabpanel" id="panel-wallet" aria-labelledby="tab-wallet" tabIndex={0}>
           <div className="wallet-actions">
-            {(PAYMENTS_ENABLED || DEMO_UPI_ENABLED) && (
+            {(paymentsAvailable || DEMO_UPI_ENABLED) && (
               <button
                 type="button"
                 className={`wallet-action${pressedTile === 'topup' ? ' wallet-action--on' : ''}`}
@@ -964,7 +971,7 @@ export default function ChildDetails() {
             eyebrow="Wallet"
             title="Add money"
             description={
-              !DEMO_UPI_ENABLED && PAYMENTS_ENABLED
+              !DEMO_UPI_ENABLED && paymentsAvailable
                 ? `Top up ${student.name}'s wallet by UPI.`
                 : `Choose an amount to add to ${student.name}'s wallet using UPI.`
             }
@@ -1017,7 +1024,7 @@ export default function ChildDetails() {
               >
                 {topupBusy
                   ? 'Waiting for the bank…'
-                  : !DEMO_UPI_ENABLED && PAYMENTS_ENABLED
+                  : !DEMO_UPI_ENABLED && paymentsAvailable
                     ? 'Add money by UPI'
                     : 'Add money to wallet'}
               </Button>
@@ -1057,7 +1064,7 @@ export default function ChildDetails() {
             <DemoUpiCheckout
               amount={Number(topupAmount)}
               studentName={student.name}
-              demo={DEMO_UPI_ENABLED || !PAYMENTS_ENABLED}
+              demo={DEMO_UPI_ENABLED}
               collectEnabled={!DEMO_UPI_ENABLED && UPI_COLLECT_ENABLED}
               onPay={addMoney}
               onClose={() => setDemoCheckoutOpen(false)}

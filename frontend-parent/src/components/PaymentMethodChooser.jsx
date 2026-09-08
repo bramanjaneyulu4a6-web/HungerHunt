@@ -31,6 +31,14 @@ const SUCCESS_HOLD_MS = 2000;
    something else has one, a row that commits does not — which is why the
    wallet, which always commits, never carries one.
 
+   `upiEnabled` false removes every UPI row, leaving the wallet as the only way
+   to pay. That is the state an ordinary parent is in while the gateway is
+   restricted to the accounts PhonePe is reviewing with: not a UPI choice that
+   fails, and emphatically not the demo checkout, which would answer a real
+   parent with a confirmation and a reference number for a payment that never
+   happened. The wallet row is untouched by it — approving an order out of the
+   wallet is what this sheet did before UPI existed.
+
    `collectEnabled` adds the row where a parent types their own UPI ID. It is
    independent of `upiProviders` and offered in a browser as well as on a phone,
    because a collect request needs nothing installed and nothing launched: the
@@ -49,6 +57,7 @@ export default function PaymentMethodChooser({
   studentName,
   walletDisabled,
   busy,
+  upiEnabled = true,
   upiProviders = null,
   collectEnabled = false,
   demoUpi = false,
@@ -240,7 +249,7 @@ export default function PaymentMethodChooser({
             </header>
 
             <div className="payment-choice-options">
-              {listed ? (
+              {upiEnabled && (listed ? (
                 upiProviders.map((option) => (
                   <button
                     key={option.id}
@@ -271,11 +280,11 @@ export default function PaymentMethodChooser({
                   </span>
                   <span className="payment-choice-chevron" aria-hidden="true">›</span>
                 </button>
-              )}
+              ))}
 
               {/* Typing an address opens a form rather than a payment, so this
                   row keeps its chevron where the app rows do not. */}
-              {collectEnabled && (
+              {upiEnabled && collectEnabled && (
                 <button
                   type="button"
                   className="payment-choice-option"

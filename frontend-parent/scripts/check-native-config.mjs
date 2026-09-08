@@ -6,8 +6,19 @@ const read = (relative) => readFileSync(resolve(root, relative), 'utf8');
 const packageJson = JSON.parse(read('package.json'));
 const capacitor = JSON.parse(read('capacitor.config.json'));
 const android = read('android/app/build.gradle');
+const androidRoot = read('android/build.gradle');
 const variables = read('android/variables.gradle');
 const xcode = read('ios/App/App.xcodeproj/project.pbxproj');
+const infoPlist = read('ios/App/App/Info.plist');
+const paymentService = read('src/services/payments.js');
+const phonePePackage = read('plugins/phonepe-payment/Package.swift');
+const phonePeAndroid = read(
+  'plugins/phonepe-payment/android/src/main/java/com/hungerhunt/phonepe/PhonePePaymentPlugin.java'
+);
+const phonePeAndroidGradle = read('plugins/phonepe-payment/android/build.gradle');
+const phonePeIos = read(
+  'plugins/phonepe-payment/ios/Sources/PhonePePaymentPlugin/PhonePePaymentPlugin.swift'
+);
 const requireCredentials = process.argv.includes('--credentials');
 const errors = [];
 
@@ -47,6 +58,37 @@ if (!xcode.includes('PrivacyInfo.xcprivacy in Resources')) {
 }
 if (!xcode.includes('FirebaseMessaging in Frameworks')) {
   errors.push('FirebaseMessaging is not linked to the iOS app target.');
+}
+
+if (capacitor.android?.allowMixedContent === true) {
+  errors.push('android.allowMixedContent must not be enabled in a release WebView.');
+}
+
+if (packageJson.dependencies?.['@hungerhunt/phonepe-payment'] !== 'file:plugins/phonepe-payment') {
+  errors.push('The local PhonePe Capacitor plugin dependency is missing.');
+}
+if (!androidRoot.includes('phonepe-intentsdk-android')) {
+  errors.push('The official PhonePe Android Maven repository is missing.');
+}
+if (!phonePeAndroidGradle.includes('IntentSDK:5.3.2') || !phonePeAndroid.includes('SDKType.IONIC')) {
+  errors.push('The Android bridge must use PhonePe IntentSDK 5.3.2 and identify itself as Ionic.');
+}
+if (!phonePeAndroid.includes('openUpiIntent') || !phonePeIos.includes('openUpiIntent')) {
+  errors.push('The native bridge must expose the custom UPI intent launcher on Android and iOS.');
+}
+if (!phonePePackage.includes('PhonePe/PhonePePayment.git') || !phonePePackage.includes('exact: "5.4.0"')) {
+  errors.push('The iOS bridge must pin the official PhonePePayment 5.4.0 package.');
+}
+if (!/\{\s*_,\s*state\s+in/.test(phonePeIos)) {
+  errors.push('The iOS PhonePe completion must accept both SDK callback arguments.');
+}
+if (!phonePeIos.includes('appId: appId') || !paymentService.includes('appId: sdk.appId')) {
+  errors.push('The PhonePe-issued iOS app id is not passed through to the native SDK.');
+}
+for (const scheme of ['hungerhuntpay', 'ppemerchantsdkv1', 'ppemerchantsdkv5', 'gpay', 'paytmmp']) {
+  if (!infoPlist.includes(`<string>${scheme}</string>`)) {
+    errors.push(`The iOS PhonePe scheme ${scheme} is missing from Info.plist.`);
+  }
 }
 
 if (requireCredentials) {

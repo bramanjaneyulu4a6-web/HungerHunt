@@ -101,6 +101,15 @@
       }
     },
     {
+      "identity" : "ion-ios-filesystem",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ionic-team/ion-ios-filesystem.git",
+      "state" : {
+        "revision" : "0d81e26e828ff9582807e2339112cedf2e0fab85",
+        "version" : "1.1.2"
+      }
+    },
+    {
       "identity" : "leveldb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/leveldb.git",
@@ -116,6 +125,15 @@
       "state" : {
         "revision" : "3851d94a41890dea16dc3db34caf60e585cb4163",
         "version" : "2.30910.1"
+      }
+    },
+    {
+      "identity" : "phonepepayment",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PhonePe/PhonePePayment.git",
+      "state" : {
+        "revision" : "78fd947ab58cc4a9805b24860ec1b0ce333944b7",
+        "version" : "5.4.0"
       }
     },
     {

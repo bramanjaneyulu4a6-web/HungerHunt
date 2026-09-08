@@ -32,6 +32,12 @@ frontend-parent/ios/App/build/
 frontend-parent/ios/DerivedData/
 frontend-parent/android/.gradle/
 frontend-parent/android/app/build/
+# SPM resolution output inside the local Capacitor plugin. It holds full git
+# checkouts of the plugin's dependencies (nested .git directories), which git
+# would otherwise treat as embedded repositories on `git add`.
+frontend-parent/plugins/*/.build/
+frontend-parent/plugins/*/android/build/
+frontend-parent/plugins/*/android/.gradle/
 
 # Editor state. The Java extension writes settings here the moment anyone
 # opens frontend-parent/android, so this appears untracked on a clean checkout

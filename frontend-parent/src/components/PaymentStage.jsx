@@ -44,6 +44,44 @@ export function PaymentProcessingStage({ mark, title, message, amount, titleId }
   );
 }
 
+/* The two ways a payment lands without landing well. Neither carries the
+   success stage's receipt — a failed payment has nothing to hand over, and a
+   pending one would be promising something the bank has not said yet — and
+   both must be dismissed by hand: an auto-close would pull bad news out from
+   under a parent still reading it. */
+export function PaymentFailedStage({ message, titleId, onDone }) {
+  return (
+    <div className="upi-demo-state upi-demo-state--failed" aria-live="polite">
+      <div className="upi-demo-failed-mark" aria-hidden="true">
+        <span>✕</span>
+      </div>
+      {/* The verdict is the headline itself — full heading weight, in the
+         failure's own colour, carrying the dialog's aria-labelledby id. */}
+      <h2 id={titleId} className="upi-demo-failed-title">Payment failed</h2>
+      <p>{message}</p>
+      <button type="button" className="upi-demo-pay" onClick={onDone}>
+        Close
+      </button>
+    </div>
+  );
+}
+
+export function PaymentPendingStage({ title, message, titleId, onDone }) {
+  return (
+    <div className="upi-demo-state upi-demo-state--pending" aria-live="polite">
+      <div className="upi-demo-pending-mark" aria-hidden="true">
+        <span>•••</span>
+      </div>
+      <span className="upi-demo-badge upi-demo-badge--pending">Still processing</span>
+      <h2 id={titleId}>{title}</h2>
+      <p>{message}</p>
+      <button type="button" className="upi-demo-pay" onClick={onDone}>
+        Close
+      </button>
+    </div>
+  );
+}
+
 export function PaymentSuccessStage({ title, message, receipt, titleId, onDone = null }) {
   return (
     <div className="upi-demo-state upi-demo-state--success" aria-live="polite">

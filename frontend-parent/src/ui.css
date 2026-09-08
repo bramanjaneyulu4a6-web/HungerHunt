@@ -310,23 +310,6 @@
   cursor: pointer;
 }
 
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
-.checkbox-row input[type='checkbox'] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
 /* ---- ledger rows ------------------------------------------------------ */
 
 /* The invoice and recharge lists share this shape. */

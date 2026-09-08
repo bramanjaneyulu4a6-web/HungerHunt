@@ -673,6 +673,18 @@ body {
   color: #14743b;
 }
 
+/* The failed verdict's headline: the shared stage h2, recoloured — a header,
+   not a pill. */
+.upi-demo-state h2.upi-demo-failed-title {
+  color: #a82c1e;
+}
+
+.upi-demo-badge--pending {
+  border-color: #f0d9ae;
+  background: #fdf6e9;
+  color: #9a6a10;
+}
+
 .upi-demo-close {
   display: grid;
   flex: 0 0 42px;
@@ -837,6 +849,40 @@ body {
   border: 6px solid var(--parent-brand);
 }
 
+/* The way out of the app list, under it: a quiet text row rather than a fourth
+   tile, because typing an address is a different kind of act from picking one
+   of three logos and should not compete with them. */
+.upi-demo-use-id {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px dashed #d9d1c6;
+  border-radius: 13px;
+  background: none;
+  color: var(--parent-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.upi-demo-use-id:hover {
+  border-color: #b9ada0;
+  background: #faf7f3;
+}
+
+.upi-demo-use-id > :first-child {
+  color: #0f766e;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .upi-demo-trust {
   display: flex;
   align-items: flex-start;
@@ -873,6 +919,102 @@ body {
 
 .upi-demo-pay:active {
   transform: scale(0.99);
+}
+
+.upi-demo-pay:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ── Typing a UPI ID ──────────────────────────────────────────────────────
+   Shared by both checkouts (see components/UpiIdForm). The field is the only
+   thing on the screen, so it gets the room to be one: full width, generous
+   height, and a hint underneath that the error message replaces in place
+   rather than pushing the button around. */
+.upi-id-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 18px;
+}
+
+.upi-id-form label {
+  margin-bottom: 7px;
+  color: #6f665d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.upi-id-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 15px;
+  border: 1.5px solid #ded6cb;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--parent-ink);
+  font: inherit;
+  font-size: 16px; /* Anything smaller and iOS Safari zooms the page on focus. */
+  font-weight: 600;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.upi-id-input::placeholder {
+  color: #b3a99c;
+  font-weight: 500;
+}
+
+.upi-id-input:focus {
+  border-color: var(--parent-brand);
+  box-shadow: 0 0 0 3px rgba(247, 148, 29, 0.18);
+  outline: none;
+}
+
+.upi-id-input--invalid {
+  border-color: #c9382b;
+}
+
+.upi-id-input--invalid:focus {
+  border-color: #c9382b;
+  box-shadow: 0 0 0 3px rgba(201, 56, 43, 0.16);
+}
+
+.upi-id-hint,
+.upi-id-problem {
+  margin: 9px 2px 18px;
+  /* Both messages reserve the same two lines, so correcting a typo does not
+     make the Pay button jump under the parent's thumb. */
+  min-height: 32px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.upi-id-hint {
+  color: #6f665d;
+}
+
+.upi-id-problem {
+  color: #c9382b;
+  font-weight: 600;
+}
+
+.upi-id-back {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 0;
+  border-radius: 13px;
+  background: none;
+  color: #6f665d;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upi-id-back:hover {
+  color: var(--parent-ink);
 }
 
 .upi-demo-state {
@@ -955,6 +1097,61 @@ body {
   animation: upi-demo-confetti 800ms 180ms ease-out both;
 }
 
+/* The failed and pending verdicts share the success mark's build — same
+   circle, same entrance pop — so a payment landing badly still lands with
+   the same weight. Failure adds a headshake; neither throws confetti. */
+.upi-demo-state--failed,
+.upi-demo-state--pending {
+  min-height: 520px;
+}
+
+.upi-demo-failed-mark,
+.upi-demo-pending-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 102px;
+  height: 102px;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.upi-demo-failed-mark {
+  background: linear-gradient(145deg, #e05243, #b3271c);
+  box-shadow: 0 18px 36px -18px rgba(179, 39, 28, 0.75);
+  animation:
+    upi-demo-success-pop 560ms cubic-bezier(0.2, 1.5, 0.45, 1) both,
+    upi-demo-headshake 480ms 480ms ease-in-out both;
+}
+
+.upi-demo-pending-mark {
+  background: linear-gradient(145deg, #f0a53a, #cf7d10);
+  box-shadow: 0 18px 36px -18px rgba(207, 125, 16, 0.75);
+  animation: upi-demo-success-pop 560ms cubic-bezier(0.2, 1.5, 0.45, 1) both;
+}
+
+.upi-demo-failed-mark span {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.upi-demo-pending-mark span {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  line-height: 1;
+  text-indent: 4px;
+}
+
+/* The success stage's Done button gets its breathing room from the receipt
+   row above it; these stages have no receipt, so the button spaces itself. */
+.upi-demo-state--failed .upi-demo-pay,
+.upi-demo-state--pending .upi-demo-pay {
+  margin-top: 24px;
+}
+
 .upi-demo-receipt {
   display: flex;
   width: 100%;
@@ -988,6 +1185,14 @@ body {
 
 @keyframes upi-demo-success-pop {
   from { opacity: 0; transform: scale(0.45); }
+}
+
+@keyframes upi-demo-headshake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  45% { transform: translateX(6px); }
+  70% { transform: translateX(-4px); }
+  85% { transform: translateX(2px); }
 }
 
 @keyframes upi-demo-confetti {
@@ -2250,25 +2455,6 @@ body {
   min-width: 120px;
 }
 
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-/* Wallet Control opens from its own button above now, leaving Purchase
-   Approval alone here — a lone card in a two-column grid sat stranded at
-   half width. */
-.wallet-settings-grid {
-  grid-template-columns: minmax(0, 1fr);
-  margin-top: 24px;
-}
-
-.settings-card {
-  max-width: none !important;
-  margin: 0 !important;
-}
-
 .pending-card {
   max-width: 720px;
   margin: 0 auto 18px;
@@ -2623,10 +2809,6 @@ body {
   margin-top: 14px;
 }
 
-.checkbox-row input[type='checkbox'] {
-  accent-color: var(--parent-brand-deep);
-}
-
 .input:focus,
 .select:focus {
   border-color: var(--parent-brand);
@@ -2736,10 +2918,6 @@ body {
 
   .card-grid > * + * {
     margin-top: 18px;
-  }
-
-  .settings-grid {
-    grid-template-columns: 1fr;
   }
 
   .review-modal-backdrop {
@@ -3003,7 +3181,9 @@ body {
   .wallet-dialog,
   .upi-demo-spinner,
   .upi-demo-success-mark,
-  .upi-demo-success-mark i {
+  .upi-demo-success-mark i,
+  .upi-demo-failed-mark,
+  .upi-demo-pending-mark {
     animation: none;
   }
 

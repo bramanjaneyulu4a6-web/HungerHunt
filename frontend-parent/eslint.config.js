@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   // ios/ and android/ are Capacitor native shells: they contain Xcode build
   // output and a copy of the bundled web assets, none of it hand-written.
-  globalIgnores(['dist', 'ios', 'android']),
+  globalIgnores(['dist', 'ios', 'android', 'plugins/*/.build', 'plugins/*/android/build']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

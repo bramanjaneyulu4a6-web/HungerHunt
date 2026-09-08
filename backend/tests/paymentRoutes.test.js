@@ -6,6 +6,9 @@ process.env.JWT_SECRET ||= 'test-secret';
 process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
 process.env.NODE_ENV = 'test';
 process.env.PHONEPE_ENV = 'sandbox';
+process.env.PHONEPE_PAYMENTS_ENABLED = 'true';
+process.env.PHONEPE_MERCHANT_ID = 'M123';
+process.env.PHONEPE_IOS_APP_ID = 'APP123';
 process.env.PHONEPE_CLIENT_ID = 'x';
 process.env.PHONEPE_CLIENT_SECRET = 'x';
 process.env.PHONEPE_WEBHOOK_USERNAME = 'hookuser';
@@ -127,6 +130,144 @@ test('an order intent snapshots the order total in paise', async () => {
   assert.equal(capturedFilter.parentId, PARENT_ID);
 });
 
+test('a native payment returns an SDK order token instead of a redirect URL', async () => {
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createSdkPayment', async () => ({
+    providerOrderId: 'OMO-SDK', orderId: 'OMO-SDK', token: 'sdk-token', state: 'PENDING',
+  }));
+
+  const res = await send('POST', '/api/payments/intents', {
+    purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 1, checkoutMode: 'SDK',
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 201);
+  assert.equal(createdDoc.checkoutMode, 'SDK');
+  assert.equal(body.redirectUrl, undefined);
+  assert.deepEqual(body.sdk, {
+    orderId: 'OMO-SDK', token: 'sdk-token', merchantId: 'M123', appId: 'APP123', environment: 'SANDBOX',
+  });
+});
+
+test('a custom UPI intent maps the selected app on the server and returns only its intent URL', async () => {
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createUpiIntentPayment', async (request) => {
+    assert.equal(request.targetApp, 'com.google.android.apps.nbu.paisa.user');
+    assert.equal(request.deviceOS, 'ANDROID');
+    return { providerOrderId: 'OMO-INTENT', intentUrl: 'gpay://upi/pay?token=x', state: 'PENDING' };
+  });
+
+  const res = await send('POST', '/api/payments/intents', {
+    purpose: 'TOPUP',
+    studentId: STUDENT_ID,
+    amountRupees: 50,
+    checkoutMode: 'UPI_INTENT',
+    upiApp: 'gpay',
+    deviceOS: 'ANDROID',
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 201);
+  assert.equal(createdDoc.checkoutMode, 'UPI_INTENT');
+  assert.equal(createdDoc.upiApp, 'gpay', 'the chosen app is recorded — the receipt prints it');
+  assert.equal(body.intentUrl, 'gpay://upi/pay?token=x');
+  assert.equal(body.redirectUrl, undefined);
+  assert.equal(body.sdk, undefined);
+});
+
+test('a UPI collect payment records the typed address and returns nothing to open', async () => {
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createUpiCollectPayment', async (request) => {
+    assert.equal(request.vpa, 'ashok@okhdfcbank', 'the address reaches PhonePe normalized');
+    return { providerOrderId: 'OMO-COLLECT', state: 'PENDING' };
+  });
+
+  const res = await send('POST', '/api/payments/intents', {
+    purpose: 'TOPUP',
+    studentId: STUDENT_ID,
+    amountRupees: 50,
+    checkoutMode: 'UPI_COLLECT',
+    vpa: '  Ashok@OKHDFCBank ',
+  });
+  const body = await res.json();
+
+  assert.equal(res.status, 201);
+  assert.equal(createdDoc.checkoutMode, 'UPI_COLLECT');
+  assert.equal(createdDoc.upiVpa, 'ashok@okhdfcbank', 'the address is recorded — the receipt prints it masked');
+  assert.equal(createdDoc.upiApp, undefined, 'no app was chosen; the address decides which one rings');
+  // Nothing is launched for a collect: the parent approves in their own app.
+  assert.equal(body.redirectUrl, undefined);
+  assert.equal(body.intentUrl, undefined);
+  assert.equal(body.sdk, undefined);
+  // Only ever the masked form leaves this server, even back to the parent
+  // who typed it — the waiting screen says who was asked, not the whole ID.
+  assert.deepEqual(body.collect, { vpa: 'as***@okhdfcbank' });
+});
+
+test('a UPI collect payment rejects a malformed address before creating an intent', async () => {
+  asParent();
+  const created = mock.method(PaymentIntent, 'create', async () => null);
+  const collect = mock.method(phonepe, 'createUpiCollectPayment', async () => null);
+
+  for (const vpa of ['ashok', 'ashok@gmail.com', '', 'ashok ok@ybl']) {
+    const res = await send('POST', '/api/payments/intents', {
+      purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 50,
+      checkoutMode: 'UPI_COLLECT', vpa,
+    });
+    assert.equal(res.status, 400, `${vpa} should be refused`);
+  }
+
+  assert.equal(created.mock.callCount(), 0);
+  assert.equal(collect.mock.callCount(), 0);
+});
+
+test('a custom UPI intent rejects unknown app identifiers before creating an intent', async () => {
+  asParent();
+  const created = mock.method(PaymentIntent, 'create', async () => null);
+  const res = await send('POST', '/api/payments/intents', {
+    purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 50,
+    checkoutMode: 'UPI_INTENT', upiApp: 'made-up-app', deviceOS: 'ANDROID',
+  });
+
+  assert.equal(res.status, 400);
+  assert.equal(created.mock.callCount(), 0);
+});
+
+test('an order below PhonePe\'s ₹1 minimum is rejected before creating an intent', async () => {
+  asParent();
+  mock.method(PendingOrder, 'findOne', async () => ({
+    _id: ORDER_ID, parentId: PARENT_ID, studentId: STUDENT_ID, status: 'PENDING',
+    totalAmount: 0.5, expiresAt: new Date(Date.now() + 3600_000),
+  }));
+  const created = mock.method(PaymentIntent, 'create', async () => null);
+
+  const res = await send('POST', '/api/payments/intents', { purpose: 'ORDER', pendingOrderId: ORDER_ID });
+
+  assert.equal(res.status, 400);
+  assert.equal(created.mock.callCount(), 0);
+});
+
 test('reading a pending intent settles it first', async () => {
   asParent();
   const settled = mock.method(settle, 'settlePaymentIntent', async () =>
@@ -161,9 +302,14 @@ test('the webhook rejects a bad credential hash and never settles', async () => 
   assert.equal(settled.mock.callCount(), 0);
 });
 
-test('an authenticated webhook settles by merchantOrderId and answers 200', async () => {
+test('an authenticated webhook acknowledges before settlement finishes', async () => {
   mock.method(PaymentIntent, 'findOne', async () => ({ _id: INTENT_ID }));
-  const settled = mock.method(settle, 'settlePaymentIntent', async () => ({ status: 'APPLIED' }));
+  let releaseSettlement;
+  const settlementBlocked = new Promise((resolve) => { releaseSettlement = resolve; });
+  const settled = mock.method(settle, 'settlePaymentIntent', async () => {
+    await settlementBlocked;
+    return { status: 'APPLIED' };
+  });
   const auth = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
 
   const res = await fetch(base + '/api/payments/phonepe/webhook', {
@@ -172,11 +318,14 @@ test('an authenticated webhook settles by merchantOrderId and answers 200', asyn
     body: JSON.stringify({ event: 'checkout.order.completed', payload: { merchantOrderId: `HH-${INTENT_ID}` } }),
   });
 
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 202);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(settled.mock.callCount(), 1);
+  releaseSettlement();
+  await settlementBlocked;
 });
 
-test('a webhook for an unknown order still answers 200 and stays quiet', async () => {
+test('a webhook for an unknown order still answers 202 and stays quiet', async () => {
   mock.method(PaymentIntent, 'findOne', async () => null);
   const auth = crypto.createHash('sha256').update('hookuser:hookpass').digest('hex');
   const res = await fetch(base + '/api/payments/phonepe/webhook', {
@@ -184,15 +333,11 @@ test('a webhook for an unknown order still answers 200 and stays quiet', async (
     headers: { 'Content-Type': 'application/json', Authorization: auth },
     body: JSON.stringify({ payload: { merchantOrderId: 'HH-nobody' } }),
   });
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 202);
+  await new Promise((resolve) => setImmediate(resolve));
 });
 
-test('a webhook whose lookup rejects still answers instead of crashing the process', async () => {
-  // A bare, un-caught await here would reject the handler's promise; Express
-  // 4 does not catch that, and with no unhandledRejection handler installed
-  // it would take the whole backend down rather than answer PhonePe at all.
-  // This only proves a response comes back — see paymentController.js for
-  // why 500 (not the usual always-200) is the deliberate answer here.
+test('a webhook whose background lookup rejects remains acknowledged', async () => {
   mock.method(PaymentIntent, 'findOne', async () => {
     throw new Error('mongo buffering timed out');
   });
@@ -202,7 +347,8 @@ test('a webhook whose lookup rejects still answers instead of crashing the proce
     headers: { 'Content-Type': 'application/json', Authorization: auth },
     body: JSON.stringify({ payload: { merchantOrderId: `HH-${INTENT_ID}` } }),
   });
-  assert.equal(res.status, 500);
+  assert.equal(res.status, 202);
+  await new Promise((resolve) => setTimeout(resolve, 5));
 });
 
 /* ---- the public return-page read --------------------------------------- */

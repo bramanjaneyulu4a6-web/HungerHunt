@@ -234,7 +234,7 @@ export const settlePaymentIntent = async (intentId, deps = {}) => {
   if (!intent || TERMINAL.includes(intent.status)) return intent;
   if (intent.status === 'APPLYING') return intent; // another worker is mid-apply
 
-  const providerStatus = await provider.getOrderStatus(intent.merchantOrderId);
+  const providerStatus = await provider.getOrderStatus(intent.merchantOrderId, intent.checkoutMode);
 
   if (providerStatus.state === 'PENDING') return intent;
 
@@ -288,9 +288,17 @@ export const settlePaymentIntent = async (intentId, deps = {}) => {
   }
 
   // COMPLETED, right amount: claim it. Exactly one caller wins this write.
+  // The UTR rides along on the claim — it is what the receipt quotes, and
+  // this is the one write every settling path (webhook, poll, sweep) makes.
   const claimed = await PaymentIntent.findOneAndUpdate(
     { _id: intent._id, status: 'PENDING' },
-    { $set: { status: 'APPLYING', providerState: 'COMPLETED' } },
+    {
+      $set: {
+        status: 'APPLYING',
+        providerState: 'COMPLETED',
+        ...(providerStatus.utr ? { utr: providerStatus.utr } : {}),
+      },
+    },
     { new: true }
   );
 

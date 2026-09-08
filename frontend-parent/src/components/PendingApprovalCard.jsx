@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
-import { formatINR } from '../utils/format';
+import { formatClass, formatINR } from '../utils/format';
 import { Banner, Button, Card } from './ui';
 import Icon from './Icon';
 import PaymentMethodChooser from './PaymentMethodChooser';
 import { DEMO_UPI_PROVIDERS } from '../utils/demoUpi';
 import { ErrorFeedback, InlineFieldError } from './error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
-import { createOrderPayment, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { COLLECT_POLL_TIMEOUT_MS, createOrderPayment, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED } from '../services/payments';
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -47,7 +47,7 @@ const PAY_UPI_TERMINAL_COPY = {
 const DEGRADED_TOPUP_NOTE =
   'The order itself could not go through after payment, so instead of losing the money, the full amount was added to the wallet as balance. Nothing was lost — it is sitting as credit rather than having paid for that order.';
 
-// pollIntent's 5-minute cap lapsed without a terminal status — it gave up,
+// pollIntent's 2-minute cap lapsed without a terminal status — it gave up,
 // the payment did not fail. Same framing PaymentReturn.jsx uses for the
 // same situation.
 const PAY_UPI_STILL_PROCESSING = {
@@ -117,7 +117,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   }, [busy]);
 
   // A parent who navigates away mid-payment must not leave pollIntent's
-  // 3-second loop running in the background for up to 5 minutes, and must
+  // 3-second loop running in the background for up to 2 minutes, and must
   // not leave the degraded-notice timer trying to update this card later.
   useEffect(() => {
     // Strict Mode rehearses this effect once before the real mount. Reset the
@@ -221,11 +221,15 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   // Split from payByUpi so "Try again" after a poll failure can resume
   // checking the same intent without creating a second one (a second
   // startPayment call would open a second checkout).
-  const runPay = async (intentId, controller) => {
+  const runPay = async (intentId, controller, { deferResolution = false, collect = false } = {}) => {
     try {
       const finalIntent = await pollIntent(intentId, {
         onUpdate: (intent) => mountedRef.current && setPayState(intent),
         signal: controller.signal,
+        // A collect request waits on someone walking to their phone, so it is
+        // given longer before this screen stops watching. Nothing is lost past
+        // it either way: the backend settles the payment regardless.
+        ...(collect ? { timeoutMs: COLLECT_POLL_TIMEOUT_MS } : {}),
       });
       if (!mountedRef.current) return;
 
@@ -241,11 +245,14 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             if (!mountedRef.current) return;
             onResolved?.(DEGRADED_TOPUP_NOTE, { degradedToTopup: true });
           }, DEGRADED_NOTICE_DELAY_MS);
-        } else {
+        } else if (!deferResolution) {
           onResolved?.('Paid by UPI. The order is paid for.');
         }
       }
       setPayState(finalIntent);
+      return finalIntent?.degradedToTopup
+        ? { ...finalIntent, status: 'DEGRADED' }
+        : finalIntent;
     } catch (err) {
       if (!mountedRef.current) return;
       // The shared axios instance is already redirecting to /login for
@@ -258,6 +265,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
       // payment may well have gone through. This is a connectivity
       // problem with checking, not evidence the payment failed.
       setPayState({ status: 'POLL_FAILED', synthetic: true });
+      return null;
     } finally {
       if (mountedRef.current) {
         setBusy(false);
@@ -269,7 +277,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   // Deliberately not gated behind the insufficient-balance guard that blocks
   // Approve — paying by UPI is exactly what a parent reaches for when the
   // wallet doesn't cover the order.
-  const payByUpi = async () => {
+  const payByUpi = async (choice, { deferResolution = false } = {}) => {
     if (degradedNoticeTimeoutRef.current) {
       clearTimeout(degradedNoticeTimeoutRef.current);
       degradedNoticeTimeoutRef.current = null;
@@ -284,25 +292,28 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
 
     let intentId;
     try {
-      ({ intentId } = await startPayment(() => createOrderPayment(order._id)));
+      ({ intentId } = await startPayment(() => createOrderPayment(order._id, choice)));
     } catch (err) {
       if (mountedRef.current) {
         if (!isAuthRequiredError(err)) {
           setPayState({
             status: 'FAILED',
             synthetic: true,
-            message: err.response?.data?.message || 'Could not start the payment.',
+            message:
+              err.response?.data?.message ||
+              err.message ||
+              'Could not start the payment.',
           });
         }
         setBusy(false);
         setPayBusy(false);
       }
-      return;
+      return null;
     }
 
     if (!mountedRef.current) return;
     lastIntentIdRef.current = intentId;
-    await runPay(intentId, controller);
+    return runPay(intentId, controller, { deferResolution, collect: Boolean(choice?.vpa) });
   };
 
   // Resumes checking the same intent after a poll failure, rather than
@@ -326,7 +337,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     typeof payState === 'object' &&
     (payState.synthetic || TERMINAL_STATUSES.includes(payState.status));
 
-  // pollIntent's 5-minute cap lapsed and handed back the last non-terminal
+  // pollIntent's 2-minute cap lapsed and handed back the last non-terminal
   // status it saw — the poll gave up, the payment itself did not fail.
   const payGaveUp = !payBusy && payState && typeof payState === 'object' && !payTerminal;
 
@@ -387,19 +398,43 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     onResolved?.('Order placed. The wallet has been charged.');
   };
 
-  /* Exactly the condition under which the demo payment is what runs, so the
-     chooser lists UPI apps only when picking one here is what actually
-     decides the payment. On the live gateway it stays a single UPI row that
-     hands off, because the app is chosen in PhonePe's own screen, not ours. */
+  /* Demo and native Custom Checkout both use Hunger Hunt's app picker. Live
+     web checkout stays a single UPI row because desktop users need PhonePe's
+     hosted QR fallback rather than an installed-app intent. */
   const demoCheckout = DEMO_UPI_ENABLED || !PAYMENTS_ENABLED;
+  const customIntentCheckout = !demoCheckout && CUSTOM_UPI_INTENT_ENABLED;
+  // A typed UPI ID needs no installed app, so it is offered wherever the live
+  // gateway is — including the browser, where the app rows are not.
+  const collectCheckout = !demoCheckout && UPI_COLLECT_ENABLED;
 
-  // Only reachable with the live gateway: with the demo, the chooser lists the
-  // apps itself and there is no separate UPI row to hand off from.
+  // Live web fallback: PhonePe's hosted page owns the next choice.
   const chooseUpi = () => {
     setPaymentChooserOpen(false);
     if (compact) payByUpiFromReview();
     else payByUpi();
   };
+
+  const chooseCustomUpi = async (choice) => {
+    if (edited) {
+      setBusy(true);
+      setError(null);
+      try {
+        await putEdits();
+      } catch (err) {
+        setError(presentError(err, { message: err.response?.data?.message || 'That did not go through. Please try again.' }));
+        setBusy(false);
+        return null;
+      }
+    }
+    return payByUpi(choice, { deferResolution: true });
+  };
+
+  /* Which of the two the sheet's UPI rows lead to. A typed address always
+     settles inside the sheet, even on a web build whose app rows would hand
+     over to PhonePe's hosted page — there is no page to hand over to, and the
+     parent is waiting on their own phone rather than on this screen. */
+  const chooseUpiMethod = (choice) =>
+    customIntentCheckout || choice?.vpa ? chooseCustomUpi(choice) : chooseUpi();
 
   /* The demo payment confirms inside the chooser, so by the time this runs
      the parent has already seen it succeed. Everything that was open closes
@@ -412,6 +447,13 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
     navigate('/', { replace: true });
   };
 
+  const completeCustomOrderPayment = () => {
+    setPaymentChooserOpen(false);
+    setReviewing(false);
+    setConfirming(null);
+    onResolved?.('Paid by UPI. The order is paid for.');
+  };
+
   const paymentOverlays = (
     <>
       {paymentChooserOpen && (
@@ -421,11 +463,13 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           studentName={student.name || 'your child'}
           walletDisabled={insufficient || empty}
           busy={busy}
-          upiProviders={demoCheckout ? DEMO_UPI_PROVIDERS : null}
+          upiProviders={demoCheckout || customIntentCheckout ? DEMO_UPI_PROVIDERS : null}
+          collectEnabled={collectCheckout}
+          demoUpi={demoCheckout}
           onWallet={payThroughWallet}
           onWalletPaid={completeWalletPayment}
-          onUpi={chooseUpi}
-          onUpiPaid={completeDemoOrderPayment}
+          onUpi={chooseUpiMethod}
+          onUpiPaid={demoCheckout ? completeDemoOrderPayment : completeCustomOrderPayment}
           onClose={() => setPaymentChooserOpen(false)}
         />
       )}
@@ -690,7 +734,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             </span>
             <span>
               <b>{student.name || 'Your child'}</b>
-              <small>Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</small>
+              <small>Class {formatClass(student) || '—'} · Room {student.roomNumber || '—'}</small>
             </span>
           </button>
         ) : (
@@ -700,7 +744,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             </span>
             <span>
               <b>{student.name || 'Your child'}</b>
-              <small>Grade {student.grade || '—'} · Room {student.roomNumber || '—'}</small>
+              <small>Class {formatClass(student) || '—'} · Room {student.roomNumber || '—'}</small>
             </span>
           </div>
         )}

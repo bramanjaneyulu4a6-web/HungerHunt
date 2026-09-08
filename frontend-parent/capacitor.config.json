@@ -12,17 +12,25 @@
           }
         },
         "packageTraits": {
-          "@capacitor-firebase/authentication": ["Lite"]
+          "@capacitor-firebase/authentication": [
+            "Lite"
+          ]
         }
       }
     }
   },
   "plugins": {
     "FirebaseAuthentication": {
-      "providers": ["phone"]
+      "providers": [
+        "phone"
+      ]
     },
     "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
     }
   }
 }

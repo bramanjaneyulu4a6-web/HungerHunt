@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
 import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
-import { formatINR } from '../utils/format';
+import { formatClass, formatINR } from '../utils/format';
 import {
   AnimateIn,
   Banner,
@@ -17,12 +17,13 @@ import PendingApprovalCard from '../components/PendingApprovalCard';
 import OrderCard from '../components/OrderCard';
 import DemoUpiCheckout from '../components/DemoUpiCheckout';
 import WalletDialog from '../components/WalletDialog';
+import ReceiptDialog from '../components/ReceiptDialog';
 import StatusToggleTile from '../components/StatusToggleTile';
 import { ErrorFeedback, InlineFieldError } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
 import { demoAmountProblem } from '../utils/demoUpi';
 import { tick } from '../utils/haptics';
-import { createTopup, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES } from '../services/payments';
+import { COLLECT_POLL_TIMEOUT_MS, createTopup, CUSTOM_UPI_INTENT_ENABLED, DEMO_UPI_ENABLED, PAYMENTS_ENABLED, pollIntent, startPayment, TERMINAL_STATUSES, UPI_COLLECT_ENABLED } from '../services/payments';
 
 const BASE_TABS = [
   { id: 'orders', icon: '📦', label: 'Orders' },
@@ -64,7 +65,7 @@ const TOPUP_TERMINAL_COPY = {
   },
 };
 
-// pollIntent's 5-minute cap lapsed without a terminal status — it gave up,
+// pollIntent's 2-minute cap lapsed without a terminal status — it gave up,
 // the payment did not fail. Same framing PaymentReturn.jsx uses for the
 // same situation.
 const TOPUP_STILL_PROCESSING = {
@@ -249,6 +250,10 @@ export default function ChildDetails() {
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   // null | 'topup' | 'control' — which of the two wallet actions is open.
   const [walletDialog, setWalletDialog] = useState(null);
+  // The recharge whose receipt is open, by its adjustment id.
+  const [receiptFor, setReceiptFor] = useState(null);
+  // The activity card open to its references, one at a time.
+  const [expandedTx, setExpandedTx] = useState(null);
   /* Which tile is drawn pressed. It trails `walletDialog` rather than mirroring
      it: the sheet lifts off a screen the parent has not looked at in a while,
      and releasing the tile in the same frame gives them nothing to land on.
@@ -286,6 +291,9 @@ export default function ChildDetails() {
   // poll failure can resume checking the same payment instead of starting
   // a second one.
   const lastTopupIntentRef = useRef(null);
+  // Whether that payment was a collect, so a retry waits as long as the first
+  // attempt did rather than quietly halving its window.
+  const lastTopupWasCollectRef = useRef(false);
 
   // "Try again" bumps this to run the effect below again, which keeps the one
   // copy of the request inside the effect that owns and cancels it.
@@ -296,7 +304,7 @@ export default function ChildDetails() {
   };
 
   // A parent who navigates away mid-payment must not leave pollIntent's
-  // 3-second loop running in the background for up to 5 minutes.
+  // 3-second loop running in the background for up to 2 minutes.
   useEffect(
     () => () => {
       mountedRef.current = false;
@@ -557,6 +565,16 @@ export default function ChildDetails() {
      page's own wallet state, so the dialog that shows it stays a shell. */
   const renderWalletControl = () => (
     <>
+      {approvalBanner.message && (
+        <Banner
+          variant={approvalBanner.type === 'error' ? 'alert' : 'success'}
+          icon={approvalBanner.type === 'error' ? '⚠️' : '✅'}
+          style={{ marginBottom: 20 }}
+        >
+          {approvalBanner.message}
+        </Banner>
+      )}
+
       {walletBanner.message && (
         <Banner
           variant={walletBanner.type === 'error' ? 'alert' : 'success'}
@@ -566,6 +584,20 @@ export default function ChildDetails() {
           {walletBanner.message}
         </Banner>
       )}
+
+      {/* Saves on the flip, unlike the limit below — see toggleApproval. */}
+      <StatusToggleTile
+        label="Ask me before each purchase"
+        value={approvalRequired}
+        disabled={approvalSaving}
+        onTap={() => toggleApproval(!approvalRequired)}
+        activeLabel="On"
+        inactiveLabel="Off"
+        activeIcon={<Icon name="bell" size={24} />}
+        inactiveIcon={<Icon name="cart" size={24} />}
+        activeDescription={`The counter can no longer charge ${student.name} directly. Each purchase is sent here for your approval, and nothing is taken from the wallet until you agree. Requests expire after three days.`}
+        inactiveDescription={`${student.name} can buy at the counter with their purchase code, and the wallet is charged there and then.`}
+      />
 
       <StatusToggleTile
         label="Spending limit"
@@ -640,11 +672,15 @@ export default function ChildDetails() {
   // Split from addMoney so "Try again" after a poll failure can resume
   // checking the same intent without creating a second one (a second
   // startPayment call would open a second checkout).
-  const runTopupPoll = async (intentId, controller) => {
+  const runTopupPoll = async (intentId, controller, { collect = false } = {}) => {
     try {
       const finalIntent = await pollIntent(intentId, {
         onUpdate: (intent) => mountedRef.current && setTopupState(intent),
         signal: controller.signal,
+        // A collect request waits on someone walking to their phone, so this
+        // screen watches for longer before giving up. Nothing is lost past it
+        // either way: the backend settles the payment regardless.
+        ...(collect ? { timeoutMs: COLLECT_POLL_TIMEOUT_MS } : {}),
       });
       if (!mountedRef.current) return;
 
@@ -658,6 +694,7 @@ export default function ChildDetails() {
         refreshWallet();
         recharges.reload();
       }
+      return finalIntent;
     } catch (err) {
       if (!mountedRef.current) return;
       // The shared axios instance is already redirecting to /login for
@@ -670,12 +707,13 @@ export default function ChildDetails() {
       // payment may well have gone through. This is a connectivity
       // problem with checking, not evidence the payment failed.
       setTopupState({ status: 'POLL_FAILED', synthetic: true });
+      return null;
     } finally {
       if (mountedRef.current) setTopupBusy(false);
     }
   };
 
-  const addMoney = async () => {
+  const addMoney = async (choice) => {
     const amountRupees = Number(topupAmount);
     if (!Number.isInteger(amountRupees) || amountRupees < 1 || amountRupees > 20000) {
       setTopupState({
@@ -683,7 +721,7 @@ export default function ChildDetails() {
         synthetic: true,
         message: 'Enter a whole rupee amount between 1 and 20,000.',
       });
-      return;
+      return null;
     }
 
     setTopupState(null);
@@ -693,24 +731,29 @@ export default function ChildDetails() {
 
     let intentId;
     try {
-      ({ intentId } = await startPayment(() => createTopup(id, amountRupees)));
+      ({ intentId } = await startPayment(() => createTopup(id, amountRupees, choice)));
     } catch (err) {
       if (mountedRef.current) {
         if (!isAuthRequiredError(err)) {
           setTopupState({
             status: 'FAILED',
             synthetic: true,
-            message: err.response?.data?.message || 'Could not start the payment.',
+            message:
+              err.response?.data?.message ||
+              err.message ||
+              'Could not start the payment.',
           });
         }
         setTopupBusy(false);
       }
-      return;
+      return null;
     }
 
     if (!mountedRef.current) return;
     lastTopupIntentRef.current = intentId;
-    await runTopupPoll(intentId, controller);
+    const collect = Boolean(choice?.vpa);
+    lastTopupWasCollectRef.current = collect;
+    return runTopupPoll(intentId, controller, { collect });
   };
 
   // Resumes checking the same intent after a poll failure, rather than
@@ -722,7 +765,8 @@ export default function ChildDetails() {
     setTopupBusy(true);
     const controller = new AbortController();
     topupAbortRef.current = controller;
-    runTopupPoll(intentId, controller);
+    // The same payment deserves the same patience it was given the first time.
+    runTopupPoll(intentId, controller, { collect: lastTopupWasCollectRef.current });
   };
 
   // Keyed on the client-made `synthetic` flag rather than presence of a
@@ -733,7 +777,7 @@ export default function ChildDetails() {
     typeof topupState === 'object' &&
     (topupState.synthetic || TERMINAL_STATUSES.includes(topupState.status));
 
-  // pollIntent's 5-minute cap lapsed and handed back the last non-terminal
+  // pollIntent's 2-minute cap lapsed and handed back the last non-terminal
   // status it saw — the poll gave up, the payment itself did not fail.
   const topupGaveUp = !topupBusy && topupState && typeof topupState === 'object' && !topupTerminal;
 
@@ -746,6 +790,9 @@ export default function ChildDetails() {
     : topupGaveUp
       ? TOPUP_STILL_PROCESSING
       : null;
+
+  const customIntentCheckout =
+    !DEMO_UPI_ENABLED && PAYMENTS_ENABLED && CUSTOM_UPI_INTENT_ENABLED;
 
   /* Shared by both history tabs: the first load shows skeletons, a failure
      offers to retry, and a full page offers the next one. */
@@ -791,7 +838,7 @@ export default function ChildDetails() {
           <div>
             <h1 style={{ fontSize: 25, fontWeight: 850 }}>{student.name}</h1>
             <p className="student-meta">
-              Grade {student.grade || '—'} · Room {student.roomNumber || '—'}
+              Class {formatClass(student) || '—'} · Room {student.roomNumber || '—'}
             </p>
           </div>
         </div>
@@ -966,7 +1013,7 @@ export default function ChildDetails() {
               </div>
               <Button
                 disabled={topupBusy || demoCheckoutOpen}
-                onClick={DEMO_UPI_ENABLED ? openDemoTopup : addMoney}
+                onClick={DEMO_UPI_ENABLED || customIntentCheckout ? openDemoTopup : addMoney}
               >
                 {topupBusy
                   ? 'Waiting for the bank…'
@@ -998,8 +1045,8 @@ export default function ChildDetails() {
             <WalletDialog
               eyebrow="Wallet"
               title="Wallet control"
-              description={`Cap what ${student.name} can spend from the wallet over a set period.`}
-              busy={saving}
+              description={`Decide how ${student.name}'s wallet can be spent.`}
+              busy={saving || approvalSaving}
               onClose={() => setWalletDialog(null)}
             >
               {renderWalletControl()}
@@ -1010,8 +1057,21 @@ export default function ChildDetails() {
             <DemoUpiCheckout
               amount={Number(topupAmount)}
               studentName={student.name}
+              demo={DEMO_UPI_ENABLED || !PAYMENTS_ENABLED}
+              collectEnabled={!DEMO_UPI_ENABLED && UPI_COLLECT_ENABLED}
+              onPay={addMoney}
               onClose={() => setDemoCheckoutOpen(false)}
-              onComplete={setDemoPaymentResult}
+              /* A settled attempt — confirmed or failed — closes the Add money
+                 sheet along with the checkout: the parent already read the
+                 verdict full-screen, and the refreshed balance and activity
+                 list behind it are the lasting record. A pending payment goes
+                 back to the sheet instead, which owns the "still checking"
+                 banner and its retry. */
+              onComplete={(result) => {
+                setDemoPaymentResult(result);
+                setWalletDialog(null);
+              }}
+              onFailedClosed={() => setWalletDialog(null)}
             />
           )}
 
@@ -1025,96 +1085,174 @@ export default function ChildDetails() {
             ),
             // Already newest-first from the server, which is what the reversed
             // client-side copy was approximating.
-            children: recharges.items.map((r, i) => (
-              <AnimateIn key={`${r.date}-${i}`} index={i}>
-                <Card className="card--tight" style={{ marginBottom: 16 }}>
-                  <div className="ledger-head">
-                    <span>
-                      {r.kind === 'ORDER_PAYMENT'
-                        ? 'Order payment'
-                        : r.kind === 'ORDER_CANCELLATION_REFUND'
-                          ? 'Cancelled Order Refund'
-                          : 'Money added'}
-                    </span>
-                    <span>{formatDate(r.date)}</span>
-                  </div>
-
-                  <div className="ledger-total" style={{ border: 'none', paddingTop: 0 }}>
-                    <span>
-                      {r.kind === 'ORDER_PAYMENT'
-                        ? 'Amount deducted'
-                        : r.kind === 'ORDER_CANCELLATION_REFUND'
-                          ? 'Refund amount'
-                          : 'Amount added'}
-                    </span>
-                    <span className={r.kind === 'ORDER_PAYMENT' ? 'amount-out' : 'amount-in'}>
-                      {r.kind === 'ORDER_PAYMENT' ? '-' : '+'}{formatINR(r.amount)}
-                    </span>
-                  </div>
-
-                  <div className="ledger-row">
-                    <span>Previous Balance</span>
-                    <span>{formatINR(r.previousBalance)}</span>
-                  </div>
-
-                  {/* Top-ups carry no reason; a payment names its order and a
-                      refund carries what the storeroom wrote. */}
-                  {r.reason && (
-                    <div className="ledger-row">
-                      <span>Reason</span>
-                      <span>{r.reason}</span>
+            /* One movement, one card, read the way a bank statement reads:
+               what it was on the left, when on the right, then the signed
+               amount against the balance it left behind. Everything else —
+               the order it paid, the codes to quote, the receipt — waits
+               below a tap. */
+            children: recharges.items.map((r, i) => {
+              const key = String(r._id || `${r.date}-${i}`);
+              const failed = r.kind === 'TOPUP_FAILED';
+              const label =
+                r.kind === 'ORDER_PAYMENT'
+                  ? 'Student Wallet Payment'
+                  : r.kind === 'UPI_ORDER_PAYMENT'
+                    ? 'UPI Payment'
+                    : r.kind === 'ORDER_CANCELLATION_REFUND'
+                      ? 'Refund'
+                      : failed
+                        ? 'Failed Transaction'
+                        : r.mode === 'UPI'
+                          ? 'UPI Deposit'
+                          : 'Cash Deposit';
+              const moneyOut =
+                r.kind === 'ORDER_PAYMENT' || r.kind === 'UPI_ORDER_PAYMENT';
+              /* Refunds sometimes carry no note and no references — such a
+                 card has nothing folded away, so it does not invite a tap. */
+              const hasDetails = Boolean(
+                failed || r.reason || r.orderId || r.receiptNumber || r.transactionId
+              );
+              const expanded = hasDetails && expandedTx === key;
+              return (
+                <AnimateIn key={key} index={i}>
+                  <Card
+                    className={`card--tight tx-card${expanded ? ' tx-card--expanded' : ''}`}
+                    style={{ marginBottom: 16 }}
+                    role={hasDetails ? 'button' : undefined}
+                    tabIndex={hasDetails ? 0 : undefined}
+                    aria-expanded={hasDetails ? expanded : undefined}
+                    onClick={
+                      hasDetails
+                        ? () => setExpandedTx(expanded ? null : key)
+                        : undefined
+                    }
+                    onKeyDown={
+                      hasDetails
+                        ? (e) => {
+                            // Only the card itself — Enter on the receipt
+                            // button below must not also fold the card.
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setExpandedTx(expanded ? null : key);
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    <div className="tx-head">
+                      <span className={`tx-kind${failed ? ' tx-kind--failed' : ''}`}>
+                        {label}
+                      </span>
+                      <span className="tx-date">{formatDate(r.date)}</span>
                     </div>
-                  )}
 
-                  <div className="ledger-row">
-                    <span>New Balance</span>
-                    <span>{formatINR(r.newBalance)}</span>
-                  </div>
-                </Card>
-              </AnimateIn>
-            )),
+                    {/* A failed attempt moves no money, so its amount carries
+                        no sign and is struck through rather than coloured.
+                        The balance prints only where the server sent one —
+                        failed attempts and UPI-funded order payments moved
+                        nothing through the wallet, so they have none. */}
+                    <div className="tx-figures">
+                      {failed ? (
+                        <span className="tx-amount amount-void">{formatINR(r.amount)}</span>
+                      ) : (
+                        <span
+                          className={`tx-amount ${moneyOut ? 'amount-out' : 'amount-in'}`}
+                        >
+                          {moneyOut ? '-' : '+'}
+                          {formatINR(r.amount)}
+                        </span>
+                      )}
+                      {r.newBalance != null && (
+                        <span className="tx-balance">{formatINR(r.newBalance)}</span>
+                      )}
+                    </div>
+
+                    {hasDetails && (
+                      <div className="tx-details">
+                        <div className="tx-details-clip">
+                          <div className="tx-details-body">
+                            {failed && (
+                              <p className="ledger-note ledger-flag--failed">
+                                Payment failed. This money was not added to the wallet.
+                              </p>
+                            )}
+
+                            {/* Only refunds carry a reason now — the note the
+                                storeroom wrote. What an order payment was for
+                                is a reference, and lives in the panel below. */}
+                            {r.reason && (
+                              <div className="ledger-row">
+                                <span>Reason</span>
+                                <span>{r.reason}</span>
+                              </div>
+                            )}
+
+                            {/* The codes to quote if this payment ever has to
+                                be asked about, kept in their own panel so no
+                                reference can be read as an amount. Different
+                                desks ask for different ones: the school office
+                                quotes the receipt number or a wallet charge's
+                                transaction id, gateway support quotes its own
+                                reference, and an order payment names the order
+                                it paid the way the orders tab does. A refused
+                                attempt wrote no ledger row and so has no
+                                receipt to be numbered; the gateway reference
+                                is all it can offer, and all it shows. */}
+                            {(r.orderId || r.receiptNumber || r.transactionId) && (
+                              <div className="ledger-refs">
+                                {r.orderId && (
+                                  <div className="ledger-ref">
+                                    <span>Order ID</span>
+                                    <span className="ledger-mono">{r.orderId}</span>
+                                  </div>
+                                )}
+                                {r.receiptNumber && (
+                                  <div className="ledger-ref">
+                                    <span>Receipt No.</span>
+                                    <span className="ledger-mono">{r.receiptNumber}</span>
+                                  </div>
+                                )}
+                                {r.transactionId && (
+                                  <div className="ledger-ref">
+                                    <span>Transaction ID</span>
+                                    <span className="ledger-mono">{r.transactionId}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Only ledger-backed top-ups have a receipt to
+                                fetch — money added, at the desk or over UPI. */}
+                            {r.kind === 'TOP_UP' && r.adjustmentId && (
+                              <Button
+                                variant="ghost"
+                                block
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReceiptFor(r.adjustmentId);
+                                }}
+                                style={{ marginTop: 12 }}
+                              >
+                                Download receipt
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </AnimateIn>
+              );
+            }),
           })}
-          <div className="settings-grid wallet-settings-grid">
-          <Card className="settings-card">
-            <h2 className="section-title" style={{ fontSize: 20 }}>
-              Purchase Approval
-            </h2>
 
-            {approvalBanner.message && (
-              <Banner
-                variant={approvalBanner.type === 'error' ? 'alert' : 'success'}
-                icon={approvalBanner.type === 'error' ? '⚠️' : '✅'}
-                style={{ marginBottom: 20 }}
-              >
-                {approvalBanner.message}
-              </Banner>
-            )}
-
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={approvalRequired}
-                disabled={approvalSaving}
-                onChange={(e) => toggleApproval(e.target.checked)}
-              />
-              Ask me before each purchase
-            </label>
-
-            <p
-              style={{
-                marginTop: 12,
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: 'var(--muted)',
-              }}
-            >
-              {approvalRequired
-                ? `The counter can no longer charge ${student.name} directly. Each purchase is sent here for your approval, and nothing is taken from the wallet until you agree. Requests expire after three days.`
-                : `${student.name} can buy at the counter with their purchase code, and the wallet is charged there and then.`}
-            </p>
-          </Card>
-
-          </div>
+          {receiptFor && (
+            <ReceiptDialog
+              adjustmentId={receiptFor}
+              onClose={() => setReceiptFor(null)}
+            />
+          )}
         </div>
       )}
     </div>

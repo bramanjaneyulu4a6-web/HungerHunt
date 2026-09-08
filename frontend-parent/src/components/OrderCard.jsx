@@ -136,6 +136,31 @@ export default function OrderCard({
         <strong>{formatINR(order.totalAmount)}</strong>
         {showAllOrdersLink && destination && <Link to={destination}>View all orders</Link>}
       </div>
+
+      {/* How the order was paid, quoting the same references wallet activity
+          shows for this charge — the same panel styling, so a reference reads
+          as a code here too. The dashboard's ongoing orders come without
+          payment details and simply skip the panel. */}
+      {order.payment && (
+        <div className="ledger-refs" style={{ marginTop: 14 }}>
+          <div className="ledger-ref">
+            <span>Paid via</span>
+            <span>{order.payment.mode === 'UPI' ? 'UPI' : 'Student Wallet'}</span>
+          </div>
+          {order.payment.receiptNumber && (
+            <div className="ledger-ref">
+              <span>Receipt No.</span>
+              <span className="ledger-mono">{order.payment.receiptNumber}</span>
+            </div>
+          )}
+          {order.payment.transactionId && (
+            <div className="ledger-ref">
+              <span>Transaction ID</span>
+              <span className="ledger-mono">{order.payment.transactionId}</span>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

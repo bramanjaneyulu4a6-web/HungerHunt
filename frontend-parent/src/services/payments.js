@@ -1,6 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { PhonePePayment } from '@hungerhunt/phonepe-payment';
 import API from './api';
+import { checkoutContext } from '../utils/checkoutMode';
+import { wait } from '../utils/resumeAwareWait';
 
 /* THE GOLDEN RULE OF GATEWAYS
  *
@@ -41,11 +44,56 @@ export const DEMO_UPI_ENABLED = import.meta.env.VITE_DEMO_UPI_ENABLED !== 'false
 
 export const TERMINAL_STATUSES = ['APPLIED', 'FAILED', 'EXPIRED', 'AMOUNT_MISMATCH'];
 
-export const createOrderPayment = (pendingOrderId) =>
-  API.post('/payments/intents', { purpose: 'ORDER', pendingOrderId }).then((r) => r.data);
+/* PhonePe's native Standard Checkout can strand the parent inside its
+ * "Confirming Payment" activity when the UAT page/API CORS configuration is
+ * out of sync. Hosted checkout still hands UPI links to installed apps and,
+ * unlike the SDK activity, lets our app begin polling immediately. Keep the
+ * native integration available for a separately certified production build.
+ * The custom UPI intent flow below does not use that checkout page: Hunger
+ * Hunt chooses the target app first and launches PhonePe's returned URL. */
+export const NATIVE_PAYMENT_SDK_ENABLED =
+  import.meta.env.VITE_PHONEPE_NATIVE_SDK_ENABLED === 'true';
 
-export const createTopup = (studentId, amountRupees) =>
-  API.post('/payments/intents', { purpose: 'TOPUP', studentId, amountRupees }).then((r) => r.data);
+export const CUSTOM_UPI_INTENT_ENABLED = Capacitor.isNativePlatform();
+
+/* Paying to a UPI ID the parent types needs nothing installed and nothing
+ * launched — PhonePe rings whichever app owns that address — so unlike the
+ * app picker above it is offered everywhere the gateway itself is. */
+export const UPI_COLLECT_ENABLED = PAYMENTS_ENABLED;
+
+/* A collect request is approved on a phone that may be in another room, so
+ * the ordinary two-minute window would give up on payments that are simply
+ * waiting for someone to walk over and enter a PIN. Five minutes is the wait
+ * this screen is willing to sit through; past it the payment is not lost, it
+ * is described as still processing and the backend's sweep owns it. */
+export const COLLECT_POLL_TIMEOUT_MS = 300000;
+
+// The decision itself lives in utils/checkoutMode, where it can be tested
+// without a Vite build. This only supplies what the runtime knows.
+const paymentContext = (choice) =>
+  checkoutContext(choice, {
+    native: Capacitor.isNativePlatform(),
+    sdkEnabled: NATIVE_PAYMENT_SDK_ENABLED,
+    platform: Capacitor.getPlatform(),
+  });
+
+/* `choice` is what the parent picked in the sheet: `{ app: 'gpay' }` for one
+ * of the listed UPI apps, `{ vpa: 'name@bank' }` for an address they typed,
+ * or nothing at all to hand the whole choice to PhonePe's hosted page. */
+export const createOrderPayment = (pendingOrderId, choice) =>
+  API.post('/payments/intents', {
+    purpose: 'ORDER',
+    pendingOrderId,
+    ...paymentContext(choice),
+  }).then((r) => r.data);
+
+export const createTopup = (studentId, amountRupees, choice) =>
+  API.post('/payments/intents', {
+    purpose: 'TOPUP',
+    studentId,
+    amountRupees,
+    ...paymentContext(choice),
+  }).then((r) => r.data);
 
 // The shared axios instance sets no per-request timeout, so a hung
 // connection (as opposed to one that fails fast) would otherwise hold a poll
@@ -76,10 +124,10 @@ export const getPublicIntent = (intentId, token, { signal } = {}) =>
     timeout: POLL_TIMEOUT_MS,
   }).then((r) => r.data.intent);
 
-/* Opens PhonePe's hosted checkout. On a phone this is the system browser,
- * where upi:// intent links actually resolve to installed UPI apps; inside
- * the webview they would dead-end. */
-const openCheckout = async (redirectUrl) => {
+/* Browser builds use PhonePe's hosted checkout. The legacy native Standard
+ * Checkout helper remains below for explicitly flagged builds; the custom
+ * app-picker path launches its intent URL in startPayment instead. */
+const openHostedCheckout = async (redirectUrl) => {
   if (Capacitor.isNativePlatform()) {
     await Browser.open({ url: redirectUrl });
     return;
@@ -107,45 +155,58 @@ const openCheckout = async (redirectUrl) => {
   }
 };
 
-/* Dismisses the native checkout tab (Custom Tab / SFSafariViewController)
- * once the in-app poll knows the real answer. Without this, every native
- * payment ends with the parent staring at whatever the checkout tab landed
- * on — PhonePe's redirect arrives in a browser that shares no localStorage
- * with the app, so /payment-return greets them with a login screen — while
- * the app underneath is already showing the truth. Closing the tab returns
- * them to that truth.
- *
- * Native only: on the web there is no Capacitor browser to close (the web
- * checkout is a popup or the same tab), and Browser.close() there rejects
- * with "not implemented". The catch also covers the tab the parent already
- * dismissed by hand — nothing to close is success, not an error. */
-const closeCheckout = async () => {
-  if (!Capacitor.isNativePlatform()) return;
+const closeHostedCheckout = async () => {
+  if (!Capacitor.isNativePlatform() || NATIVE_PAYMENT_SDK_ENABLED) return;
   try {
     await Browser.close();
   } catch {
-    // Already closed, or never opened — either way the parent is in the app.
+    // The parent may already have dismissed the tab. There is nothing left
+    // to close, which is the outcome this helper wanted.
   }
 };
 
-export const startPayment = async (createFn) => {
-  const { intent, redirectUrl } = await createFn();
-  await openCheckout(redirectUrl);
-  return { intentId: intent.id };
+const openNativeCheckout = async (sdk, intentId) => {
+  if (!sdk?.orderId || !sdk?.token || !sdk?.merchantId || !sdk?.environment) {
+    throw new Error('The payment service returned an incomplete PhonePe SDK order.');
+  }
+
+  // PhonePe's application id belongs to the iOS SDK contract. Android's
+  // init() takes the merchant, flow and environment only, so requiring the
+  // iOS value here prevented every Android checkout from reaching the native
+  // plugin whenever PHONEPE_IOS_APP_ID was (correctly) unset.
+  if (Capacitor.getPlatform() === 'ios' && !sdk.appId) {
+    throw new Error('The payment service is missing its PhonePe iOS application id.');
+  }
+
+  await PhonePePayment.startCheckout({
+    orderId: sdk.orderId,
+    token: sdk.token,
+    merchantId: sdk.merchantId,
+    ...(sdk.appId ? { appId: sdk.appId } : {}),
+    environment: sdk.environment,
+    flowId: intentId,
+    appSchema: 'hungerhuntpay',
+  });
 };
 
-const wait = (ms, signal) =>
-  new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true }
-    );
-  });
+export const startPayment = async (createFn) => {
+  const { intent, redirectUrl, intentUrl, sdk, collect } = await createFn();
+  if (sdk) {
+    await openNativeCheckout(sdk, intent.id);
+  } else if (intentUrl) {
+    await PhonePePayment.openUpiIntent({ intentUrl });
+  } else if (collect) {
+    /* Nothing to open, and that is the whole point of a collect: the request
+       has already been pushed to the parent's own UPI app. This app's only
+       job now is to wait and keep asking the backend, which the caller does
+       next. `collect.vpa` comes back masked, for the waiting screen to name
+       who was asked. */
+  } else {
+    if (!redirectUrl) throw new Error('The payment service did not return a checkout URL.');
+    await openHostedCheckout(redirectUrl);
+  }
+  return { intentId: intent.id, collect: collect || null };
+};
 
 const isAuthRequiredError = (err) =>
   err?.response?.status === 401 && err?.response?.data?.code === 'AUTH_REQUIRED';
@@ -157,7 +218,7 @@ const isAuthRequiredError = (err) =>
 const MAX_CONSECUTIVE_POLL_FAILURES = 4;
 
 /* Every GET below makes the backend re-check with PhonePe, so polling is
- * also the recovery path for a dropped webhook. 3s cadence, 5 minute cap —
+ * also the recovery path for a dropped webhook. 3s cadence, 2 minute cap —
  * a UPI payment that has not resolved by then shows as "still processing"
  * and the backend's reconcile sweep owns it from there.
  *
@@ -175,7 +236,7 @@ const MAX_CONSECUTIVE_POLL_FAILURES = 4;
  * the two reads differ only in what proves the caller may see the verdict. */
 export const pollIntent = async (
   intentId,
-  { onUpdate, intervalMs = 3000, timeoutMs = 300000, signal, fetcher = getIntent } = {}
+  { onUpdate, intervalMs = 3000, timeoutMs = 120000, signal, fetcher = getIntent } = {}
 ) => {
   const deadline = Date.now() + timeoutMs;
   let failures = 0;
@@ -201,12 +262,18 @@ export const pollIntent = async (
     onUpdate?.(intent);
 
     if (TERMINAL_STATUSES.includes(intent.status)) {
-      // The ledger has answered; the checkout tab is now just something
-      // standing between the parent and the app that shows that answer.
-      await closeCheckout();
+      await closeHostedCheckout();
       return intent;
     }
-    if (Date.now() >= deadline) return intent;
+    if (Date.now() >= deadline) {
+      // A provider can legitimately remain pending after we stop waiting,
+      // especially in PhonePe's sandbox. Do not leave the parent trapped in
+      // the Custom Tab: return them to the app, where the non-terminal status
+      // is described as still processing. This closes presentation only; the
+      // backend remains the sole authority that can settle the payment.
+      await closeHostedCheckout();
+      return intent;
+    }
 
     await wait(intervalMs, signal);
   }

@@ -92,7 +92,7 @@ export default function PaymentReturn() {
       .then((finalIntent) => {
         if (cancelled) return;
         // pollIntent only resolves (rather than rejects) without a terminal
-        // status when the 5-minute cap lapsed — the poll gave up, the
+        // status when the 2-minute cap lapsed — the poll gave up, the
         // payment did not fail.
         if (finalIntent && !TERMINAL_STATUSES.includes(finalIntent.status)) {
           setGaveUp(true);

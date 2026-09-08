@@ -25,8 +25,8 @@ test('an order intent requires its pendingOrderId', () => {
   assert.equal(ok.validateSync(), undefined);
 });
 
-test('amountPaise must be a positive integer', () => {
-  for (const bad of [0, -100, 10.5]) {
+test('amountPaise must meet PhonePe\'s ₹1 minimum as an integer', () => {
+  for (const bad of [0, -100, 99, 10.5]) {
     const doc = new PaymentIntent({ ...base, purpose: 'TOPUP', amountPaise: bad });
     assert.ok(doc.validateSync()?.errors?.amountPaise, `accepted ${bad}`);
   }

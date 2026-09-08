@@ -71,3 +71,69 @@ services:
         sync: false
       - key: FIREBASE_PRIVATE_KEY
         sync: false
+      # PhonePe UPI payments. PHONEPE_PAYMENTS_ENABLED is the backend kill
+      # switch, separate from the frontend's build-time VITE_PAYMENTS_ENABLED:
+      # false serves 503 on payment creation; flipping it to true with any of
+      # the values below missing or invalid makes the service REFUSE TO BOOT
+      # (app.js), so set the whole block in the dashboard before flipping it.
+      - key: PHONEPE_PAYMENTS_ENABLED
+        value: "false"
+      - key: PHONEPE_ENV
+        value: production
+      - key: PHONEPE_CLIENT_VERSION
+        value: "1"
+      - key: PHONEPE_HTTP_TIMEOUT_MS
+        value: "10000"
+      # Must be the public origin of the deployed parent app; PhonePe's hosted
+      # checkout redirects to <this>/payment-return?intent=...&t=... afterwards.
+      - key: PHONEPE_REDIRECT_BASE_URL
+        value: https://hunger-hunt-parent.vercel.app
+      - key: PHONEPE_MERCHANT_ID
+        sync: false
+      # Public identifier issued by PhonePe for the iOS app after its Apple
+      # Team ID is registered. This is distinct from the bundle identifier.
+      - key: PHONEPE_IOS_APP_ID
+        sync: false
+      - key: PHONEPE_CLIENT_ID
+        sync: false
+      - key: PHONEPE_CLIENT_SECRET
+        sync: false
+      # Webhook basic-auth pair; the same values are registered on the PhonePe
+      # Business dashboard when configuring the webhook URL. Left unset every
+      # PhonePe webhook 401s quietly and money only lands via the app's poll
+      # and the reconcile sweep below.
+      - key: PHONEPE_WEBHOOK_USERNAME
+        sync: false
+      - key: PHONEPE_WEBHOOK_PASSWORD
+        sync: false
+
+  # The net under the webhook: sweeps unfinished PaymentIntents against
+  # PhonePe's status API and settles each through the same idempotent
+  # settlePaymentIntent the webhook and the app's poll use. Idempotent and
+  # read-before-write, so running it while everything is healthy is free.
+  # Like the web service above, this is the source of truth to MIRROR into
+  # the dashboard by hand, not to apply as a Blueprint.
+  - type: cron
+    name: hungerhunt-reconcile-payments
+    runtime: node
+    rootDir: backend
+    schedule: "*/15 * * * *"
+    buildCommand: npm ci
+    startCommand: npm run reconcile:payments
+    branch: main
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: PHONEPE_ENV
+        value: production
+      - key: PHONEPE_CLIENT_VERSION
+        value: "1"
+      - key: PHONEPE_HTTP_TIMEOUT_MS
+        value: "10000"
+      - key: PHONEPE_CLIENT_ID
+        sync: false
+      - key: PHONEPE_CLIENT_SECRET
+        sync: false

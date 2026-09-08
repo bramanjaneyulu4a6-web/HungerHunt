@@ -6,6 +6,7 @@ import Parent from '../models/Parent.js';
 import phonepe from '../src/domain/payments/providers/phonepe.js';
 import settle from '../src/domain/payments/settlePaymentIntent.js';
 import { rupeesToPaise, paiseToRupees } from '../src/domain/payments/money.js';
+import { isValidVpa, maskVpa, normalizeVpa } from '../utils/upiVpa.js';
 
 /* The Golden Rule of gateways, enforced here by what these handlers refuse to
  * do: nothing a client can call marks money as received. createIntent starts
@@ -56,10 +57,91 @@ const intentView = (intent) => ({
 });
 
 const TOPUP_MAX_RUPEES = 20000;
+const MIN_PAYMENT_PAISE = 100;
+
+const phonepeEnabled = () => process.env.PHONEPE_PAYMENTS_ENABLED === 'true';
+
+const sdkConfiguration = () => ({
+  merchantId: process.env.PHONEPE_MERCHANT_ID,
+  appId: process.env.PHONEPE_IOS_APP_ID,
+  environment: process.env.PHONEPE_ENV === 'production' ? 'PRODUCTION' : 'SANDBOX',
+});
+
+const UPI_APPS = {
+  phonepe: { ANDROID: 'com.phonepe.app', IOS: 'PHONEPE' },
+  gpay: { ANDROID: 'com.google.android.apps.nbu.paisa.user', IOS: 'GPAY' },
+  paytm: { ANDROID: 'net.one97.paytm', IOS: 'PAYTM' },
+};
+
+/* A checkout mode is two things: how the payment is opened with PhonePe, and
+ * what the app is handed back so it can pass the parent along. Keeping the
+ * pair together is what stops a new mode from being half-added — one that
+ * starts a payment the app then has no way to continue.
+ *
+ * UPI_COLLECT is the one with nothing to hand over. There is no page, no app
+ * and no URL: PhonePe pushes the request to whatever app owns the address the
+ * parent typed, and the only thing to report back is who was asked. */
+const START_CHECKOUT = {
+  SDK: ({ merchantOrderId, amountPaise }) =>
+    phonepe.createSdkPayment({ merchantOrderId, amountPaise }),
+
+  UPI_INTENT: ({ merchantOrderId, amountPaise, upiApp, deviceOS }) =>
+    phonepe.createUpiIntentPayment({
+      merchantOrderId,
+      amountPaise,
+      targetApp: UPI_APPS[upiApp][deviceOS],
+      deviceOS,
+      merchantCallBackScheme: 'hungerhuntpay',
+    }),
+
+  UPI_COLLECT: ({ merchantOrderId, amountPaise, upiVpa }) =>
+    phonepe.createUpiCollectPayment({ merchantOrderId, amountPaise, vpa: upiVpa }),
+
+  REDIRECT: ({ merchantOrderId, amountPaise, redirectUrl }) =>
+    phonepe.createPayment({ merchantOrderId, amountPaise, redirectUrl }),
+};
+
+const HANDOFF = {
+  SDK: (created) => ({
+    sdk: { orderId: created.orderId, token: created.token, ...sdkConfiguration() },
+  }),
+  UPI_INTENT: (created) => ({ intentUrl: created.intentUrl }),
+  /* Masked on the way back, not because the app does not know the address —
+     it just typed it, and its waiting screen shows it in full so a parent can
+     spot a typo that would otherwise look like a payment ignored. Masked
+     because this response has no need to carry it: the only job of this echo
+     is to say a collect was started, and a payload that never holds the whole
+     address cannot leak one in a log, a proxy or a crash report. */
+  UPI_COLLECT: (created, { upiVpa }) => ({ collect: { vpa: maskVpa(upiVpa) } }),
+  REDIRECT: (created) => ({ redirectUrl: created.redirectUrl }),
+};
 
 export const createPaymentIntent = async (req, res) => {
   try {
+    if (!phonepeEnabled()) {
+      return res.status(503).json({ message: 'UPI payments are temporarily unavailable.' });
+    }
+
     const { purpose } = req.body || {};
+    const requestedMode = req.body?.checkoutMode;
+    const checkoutMode = ['SDK', 'UPI_INTENT', 'UPI_COLLECT'].includes(requestedMode)
+      ? requestedMode
+      : 'REDIRECT';
+    const deviceOS = req.body?.deviceOS === 'IOS' ? 'IOS' : 'ANDROID';
+    const upiApp = typeof req.body?.upiApp === 'string' ? req.body.upiApp : '';
+    if (checkoutMode === 'UPI_INTENT' && !UPI_APPS[upiApp]) {
+      return res.status(400).json({ message: 'Choose a supported UPI app.' });
+    }
+
+    /* The address is checked here, before an intent row exists, so a typo
+       costs the parent a message rather than a stranded PENDING payment they
+       then see in their history. */
+    const upiVpa = normalizeVpa(req.body?.vpa);
+    if (checkoutMode === 'UPI_COLLECT' && !isValidVpa(upiVpa)) {
+      return res.status(400).json({
+        message: 'Enter a UPI ID in the form name@bank, such as 9876543210@ybl.',
+      });
+    }
     let studentId;
     let pendingOrderId = null;
     let amountPaise;
@@ -101,24 +183,34 @@ export const createPaymentIntent = async (req, res) => {
       return res.status(400).json({ message: 'purpose must be TOPUP or ORDER.' });
     }
 
+    if (amountPaise < MIN_PAYMENT_PAISE) {
+      return res.status(400).json({ message: 'PhonePe payments must be at least ₹1.' });
+    }
+
     const intent = await PaymentIntent.create({
       parentId: req.parent.id,
       studentId,
       purpose,
       pendingOrderId,
       amountPaise,
+      checkoutMode,
+      ...(checkoutMode === 'UPI_INTENT' ? { upiApp } : {}),
+      ...(checkoutMode === 'UPI_COLLECT' ? { upiVpa } : {}),
       merchantOrderId: `HH-${new mongoose.Types.ObjectId()}`,
       returnToken: crypto.randomBytes(32).toString('hex'),
     });
 
     let created;
     try {
-      created = await phonepe.createPayment({
+      created = await START_CHECKOUT[checkoutMode]({
         merchantOrderId: intent.merchantOrderId,
         amountPaise,
-        // The token travels only here, in the URL PhonePe redirects to. It
-        // is what lets that page report a verdict in a browser with no
-        // session — see returnToken on the model.
+        upiApp,
+        upiVpa,
+        deviceOS,
+        // The token travels only here, in the URL PhonePe redirects to. It is
+        // what lets that page report a verdict in a browser with no session —
+        // see returnToken on the model.
         redirectUrl: `${process.env.PHONEPE_REDIRECT_BASE_URL}/payment-return?intent=${intent._id}&t=${intent.returnToken}`,
       });
     } catch (err) {
@@ -135,7 +227,10 @@ export const createPaymentIntent = async (req, res) => {
       { new: true }
     );
 
-    res.status(201).json({ intent: intentView(pending || intent), redirectUrl: created.redirectUrl });
+    res.status(201).json({
+      intent: intentView(pending || intent),
+      ...HANDOFF[checkoutMode](created, { upiVpa }),
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -192,12 +287,25 @@ export const getPublicPaymentIntent = async (req, res) => {
 
 export const phonepeWebhook = async (req, res) => {
   if (!phonepe.verifyWebhookAuth(req.get('authorization'))) {
+    const _h = String(req.get('authorization') || '');
+    console.error('PhonePe webhook authentication failed.', {
+      event: req.body?.event || null,
+      headerPresent: Boolean(_h),
+      headerLen: _h.length,
+    });
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   // PhonePe nests order fields under payload; tolerate both shapes.
   const merchantOrderId =
     req.body?.payload?.merchantOrderId || req.body?.merchantOrderId || null;
+
+  // PhonePe requires a 2xx acknowledgement within 3–5 seconds. Authenticate
+  // and capture the provider-owned reference synchronously, then acknowledge;
+  // status verification and ledger work continue through the same idempotent
+  // settle path. The scheduled reconcile sweep is the durable recovery path
+  // if this process dies after acknowledgement.
+  res.status(202).json({ received: true });
 
   try {
     if (merchantOrderId) {
@@ -211,25 +319,10 @@ export const phonepeWebhook = async (req, res) => {
       }
     }
   } catch (err) {
-    // The lookup itself failed — a mongo disconnect or buffer timeout, not
-    // "order not found". Express 4 does not catch a rejected async handler,
-    // and this process installs no unhandledRejection handler, so leaving
-    // this await bare would take the whole backend down and PhonePe would
-    // get no response at all — strictly worse than any status code below.
-    //
-    // Answered as 500, not the usual always-200: an unknown order is a
-    // problem retrying cannot fix (the always-200 contract is for that
-    // case), but a transient DB error is exactly the kind of problem a
-    // retry *can* fix, so PhonePe should be told to try again rather than
-    // have this webhook silently swallow a real infrastructure failure.
+    // The acknowledgement has already gone out, so a transient lookup failure
+    // is recovered by the scheduled sweep. Catch it here so post-response work
+    // never becomes an unhandled rejection that can terminate the process.
     console.error('Webhook lookup failed for', merchantOrderId, err);
-    return res.status(500).json({ message: 'Temporarily unable to process this webhook.' });
+    return;
   }
-
-  // Always 200 once authenticated and the lookup succeeded: a 5xx here
-  // would make PhonePe hammer retries for problems a retry cannot fix
-  // (an unknown order, for instance). The reconcile script and the
-  // parent's own poll own any straggler that legitimately needs another
-  // look.
-  res.json({ received: true });
 };

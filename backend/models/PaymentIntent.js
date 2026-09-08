@@ -29,8 +29,8 @@ const paymentIntentSchema = new mongoose.Schema(
       type: Number,
       required: true,
       validate: {
-        validator: (v) => Number.isInteger(v) && v > 0,
-        message: 'amountPaise must be a positive integer',
+        validator: (v) => Number.isInteger(v) && v >= 100,
+        message: 'amountPaise must be an integer of at least 100 paise',
       },
     },
 
@@ -39,6 +39,30 @@ const paymentIntentSchema = new mongoose.Schema(
 
     provider: { type: String, enum: ['PHONEPE'], default: 'PHONEPE', required: true },
     providerOrderId: { type: String, default: null },
+    /* The banking rails' own reference, reported by PhonePe once an attempt
+       completes. Not ours and not PhonePe's: it is what the parent's bank
+       statement shows, so the receipt quotes it. Null until settled, and
+       null forever for an attempt PhonePe reported without rail details. */
+    utr: { type: String, default: null },
+    checkoutMode: {
+      type: String,
+      enum: ['REDIRECT', 'SDK', 'UPI_INTENT', 'UPI_COLLECT'],
+      default: 'REDIRECT',
+      required: true,
+    },
+
+    /* Which UPI app the parent chose, recorded only for the custom-intent
+     * checkout where Hunger Hunt owns the picker. Hosted and SDK checkouts
+     * leave it null — the choice happens inside PhonePe's own UI, invisible
+     * to this server. The recharge receipt prints it. */
+    upiApp: { type: String, enum: ['phonepe', 'gpay', 'paytm', null], default: null },
+
+    /* The address a parent typed instead of picking an app, for the collect
+     * checkout. Stored normalized and whole because it is what PhonePe was
+     * asked to bill and what a dispute would be argued from; everything that
+     * shows it to a human — the waiting screen, the receipt — masks it first
+     * through utils/upiVpa. Null for every other checkout mode. */
+    upiVpa: { type: String, default: null, maxlength: 320 },
 
     /* A bearer secret for one intent, carried only in the redirect URL we
      * hand PhonePe. It exists because of where that redirect lands: whatever

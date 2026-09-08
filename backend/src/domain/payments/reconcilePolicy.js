@@ -22,9 +22,12 @@ export const unknownProviderStateFilter = () => ({
  * answers with INVALID_MERCHANT_ORDER_ID before writing it off as FAILED.
  *
  * Seven days, because of what such a row can and cannot be. A PhonePe order,
- * once created, expires in 20 minutes (createPayment sets expireAfter: 1200)
- * and from then on the status API answers EXPIRED — a real, terminal answer
- * settle handles. So an intent still drawing that code is one whose
+ * once created, expires on its own — in 20 minutes for every checkout that
+ * opens something (expireAfter: 1200), in an hour for a UPI collect, which
+ * waits on a parent walking to their phone (createUpiCollectPayment sets
+ * expireAfter: 3600). From then on the status API answers EXPIRED — a real,
+ * terminal answer settle handles. Either way that is orders of magnitude
+ * inside the week below. So an intent still drawing that code is one whose
  * create call never registered with PhonePe at all (a crash between our DB
  * write and the API call, or a create the provider rejected): no order, no
  * checkout page, no way the parent's money was ever captured against it.

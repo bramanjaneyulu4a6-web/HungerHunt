@@ -56,7 +56,8 @@ const IDENTITY = {
   admissionNumber: '10425',
   fatherName: 'Test Father',
   roomNumber: 'A-1',
-  grade: '8',
+  className: '8',
+  section: 'B',
   parentPhoneNumber: '9000000000',
 };
 

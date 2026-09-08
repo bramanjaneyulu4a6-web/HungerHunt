@@ -38,6 +38,7 @@ from a separate device.
 ```bash
 npm run build             # dist/ is what the native shells serve
 npx cap sync              # copy dist/ + register plugins into ios/ and android/
+npm run check:native:compile # compile both native PhonePe bridges
 npx cap open ios          # or: npx cap open android
 ```
 
@@ -72,6 +73,10 @@ npx cap open ios                    # Xcode → Archive → Distribute
 `npm run check:release` performs the preflight without building. Release
 commands refuse local/plaintext API URLs, missing Firebase files and missing
 Android signing instead of producing an artifact that cannot be shipped.
+Before an iOS archive, `npm run check:native:compile` also compiles the local
+PhonePe bridge against the pinned Android and iOS SDKs; the lighter
+`check:native` command performs the platform-independent structural checks CI
+can run on any host.
 
 The full release sequence, including signing and the store paperwork, is in
 [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md).

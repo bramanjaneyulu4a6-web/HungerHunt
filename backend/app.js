@@ -102,13 +102,14 @@ if (unverifiedBillsAccepted()) {
   );
 }
 
-/* UPI payment env that fails quietly, not loudly, when it is missing. Unset
-   client credentials at least fail every payment create with an error a
-   parent sees; the two below never announce themselves at all, so they get
-   the same treatment as the JWT secrets above: say it at boot. PHONEPE_ENV
-   and PHONEPE_CLIENT_VERSION are omitted on purpose — both have safe
-   defaults (sandbox, "1"). The full set is listed in .env.example. */
+/* Payment availability is explicit on both sides of the API. A production
+   backend that claims PhonePe is enabled must be fully usable; refusing to
+   boot is safer than publishing a button that can create half an intent and
+   then fail because a credential or return URL was omitted. */
+const phonepePaymentsEnabled = process.env.PHONEPE_PAYMENTS_ENABLED === 'true';
 const missingPaymentEnv = [
+  'PHONEPE_MERCHANT_ID',
+  'PHONEPE_IOS_APP_ID',
   'PHONEPE_CLIENT_ID',
   'PHONEPE_CLIENT_SECRET',
   'PHONEPE_WEBHOOK_USERNAME',
@@ -116,13 +117,29 @@ const missingPaymentEnv = [
   'PHONEPE_REDIRECT_BASE_URL',
 ].filter((name) => !process.env[name]?.trim());
 
-if (missingPaymentEnv.length) {
+const phonepeEnvironmentValid = ['sandbox', 'production'].includes(process.env.PHONEPE_ENV);
+const phonepeRedirectValid = (() => {
+  try {
+    const url = new URL(process.env.PHONEPE_REDIRECT_BASE_URL);
+    return process.env.NODE_ENV !== 'production' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+})();
+
+const paymentConfigurationProblems = [
+  ...(missingPaymentEnv.length ? [`missing ${missingPaymentEnv.join(', ')}`] : []),
+  ...(!phonepeEnvironmentValid ? ['PHONEPE_ENV must be sandbox or production'] : []),
+  ...(process.env.NODE_ENV === 'production' && process.env.PHONEPE_ENV !== 'production'
+    ? ['PHONEPE_ENV must be production'] : []),
+  ...(!phonepeRedirectValid ? ['PHONEPE_REDIRECT_BASE_URL must be a valid HTTPS URL in production'] : []),
+];
+
+if (phonepePaymentsEnabled && paymentConfigurationProblems.length) {
+  const message = `PhonePe payments are enabled with invalid configuration: ${paymentConfigurationProblems.join('; ')}.`;
+  if (process.env.NODE_ENV === 'production') throw new Error(message);
   console.warn(
-    `PhonePe payment env is incomplete (${missingPaymentEnv.join(', ')} unset), and the failures` +
-    ' are quiet ones: missing webhook credentials 401 every PhonePe webhook so money only lands' +
-    ' via the app\'s poll and the reconcile sweep, and a missing PHONEPE_REDIRECT_BASE_URL' +
-    ' registers the literal string "undefined/payment-return?..." with PhonePe as the return URL.' +
-    ' The full PHONEPE_* set is documented in .env.example.'
+    `${message} Payment creation stays unavailable until the values in backend/.env.example are set.`
   );
 }
 
@@ -225,7 +242,10 @@ app.use(
       return callback(err);
     },
     credentials: true,
-    exposedHeaders: ['X-Data-Revision'],
+    // Content-Disposition carries the server-chosen filename on downloads
+    // (order print sheets, Tally exports); without exposing it, cross-origin
+    // JS silently falls back to a made-up name.
+    exposedHeaders: ['X-Data-Revision', 'Content-Disposition'],
   })
 );
 app.use(express.json());

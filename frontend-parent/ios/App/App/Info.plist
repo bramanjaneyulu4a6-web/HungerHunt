@@ -37,6 +37,14 @@
 				<string>app-1-383327390863-ios-9dc6a25b80dbe86dfb34fa</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>phonepe-payment-return</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>hungerhuntpay</string>
+			</array>
+		</dict>
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
@@ -44,12 +52,31 @@
 	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>phonepe</string>
-		<string>tez</string>
-		<string>gpay</string>
-		<string>paytm</string>
+		<string>ppemerchantsdkv1</string>
+		<string>ppemerchantsdkv2</string>
+		<string>ppemerchantsdkv3</string>
+		<string>ppemerchantsdkv4</string>
+		<string>ppemerchantsdkv5</string>
+		<string>supermoney</string>
+		<string>credpay</string>
+		<string>amazonpay</string>
 		<string>bhim</string>
-		<string>upi</string>
+		<string>gpay</string>
+		<string>paytmmp</string>
+		<string>navi</string>
+		<string>mobikwik</string>
+		<string>slice-upi</string>
+		<string>postpe</string>
+		<string>popclubapp</string>
+		<string>jiofinance</string>
+		<string>jupiter</string>
+		<string>indmoney</string>
+		<string>kiwi</string>
+		<string>flipkart</string>
+		<string>myjio</string>
+		<string>sbiyono</string>
+		<string>whatsapp-consumer</string>
+		<string>payzapp</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

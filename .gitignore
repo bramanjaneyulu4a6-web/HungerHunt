@@ -39,6 +39,11 @@ frontend-parent/plugins/*/.build/
 frontend-parent/plugins/*/android/build/
 frontend-parent/plugins/*/android/.gradle/
 
+# The MINDS X roll: real students, their admission numbers and their
+# parents' phone numbers. This repository is public, so the roll stays on
+# the machine that runs the importer and never in history.
+backend/scripts/data/
+
 # Editor state. The Java extension writes settings here the moment anyone
 # opens frontend-parent/android, so this appears untracked on a clean checkout
 # without anyone choosing it. Kept personal: once the directory is tracked,

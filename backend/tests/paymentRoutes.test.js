@@ -27,6 +27,7 @@ const phonepe = (await import('../src/domain/payments/providers/phonepe.js')).de
 const settle = (await import('../src/domain/payments/settlePaymentIntent.js')).default;
 const { signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
+const { paymentCreateLimiter } = await import('../middleware/rateLimit.js');
 
 mongoose.set('bufferTimeoutMS', 200);
 
@@ -47,7 +48,15 @@ before(async () => {
   base = `http://127.0.0.1:${server.address().port}`;
 });
 after(() => new Promise((resolve) => server.close(resolve)));
-afterEach(() => mock.restoreAll());
+afterEach(async () => {
+  mock.restoreAll();
+  delete process.env.PHONEPE_TEST_PARENT_PHONES;
+  /* This suite creates more intents across its tests than paymentCreateLimiter
+     allows one parent in a window, and every test signs in as the same parent.
+     Emptying that bucket between tests keeps a failure here meaning "the code
+     is wrong" rather than "an earlier test spent the allowance". */
+  await paymentCreateLimiter.resetKey(`parent:${PARENT_ID}`);
+});
 
 const asParent = () => mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
 
@@ -99,6 +108,99 @@ test('a parent cannot create a topup for a student that is not theirs', async ()
   const res = await send('POST', '/api/payments/intents',
     { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 100 });
   assert.equal(res.status, 404);
+});
+
+/* The allowlist that lets PhonePe review a live app while the roll sees no
+   checkout. The token these tests carry is parent 9999999999. */
+
+test('a parent outside the payments allowlist cannot start a topup', async () => {
+  process.env.PHONEPE_TEST_PARENT_PHONES = '9000000021';
+  asParent();
+  const create = mock.method(PaymentIntent, 'create', async () => {
+    throw new Error('an intent must never be created for a barred parent');
+  });
+
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 500 });
+
+  assert.equal(res.status, 503);
+  assert.equal(create.mock.callCount(), 0);
+});
+
+test('a parent outside the payments allowlist cannot pay for an order', async () => {
+  process.env.PHONEPE_TEST_PARENT_PHONES = '9000000021';
+  asParent();
+  const create = mock.method(PaymentIntent, 'create', async () => {
+    throw new Error('an intent must never be created for a barred parent');
+  });
+
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'ORDER', pendingOrderId: ORDER_ID });
+
+  assert.equal(res.status, 503);
+  assert.equal(create.mock.callCount(), 0);
+});
+
+test('a parent named in the payments allowlist is let through', async () => {
+  process.env.PHONEPE_TEST_PARENT_PHONES = '9000000021,9999999999';
+  asParent();
+  let createdDoc;
+  mock.method(PaymentIntent, 'create', async (doc) => {
+    createdDoc = doc;
+    return { ...doc, _id: INTENT_ID, status: 'CREATED' };
+  });
+  mock.method(PaymentIntent, 'findOneAndUpdate', async (filter, update) =>
+    ({ _id: INTENT_ID, ...createdDoc, ...update.$set }));
+  mock.method(phonepe, 'createPayment', async () =>
+    ({ providerOrderId: 'OMO1', redirectUrl: 'https://pg.example/co', state: 'PENDING' }));
+
+  const res = await send('POST', '/api/payments/intents',
+    { purpose: 'TOPUP', studentId: STUDENT_ID, amountRupees: 500 });
+
+  assert.equal(res.status, 201);
+});
+
+/* What the parent app asks before it decides whether to draw a Pay button.
+   It has to be a live question rather than a build-time flag: adding a
+   reviewer's account must not need the four frontends rebuilt. */
+
+test('availability is true for a parent in the allowlist', async () => {
+  process.env.PHONEPE_TEST_PARENT_PHONES = '9999999999';
+  asParent();
+
+  const res = await send('GET', '/api/payments/availability');
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { paymentsEnabled: true });
+});
+
+test('availability is false for a parent outside the allowlist', async () => {
+  process.env.PHONEPE_TEST_PARENT_PHONES = '9000000021';
+  asParent();
+
+  const res = await send('GET', '/api/payments/availability');
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { paymentsEnabled: false });
+});
+
+test('availability is false for everyone while the gateway switch is off', async () => {
+  process.env.PHONEPE_PAYMENTS_ENABLED = 'false';
+  asParent();
+  try {
+    const res = await send('GET', '/api/payments/availability');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { paymentsEnabled: false });
+  } finally {
+    process.env.PHONEPE_PAYMENTS_ENABLED = 'true';
+  }
+});
+
+test('availability needs a signed-in parent', async () => {
+  const res = await fetch(`${base}/api/payments/availability`);
+
+  assert.equal(res.status, 401);
 });
 
 test('an order intent snapshots the order total in paise', async () => {

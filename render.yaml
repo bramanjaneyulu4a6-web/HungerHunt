@@ -88,6 +88,12 @@ services:
       # checkout redirects to <this>/payment-return?intent=...&t=... afterwards.
       - key: PHONEPE_REDIRECT_BASE_URL
         value: https://hunger-hunt-parent.vercel.app
+      # Comma-separated parent phones allowed to reach the checkout. Empty
+      # means every parent may pay. Set it and only those accounts can — the
+      # switch that lets PhonePe review a live checkout while the roll sees
+      # none. It limits who may pay, not whether the money is real.
+      - key: PHONEPE_TEST_PARENT_PHONES
+        sync: false
       - key: PHONEPE_MERCHANT_ID
         sync: false
       # Public identifier issued by PhonePe for the iOS app after its Apple

@@ -35,6 +35,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import { requestContext } from './src/interfaces/http/middleware/requestContext.js';
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
+import { paymentAccessSummary } from './config/paymentAccess.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
 import { currentDataRevision, dataRevision } from './middleware/dataRevision.js';
@@ -142,6 +143,12 @@ if (phonepePaymentsEnabled && paymentConfigurationProblems.length) {
     `${message} Payment creation stays unavailable until the values in backend/.env.example are set.`
   );
 }
+
+/* Which parents may actually reach the checkout. Said out loud at boot
+   because the failure that matters is silent: a mistyped
+   PHONEPE_TEST_PARENT_PHONES leaves payments open to every family on the
+   roll, and nothing else would report it. */
+if (phonepePaymentsEnabled) console.log(paymentAccessSummary());
 
 app.use(helmet());
 

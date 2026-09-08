@@ -7,6 +7,7 @@ import {
 } from '../middleware/rateLimit.js';
 import {
   createPaymentIntent,
+  getPaymentAvailability,
   getPaymentIntent,
   getPublicPaymentIntent,
   phonepeWebhook,
@@ -24,6 +25,11 @@ const router = express.Router();
    client must not get the whole account throttled by PhonePe — settlement
    itself runs on that same API. The limits are sized in rateLimit.js so a
    real payment flow, polling included, never comes near them. */
+/* A plain read of two switches — no provider call, no write — so it carries
+   no limiter of its own beyond the auth gate's own lookup. The app asks it
+   once on load. */
+router.get('/availability', protectParent, getPaymentAvailability);
+
 router.post('/intents', protectParent, paymentCreateLimiter, createPaymentIntent);
 router.get('/intents/:id', protectParent, paymentStatusLimiter, getPaymentIntent);
 

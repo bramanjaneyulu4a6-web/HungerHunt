@@ -7,6 +7,7 @@ import phonepe from '../src/domain/payments/providers/phonepe.js';
 import settle from '../src/domain/payments/settlePaymentIntent.js';
 import { rupeesToPaise, paiseToRupees } from '../src/domain/payments/money.js';
 import { isValidVpa, maskVpa, normalizeVpa } from '../utils/upiVpa.js';
+import { paymentsAllowedFor } from '../config/paymentAccess.js';
 
 /* The Golden Rule of gateways, enforced here by what these handlers refuse to
  * do: nothing a client can call marks money as received. createIntent starts
@@ -116,9 +117,34 @@ const HANDOFF = {
   REDIRECT: (created) => ({ redirectUrl: created.redirectUrl }),
 };
 
+/* Whether this parent may pay, asked once by the app before it decides
+   whether to draw a Pay button at all. A live question rather than a
+   build-time flag, so adding a reviewer's account is a Render env edit
+   instead of rebuilding four frontends.
+
+   Both halves of the answer are the server's: the gateway switch and the
+   allowlist. The app can only hide or show a button on this — the real
+   refusal is in createPaymentIntent, which asks the same two questions
+   again and does not trust that this was ever called. */
+export const getPaymentAvailability = (req, res) => {
+  res.json({ paymentsEnabled: phonepeEnabled() && paymentsAllowedFor(req.parent?.phone) });
+};
+
 export const createPaymentIntent = async (req, res) => {
   try {
     if (!phonepeEnabled()) {
+      return res.status(503).json({ message: 'UPI payments are temporarily unavailable.' });
+    }
+
+    /* The gateway can be fully live while only named accounts may use it —
+       what lets PhonePe review a working checkout in production without
+       putting one in front of the families on the roll. Deliberately the same
+       answer as the switch above: to a parent who is not in the allowlist,
+       payments are simply not on offer, and the response has no reason to
+       describe a list they are not on. The app hides the button on the same
+       fact (GET /payments/availability), so reaching here means a stale page
+       or a hand-made request, not a parent tapping something they can see. */
+    if (!paymentsAllowedFor(req.parent?.phone)) {
       return res.status(503).json({ message: 'UPI payments are temporarily unavailable.' });
     }
 

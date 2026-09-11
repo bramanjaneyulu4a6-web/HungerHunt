@@ -324,6 +324,15 @@ paths:
           name: to
           required: true
           schema: { type: string, format: date }
+        - in: query
+          name: include
+          required: false
+          description: >
+            Comma-separated movement types to export. Omit for all of them.
+            An unrecognised type is rejected rather than ignored.
+          schema:
+            type: string
+            example: CASH_DEPOSIT,UPI_DEPOSIT,REFUND
       responses:
         '200':
           description: Native TallyPrime Vouchers import XML
@@ -338,6 +347,48 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '413':
           description: More than 50,000 vouchers; select a shorter period
+  /accounting-exports/tally.csv:
+    get:
+      summary: Download the flat transactions spreadsheet
+      description: >
+        Admin only. One row per movement — cash and UPI deposits, student wallet
+        deductions, orders paid directly by UPI, and refunds — in the column order
+        of the school's uniform receipts book. Deductions and refunds carry a
+        negative amount. Date-only bounds use BUSINESS_TIME_ZONE and the
+        through-date is inclusive.
+      operationId: exportTallyPrimeCsv
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: include
+          required: false
+          description: >
+            Comma-separated movement types to export. Omit for all of them.
+            An unrecognised type is rejected rather than ignored.
+          schema:
+            type: string
+            example: CASH_DEPOSIT,UPI_DEPOSIT,REFUND
+      responses:
+        '200':
+          description: UTF-8 CSV with a byte-order mark, CRLF records
+          headers:
+            X-HungerHunt-Row-Count:
+              schema: { type: integer, minimum: 0 }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413':
+          description: More than 50,000 rows; select a shorter period or fewer types
   /replenishment-drafts:
     post:
       summary: Generate or return today's active analytics-assisted replenishment draft

@@ -2245,3 +2245,54 @@
     width: auto;
   }
 }
+
+/* TallyPrime export: the movement-type filter and the quick-range rows. The
+   filter governs every download on the page, so it sits in its own card above
+   both of them rather than inside either. */
+.export-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 18px;
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+}
+
+.export-types__row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.quick-export__row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.quick-export__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.quick-export__row small {
+  display: block;
+  color: var(--ink-soft);
+}
+
+.quick-export__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .quick-export__row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

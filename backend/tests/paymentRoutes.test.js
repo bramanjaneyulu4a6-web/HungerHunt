@@ -43,6 +43,10 @@ const parentToken = signParentToken(PARENT_ID, '9999999999');
 
 let server, base;
 before(async () => {
+  /* Cleared before the first test as well as after each: app.js loads
+     backend/.env, and a developer's allowlist there would otherwise decide
+     whether this suite's parent may pay at all. */
+  delete process.env.PHONEPE_TEST_PARENT_PHONES;
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;

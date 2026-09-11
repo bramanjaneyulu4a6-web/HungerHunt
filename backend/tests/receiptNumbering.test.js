@@ -39,6 +39,13 @@ const { signAdminToken } = await import('../utils/tokens.js');
 const { accountMatcher } = await import('./helpers/accountIs.js');
 const app = (await import('../app.js')).default;
 
+/* The PhonePe test account lifts purchase limits and the weekly cap at
+   checkout (utils/testAccount.js), and app.js loads backend/.env, so a
+   developer whose .env names a test parent would run this suite with the
+   bypass live — its student stubs would then be asked for a phone they were
+   never given. Pinned empty: no list, no test account, whatever .env says. */
+process.env.PHONEPE_TEST_PARENT_PHONES = '';
+
 mongoose.set('bufferTimeoutMS', 200);
 
 const ADMIN_ID = '507f1f77bcf86cd799439011';

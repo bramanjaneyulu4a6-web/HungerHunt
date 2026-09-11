@@ -23,10 +23,13 @@ test('maps the first worksheet row to the backend student field names', () => {
   assert.equal(record.__importCells.parentPhoneNumber, 'F2');
 });
 
+/* The sheet's heading is className now; a legacy grade column merely stands
+   in for it. A sheet with neither is told the current name to add, not the
+   old one. */
 test('requires the core student columns', () => {
   assert.throws(
     () => studentRecordsFromRows([headers.filter((value) => value !== 'grade'), ['Asha']]),
-    /Missing required columns: grade/
+    /Missing required columns: className/
   );
 });
 

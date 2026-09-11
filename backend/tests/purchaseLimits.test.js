@@ -22,6 +22,13 @@ const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const { chargeCart } = await import('../utils/checkout.js');
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
+
+/* The PhonePe test account lifts purchase limits and the weekly cap at
+   checkout (utils/testAccount.js), and app.js loads backend/.env, so a
+   developer whose .env names a test parent would run this suite with the
+   bypass live — its student stubs would then be asked for a phone they were
+   never given. Pinned empty: no list, no test account, whatever .env says. */
+process.env.PHONEPE_TEST_PARENT_PHONES = '';
 const { accountMatcher } = await import('./helpers/accountIs.js');
 
 mongoose.set('bufferTimeoutMS', 200);

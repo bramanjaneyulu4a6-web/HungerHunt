@@ -19,6 +19,7 @@ import { fulfillmentStatusLabel } from '../utils/fulfillmentStatus';
 import {
   describeEntry,
   entryAmount,
+  entryChannel,
   entryLabel,
   entryReference,
   hasDetails,
@@ -42,7 +43,20 @@ export const EntryDetails = ({ entry }) => {
   const { order } = entry;
   const items = entry.items?.length ? entry.items : order?.items || [];
 
+  /* Who handled it and through which door, first — that is the question a
+     row is usually opened for. A person's name is worth a line of its own;
+     the channel is worth one for the rows that have no person. */
+  const role = entry.processedBy?.role;
+  const processingFacts = [
+    ['Processed by', entry.processedBy?.name
+      ? `${entry.processedBy.name}${role && role !== 'admin' ? ` (${role})` : ''}`
+      : null],
+    ['Recorded via', entryChannel(entry)],
+    ['Mode', entry.kind === 'TOP_UP' ? entry.mode : null],
+  ].filter(([, value]) => value);
+
   const transactionFacts = [
+    ...processingFacts,
     ['Receipt No.', entry.receiptNumber],
     // The bank's settlement reference. It is the number a parent is given when
     // they ask their own bank where the money went, and the only one that

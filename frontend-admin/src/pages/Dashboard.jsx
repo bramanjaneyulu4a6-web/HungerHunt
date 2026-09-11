@@ -17,6 +17,7 @@ import {
   businessDateToday,
   describeEntry,
   entryAmount,
+  entryActor,
   entryLabel,
   entryReference,
   hasDetails,
@@ -129,7 +130,8 @@ const Dashboard = () => {
       "Entry ID",
       "Student Name",
       "Date/Time",
-      "Status",
+      "Type",
+      "Processed By",
       "Reference",
       "Receipt No.",
       "UTR",
@@ -150,6 +152,7 @@ const Dashboard = () => {
           ? `"${entry.items.map((i) => `${i.name} (${i.quantity}x₹${i.price})`).join(" | ")}"`
           : '""';
         const reference = `"${(entryReference(entry) || "").replace(/"/g, '""')}"`;
+        const processedBy = `"${entryActor(entry).name.replace(/"/g, '""')}"`;
 
         return [
           index + 1,
@@ -157,6 +160,7 @@ const Dashboard = () => {
           studentName,
           timestamp,
           `"${label}"`,
+          processedBy,
           reference,
           `"${entry.receiptNumber || ""}"`,
           `"${entry.utr || ""}"`,
@@ -309,7 +313,8 @@ const Dashboard = () => {
                   <th style={{ width: 60 }}>S.No.</th>
                   <th>Student Name</th>
                   <th>Date/Time</th>
-                  <th style={{ width: 170 }}>Status</th>
+                  <th style={{ width: 190 }}>Type</th>
+                  <th>Processed by</th>
                   <th>Reference</th>
                   <th style={{ textAlign: "right" }}>Amount</th>
                   <th style={{ textAlign: "right", width: 130 }}>Balance</th>
@@ -320,6 +325,7 @@ const Dashboard = () => {
                 {filteredHistory.map((entry, index) => {
                   const { label, variant } = entryLabel(entry);
                   const { direction } = describeEntry(entry);
+                  const actor = entryActor(entry);
                   const rowKey = `${entry.kind}-${entry._id}`;
                   const isExpanded = expandedTransaction === rowKey;
                   // A charge or a refund has a basket and a package to open;
@@ -358,8 +364,14 @@ const Dashboard = () => {
                         >
                           {new Date(entry.date).toLocaleString()}
                         </td>
-                        <td data-label="Status">
+                        <td data-label="Type">
                           <Badge variant={variant}>{label}</Badge>
+                        </td>
+                        <td
+                          data-label="Processed by"
+                          style={actor.muted ? { color: "var(--muted)", fontSize: 13 } : undefined}
+                        >
+                          {actor.name}
                         </td>
                         <td data-label="Reference" className="ledger-mono">
                           {entryReference(entry) || "—"}
@@ -408,7 +420,7 @@ const Dashboard = () => {
 
                       {isExpanded && (
                         <tr className="ledger-detail-row">
-                          <td colSpan="8">
+                          <td colSpan="9">
                             <EntryDetails entry={entry} />
                           </td>
                         </tr>

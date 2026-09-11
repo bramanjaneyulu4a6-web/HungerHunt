@@ -9,6 +9,7 @@
  * caretakers have no business in a family's money, and the gate says so
  * rather than the response being thin.
  */
+import Admin from '../models/Admin.js';
 import PaymentIntent from '../models/PaymentIntent.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
@@ -84,6 +85,31 @@ export const getStudentLedger = async (req, res) => {
  * four models keep their own shapes and their own indexes, and the merge is
  * cheap at the depth this feed asks for. If this ever needs the whole year it
  * wants a different design, not a bigger limit. */
+/* Who or what moved the money. An admin's rows carry their id (performedBy on
+   a deposit and on a refund) and the feed names them; everything else names
+   the channel, because there is no person on the office's side of it — a UPI
+   deposit and a parent-approved order are the parent's doing, and a kiosk
+   sale is the student's. One lookup per page for the names: the id is on the
+   row, the name is not, and an admin renamed since should read by the new
+   name. An admin deleted since reads as the desk, not as nobody. */
+const CHANNEL_OF_CHARGE = {
+  DIRECT_CHECKOUT: 'KIOSK',
+  PARENT_APPROVAL: 'PARENT_APP',
+  UPI_ORDER_PAYMENT: 'PARENT_APP',
+};
+
+const FORMER_STAFF = Object.freeze({ name: 'Former staff', role: null });
+
+const staffNamesFor = async (rows) => {
+  const ids = [...new Set(rows.map((row) => row.performedBy).filter(Boolean).map(String))];
+  if (ids.length === 0) return new Map();
+  const admins = await Admin.find({ _id: { $in: ids } }).select('name role').lean();
+  return new Map(admins.map((admin) => [String(admin._id), { name: admin.name, role: admin.role ?? 'admin' }]));
+};
+
+const processedBy = (row, names) =>
+  row.performedBy ? names.get(String(row.performedBy)) ?? FORMER_STAFF : null;
+
 export const getLedgerFeed = async (req, res) => {
   try {
     const { page, limit, skip } = readPaging(req);
@@ -185,6 +211,7 @@ export const getLedgerFeed = async (req, res) => {
     const orderByTransaction = new Map(
       orders.map((order) => [String(order.transactionId), order])
     );
+    const staffNames = await staffNamesFor([...topups, ...refunds]);
 
     const all = [
       ...topups.map((entry) => ({
@@ -192,6 +219,8 @@ export const getLedgerFeed = async (req, res) => {
         kind: 'TOP_UP',
         adjustmentId: entry._id,
         mode: entry.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
+        via: entry.source === 'PARENT_UPI' ? 'PARENT_APP' : 'ADMIN_DESK',
+        processedBy: entry.source === 'PARENT_UPI' ? null : processedBy(entry, staffNames),
         amount: entry.amount,
         previousBalance: entry.previousBalance,
         newBalance: entry.newBalance,
@@ -207,6 +236,8 @@ export const getLedgerFeed = async (req, res) => {
         return {
         _id: entry._id,
         kind: entry.sourceType === 'UPI_ORDER_PAYMENT' ? 'UPI_ORDER_PAYMENT' : 'ORDER_PAYMENT',
+        via: CHANNEL_OF_CHARGE[entry.sourceType] || 'KIOSK',
+        processedBy: null,
         amount: entry.totalAmount,
         ...(entry.sourceType === 'UPI_ORDER_PAYMENT'
           ? { transactionId: entry.idempotencyKey || null }
@@ -224,6 +255,8 @@ export const getLedgerFeed = async (req, res) => {
       ...refunds.map((entry) => ({
         _id: entry._id,
         kind: 'ORDER_CANCELLATION_REFUND',
+        via: 'ADMIN_DESK',
+        processedBy: processedBy(entry, staffNames),
         amount: entry.amount,
         previousBalance: entry.previousBalance,
         newBalance: entry.newBalance,
@@ -246,6 +279,8 @@ export const getLedgerFeed = async (req, res) => {
       ...failedTopups.map((entry) => ({
         _id: entry._id,
         kind: 'TOPUP_FAILED',
+        via: 'PARENT_APP',
+        processedBy: null,
         amount: paiseToRupees(entry.amountPaise),
         transactionId: entry.merchantOrderId,
         date: entry.createdAt,

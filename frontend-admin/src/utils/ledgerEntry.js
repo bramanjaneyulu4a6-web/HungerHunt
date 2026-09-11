@@ -73,12 +73,17 @@ export const entryReference = (entry) => {
    coming back are one event to everybody except the ledger. */
 const ORDER_STATUS_VARIANTS = { CANCELLED: 'alert', COLLECTED: 'success' };
 
+const asOrder = (state) => `Order – ${state}`;
+
 const describeOrder = (entry) => {
-  if (entry.refunded) return { label: 'Refunded', variant: 'success' };
+  if (entry.refunded) return { label: asOrder('Refunded'), variant: 'success' };
   const status = entry.order?.status;
-  if (!status) return describeEntry(entry);
+  if (!status) {
+    const kind = describeEntry(entry);
+    return { ...kind, label: asOrder(kind.label) };
+  }
   return {
-    label: fulfillmentStatusLabel(status),
+    label: asOrder(fulfillmentStatusLabel(status)),
     variant: ORDER_STATUS_VARIANTS[status] || 'neutral',
   };
 };
@@ -86,6 +91,40 @@ const describeOrder = (entry) => {
 /* What a row is called wherever it is shown. */
 export const entryLabel = (entry) =>
   isOrder(entry) ? describeOrder(entry) : describeEntry(entry);
+
+/* Which hands the money moved through. The dashboard feed says so outright
+   (`via`); the student ledger, built by the older shared builder, does not,
+   and there a deposit's mode and a refund's kind are enough to place it while
+   a purchase is left as an order rather than guessed at. */
+const CHANNELS = { ADMIN_DESK: 'Admin desk', PARENT_APP: 'Parent app', KIOSK: 'Kiosk' };
+
+const channelOf = (entry) => {
+  if (entry.via) return entry.via;
+  if (entry.kind === 'TOP_UP') return entry.mode === 'UPI' ? 'PARENT_APP' : 'ADMIN_DESK';
+  if (entry.kind === 'ORDER_CANCELLATION_REFUND') return 'ADMIN_DESK';
+  if (entry.kind === 'TOPUP_FAILED') return 'PARENT_APP';
+  return null;
+};
+
+export const entryChannel = (entry) => CHANNELS[channelOf(entry)] ?? null;
+
+/* The Processed by column. An admin's row names the admin; every other row
+   names the channel in muted text, so the column never reads as missing —
+   there is no person on the office's side of a parent's UPI deposit or a
+   student's kiosk sale, and the row should say so rather than leave a dash. */
+export const entryActor = (entry) => {
+  if (entry.processedBy?.name) return { name: entry.processedBy.name, muted: false };
+
+  const channel = channelOf(entry);
+  const upi = entry.kind === 'TOP_UP' || entry.kind === 'TOPUP_FAILED' ? 'Parent via PhonePe' : 'Parent via UPI';
+  const name =
+    channel === 'KIOSK' ? 'Student at kiosk'
+    : channel === 'ADMIN_DESK' ? 'Admin desk'
+    : channel === 'PARENT_APP'
+      ? (entry.kind === 'ORDER_PAYMENT' ? 'Parent approval' : upi)
+      : 'Order';
+  return { name, muted: true };
+};
 
 export const entryAmount = (entry) => {
   const { direction } = describeEntry(entry);
@@ -97,7 +136,8 @@ export const entryAmount = (entry) => {
    nothing more to say; a charge or a refund has a basket, a package, or both. */
 export const hasDetails = (entry) =>
   Boolean(
-    entry.order ||
+    entry.processedBy ||
+      entry.order ||
       entry.items?.length ||
       entry.receiptNumber ||
       entry.utr ||

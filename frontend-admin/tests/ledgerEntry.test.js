@@ -1,9 +1,8 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { entryReference, businessDateToday, receiptEntryFromTopUp } = await import(
-  '../src/utils/ledgerEntry.js'
-);
+const { entryReference, businessDateToday, receiptEntryFromTopUp, entryLabel, entryActor, entryChannel } =
+  await import('../src/utils/ledgerEntry.js');
 
 /* The Reference column is what an admin reads back to a parent on the phone,
    and for money coming in that is the receipt number — the one figure printed
@@ -113,5 +112,80 @@ describe('the receipt a fresh recharge opens', () => {
   test('a response with no adjustment opens nothing', () => {
     assert.equal(receiptEntryFromTopUp({ newBalance: 600 }), null);
     assert.equal(receiptEntryFromTopUp(undefined), null);
+  });
+});
+
+/* The Type column names an order as an order and says where the package is;
+   the ledger used to print the bare status, which read as the state of the
+   money rather than of a parcel. */
+describe('what a row is called', () => {
+
+  test('an order row is Order – <where the package is>', () => {
+    assert.equal(
+      entryLabel({ kind: 'ORDER_PAYMENT', order: { status: 'PACKED' } }).label,
+      'Order – Packed'
+    );
+    assert.equal(
+      entryLabel({ kind: 'UPI_ORDER_PAYMENT', order: { status: 'COLLECTED' } }).label,
+      'Order – Delivered'
+    );
+  });
+
+  test('a refunded order says so, still as an order', () => {
+    assert.equal(
+      entryLabel({ kind: 'ORDER_PAYMENT', refunded: true, order: { status: 'CANCELLED' } }).label,
+      'Order – Refunded'
+    );
+  });
+
+  test('a charge with no package yet is still an order', () => {
+    assert.equal(entryLabel({ kind: 'ORDER_PAYMENT' }).label, 'Order – Student Wallet Payment');
+  });
+
+  test('deposits and refunds keep their names', () => {
+    assert.equal(entryLabel({ kind: 'TOP_UP', mode: 'CASH' }).label, 'Cash Deposit');
+    assert.equal(entryLabel({ kind: 'ORDER_CANCELLATION_REFUND' }).label, 'Refund');
+  });
+});
+
+/* "Processed by" is the admin where there was one, and otherwise says whose
+   hands the money moved through, so the column never reads as missing. */
+describe('who processed a row', () => {
+
+  test('an admin\'s row names the admin', () => {
+    assert.deepEqual(
+      entryActor({ kind: 'TOP_UP', mode: 'CASH', via: 'ADMIN_DESK', processedBy: { name: 'Ravi', role: 'admin' } }),
+      { name: 'Ravi', muted: false }
+    );
+    assert.deepEqual(
+      entryActor({ kind: 'ORDER_CANCELLATION_REFUND', via: 'ADMIN_DESK', processedBy: { name: 'Meena', role: 'warehouse' } }),
+      { name: 'Meena', muted: false }
+    );
+  });
+
+  test('rows with nobody on the office side name the channel, muted', () => {
+    assert.deepEqual(entryActor({ kind: 'TOP_UP', mode: 'UPI', via: 'PARENT_APP', processedBy: null }), { name: 'Parent via PhonePe', muted: true });
+    assert.deepEqual(entryActor({ kind: 'TOPUP_FAILED', via: 'PARENT_APP' }), { name: 'Parent via PhonePe', muted: true });
+    assert.deepEqual(entryActor({ kind: 'ORDER_PAYMENT', via: 'KIOSK' }), { name: 'Student at kiosk', muted: true });
+    assert.deepEqual(entryActor({ kind: 'ORDER_PAYMENT', via: 'PARENT_APP' }), { name: 'Parent approval', muted: true });
+    assert.deepEqual(entryActor({ kind: 'UPI_ORDER_PAYMENT', via: 'PARENT_APP' }), { name: 'Parent via UPI', muted: true });
+  });
+
+  /* A student's own history comes from the older builder, which does not say
+     the channel. Deposits and refunds can still be placed from what it does
+     say; a purchase cannot, and reads as an order rather than a guess. */
+  test('a row from the student ledger, which carries no channel, is still placed', () => {
+    assert.deepEqual(entryActor({ kind: 'TOP_UP', mode: 'CASH' }), { name: 'Admin desk', muted: true });
+    assert.deepEqual(entryActor({ kind: 'TOP_UP', mode: 'UPI' }), { name: 'Parent via PhonePe', muted: true });
+    assert.deepEqual(entryActor({ kind: 'ORDER_CANCELLATION_REFUND' }), { name: 'Admin desk', muted: true });
+    assert.deepEqual(entryActor({ kind: 'ORDER_PAYMENT' }), { name: 'Order', muted: true });
+  });
+
+  test('the channel reads as a place in the row detail', () => {
+    assert.equal(entryChannel({ via: 'ADMIN_DESK' }), 'Admin desk');
+    assert.equal(entryChannel({ via: 'PARENT_APP' }), 'Parent app');
+    assert.equal(entryChannel({ via: 'KIOSK' }), 'Kiosk');
+    assert.equal(entryChannel({ kind: 'TOP_UP', mode: 'CASH' }), 'Admin desk');
+    assert.equal(entryChannel({ kind: 'ORDER_PAYMENT' }), null);
   });
 });

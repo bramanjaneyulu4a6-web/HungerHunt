@@ -421,6 +421,87 @@ describe('the whole school, for the dashboard', () => {
     }
   });
 
+  /* The desk asks "who took this?" of a deposit and "who gave this back?" of
+     a refund, and the row has always known — performedBy is on both — but the
+     feed dropped it. A UPI deposit and every purchase have no admin behind
+     them, so they say which channel the money moved through instead. */
+  test('rows an admin processed name that admin; the rest name their channel', async () => {
+    authenticate();
+    const OTHER_ADMIN = '507f1f77bcf86cd799439012';
+    feedIs({
+      topups: [
+        named({ ...topUp('a', 500, '2026-09-01T08:00:00.000Z'), performedBy: ADMIN_ID }, 'Asha'),
+        named(topUp('b', 300, '2026-09-01T09:00:00.000Z', 'PARENT_UPI'), 'Asha'),
+      ],
+      charges: [
+        named({ ...charge('c', 60, '2026-09-01T10:00:00.000Z'), sourceType: 'DIRECT_CHECKOUT' }, 'Vikram'),
+        named({ ...charge('d', 70, '2026-09-01T11:00:00.000Z'), sourceType: 'PARENT_APPROVAL' }, 'Vikram'),
+      ],
+      refunds: [
+        named({
+          _id: 'e',
+          transactionId: 'd',
+          amount: 70,
+          previousBalance: 0,
+          newBalance: 70,
+          reason: 'Order cancelled',
+          performedBy: OTHER_ADMIN,
+          createdAt: new Date('2026-09-01T12:00:00.000Z'),
+        }, 'Vikram'),
+      ],
+    });
+    const asked = [];
+    mock.method(Admin, 'find', (filter) => {
+      asked.push(filter);
+      return {
+        select: () => ({
+          lean: async () => [
+            { _id: ADMIN_ID, name: 'Ravi', role: 'admin' },
+            { _id: OTHER_ADMIN, name: 'Meena', role: 'warehouse' },
+          ],
+        }),
+      };
+    });
+
+    const body = await (await get('/api/transactions/ledger')).json();
+    const byId = Object.fromEntries(body.entries.map((entry) => [String(entry._id), entry]));
+
+    assert.deepEqual(byId.a.processedBy, { name: 'Ravi', role: 'admin' });
+    assert.equal(byId.a.via, 'ADMIN_DESK');
+    assert.equal(byId.b.processedBy, null);
+    assert.equal(byId.b.via, 'PARENT_APP');
+    assert.equal(byId.c.processedBy, null);
+    assert.equal(byId.c.via, 'KIOSK');
+    assert.equal(byId.d.via, 'PARENT_APP');
+    assert.deepEqual(byId.e.processedBy, { name: 'Meena', role: 'warehouse' });
+    assert.equal(byId.e.via, 'ADMIN_DESK');
+    // One lookup for the page, not one per row.
+    assert.equal(asked.length, 1);
+    assert.deepEqual(asked[0]._id.$in.map(String).sort(), [ADMIN_ID, OTHER_ADMIN].sort());
+  });
+
+  test('a deposit whose admin has since been deleted still says the desk took it', async () => {
+    authenticate();
+    feedIs({
+      topups: [named({ ...topUp('a', 500, '2026-09-01T08:00:00.000Z'), performedBy: ADMIN_ID }, 'Asha')],
+    });
+    mock.method(Admin, 'find', () => ({ select: () => ({ lean: async () => [] }) }));
+
+    const body = await (await get('/api/transactions/ledger')).json();
+
+    assert.deepEqual(body.entries[0].processedBy, { name: 'Former staff', role: null });
+  });
+
+  test('a page with nothing an admin processed asks for no admins', async () => {
+    authenticate();
+    feedIs({ topups: [named(topUp('b', 300, '2026-09-01T09:00:00.000Z', 'PARENT_UPI'), 'Asha')] });
+    const find = mock.method(Admin, 'find', () => ({ select: () => ({ lean: async () => [] }) }));
+
+    await get('/api/transactions/ledger');
+
+    assert.equal(find.mock.callCount(), 0);
+  });
+
   test('a warehouse account cannot read the feed', async () => {
     accountIs('warehouse');
     const response = await get('/api/transactions/ledger', {

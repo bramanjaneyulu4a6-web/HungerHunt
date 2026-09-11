@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { Card } from './ui';
+import { Button, Card } from './ui';
+import Icon from './Icon';
 import { formatINR } from '../utils/format';
+import WarehouseSimulationDialog from './WarehouseSimulationDialog';
 
 /* The warehouse handing the package to the room (DELIVERED) is not
    delivery: only the student ending the package with their own code
@@ -56,20 +59,29 @@ const statusClass = (status) => {
    to the full list, and on that tab itself it is a link to the page you are
    standing on. Deliberately its own prop rather than reusing showStudent,
    which happens to split the same two callers today but answers a different
-   question — whose order this is, not where the link would take you. */
+   question — whose order this is, not where the link would take you.
+
+   `onSimulated` is called once the PhonePe test account has walked this
+   package through the warehouse (see WarehouseSimulationDialog), so the list
+   this card sits in can ask the server for the package's new state. The
+   server alone decides which cards offer that — `order.warehouseSimulation`
+   is never sent to a real family. */
 export default function OrderCard({
   order,
   index = 0,
   showStudent = false,
   showAllOrdersLink = true,
+  onSimulated,
 }) {
   const status = ORDER_STATUS_LABELS[order.status] || order.status;
   const activeStep = progressIndex(order.status);
   const destination = order.studentId
     ? `/child/${order.studentId}?tab=orders`
     : null;
+  const [simulating, setSimulating] = useState(false);
 
   return (
+    <>
     <Card
       className={`order-card order-card--${statusClass(order.status)}`}
       style={{ '--i': index }}
@@ -103,6 +115,23 @@ export default function OrderCard({
             );
           })}
         </ol>
+      )}
+
+      {order.warehouseSimulation === true && (
+        <div className="sim-callout" role="status">
+          <span className="sim-callout__icon" aria-hidden="true"><Icon name="shelf" size={20} /></span>
+          <div>
+            <strong>Now the warehouse takes over</strong>
+            <p>
+              Payment is confirmed. On a real order the storeroom and the
+              caretaker move it from here — as the test account, you can run
+              those steps yourself.
+            </p>
+          </div>
+          <Button variant="dark" block onClick={() => setSimulating(true)}>
+            <Icon name="truck" size={18} /> Simulate the warehouse process
+          </Button>
+        </div>
       )}
 
       <ul className="order-card__items">
@@ -162,5 +191,13 @@ export default function OrderCard({
         </div>
       )}
     </Card>
+    {simulating && (
+      <WarehouseSimulationDialog
+        order={order}
+        onClose={() => setSimulating(false)}
+        onSimulated={onSimulated}
+      />
+    )}
+    </>
   );
 }

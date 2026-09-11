@@ -441,6 +441,30 @@ that arrives without that code is simply not recognised, so the row keeps
 retrying and keeps appearing in the sweep's failure lines until a person
 looks at it. That costs noise. The other reading would have cost a payment.
 
+### The test account stands in for the warehouse
+
+PhonePe reviews the app through one allowlisted parent
+(`PHONEPE_TEST_PARENT_PHONES`, see decision 6) whose children are on the
+roll like any others. A review order has to end the way a real one does, and
+nobody is going to pack, drive and sign for a reviewer's package on demand.
+So, for that account only:
+
+- The test students shop without the per-product purchase limits, the weekly
+  wallet cap, or the one-open-package-at-a-time rule at the kiosk door
+  (`utils/testAccount.js`). The unanswered-approval gate still holds.
+- The parent API marks the test account's unfinished packages
+  (`warehouseSimulation: true`), and the parent app offers a dialog that
+  explains the four warehouse steps and walks the package to COLLECTED in
+  one call (`POST /parent/packages/:id/simulate-warehouse`). Proof of
+  delivery is filled with placeholders ("Test Receiver", 9000000000) and
+  every transition carries the note "Simulated by the PhonePe test parent",
+  so the storeroom and admin screens read it as what it is.
+
+The gate is the allowlist and nothing else. An empty list makes nobody a
+test account — the opposite default from payment access, where an empty list
+opens the checkout to all — so deleting the variable at launch turns every
+one of these off, and a real family can never reach any of it.
+
 ## Implementation order
 
 1. Operational accounting export (implemented for TallyPrime XML).

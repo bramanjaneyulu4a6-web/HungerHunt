@@ -10,6 +10,7 @@ import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.
 import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
 import { mintReceiptNumber } from '../utils/walletReceipts.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
+import { isTestAccountStudent } from '../utils/testAccount.js';
 import {
   ADMISSION_NUMBER_MESSAGE,
   isValidAdmissionNumber,
@@ -428,7 +429,7 @@ export const createKioskSession = async (req, res) => {
       admissionNumber,
       active: { $ne: false },
     })
-      .select('name admissionNumber pocketMoney updatedAt requiresParentApproval +purchasePassword');
+      .select('name admissionNumber pocketMoney updatedAt requiresParentApproval parentPhoneNumber +purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: 'No student found with that admission number.' });
@@ -458,6 +459,11 @@ export const createKioskSession = async (req, res) => {
       });
     }
 
+    /* One package on its way at a time — except for the PhonePe reviewer's
+       children, who must be able to order again before the last package is
+       delivered, or every review order waits on a real warehouse round. The
+       unanswered-approval gate below still holds for them: that one is about
+       the parent answering, not about how many orders a week may carry. */
     const now = new Date();
     const [pendingApproval, fulfillmentOrder] = await Promise.all([
       PendingOrder.findOne({
@@ -467,10 +473,12 @@ export const createKioskSession = async (req, res) => {
           { status: 'PROCESSING' },
         ],
       }).select('status expiresAt'),
-      FulfillmentOrder.findOne({
-        studentId: student._id,
-        status: { $in: OPEN_STATUSES },
-      }).sort({ orderedAt: -1 }).select('status deliverBy'),
+      (await isTestAccountStudent(student))
+        ? null
+        : FulfillmentOrder.findOne({
+            studentId: student._id,
+            status: { $in: OPEN_STATUSES },
+          }).sort({ orderedAt: -1 }).select('status deliverBy'),
     ]);
 
     if (pendingApproval || fulfillmentOrder) {

@@ -6,6 +6,8 @@ import PendingOrder from "../models/PendingOrder.js";
 
 import bcrypt from "bcryptjs";
 import { isOverdue, OPEN_STATUSES } from "../src/domain/fulfillment/overdue.js";
+import { isTestAccountPhone } from "../config/paymentAccess.js";
+import { OrderStatus } from "../src/domain/fulfillment/orderState.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
 import { sendPasswordResetMail } from "../utils/mailer.js";
@@ -176,10 +178,11 @@ export const getParentDashboardDetails = async (req, res) => {
       : [];
 
     const now = new Date();
+    const options = packageViewOptions(req);
 
     res.json({
       children: parent.studentIds,
-      ongoingOrders: orders.map((order) => parentPackageView(order, now)),
+      ongoingOrders: orders.map((order) => parentPackageView(order, now, null, options)),
     });
 
   } catch (error) {
@@ -395,7 +398,7 @@ export const getChildRecharges = async (req, res) => {
  * stored at payment for exactly this reason, so the deadline the parent reads
  * is the deadline the storeroom is working to, and no client has to know the
  * 48-hour rule or the business timezone to display it. */
-const parentPackageView = (order, now, payment = null) => ({
+export const parentPackageView = (order, now, payment = null, { testAccount = false } = {}) => ({
   id: String(order._id),
   studentId: String(order.studentId),
   studentName: order.studentSnapshot?.name || "",
@@ -418,7 +421,19 @@ const parentPackageView = (order, now, payment = null) => ({
      shows for the charge — one story across both screens. Null where the
      caller did not look the payment up (the dashboard's ongoing orders). */
   payment,
+  /* Only on the PhonePe test account's packages, and only while the package
+     is still moving: the reviewer may stand in for the warehouse and the
+     caretaker (see warehouseSimulationController). A real family's package
+     never carries the key at all, so the app cannot draw the button on a
+     falsy-but-present value either. */
+  ...(testAccount
+    ? {
+        warehouseSimulation: ![OrderStatus.COLLECTED, OrderStatus.CANCELLED].includes(order.status),
+      }
+    : {}),
 });
+
+const packageViewOptions = (req) => ({ testAccount: isTestAccountPhone(req.parent?.phone) });
 
 /* The payment behind each of the listed orders, keyed by transaction id.
  * Mode plus the references wallet activity quotes: a wallet charge's own
@@ -480,10 +495,11 @@ export const getChildPackages = async (req, res) => {
 
     const payments = await paymentsByTransaction(req.params.id, orders);
     const now = new Date();
+    const options = packageViewOptions(req);
 
     res.json({
       packages: orders.map((order) =>
-        parentPackageView(order, now, payments.get(String(order.transactionId)) || null)
+        parentPackageView(order, now, payments.get(String(order.transactionId)) || null, options)
       ),
       ...paged(total, page, limit)
     });

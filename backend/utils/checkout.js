@@ -7,6 +7,7 @@ import WalletReversal from '../models/WalletReversal.js';
 import { checkPurchaseLimits } from './purchaseLimits.js';
 import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
+import { isTestAccountStudent } from './testAccount.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -120,11 +121,18 @@ export const chargeCart = async ({
     entries: limitedEntries,
     session,
     excludePendingOrderId: sourceType === 'PARENT_APPROVAL' ? sourceId : null,
+    student,
   });
 
   if (!withinLimits.ok) return withinLimits;
 
-  if (funding === 'WALLET' && student.walletControl?.enabled) {
+  // The weekly cap is the parent's rule for their own child. The PhonePe
+  // reviewer's children are exempt for the same reason the product limits
+  // above are: a review has to be able to keep ordering. Real families are
+  // untouched — see utils/testAccount.js for what makes a student a test one.
+  const testStudent = await isTestAccountStudent(student, { session });
+
+  if (funding === 'WALLET' && student.walletControl?.enabled && !testStudent) {
     const spendingQuery = Transaction.aggregate([
       {
         $match: {

@@ -3345,3 +3345,489 @@ body {
   font-size: 14px;
 }
 
+
+/* ---- warehouse simulation (PhonePe test account only) ------------------ */
+
+/* The hand-over banner on an order card. Only the test account's cards carry
+   it (the server decides), so it can afford to stand out: it is the one thing
+   on the card that asks for a tap. */
+.sim-callout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 14px;
+  margin: 16px 0 4px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--parent-brand) 38%, var(--parent-line));
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--parent-brand) 10%, #fff) 0%, #fff 70%);
+}
+
+.sim-callout__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  color: var(--parent-brand-deep);
+  background: color-mix(in srgb, var(--parent-brand) 16%, #fff);
+  border-radius: 12px;
+  place-items: center;
+}
+
+.sim-callout strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+  color: var(--parent-ink);
+}
+
+.sim-callout p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--parent-muted);
+}
+
+.sim-callout .btn {
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+
+/* The dialog. Large on purpose — it is an explanation first and a button
+   second, and the route it plays needs the width. */
+.sim-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(31, 22, 15, 0.55);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  animation: parent-fade-in 160ms ease-out both;
+}
+
+.sim-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(92vw, 880px);
+  max-height: 88svh;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(220, 211, 200, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 30px 90px -28px rgba(36, 23, 14, 0.65);
+  animation: parent-modal-in 180ms ease-out both;
+}
+
+.sim-modal__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--parent-line);
+  background: linear-gradient(180deg, var(--parent-soft) 0%, #fff 100%);
+}
+
+.sim-modal__head h2 {
+  margin: 2px 0 6px;
+  font-size: clamp(22px, 3vw, 30px);
+  color: var(--parent-ink);
+}
+
+.sim-modal__head p {
+  margin: 0;
+  max-width: 62ch;
+  line-height: 1.55;
+  color: var(--parent-muted);
+}
+
+.sim-modal__head .section-eyebrow {
+  color: var(--parent-brand-deep);
+}
+
+.sim-modal--delivered .sim-modal__head h2 {
+  color: #1f6b43;
+}
+
+.sim-modal__close {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: var(--parent-ink);
+  background: var(--parent-soft);
+  border: 1px solid var(--parent-line);
+  border-radius: 50%;
+  cursor: pointer;
+  place-items: center;
+}
+
+.sim-modal__close:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.sim-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 24px 26px;
+}
+
+.sim-modal__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--parent-line);
+  background: #fff;
+}
+
+.sim-modal__actions .btn {
+  gap: 8px;
+}
+
+.sim-modal__status {
+  font-weight: 600;
+  color: var(--parent-muted);
+  animation: sim-breathe 1.2s ease-in-out infinite;
+}
+
+/* The four steps, explained before anything moves. */
+.sim-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: sim-step;
+}
+
+.sim-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--parent-line);
+  border-radius: 16px;
+  background: var(--parent-soft);
+}
+
+.sim-step__mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  color: var(--parent-brand-deep);
+  background: #fff;
+  border: 1px solid var(--parent-line);
+  border-radius: 12px;
+  place-items: center;
+}
+
+.sim-step__actor {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--parent-brand-deep);
+}
+
+.sim-step strong {
+  display: block;
+  font-size: 15px;
+  color: var(--parent-ink);
+}
+
+.sim-step p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--parent-muted);
+}
+
+.sim-defaults {
+  padding: 16px 18px;
+  border: 1px dashed color-mix(in srgb, var(--parent-brand) 45%, var(--parent-line));
+  border-radius: 16px;
+}
+
+.sim-defaults h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--parent-ink);
+}
+
+.sim-defaults > p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--parent-muted);
+}
+
+.sim-defaults dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.sim-defaults dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.sim-defaults dt {
+  color: var(--parent-muted);
+}
+
+.sim-defaults dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--parent-ink);
+  text-align: right;
+}
+
+/* The route. A line across the dialog, one node per step, and a parcel that
+   travels the line as --progress runs from 0 to 1. Nodes light up as the
+   parcel passes them. */
+.sim-route {
+  padding: 18px 0 6px;
+}
+
+.sim-route__track {
+  --node: 44px;
+  position: relative;
+  padding: 0 calc(var(--node) / 2);
+}
+
+.sim-route__line,
+.sim-route__fill {
+  position: absolute;
+  top: calc(var(--node) / 2 - 3px);
+  left: calc(var(--node) / 2);
+  right: calc(var(--node) / 2);
+  height: 6px;
+  border-radius: 999px;
+  background: var(--parent-line);
+}
+
+.sim-route__fill {
+  right: auto;
+  width: calc((100% - var(--node)) * var(--progress));
+  background: linear-gradient(90deg, var(--parent-brand) 0%, #1f6b43 100%);
+  transition: width 120ms linear;
+}
+
+.sim-route__parcel {
+  position: absolute;
+  top: calc(var(--node) / 2);
+  left: calc(var(--node) / 2 + (100% - var(--node)) * var(--progress));
+  z-index: 2;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  color: #fff;
+  background: var(--parent-brand-deep);
+  border: 3px solid #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px -10px rgba(217, 81, 37, 0.8);
+  transform: translate(-50%, -50%);
+  transition: left 120ms linear;
+  place-items: center;
+  animation: sim-bob 700ms ease-in-out infinite;
+}
+
+/* Once the last node has lit there is nothing left for the parcel to carry:
+   it fades where it stands rather than sitting on top of the delivered node. */
+.sim-modal--delivered .sim-route__parcel,
+.sim-modal--settling .sim-route__parcel {
+  opacity: 0;
+  animation: none;
+  transition: left 120ms linear, opacity 260ms ease 120ms;
+}
+
+.sim-route__nodes {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-node {
+  display: flex;
+  flex: 0 0 var(--node);
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: var(--node);
+  text-align: center;
+}
+
+.sim-node__dot {
+  display: grid;
+  width: var(--node);
+  height: var(--node);
+  color: var(--parent-muted);
+  background: #fff;
+  border: 2px solid var(--parent-line);
+  border-radius: 50%;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease, transform 200ms ease;
+  place-items: center;
+}
+
+.sim-node small {
+  width: 96px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--parent-muted);
+}
+
+.sim-node--active .sim-node__dot {
+  color: var(--parent-brand-deep);
+  border-color: var(--parent-brand);
+  animation: sim-pulse 900ms ease-out infinite;
+}
+
+.sim-node--reached .sim-node__dot {
+  color: #fff;
+  background: #1f6b43;
+  border-color: #1f6b43;
+  transform: scale(1.06);
+}
+
+.sim-node--reached small {
+  color: #1f6b43;
+}
+
+.sim-route__wait {
+  margin: 26px 0 0;
+  text-align: center;
+  color: var(--parent-muted);
+  animation: sim-breathe 1.2s ease-in-out infinite;
+}
+
+/* Delivered: the mark pops in and six dots burst out of it. */
+.sim-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 30px;
+  padding: 24px 16px 8px;
+  text-align: center;
+  animation: parent-modal-in 240ms ease-out both;
+}
+
+.sim-done__mark {
+  position: relative;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 8px;
+  color: #fff;
+  background: #1f6b43;
+  border-radius: 50%;
+  box-shadow: 0 0 0 10px #eef9f2;
+  place-items: center;
+  animation: sim-pop 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.sim-done__mark i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: var(--parent-brand);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: sim-burst 700ms ease-out both;
+  animation-delay: 120ms;
+  --angle: calc(var(--dot) * 60deg);
+}
+
+.sim-done strong {
+  font-size: 20px;
+  color: #1f6b43;
+}
+
+.sim-done p {
+  max-width: 48ch;
+  margin: 0;
+  line-height: 1.55;
+  color: var(--parent-muted);
+}
+
+@keyframes sim-bob {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, -62%); }
+}
+
+@keyframes sim-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(241, 104, 58, 0.45); }
+  100% { box-shadow: 0 0 0 14px rgba(241, 104, 58, 0); }
+}
+
+@keyframes sim-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes sim-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes sim-burst {
+  from { transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0); opacity: 1; }
+  to { transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-58px); opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  .sim-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .sim-node small {
+    width: 64px;
+    font-size: 11px;
+  }
+
+  .sim-modal__actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sim-modal,
+  .sim-modal-backdrop,
+  .sim-modal__status,
+  .sim-route__wait,
+  .sim-route__parcel,
+  .sim-node--active .sim-node__dot,
+  .sim-done,
+  .sim-done__mark,
+  .sim-done__mark i {
+    animation: none;
+  }
+
+  .sim-route__fill,
+  .sim-route__parcel,
+  .sim-node__dot {
+    transition: none;
+  }
+}

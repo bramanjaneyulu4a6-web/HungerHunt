@@ -102,7 +102,7 @@ export default function Dashboard() {
           <div className="dashboard-orders-grid">
             {ongoingOrders.map((order, index) => (
               <AnimateIn key={order.id} index={index}>
-                <OrderCard order={order} index={index} showStudent />
+                <OrderCard order={order} index={index} showStudent onSimulated={() => reload()} />
               </AnimateIn>
             ))}
           </div>

@@ -3,6 +3,7 @@ import Transaction from '../models/Transaction.js';
 import WalletReversal from '../models/WalletReversal.js';
 import PendingOrder from '../models/PendingOrder.js';
 import { businessPeriodStart } from './businessTime.js';
+import { isTestAccountStudent } from './testAccount.js';
 
 /* Per-product purchase limits: how many units of one product a single student
  * may buy in a period.
@@ -136,6 +137,7 @@ export const getPurchaseAllowances = async ({
   session = null,
   now = new Date(),
   excludePendingOrderId = null,
+  student = null,
 }) => {
   const limited = products
     .map((product) => ({ product, limit: limitOf(product) }))
@@ -143,6 +145,13 @@ export const getPurchaseAllowances = async ({
   const result = new Map();
 
   if (limited.length === 0) return result;
+
+  // The PhonePe reviewer's children shop without limits, so that a review can
+  // place order after order without waiting for a business week to turn over.
+  // An empty map reads as "nothing is limited" to every caller — the kiosk
+  // draws no counters and checkPurchaseLimits finds nothing to refuse — which
+  // is why the bypass lives here and not in each of them.
+  if (await isTestAccountStudent(student ?? studentId, { session })) return result;
 
   const productIds = limited.map(({ product }) => product._id);
   const pending = await pendingQuantities({
@@ -203,6 +212,7 @@ export const checkPurchaseLimits = async ({
   session = null,
   now = new Date(),
   excludePendingOrderId = null,
+  student = null,
 }) => {
   // One cart can name the same product on two lines; the limit applies to the
   // total being bought, not to whichever line is looked at first.
@@ -231,6 +241,7 @@ export const checkPurchaseLimits = async ({
     session,
     now,
     excludePendingOrderId,
+    student,
   });
 
   for (const entry of wanted.values()) {

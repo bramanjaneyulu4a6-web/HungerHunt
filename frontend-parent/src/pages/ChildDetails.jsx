@@ -534,6 +534,10 @@ export default function ChildDetails() {
     // instead of paying for the order — the balance line on this page is
     // now stale and needs its own refresh, separate from the pending list.
     if (degradedToTopup) refreshWallet();
+    // An approval that went through is a new package in the list below, so
+    // the parent sees it — and, on the test account, the warehouse hand-over
+    // banner on it — without leaving the tab and coming back.
+    fulfillmentOrders.reload();
     try {
       const response = await API.get('/pending-orders/parent');
       const childOrders = (response.data.orders || []).filter(
@@ -919,7 +923,12 @@ export default function ChildDetails() {
               <div className="order-list">
                 {fulfillmentOrders.items.map((item, i) => (
                   <AnimateIn key={item.id} index={i}>
-                    <OrderCard order={item} index={i} showAllOrdersLink={false} />
+                    <OrderCard
+                      order={item}
+                      index={i}
+                      showAllOrdersLink={false}
+                      onSimulated={fulfillmentOrders.reload}
+                    />
                   </AnimateIn>
                 ))}
               </div>

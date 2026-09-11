@@ -33,6 +33,18 @@ export const paymentsAllowedFor = (phone) => {
   return allowed.has(String(phone ?? '').trim());
 };
 
+/* Whether this phone belongs to a PhonePe test account — the reviewer's
+   family, not a real one. Deliberately the opposite default from
+   paymentsAllowedFor: an empty list opens payments to everyone, but it makes
+   NOBODY a test account. Everything hung off this answer (limits lifted at the
+   kiosk, a parent walking their own package through the warehouse) must be
+   unreachable by a real family, and "no list, no test account" is what keeps
+   it that way once the variable is deleted at launch. */
+export const isTestAccountPhone = (phone) => {
+  const allowed = allowlist();
+  return allowed.size > 0 && allowed.has(String(phone ?? '').trim());
+};
+
 /* Printed once at boot. Without it a mistyped variable name is invisible:
    payments stay open to every parent, which is the dangerous direction for
    this switch to fail in. */

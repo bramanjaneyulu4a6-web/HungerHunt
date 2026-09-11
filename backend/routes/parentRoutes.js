@@ -21,6 +21,7 @@ import {
   deleteParentAccount
 } from "../controllers/parentController.js";
 import { getWalletBalance } from '../controllers/walletController.js';
+import { simulateWarehouse } from '../controllers/warehouseSimulationController.js';
 import { getWalletReceipt, getWalletReceiptPdf } from '../controllers/walletReceiptController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
@@ -46,6 +47,11 @@ router.get('/child/:id/wallet', protectParent, getWalletBalance);
 router.get('/child/:id/bills', protectParent, getChildBills);
 router.get('/child/:id/recharges', protectParent, getChildRecharges);
 router.get('/child/:id/packages', protectParent, getChildPackages);
+
+/* The PhonePe test account standing in for the warehouse and the caretaker.
+   Refused to every other parent inside the controller, so this is one more
+   route a real family cannot use rather than one they cannot see. */
+router.post('/packages/:orderId/simulate-warehouse', protectParent, simulateWarehouse);
 
 // One recharge, printed: the same data as the app's receipt view and the PDF
 // the parent saves or shares. Any recharge in the ledger can be reprinted.

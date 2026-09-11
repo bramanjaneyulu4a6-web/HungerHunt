@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AuthContext } from './auth';
+import API from '../services/api';
 import { stopPush } from '../utils/push';
 
 /* Read once, at module scope, rather than in an effect after the first render.
@@ -25,8 +26,72 @@ const restoreSession = () => {
   }
 };
 
+const NO_SESSION = { status: 'signed-out', pending: [] };
+const ASKING = { status: 'asking', pending: [] };
+
 export const AuthProvider = ({ children }) => {
   const [parent, setParent] = useState(restoreSession);
+
+  /* Which children still have no purchase code. The app is gated on this — see
+     ProtectedRoute in App.jsx — so it is asked here, once per signed-in
+     session, rather than by each screen that might care.
+
+     Only the answer is held, stamped with who it is about and which asking it
+     belongs to. Everything else is derived below: signed out when there is no
+     parent, and 'asking' whenever the answer on hand is not the one currently
+     being waited for. Storing those two states instead would mean setting
+     state from inside the effect, which cascades a render every time the
+     session changes. */
+  const [answer, setAnswer] = useState(null);
+  const [asked, setAsked] = useState(0);
+
+  const refreshCodeSetup = useCallback(() => setAsked((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!parent) return undefined;
+
+    // An answer for a session that has since ended must not land.
+    let ignore = false;
+
+    API.get('/parent/purchase-code-setup')
+      .then((response) => {
+        if (ignore) return;
+        setAnswer({
+          parentId: parent.id,
+          asked,
+          status: 'known',
+          pending: response.data?.pending ?? [],
+        });
+      })
+      .catch(() => {
+        if (ignore) return;
+
+        /* Nothing is held back when the question cannot be asked. A parent on
+           a bad connection would otherwise be shut out of the whole app by a
+           screen that cannot load the children it is about — and the gate is
+           not what stops a code-less child spending: the counter refuses them
+           outright. The question is asked again on every start, so this opens
+           the app for one session rather than for good. */
+        setAnswer({ parentId: parent.id, asked, status: 'unknown', pending: [] });
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [parent, asked]);
+
+  const codeSetup = useMemo(() => {
+    if (!parent) return NO_SESSION;
+    if (answer?.parentId !== parent.id) return ASKING;
+
+    /* Being asked again keeps the answer on hand rather than emptying it. The
+       setup screen refreshes this the moment it saves the last code, and an
+       empty list in the meantime would blank the screen out from under the
+       parent for as long as the request takes. */
+    if (answer.asked !== asked) return { status: 'asking', pending: answer.pending };
+
+    return { status: answer.status, pending: answer.pending };
+  }, [parent, answer, asked]);
 
   const login = (token, parentData) => {
     localStorage.setItem('parentToken', token);
@@ -60,7 +125,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ parent, login, logout }}>
+    <AuthContext.Provider value={{ parent, login, logout, codeSetup, refreshCodeSetup }}>
       {children}
     </AuthContext.Provider>
   );

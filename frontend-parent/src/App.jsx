@@ -23,6 +23,7 @@ const ChildDetails = lazy(() => import("./pages/ChildDetails"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SetPurchasePassword = lazy(() => import("./pages/SetPurchasePassword"));
+const SetupPurchaseCodes = lazy(() => import("./pages/SetupPurchaseCodes"));
 const PaymentReturn = lazy(() => import("./pages/PaymentReturn"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy"));
@@ -36,9 +37,45 @@ import { PUSH_EVENT } from "./utils/events";
 import API from "./services/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
+/* Every screen behind the session, and the purchase-code gate in front of all
+   of them. A child with no purchase code cannot buy anything at the counter,
+   and only their parent can set one, so a parent with a code-less child is
+   sent to do it before the app will show them anything else.
+
+   'asking' renders nothing rather than guessing: the gate has no answer yet,
+   and either guess is visibly wrong — a dashboard that vanishes a moment
+   later, or a setup screen shown to a parent with nothing to set. It matches
+   the Suspense fallback below, so a route being fetched and a gate being
+   answered look the same.
+
+   A failed question ('unknown') opens the app. See AuthContext for why. */
 const ProtectedRoute = ({ children }) => {
-  const { parent } = useAuth();
-  return parent ? children : <Navigate to="/login" replace />;
+  const { parent, codeSetup } = useAuth();
+
+  if (!parent) return <Navigate to="/login" replace />;
+  if (codeSetup.status === 'asking') return null;
+  if (codeSetup.pending.length) return <Navigate to="/setup-purchase-codes" replace />;
+
+  return children;
+};
+
+/* The gate's own screen, which is the one route the gate cannot redirect away
+   from. It needs a session and something to ask for: a parent whose children
+   all have codes has no business here, and lands on the dashboard instead —
+   which is also what carries them out of this screen when the last code is
+   saved and the list comes back empty. */
+const PurchaseCodeSetupRoute = ({ children }) => {
+  const { parent, codeSetup } = useAuth();
+
+  if (!parent) return <Navigate to="/login" replace />;
+
+  if (!codeSetup.pending.length) {
+    // Nothing to ask for yet, or nothing left to ask for. Which of the two it
+    // is decides between waiting and leaving.
+    return codeSetup.status === 'asking' ? null : <Navigate to="/" replace />;
+  }
+
+  return children;
 };
 
 const PublicOnlyRoute = ({ children }) => {
@@ -52,6 +89,7 @@ const pageTitle = (pathname) => {
   if (pathname === '/accounts') return 'Student accounts';
   if (pathname === '/account') return 'Your account';
   if (pathname.startsWith('/purchase-password/')) return 'Purchase code';
+  if (pathname === '/setup-purchase-codes') return 'Set purchase codes';
   if (pathname === '/login') return 'Sign in';
   if (pathname === '/create-password') return 'Create password';
   if (pathname === '/forgot-password') return 'Forgot password';
@@ -76,7 +114,7 @@ function RouteEffects() {
 }
 
 function AppContent() {
-  const { parent } = useAuth();
+  const { parent, codeSetup } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => startDataAutoRefresh(API, {
@@ -111,7 +149,9 @@ function AppContent() {
   return (
     <>
       <RouteEffects />
-      {parent && <Navbar />}
+      {/* Hidden while the gate is up: the setup screen carries its own sign-out,
+          and a navbar there would offer links that only redirect back to it. */}
+      {parent && !codeSetup.pending.length && <Navbar />}
 
       <main id="main-content" className="parent-main">
         <Suspense fallback={null}>
@@ -178,6 +218,15 @@ function AppContent() {
             <ProtectedRoute>
               <SetPurchasePassword />
             </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/setup-purchase-codes"
+          element={
+            <PurchaseCodeSetupRoute>
+              <SetupPurchaseCodes />
+            </PurchaseCodeSetupRoute>
           }
         />
 

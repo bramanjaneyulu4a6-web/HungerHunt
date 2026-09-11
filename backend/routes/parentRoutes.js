@@ -8,6 +8,7 @@ import {
   getChildBills,
   getChildPackages,
   getChildRecharges,
+  getPurchaseCodeSetup,
   setPurchasePassword,
   changePurchasePassword,
   resetPurchasePassword,
@@ -53,6 +54,12 @@ router.get('/receipts/:adjustmentId/pdf', protectParent, getWalletReceiptPdf);
 
 router.post('/save-fcm-token', protectParent, savePushToken);
 router.post('/remove-fcm-token', protectParent, removePushToken);
+
+/* The gate the app holds a newly signed-in parent at: which children still
+   need a purchase code. Read-only, one indexed query, and asked on every start
+   of the app, so it stays off parentAuthGate for the same reason /login-step
+   does. */
+router.get('/purchase-code-setup', protectParent, getPurchaseCodeSetup);
 
 router.post('/set-purchase-password', protectParent, setPurchasePassword);
 router.post('/change-purchase-password', protectParent, changePurchasePassword);

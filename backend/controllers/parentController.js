@@ -494,6 +494,47 @@ export const getChildPackages = async (req, res) => {
 };
 
 /* =========================================================
+   ✅ PURCHASE CODE SETUP (ONBOARDING GATE)
+========================================================= */
+/* Which of this parent's children still have no purchase code — the one
+   question the app's gate is built on, and the contents of the screen that
+   answers it. An empty list means there is nothing to do and the app opens
+   normally.
+
+   Only the parent can set these codes; a child without one is turned away at
+   the counter (see createKioskSession), which is why the app asks this before
+   showing anything else rather than leaving the parent to find the screen.
+
+   An archived child is excluded deliberately: they cannot be given a code by
+   anyone, so counting them would hold their parent at a gate that never
+   opens. */
+export const getPurchaseCodeSetup = async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.parent.id).select('studentIds');
+
+    if (!parent) {
+      return res.status(404).json({ message: "Parent not found" });
+    }
+
+    // purchasePassword is select: false, and asking for it by name is how the
+    // roll is filtered rather than what comes back — the hash is never read.
+    const pending = parent.studentIds?.length
+      ? await Student.find({
+          _id: { $in: parent.studentIds },
+          active: { $ne: false },
+          purchasePassword: null,
+        })
+          .select('name className section grade roomNumber')
+          .lean()
+      : [];
+
+    res.json({ pending });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* =========================================================
    ✅ SET PURCHASE PASSWORD
 ========================================================= */
 export const setPurchasePassword = async (req, res) => {

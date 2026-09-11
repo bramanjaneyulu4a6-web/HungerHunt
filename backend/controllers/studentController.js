@@ -19,6 +19,8 @@ import {
   findStudentsByIdentity,
   unlinkStudent
 } from "../utils/studentLinks.js";
+import bcrypt from "bcryptjs";
+import { purchaseCodeProblem } from "../utils/validation.js";
 
 // The fields describing who a student is, and the only ones any admin route
 // will write. The rest of the document belongs to a flow with rules of its own:
@@ -699,5 +701,53 @@ export const topUpWallet = async (req, res) => {
 
     console.error("❌ topUpWallet Error:", error);
     return res.status(error.status || 500).json({ message: error.message });
+  }
+};
+
+/* =========================================================
+   ✅ SET A STUDENT'S PURCHASE CODE (OFFICE)
+========================================================= */
+/* A purchase code belongs to the parent, and WRITABLE_FIELDS above still
+   refuses to let one be set as a side effect of editing a student. This route
+   is the deliberate exception, and it is a route rather than a field for
+   exactly that reason: the office has to name what it is doing.
+ *
+ * It exists because the parent app now holds a parent at a gate until every
+ * child has a code, and until this route there was no way for anyone but the
+ * parent to set one — a parent who cannot get through that screen, or who has
+ * forgotten a code and cannot reach the reset behind it, had nobody to ring.
+ *
+ * Unlike the parent's own set-purchase-password, an existing code is replaced
+ * rather than refused. Replacing it is the whole purpose. */
+export const setStudentPurchaseCode = async (req, res) => {
+  try {
+    const problem = purchaseCodeProblem(req.body?.code);
+
+    if (problem) {
+      return res.status(400).json({ message: problem });
+    }
+
+    const student = await Student.findById(req.params.id)
+      .select('name +purchasePassword purchaseCodeIsPin purchaseCodeAttempts purchaseCodeLockedUntil');
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found." });
+    }
+
+    student.purchasePassword = await bcrypt.hash(String(req.body.code), 10);
+    student.purchaseCodeIsPin = true;
+
+    /* The wrong-code streak was against the code being replaced. Left alone,
+       the office would set a code and the child still could not use it until
+       the fifteen-minute lock ran out. */
+    student.purchaseCodeAttempts = 0;
+    student.purchaseCodeLockedUntil = null;
+
+    await student.save();
+
+    res.json({ message: `Purchase code set for ${student.name}.` });
+  } catch (error) {
+    console.error("❌ setStudentPurchaseCode Error:", error);
+    res.status(500).json({ message: error.message });
   }
 };

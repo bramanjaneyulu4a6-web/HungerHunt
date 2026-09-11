@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../components/ui';
 import { phoneProblem } from '../utils/validation';
 import { BUSY_MESSAGE, useRetryCooldown } from '../utils/retryCooldown';
+import { setPendingFirstPasswordPhone } from '../utils/pendingFirstPassword';
 
 export default function Login() {
   const [stage, setStage] = useState('phone');
@@ -54,7 +55,7 @@ export default function Login() {
         });
 
         if (response.data.next === 'VERIFY_PHONE') {
-          sessionStorage.setItem('firstPasswordPhone', formData.parentPhoneNumber);
+          setPendingFirstPasswordPhone(formData.parentPhoneNumber);
           navigate('/create-password');
           return;
         }

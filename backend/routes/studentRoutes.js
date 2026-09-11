@@ -10,7 +10,8 @@ import {
   getActiveStudentCount,
   topUpWallet,
   restoreStudent,
-  createKioskSession
+  createKioskSession,
+  setStudentPurchaseCode
 } from "../controllers/studentController.js";
 import { getWalletBalance } from '../controllers/walletController.js';
 import { getStudentLedger } from '../controllers/walletLedgerController.js';
@@ -57,5 +58,10 @@ router.post('/bulk', protectAdmin, bulkImportStudents);
 router.post('/:id/restore', protectAdmin, restoreStudent);
 
 router.put('/:id/topup', protectAdmin, topUpWallet);
+
+/* Named on its own rather than added to the student edit form's writable
+   fields: a child's purchase code cannot be set as a side effect of editing
+   their row, only by asking for this. See setStudentPurchaseCode. */
+router.put('/:id/purchase-code', protectAdmin, setStudentPurchaseCode);
 
 export default router;

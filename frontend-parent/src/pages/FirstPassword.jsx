@@ -11,8 +11,10 @@ import {
 } from '../services/phoneVerification';
 import { passwordProblem } from '../utils/validation';
 import { BUSY_MESSAGE, useRetryCooldown } from '../utils/retryCooldown';
-
-const PHONE_STORAGE_KEY = 'firstPasswordPhone';
+import {
+  clearPendingFirstPasswordPhone,
+  pendingFirstPasswordPhone,
+} from '../utils/pendingFirstPassword';
 
 const friendlyFirebaseError = (error) => {
   const code = error?.code || '';
@@ -24,7 +26,12 @@ const friendlyFirebaseError = (error) => {
 };
 
 export default function FirstPassword() {
-  const phone = sessionStorage.getItem(PHONE_STORAGE_KEY) || '';
+  /* Held in memory by the sign-in screen, so a reload arrives here with
+     nothing and the guard below sends the parent back to the phone number to
+     start over. Which is the intention: the verification token went with the
+     reloaded page and the account still has no password, so there is no
+     half-finished setup to resume — see utils/pendingFirstPassword. */
+  const phone = pendingFirstPasswordPhone();
   const [step, setStep] = useState('send');
   const [code, setCode] = useState('');
   const [idToken, setIdToken] = useState('');
@@ -97,9 +104,13 @@ export default function FirstPassword() {
          success into an error screen. So: sign in first, tidy up after, and
          clearPhoneVerification (which cannot throw) is not awaited. */
       login(response.data.token, response.data.parent);
-      sessionStorage.removeItem(PHONE_STORAGE_KEY);
+      clearPendingFirstPasswordPhone();
       clearPhoneVerification();
-      navigate('/');
+      /* Straight to the purchase codes, which every child needs before this
+         parent can use the app. Navigating to '/' would land on the same
+         screen by way of the gate in App; naming it here means the parent
+         never sees a dashboard flash past. */
+      navigate('/setup-purchase-codes', { replace: true });
     } catch (createError) {
       /* 409: the account already has its password — this device lost a race
          with another, or a retry of a request that actually landed. Sending
@@ -107,7 +118,7 @@ export default function FirstPassword() {
          lap ends in this same 409) and burn a text message every time. The
          password box on the sign-in screen is the way forward. */
       if (createError.response?.status === 409) {
-        sessionStorage.removeItem(PHONE_STORAGE_KEY);
+        clearPendingFirstPasswordPhone();
         clearPhoneVerification();
         navigate(`/login?password-set=1`, { replace: true });
         return;

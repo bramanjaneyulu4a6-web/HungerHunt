@@ -23,14 +23,16 @@ import { getWalletBalance } from '../controllers/walletController.js';
 import { getWalletReceipt, getWalletReceiptPdf } from '../controllers/walletReceiptController.js';
 
 import { protectParent } from '../middleware/authMiddleware.js';
-import { authLimiter, accountDeleteLimiter } from '../middleware/rateLimit.js';
+import { authLimiter, accountDeleteLimiter, passwordResetRequestLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
 router.post('/login-step', authLimiter, getParentLoginStep);
 router.post('/first-password', authLimiter, setFirstParentPassword);
 router.post('/login', authLimiter, loginParent);
-router.post('/forgot-password', authLimiter, forgotPassword);
+// Sends an email on every hit, so it rides the stingy limiter, not the
+// sign-in one — see passwordResetRequestLimiter.
+router.post('/forgot-password', passwordResetRequestLimiter, forgotPassword);
 router.post('/reset-password/:token', authLimiter, resetPassword);
 
 router.get('/dashboard', protectParent, getParentDashboardDetails);

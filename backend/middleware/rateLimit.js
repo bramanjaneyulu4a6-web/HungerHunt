@@ -6,8 +6,52 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 export const skipAuthLimitsInDevelopment = () =>
   process.env.NODE_ENV === "development";
 
-// Credential endpoints: slow down brute-force and reset-email spam.
+/* Sign-in traffic, throttled by IP because it runs before any token exists —
+   there is no account to key on yet. That makes it the one limiter where a
+   school's worth of parents share a single bucket, which is fine for staff on
+   site and wrong for ~200 families let in on the same day: on school WiFi, or
+   behind a mobile carrier's NAT, they arrive as one address.
+
+   Sized in parents rather than requests, because signing in costs TWO of them
+   — /login-step to find out how the account is reached, then /login — so the
+   ceiling is always halved before it reaches anybody. Thirty is fifteen
+   parents; the old ten was five, and a sixth got told to come back in a
+   quarter of an hour.
+
+   The window shrank as the ceiling rose, which matters more than the ceiling:
+   whoever does hit it is trying again in five minutes instead of fifteen, and
+   is still trying rather than deciding the site is broken.
+
+   Still nowhere near enough to guess a password. Thirty attempts per five
+   minutes against a bcrypt hash is not an attack, it is a rounding error —
+   the control survives the widening intact. */
+export const AUTH_WINDOW_MS = 5 * 60 * 1000;
+export const AUTH_MAX = 30;
+
+/* Published so the arithmetic above is checkable rather than asserted. Raising
+   AUTH_MAX without halving it would overstate how many families actually fit. */
+export const PARENTS_PER_SHARED_ADDRESS = Math.floor(AUTH_MAX / 2);
+
 export const authLimiter = rateLimit({
+  windowMs: AUTH_WINDOW_MS,
+  max: AUTH_MAX,
+  skip: skipAuthLimitsInDevelopment,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again in a few minutes." },
+});
+
+/* Asking for a reset link is NOT sign-in traffic and must not ride the ceiling
+   above. Every call that finds a real account sends an email on the project's
+   Gmail credentials, and that account has a daily cap measured in hundreds.
+   At thirty per five minutes one address could spend the whole day's quota in
+   an afternoon — at which point nobody can reset a password, which is a worse
+   failure than the one the widening above fixes.
+
+   So this keeps the old, deliberately stingy budget. Nothing about a launch
+   makes a parent need more than a few reset emails, and the cost of being
+   wrong here is borne by every other parent. */
+export const passwordResetRequestLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   skip: skipAuthLimitsInDevelopment,

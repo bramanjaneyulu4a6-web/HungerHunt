@@ -38,7 +38,7 @@ const TILE_PRESS_HOLD_MS = 200;
 // The weekly spending cap's allowed range, matched by updateWalletControl on
 // the server — a limit outside it is refused there too.
 const WALLET_LIMIT_MIN = 30;
-const WALLET_LIMIT_MAX = 250;
+const WALLET_LIMIT_MAX = 300;
 
 // Wording matches PaymentReturn.jsx's verdict copy, so a parent reads the
 // same language wherever a payment lands.

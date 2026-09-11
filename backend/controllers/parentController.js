@@ -756,7 +756,7 @@ export const updateWalletControl = async (req, res) => {
 
     const { enabled, limitAmount, limitType } = req.body;
 
-    // New limits are weekly only, between ₹30 and ₹250. Controls saved under
+    // New limits are weekly only, between ₹30 and ₹300. Controls saved under
     // the old rules may still be daily or monthly and keep working until the
     // parent next saves — checkout reads whatever is stored — but this route
     // no longer writes anything else.
@@ -768,10 +768,10 @@ export const updateWalletControl = async (req, res) => {
 
     if (
       enabled &&
-      !(Number.isFinite(Number(limitAmount)) && limitAmount >= 30 && limitAmount <= 250)
+      !(Number.isFinite(Number(limitAmount)) && limitAmount >= 30 && limitAmount <= 300)
     ) {
       return res.status(400).json({
-        message: "Weekly limit must be between ₹30 and ₹250",
+        message: "Weekly limit must be between ₹30 and ₹300",
       });
     }
 

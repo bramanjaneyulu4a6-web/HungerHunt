@@ -60,8 +60,13 @@ export const CUSTOM_UPI_INTENT_ENABLED = Capacitor.isNativePlatform();
 
 /* Paying to a UPI ID the parent types needs nothing installed and nothing
  * launched — PhonePe rings whichever app owns that address — so unlike the
- * app picker above it is offered everywhere the gateway itself is. */
-export const UPI_COLLECT_ENABLED = PAYMENTS_ENABLED;
+ * app picker above it can be offered everywhere the gateway itself is.
+ *
+ * Switched off on 2026-09-11 for the PhonePe review, by the owner's decision,
+ * until a day of its own: the sheet offers the UPI apps and the hosted page
+ * only. To bring the row back, make this `PAYMENTS_ENABLED` again — nothing
+ * else was removed, and PaymentMethodChooser still knows how to draw it. */
+export const UPI_COLLECT_ENABLED = false;
 
 /* Whether THIS parent may pay, which the build flag above cannot answer.
  *

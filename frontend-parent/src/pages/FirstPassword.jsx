@@ -10,6 +10,7 @@ import {
   startPhoneVerification,
 } from '../services/phoneVerification';
 import { passwordProblem } from '../utils/validation';
+import { BUSY_MESSAGE, useRetryCooldown } from '../utils/retryCooldown';
 
 const PHONE_STORAGE_KEY = 'firstPasswordPhone';
 
@@ -33,6 +34,7 @@ export default function FirstPassword() {
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const cooldown = useRetryCooldown();
 
   useEffect(() => () => {
     clearPhoneVerification();
@@ -78,6 +80,7 @@ export default function FirstPassword() {
   const createPassword = async (event) => {
     event.preventDefault();
     setError('');
+    cooldown.reset();
     const problem = passwordProblem(password)
       || (password !== confirmPassword ? 'The passwords do not match.' : null);
     if (problem) return setError(problem);
@@ -109,6 +112,16 @@ export default function FirstPassword() {
         navigate(`/login?password-set=1`, { replace: true });
         return;
       }
+      /* 503: the server is merely busy, and this branch must come before the
+         one below. That one sends the parent back to 'send' and throws the
+         verified token away — a fresh SMS, and another wait, for a request
+         that was never wrong. The phone is still verified; only the timing
+         was bad, so keep the step and let them press the button again. */
+      if (cooldown.startFrom(createError)) {
+        setError(createError.response?.data?.message || BUSY_MESSAGE);
+        return;
+      }
+
       setError(createError.response?.data?.message || 'Could not create your password. Please verify your phone again.');
       setStep('send');
       setIdToken('');
@@ -125,7 +138,15 @@ export default function FirstPassword() {
       subtitle={`First, verify the registered number ending in ${phone.slice(-4)}.`}
       footer={<>Wrong number? <Link to="/login">Return to sign in</Link></>}
     >
-      {error && <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>{error}</Banner>}
+      {error && (
+        <Banner
+          variant={cooldown.busy ? 'warn' : 'alert'}
+          icon={cooldown.busy ? '⏳' : '⚠️'}
+          style={{ marginBottom: 28 }}
+        >
+          {error}
+        </Banner>
+      )}
 
       {step === 'send' && (
         <div className="auth-form">
@@ -181,8 +202,10 @@ export default function FirstPassword() {
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
           />
-          <Button type="submit" variant="dark" block className="auth-submit" disabled={submitting}>
-            {submitting ? 'Creating password…' : 'Create password and sign in'}
+          <Button type="submit" variant="dark" block className="auth-submit" disabled={submitting || cooldown.waiting}>
+            {cooldown.waiting
+              ? `Try again in ${cooldown.secondsLeft}s`
+              : submitting ? 'Creating password…' : 'Create password and sign in'}
           </Button>
         </form>
       )}

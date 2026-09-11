@@ -4,6 +4,7 @@ import API from '../services/api';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../components/ui';
 import { phoneProblem } from '../utils/validation';
+import { BUSY_MESSAGE, useRetryCooldown } from '../utils/retryCooldown';
 
 export default function Login() {
   const [stage, setStage] = useState('phone');
@@ -16,6 +17,10 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Holds the button for a few seconds when the server says it is busy, so a
+  // queue of parents does not turn into a queue of retries.
+  const cooldown = useRetryCooldown();
 
   // Set by the 401 interceptor, so an expired session says so instead of
   // dropping the parent on a bare login screen with no explanation.
@@ -33,6 +38,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    cooldown.reset();
 
     const problem = phoneProblem(formData.parentPhoneNumber);
     if (problem) return setError(problem);
@@ -76,6 +82,14 @@ export default function Login() {
       // that restores the session.
       navigate('/');
     } catch (err) {
+      /* A busy server is not a bad password. Saying "Invalid credentials"
+         here would send a parent to reset a password that was always right. */
+      if (cooldown.startFrom(err)) {
+        setError(err.response?.data?.message || BUSY_MESSAGE);
+        setSubmitting(false);
+        return;
+      }
+
       setError(err.response?.data?.message || 'Invalid credentials');
       setSubmitting(false);
     }
@@ -118,7 +132,11 @@ export default function Login() {
       )}
 
       {error && (
-        <Banner variant="alert" icon="⚠️" style={{ marginBottom: 28 }}>
+        <Banner
+          variant={cooldown.busy ? 'warn' : 'alert'}
+          icon={cooldown.busy ? '⏳' : '⚠️'}
+          style={{ marginBottom: 28 }}
+        >
           {error}
         </Banner>
       )}
@@ -175,9 +193,13 @@ export default function Login() {
           variant="dark"
           block
           className="auth-submit"
-          disabled={submitting || (stage === 'phone' && formData.parentPhoneNumber.length !== 10)}
+          disabled={submitting || cooldown.waiting || (stage === 'phone' && formData.parentPhoneNumber.length !== 10)}
         >
-          {submitting ? (stage === 'phone' ? 'Checking…' : 'Signing in…') : (stage === 'phone' ? 'Continue' : 'Sign in securely')}
+          {cooldown.waiting
+            ? `Try again in ${cooldown.secondsLeft}s`
+            : submitting
+              ? (stage === 'phone' ? 'Checking…' : 'Signing in…')
+              : (stage === 'phone' ? 'Continue' : 'Sign in securely')}
         </Button>
       </form>
     </AuthLayout>

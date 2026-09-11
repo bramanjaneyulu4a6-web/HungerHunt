@@ -24,16 +24,20 @@ import { getWalletReceipt, getWalletReceiptPdf } from '../controllers/walletRece
 
 import { protectParent } from '../middleware/authMiddleware.js';
 import { authLimiter, accountDeleteLimiter, passwordResetRequestLimiter } from '../middleware/rateLimit.js';
+import { parentAuthGate } from '../middleware/authConcurrency.js';
 
 const router = express.Router();
 
+/* Deliberately NOT behind parentAuthGate: this is one indexed findOne and no
+   password hashing — measured at ~1700/sec against a pool of twenty. Queueing
+   it would only put parents in front of work that was never the bottleneck. */
 router.post('/login-step', authLimiter, getParentLoginStep);
-router.post('/first-password', authLimiter, setFirstParentPassword);
-router.post('/login', authLimiter, loginParent);
+router.post('/first-password', authLimiter, parentAuthGate, setFirstParentPassword);
+router.post('/login', authLimiter, parentAuthGate, loginParent);
 // Sends an email on every hit, so it rides the stingy limiter, not the
 // sign-in one — see passwordResetRequestLimiter.
 router.post('/forgot-password', passwordResetRequestLimiter, forgotPassword);
-router.post('/reset-password/:token', authLimiter, resetPassword);
+router.post('/reset-password/:token', authLimiter, parentAuthGate, resetPassword);
 
 router.get('/dashboard', protectParent, getParentDashboardDetails);
 router.get('/child/:id', protectParent, getChildDetails);

@@ -26,7 +26,18 @@ test('a request waiting for a connection eventually gives up', () => {
   // a slow request into one that never answers at all.
   const { waitQueueTimeoutMS } = mongoConnectOptions({});
   assert.ok(waitQueueTimeoutMS > 0);
-  assert.ok(waitQueueTimeoutMS < 30_000);
+});
+
+/* Measured, not chosen. A 200-parent sign-in burst congests the event loop for
+   ~13s on bcryptjs alone, and checkout is timed in wall clock, so anything
+   near that turns slow logins into 500s. This is the regression that a load
+   test caught and a unit test could not have. */
+test('the wait is longer than a login burst starves the event loop', () => {
+  assert.ok(mongoConnectOptions({}).waitQueueTimeoutMS >= 20_000);
+});
+
+test('the wait is tunable when a real pool problem needs flushing out', () => {
+  assert.equal(mongoConnectOptions({ MONGO_WAIT_QUEUE_MS: '5000' }).waitQueueTimeoutMS, 5000);
 });
 
 test('server selection still gives Atlas time to answer', () => {

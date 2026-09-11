@@ -67,6 +67,18 @@ services:
         value: "20"
       - key: MONGO_MIN_POOL
         value: "5"
+      # How long a request waits for a free connection. Thirty seconds looks
+      # enormous for a database that answers in one, and it is not sized for
+      # the database: bcryptjs on the login path starves the event loop under
+      # a burst, and checkout is timed in wall clock, so the starvation is
+      # charged here. At 8s a 200-parent sign-in burst failed 48 of them with
+      # "Timed out while checking out a connection from connection pool" —
+      # 500s for logins the pool could have served.
+      #
+      # If that error appears in the logs under load, RAISE this; it is
+      # almost never a sign that the pool is too small.
+      - key: MONGO_WAIT_QUEUE_MS
+        value: "30000"
       - key: JWT_SECRET
         sync: false
       - key: PARENT_JWT_SECRET

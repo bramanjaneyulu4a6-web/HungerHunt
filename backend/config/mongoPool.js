@@ -29,10 +29,28 @@ export const MAX_POOL_DEFAULT = 20;
    before any query runs. */
 export const MIN_POOL_DEFAULT = 5;
 
-/* Long enough to ride out a burst, short enough that a parent gets an answer
-   instead of a spinner. The driver's default is 0 — wait forever — which
-   turns a busy minute into requests that never resolve at all. */
-export const WAIT_QUEUE_TIMEOUT_MS = 8_000;
+/* How long a request waits for a free connection before giving up. The
+   driver's default is 0 — wait forever — which turns a busy minute into
+   requests that never resolve at all, so there is a bound here.
+ *
+ * Thirty seconds, and the size of it is measured rather than guessed. This
+ * started at 8s and a 200-parent sign-in burst turned 48 of them into 500s:
+ * "Timed out while checking out a connection from connection pool". The pool
+ * was not the problem. The SAME burst without password hashing finished in
+ * 118ms at 1700 req/sec on a pool of twenty — the database work is nothing.
+ *
+ * What fills the seconds is bcryptjs on the login path, which is pure
+ * JavaScript and starves the event loop under a burst. Connection checkout is
+ * timed in wall clock, so event-loop starvation is charged against this budget
+ * even though no connection is actually scarce. A short value here does not
+ * protect anybody: it converts logins that would have succeeded slowly into
+ * logins that fail.
+ *
+ * So this is sized above the worst congestion measured (13s at 200 concurrent)
+ * with room over it. It is a backstop against a genuinely wedged pool, not a
+ * latency control — the latency fix is to stop doing bcrypt on the event loop,
+ * which is a bigger change than a launch eve deserves. */
+export const WAIT_QUEUE_TIMEOUT_MS = 30_000;
 
 /* Atlas TLS handshakes are slow enough that a tighter bound here fails healthy
    boots. Unchanged from what server.js already used. */
@@ -63,7 +81,7 @@ export const mongoConnectOptions = (env = process.env) => {
     serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
     maxPoolSize,
     minPoolSize,
-    waitQueueTimeoutMS: WAIT_QUEUE_TIMEOUT_MS,
+    waitQueueTimeoutMS: positiveInt(env.MONGO_WAIT_QUEUE_MS, WAIT_QUEUE_TIMEOUT_MS),
   };
 };
 

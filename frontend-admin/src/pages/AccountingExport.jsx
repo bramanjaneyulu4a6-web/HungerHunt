@@ -16,6 +16,15 @@ import api from '../utils/api';
 
 const ALL_TYPES = MOVEMENT_TYPES.map((type) => type.key);
 
+/* The XML download is off at the counter until its accounting mapping has been
+ * verified against the school's actual TallyPrime company — nobody has yet
+ * created the three ledgers it imports into, and an unverified import writes
+ * vouchers that are awkward to unpick. The buttons stay on the page, greyed,
+ * rather than being deleted: the endpoint, the builder and its tests are all
+ * intact, so turning this back to true is the whole of re-enabling it.
+ */
+const XML_ENABLED = false;
+
 const AccountingExport = () => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -35,6 +44,7 @@ const AccountingExport = () => {
 
   const download = async (formatKey, range, button) => {
     if (nothingSelected) return;
+    if (formatKey === 'xml' && !XML_ENABLED) return;
     if (!range.from || !range.to) {
       toast.error('Select both dates');
       return;
@@ -74,23 +84,10 @@ const AccountingExport = () => {
 
   return (
     <div className="page">
-      <PageHeader
-        title="TallyPrime Export"
-        subtitle="Download every wallet and sales movement for a period, as a spreadsheet or as vouchers."
-      />
-
-      <Banner variant="warn" icon="⚠️">
-        Before importing the XML, create these ledgers in TallyPrime exactly: Student Wallet
-        Liability, HungerHunt Sales, and Wallet Funding Clearing. Accounts must assign their groups
-        and tax treatment. Import into a backup/test company first and review Tally's Exceptions
-        Report.
-      </Banner>
+      <PageHeader title="TallyPrime Export" />
 
       <Card style={{ maxWidth: 640, marginTop: 20 }}>
         <h2 className="section-title">Include</h2>
-        <p style={{ color: 'var(--ink-soft)', margin: '0 0 12px' }}>
-          Applies to every download on this page. Deductions and refunds carry a negative amount.
-        </p>
         <fieldset className="export-types">
           <legend className="sr-only">Movement types to export</legend>
           {MOVEMENT_TYPES.map((type) => (
@@ -131,7 +128,7 @@ const AccountingExport = () => {
               </Button>
               <Button
                 variant="ghost"
-                disabled={disabled}
+                disabled={disabled || !XML_ENABLED}
                 onClick={() => quickDownload('xml', range.key)}
               >
                 {label(`${range.key}-xml`, 'XML')}
@@ -143,9 +140,6 @@ const AccountingExport = () => {
 
       <Card style={{ maxWidth: 640, marginTop: 20 }}>
         <h2 className="section-title">Custom period</h2>
-        <p style={{ color: 'var(--ink-soft)', marginTop: 0 }}>
-          The end date is inclusive. Exports are limited to 93 days.
-        </p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -176,28 +170,18 @@ const AccountingExport = () => {
             />
           </div>
 
-          <div>
+          <div className="quick-export__actions">
             <Button type="submit" variant="success" disabled={disabled}>
               {label('period-csv', 'Download transactions CSV')}
             </Button>
-            <p style={{ color: 'var(--ink-soft)', margin: '8px 0 0', fontSize: 13 }}>
-              One row per movement, in the column order of the uniform receipts book.
-            </p>
-          </div>
-
-          <div>
             <Button
               type="button"
               variant="ghost"
-              disabled={disabled}
+              disabled={disabled || !XML_ENABLED}
               onClick={() => download('xml', { from, to }, 'period-xml')}
             >
               {label('period-xml', 'Download TallyPrime XML')}
             </Button>
-            <p style={{ color: 'var(--ink-soft)', margin: '8px 0 0', fontSize: 13 }}>
-              Balanced double-entry vouchers for bulk import. Contains internal student references
-              only — no names, phone numbers, passwords, or room details.
-            </p>
           </div>
         </form>
       </Card>

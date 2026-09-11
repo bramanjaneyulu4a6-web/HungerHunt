@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
+import { scriptConnectOptions } from '../config/mongoPool.js';
+
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
@@ -16,7 +18,7 @@ const failures = [];
 let checkedStudents = 0;
 let checkedEvents = 0;
 
-await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10_000 });
+await mongoose.connect(process.env.MONGO_URI, scriptConnectOptions());
 
 try {
   for await (const student of Student.find({})

@@ -49,6 +49,24 @@ services:
         value: https://hunger-hunt-warehouse.vercel.app
       - key: MONGO_URI
         sync: false
+      # Connection-pool bounds. Both OPTIONAL: config/mongoPool.js already
+      # defaults to exactly these values, so leaving them unset changes
+      # nothing. They are named here so that during an incident there is a
+      # knob to turn in the dashboard without a deploy.
+      #
+      # Sized for a shared Atlas tier, where a BIGGER pool is the slower
+      # choice: the cluster is throttled, so a large pool merely moves the
+      # queue from the driver (in memory, ordered, measurable) into Atlas
+      # (invisible, unfair, eventually an error). Raise MONGO_MAX_POOL only on
+      # evidence of driver-side waiting, and never above what the cluster's
+      # connection cap leaves free after the reconcile cron takes its five.
+      #
+      # MONGO_MIN_POOL is the one that removes the first-request-after-idle
+      # stall: that many sockets stay handshaked through quiet stretches.
+      - key: MONGO_MAX_POOL
+        value: "20"
+      - key: MONGO_MIN_POOL
+        value: "5"
       - key: JWT_SECRET
         sync: false
       - key: PARENT_JWT_SECRET

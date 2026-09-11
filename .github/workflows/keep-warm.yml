@@ -1,24 +1,39 @@
 # .github/workflows/keep-warm.yml
 #
 # Render's free tier spins the backend down after ~15 idle minutes, and the
-# first request afterwards eats the wake-up. Ping /health every 10 minutes —
-# but only between 08:00 and 22:00 IST (02:30–16:30 UTC). Overnight the
-# service is allowed to sleep: that window was chosen deliberately, do not
-# widen it.
+# first request afterwards eats the wake-up. Ping /health every 10 minutes.
+#
+# WIDENED TO 24/7 FOR THE PARENT LAUNCH (2026-09-11). The original window was
+# 08:00–22:00 IST, overnight sleep accepted by explicit owner decision — that
+# decision was made when the only users were staff, on site, during the school
+# day. Parents receive the link on their own phones and open it when they open
+# it: at 06:40 before work, at 23:15 after the children are asleep. Every one
+# of those requests was a ~50s cold start, which reads as "the website is
+# broken", not as "the server was asleep".
+#
+# TO REVERT once the launch has settled, restore these three lines:
+#     - cron: '30,40,50 2 * * *'    # 08:00–08:59 IST
+#     - cron: '*/10 3-15 * * *'     # 08:30–21:30 IST core window
+#     - cron: '0,10,20,30 16 * * *' # 21:30–22:00 IST tail
+# Nothing else in this file changes with the window.
 #
 # Caveats to know before "fixing" this:
 # - GitHub pauses scheduled workflows after ~60 days without repo activity;
 #   a commit or a manual run resumes them.
-# - Cron here is UTC. The odd-looking edge lines are the IST half-hour offset.
-# - The first morning ping (02:30 UTC) IS the wake-up and may take ~60s; the
-#   generous --max-time is for that request, not the steady state.
+# - Cron here is UTC. That only matters again if the IST window is restored.
+# - Any ping that finds the service asleep IS the wake-up and may take ~60s;
+#   the generous --max-time is for that request, not the steady state. On a
+#   24/7 schedule this should stop happening, which is the point.
+# - GitHub's scheduled runners are best-effort and can be late under load, so
+#   treat 10 minutes as the intent rather than a guarantee.
 name: keep-warm
 
 on:
   schedule:
-    - cron: '30,40,50 2 * * *'   # 08:00–08:59 IST
-    - cron: '*/10 3-15 * * *'    # 08:30–21:30 IST core window
-    - cron: '0,10,20,30 16 * * *' # 21:30–22:00 IST tail
+    # Every 10 minutes, all day. One line, because there is no longer an edge
+    # to work around — the IST half-hour offset only mattered while the window
+    # had ends.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:

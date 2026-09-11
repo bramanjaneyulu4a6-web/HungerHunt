@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import mongoose from 'mongoose';
 
 import { resolveMongoUri, targetBanner } from '../../utils/scriptTarget.js';
+import { scriptConnectOptions } from '../../config/mongoPool.js';
 
 const productionEnvPath = new URL('../../.env.production.local', import.meta.url);
 
@@ -31,7 +32,12 @@ export const connectForScript = async () => {
   // even when the connection is what fails.
   console.log(targetBanner(target));
 
-  await mongoose.connect(target.uri);
+  /* A small pool on purpose. These scripts — the payments reconcile sweep most
+     of all, which runs every fifteen minutes — share one shared-tier cluster
+     with the live service. Left at the driver default a background sweep may
+     open a hundred connections and spend the cluster's budget on work no
+     parent is waiting for. */
+  await mongoose.connect(target.uri, scriptConnectOptions());
 
   return target;
 };

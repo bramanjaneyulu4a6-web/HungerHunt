@@ -8,6 +8,7 @@ import app from './app.js';
 import FulfillmentOrder, { WEEKLY_ORDER_INDEX } from './models/FulfillmentOrder.js';
 import { startPushRetrySweep } from './utils/sendNotification.js';
 import { validateRuntimeEnv } from './config/runtimeEnv.js';
+import { mongoConnectOptions } from './config/mongoPool.js';
 
 // The app itself is built in app.js and exported without a database connection
 // or a listening socket, so the tests can mount it directly. This file is the
@@ -44,8 +45,18 @@ const start = async () => {
 
   // Never accept traffic before the database is usable. Money workflows use
   // MongoDB transactions and cannot safely run in a degraded database state.
-  await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10_000 });
-  console.log('MongoDB Connected Successfully');
+  //
+  // The pool is sized in config/mongoPool.js, deliberately and smaller than
+  // the driver's default — see the reasoning there before changing it.
+  const pool = mongoConnectOptions();
+  await mongoose.connect(process.env.MONGO_URI, pool);
+
+  /* Printed because pool sizing is invisible in every other way: a service
+     retuned from the dashboard looks identical in the logs to one that never
+     picked the new value up. */
+  console.log(
+    `MongoDB Connected Successfully (pool ${pool.minPoolSize}-${pool.maxPoolSize})`
+  );
 
   await releaseWeeklyOrderIndex();
 

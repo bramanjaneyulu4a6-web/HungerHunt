@@ -374,6 +374,24 @@ describe('the whole school, for the dashboard', () => {
     assert.equal(body.entries[1].mode, 'UPI');
   });
 
+  /* A guard on a decision, not a test that ever failed: receipt numbers are
+     minted when the money moves (see receiptNumbering.test.js), so the feed
+     has one to show without numbering anything itself. Reading the dashboard
+     must stay a read — it sweeps every student on the page, and numbering
+     there would turn opening a screen into a write against all of them. */
+  test('reading the feed mints nothing', async () => {
+    authenticate();
+    const counter = mock.method(Counter, 'nextSequence', async () => 1);
+    feedIs({
+      topups: [named(topUp('a', 500, '2026-09-01T08:00:00.000Z'), 'Asha')],
+    });
+
+    const body = await (await get('/api/transactions/ledger')).json();
+
+    assert.equal(body.entries[0].receiptNumber, 'GMSa');
+    assert.equal(counter.mock.callCount(), 0);
+  });
+
   test('a day filter asks each collection for that day only', async () => {
     authenticate();
     const filters = [];

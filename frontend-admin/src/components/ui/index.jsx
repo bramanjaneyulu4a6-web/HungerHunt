@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../Icon';
+import { useDismissableOverlay } from '../../utils/overlay';
 
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
@@ -71,6 +72,10 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }) {
+  // Escape answers it the way Cancel does — and, like the backdrop, not while
+  // the answer already given is still being acted on.
+  useDismissableOverlay(() => !busy && onCancel());
+
   return (
     <div className="modal-backdrop" onClick={() => !busy && onCancel()}>
       <div

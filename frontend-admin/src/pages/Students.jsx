@@ -20,6 +20,11 @@ import {
   Skeleton,
 } from '../components/ui';
 import { StudentActivityModal } from '../components/WalletActivity';
+import { PurchaseCodeDialog } from '../components/PurchaseCodeDialog';
+import { ReceiptModal } from '../components/Receipt';
+import { useReceipt } from '../utils/walletActivity';
+import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
+import { useDismissableOverlay } from '../utils/overlay';
 
 /* The student directory.
  *
@@ -147,9 +152,16 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [importErrors, setImportErrors] = useState([]);
 
   const [topupStudent, setTopupStudent] = useState(null);
+  /* Whose purchase code the office is setting, when a parent cannot set it
+     themselves. See PurchaseCodeDialog. */
+  const [codeStudent, setCodeStudent] = useState(null);
   const [topupAmount, setTopupAmount] = useState('');
   const [topupKey, setTopupKey] = useState('');
   const [topupSaving, setTopupSaving] = useState(false);
+  /* The receipt for the deposit just taken. The desk's next move after
+     recharging is handing over the paper, so the popup opens itself rather
+     than waiting to be found again in the wallet ledger. */
+  const { receipt, open: openReceipt, close: closeReceipt } = useReceipt();
 
   const fetchStudents = useCallback(async (requestedPage = 1) => {
     setLoading(true);
@@ -230,36 +242,28 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
     setFormData(EMPTY_FORM);
   };
 
-  /* Dialog housekeeping for all three: Escape closes whichever is on top, and
-     the page behind stops scrolling under it. Neither happens while a request
-     is in flight — closing then would hide the outcome of something already
-     sent. */
-  const dialogOpen = editorOpen || importOpen || Boolean(topupStudent);
+  /* Dialog housekeeping for all four, on the console's shared overlay stack
+     (utils/overlay.js): Escape closes whichever is in front, and the page
+     behind stops scrolling under it. Neither happens while a request is in
+     flight — closing then would hide the outcome of something already sent.
+
+     Only one of the four is ever open, so they share one entry on the stack.
+     The receipt popup and any confirmation are entries of their own, and being
+     in front they answer Escape first. */
+  const dialogOpen = editorOpen || importOpen || Boolean(topupStudent) || Boolean(codeStudent);
   const busy = saving || archiving || uploading || topupSaving;
 
-  useEffect(() => {
-    if (!dialogOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const onKey = (event) => {
-      if (event.key !== 'Escape' || busy) return;
-      if (topupStudent) setTopupStudent(null);
-      else if (importOpen) setImportOpen(false);
-      else {
-        setEditorOpen(false);
-        setEditingId(null);
-        setFormData(EMPTY_FORM);
-      }
-    };
-
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [dialogOpen, busy, topupStudent, importOpen]);
+  useDismissableOverlay(() => {
+    if (busy) return;
+    if (topupStudent) setTopupStudent(null);
+    else if (codeStudent) setCodeStudent(null);
+    else if (importOpen) setImportOpen(false);
+    else {
+      setEditorOpen(false);
+      setEditingId(null);
+      setFormData(EMPTY_FORM);
+    }
+  }, { active: dialogOpen });
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -394,10 +398,17 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
       setStudents((current) => current.map((student) =>
         student._id === topupStudent._id ? { ...student, pocketMoney: newBalance } : student
       ));
+      const studentId = topupStudent._id;
       setTopupStudent(null);
       setTopupKey('');
       setTopupAmount('');
       fetchStudents(page);
+      /* Last, and not awaited before the dialog closes: the money has moved
+         and the list already says so. A receipt that will not load is a toast
+         from fetchReceipt and a Receipt button still waiting in the wallet
+         ledger — never a recharge that looks like it failed. */
+      const entry = receiptEntryFromTopUp(response.data);
+      if (entry) openReceipt(studentId, entry);
     } catch (error) {
       console.error(error);
       toast.error(error?.response?.data?.message || 'Top-up failed');
@@ -624,6 +635,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       >
                         Edit
                       </Button>
+                      <Button
+                        variant="ghost"
+                        className="btn--sm"
+                        onClick={() => setCodeStudent(student)}
+                      >
+                        Purchase code
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -833,11 +851,20 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           </form>
         </div>
       )}
+      {codeStudent && (
+        <PurchaseCodeDialog
+          student={codeStudent}
+          onClose={() => setCodeStudent(null)}
+        />
+      )}
       {activityStudent && (
         <StudentActivityModal
           student={activityStudent}
           onClose={() => setActivityStudent(null)}
         />
+      )}
+      {receipt && (
+        <ReceiptModal receipt={receipt} onClose={closeReceipt} title="Recharge receipt" />
       )}
       {confirming && (
         <ConfirmDialog

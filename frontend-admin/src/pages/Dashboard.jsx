@@ -14,17 +14,24 @@ import {
 } from "../components/ui";
 import { EntryDetails } from "../components/WalletActivity";
 import {
+  businessDateToday,
   describeEntry,
   entryAmount,
   entryLabel,
   entryReference,
   hasDetails,
-} from "../utils/walletActivity";
+} from "../utils/ledgerEntry";
 import { ReceiptButton } from "../components/ReceiptButton";
 
 /* The feed is the whole ledger now — money in as well as out. The day filter
    moved to the server with it: a date is a business day in the school's
-   timezone, and the client cannot narrow to one it never fetched. */
+   timezone, and the client cannot narrow to one it never fetched.
+
+   One day at a time, always. The feed used to open on "everything, most
+   recent first", which read as a day's takings but was a window reaching back
+   however far the last few hundred rows happened to go — so the totals above
+   it counted a day the school never had. The picker moves between days; it
+   never widens to all of them, and clearing it comes back to today. */
 const FEED_LIMIT = 200;
 
 const Dashboard = () => {
@@ -35,7 +42,7 @@ const Dashboard = () => {
   const [studentCount, setStudentCount] = useState(0);
   const [activeCount, setActiveCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(businessDateToday);
 
   // Fetch student analytics on component mount
   useEffect(() => {
@@ -59,7 +66,7 @@ const Dashboard = () => {
   const fetchHistory = useCallback(async () => {
     try {
       const res = await api.get("/transactions/ledger", {
-        params: { limit: FEED_LIMIT, ...(selectedDate ? { date: selectedDate } : {}) },
+        params: { limit: FEED_LIMIT, date: selectedDate },
       });
       setHistory(res.data.entries);
       setLoadError(false);
@@ -92,6 +99,15 @@ const Dashboard = () => {
     const studentName = entry.student?.name || "Deleted Account";
     return studentName.toLowerCase().includes(searchQuery.toLowerCase());
   });
+
+  /* The tiles used to say "All" or "Selected Day"; now that the feed is always
+     one day, they name which one. Parsed at local midnight rather than through
+     Date("2026-09-07"), which is read as UTC and prints the day before for
+     anyone east of Greenwich. */
+  const dayLabel =
+    selectedDate === businessDateToday()
+      ? "Today"
+      : new Date(`${selectedDate}T00:00:00`).toLocaleDateString();
 
   // Spent and added are counted apart on purpose: one total covering both
   // directions would net a day's sales against its recharges and mean nothing.
@@ -160,7 +176,7 @@ const Dashboard = () => {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `Transactions_Report_${selectedDate || "All"}.csv`
+      `Transactions_Report_${selectedDate}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -178,21 +194,21 @@ const Dashboard = () => {
       <div className="card-grid" style={{ marginBottom: 24 }}>
         <Card className="card--tight">
           <div className="stat-label">
-            Wallet Entries ({selectedDate ? "Selected Day" : "All"})
+            Wallet Entries ({dayLabel})
           </div>
           <div className="stat-value">{filteredHistory.length}</div>
         </Card>
 
         <Card className="card--tight">
           <div className="stat-label">
-            Total Sales ({selectedDate ? "Selected Day" : "All"})
+            Total Sales ({dayLabel})
           </div>
           <div className="stat-value">{formatINR(totalSales)}</div>
         </Card>
 
         <Card className="card--tight">
           <div className="stat-label">
-            Money Added ({selectedDate ? "Selected Day" : "All"})
+            Money Added ({dayLabel})
           </div>
           <div className="stat-value">{formatINR(totalAdded)}</div>
         </Card>
@@ -247,7 +263,9 @@ const Dashboard = () => {
               style={{ width: "auto" }}
               aria-label="Filter by date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              // A cleared picker is not a request for the whole archive; it is
+              // someone emptying a field. Come back to today.
+              onChange={(e) => setSelectedDate(e.target.value || businessDateToday())}
             />
 
             <Button variant="success" onClick={downloadExcel}>
@@ -280,8 +298,8 @@ const Dashboard = () => {
             }
           >
             {history.length === 0
-              ? "Sales, top-ups and refunds appear here in real time."
-              : "Try clearing the search or date filter."}
+              ? `Sales, top-ups and refunds for ${dayLabel.toLowerCase()} appear here in real time.`
+              : "Try clearing the search, or pick another day."}
           </EmptyState>
         ) : (
           <div className="table-wrap">

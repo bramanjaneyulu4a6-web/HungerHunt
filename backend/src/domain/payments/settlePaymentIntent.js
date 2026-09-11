@@ -6,6 +6,7 @@ import Student from '../../../models/Student.js';
 import phonepeDefault from './providers/phonepe.js';
 import { chargeCart as realChargeCart } from '../../../utils/checkout.js';
 import { creditWallet } from '../../../utils/walletAccount.js';
+import { mintReceiptNumber } from '../../../utils/walletReceipts.js';
 import { withMongoTransaction, sessionOptions } from '../../../utils/mongoTransaction.js';
 import { paiseToRupees, rupeesToPaise } from './money.js';
 
@@ -122,6 +123,14 @@ const creditAsTopup = async (intent, session) => {
   // rather than gaining an uncounted extra one, and findPriorApplication()
   // will find this row on any replay and stop before trying to credit
   // again — fails short and auditable, never over-credits silently.
+  // Numbered as it is written: the student is already in hand, and a deposit
+  // that arrives overnight should not wait for someone to open its ledger
+  // before the office can name it.
+  const receiptNumber = await mintReceiptNumber({
+    studentId: intent.studentId,
+    admissionNumber: student.admissionNumber,
+  });
+
   const [adjustment] = await WalletAdjustment.create(
     [{
       studentId: intent.studentId,
@@ -131,6 +140,7 @@ const creditAsTopup = async (intent, session) => {
       amount: amountRupees,
       previousBalance,
       newBalance,
+      ...(receiptNumber ? { receiptNumber } : {}),
       // Stays merchantOrderId, deliberately: it is unique per intent, so
       // every collision on the (performedBy, idempotencyKey) index this
       // shares with ADMIN rows is a correct duplicate rejection. A key that

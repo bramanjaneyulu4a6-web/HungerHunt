@@ -5,6 +5,7 @@ import WalletReversal from '../models/WalletReversal.js';
 import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { sessionOptions, withMongoTransaction } from './mongoTransaction.js';
 import { creditWallet } from './walletAccount.js';
+import { mintReceiptNumber } from './walletReceipts.js';
 
 const cancellable = [OrderStatus.PENDING, OrderStatus.PACKED];
 
@@ -91,9 +92,25 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
 
       reversal.previousBalance = student.pocketMoney - transaction.totalAmount;
       reversal.newBalance = student.pocketMoney;
+      /* Numbered here because the admission number the receipt is built from
+         arrives with the credited student, and the balances are being written
+         back anyway. A refund draws from the same per-student series as the
+         payments it undoes — one number, one search at the counter. */
+      const receiptNumber = await mintReceiptNumber({
+        studentId: order.studentId,
+        admissionNumber: student.admissionNumber,
+        date: reversal.createdAt,
+      });
+      if (receiptNumber) reversal.receiptNumber = receiptNumber;
       await WalletReversal.updateOne(
         { _id: reversal._id },
-        { $set: { previousBalance: reversal.previousBalance, newBalance: reversal.newBalance } },
+        {
+          $set: {
+            previousBalance: reversal.previousBalance,
+            newBalance: reversal.newBalance,
+            ...(receiptNumber ? { receiptNumber } : {}),
+          },
+        },
         sessionOptions(session)
       );
       return { reversal, order, student, replayed: false };

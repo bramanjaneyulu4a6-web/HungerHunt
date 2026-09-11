@@ -8,6 +8,7 @@ import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
+import { mintReceiptNumber } from '../utils/walletReceipts.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import {
   ADMISSION_NUMBER_MESSAGE,
@@ -622,11 +623,22 @@ export const topUpWallet = async (req, res) => {
       const previousBalance = newBalance - amount;
       const historyEntry = { amount, previousBalance, newBalance, date: new Date() };
 
+      /* Numbered here rather than when the row was created, because the
+         admission number the receipt is built from arrives with the credited
+         student. The row is written before the wallet moves (so a failed
+         credit leaves history, not money), and this single $set closes both
+         gaps at once. */
+      const receiptNumber = await mintReceiptNumber({
+        studentId,
+        admissionNumber: student.admissionNumber,
+        date: adjustment.createdAt,
+      });
+
       // The MongoDB driver does not support parallel operations inside one
       // transaction, so these intentionally remain sequential.
       await WalletAdjustment.updateOne(
         { _id: adjustment._id },
-        { $set: { previousBalance, newBalance } },
+        { $set: { previousBalance, newBalance, ...(receiptNumber ? { receiptNumber } : {}) } },
         sessionOptions(session)
       );
       await Student.updateOne(
@@ -641,6 +653,7 @@ export const topUpWallet = async (req, res) => {
 
       adjustment.previousBalance = previousBalance;
       adjustment.newBalance = newBalance;
+      if (receiptNumber) adjustment.receiptNumber = receiptNumber;
 
       return { student, adjustment, newBalance };
     });

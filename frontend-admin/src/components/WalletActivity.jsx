@@ -24,9 +24,10 @@ import {
   hasDetails,
   isOrder,
   isTransaction,
-  useStudentLedger,
-} from '../utils/walletActivity';
+} from '../utils/ledgerEntry';
+import { useStudentLedger } from '../utils/walletActivity';
 import { ReceiptButton } from './ReceiptButton';
+import { useDismissableOverlay } from '../utils/overlay';
 import { Badge, Banner, Button, EmptyState, Skeleton } from './ui';
 
 const when = (value) => (value ? new Date(value).toLocaleString() : null);
@@ -272,31 +273,35 @@ const LedgerBody = ({ ledger, studentId }) => {
   );
 };
 
-const Dialog = ({ title, subtitle, onClose, children }) => (
-  <div className="modal-backdrop" onClick={onClose}>
-    <div
-      className="modal modal--activity"
-      style={{ maxWidth: 900 }}
-      role="dialog"
-      aria-modal="true"
-      onClick={(event) => event.stopPropagation()}
-    >
-      <header className="modal-head">
-        <div>
-          <h3 className="modal-title">{title}</h3>
-          {subtitle && <p className="modal-sub">{subtitle}</p>}
+const Dialog = ({ title, subtitle, onClose, children }) => {
+  useDismissableOverlay(onClose);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal modal--activity"
+        style={{ maxWidth: 900 }}
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div>
+            <h3 className="modal-title">{title}</h3>
+            {subtitle && <p className="modal-sub">{subtitle}</p>}
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog">
+            <Icon name="close" size={20} />
+          </button>
+        </header>
+        {children}
+        <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
         </div>
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog">
-          <Icon name="close" size={20} />
-        </button>
-      </header>
-      {children}
-      <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
-        <Button variant="ghost" onClick={onClose}>Close</Button>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const StudentActivityModal = ({ student, onClose }) => {
   const ledger = useStudentLedger(student?._id || student?.id);

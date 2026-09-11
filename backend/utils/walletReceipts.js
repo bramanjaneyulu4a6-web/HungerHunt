@@ -27,6 +27,22 @@ export const buildReceiptNumber = ({ date, admissionNumber, seq }) => {
   return `GMS${day}${month}${admissionNumber}${sequence}`;
 };
 
+/* The number a row is born with.
+ *
+ * Every receiptable movement mints here as it is written, so a screen that
+ * only reads rows — the dashboard's school-wide feed — has a number to show
+ * without first opening the student the money belongs to.
+ *
+ * Returns null rather than a number when the student has no admission number:
+ * "GMS0709undefined001" is a string nobody can look up, and leaving the row
+ * unnumbered lets ensureReceiptNumbers give it a real one once the record is
+ * fixed. No sequence is burned in that case. */
+export const mintReceiptNumber = async ({ studentId, admissionNumber, date = new Date() }) => {
+  if (!admissionNumber) return null;
+  const seq = await Counter.nextSequence(`walletReceipt:${studentId}`);
+  return buildReceiptNumber({ date, admissionNumber, seq });
+};
+
 const ONES = [
   '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
   'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',

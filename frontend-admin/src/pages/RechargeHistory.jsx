@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
 import { formatINR } from "../utils/format";
-import { describeEntry } from "../utils/walletActivity";
+import { describeEntry } from "../utils/ledgerEntry";
 import { ReceiptButton } from "../components/ReceiptButton";
 import {
   Badge,

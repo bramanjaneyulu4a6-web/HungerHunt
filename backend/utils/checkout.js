@@ -6,6 +6,7 @@ import { createFulfillmentOrder } from './fulfillment.js';
 import WalletReversal from '../models/WalletReversal.js';
 import { checkPurchaseLimits } from './purchaseLimits.js';
 import { creditWallet, debitWallet } from './walletAccount.js';
+import { mintReceiptNumber } from './walletReceipts.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -200,6 +201,15 @@ export const chargeCart = async ({
   let fulfillmentOrder;
 
   try {
+    /* A UPI-funded order is money that entered the school's books directly,
+       so it is receipted like a desk payment and numbered as it is written.
+       Wallet-funded charges spend money that was already receipted on its way
+       in, and take no number of their own. */
+    const receiptNumber =
+      sourceType === 'UPI_ORDER_PAYMENT'
+        ? await mintReceiptNumber({ studentId, admissionNumber: student.admissionNumber })
+        : null;
+
     const transactionDocument = {
       studentId,
       items: transactionItems,
@@ -209,6 +219,7 @@ export const chargeCart = async ({
       sourceType,
       ...(sourceId ? { sourceId } : {}),
       ...(idempotencyKey ? { idempotencyKey } : {}),
+      ...(receiptNumber ? { receiptNumber } : {}),
     };
 
     if (session) {

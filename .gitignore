@@ -55,3 +55,6 @@ backend/scripts/data/
 
 # Claude Code local state — settings and nested feature worktrees.
 .claude/
+
+# Local-only admin bootstrap: holds a plaintext password and staff contact details.
+backend/scripts/createAdminAccounts.js

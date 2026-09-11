@@ -184,6 +184,28 @@ describe('TallyPrime CSV export', () => {
     assert.equal(csvRows(csv)[1].split(',')[10], '15 Aug 2026');
   });
 
+  /* The receipts book spells every month in three letters. en-GB does not:
+     its short form for September is "Sept", which is how a column of dates
+     ends up one character wider for one month of the year. */
+  test('spells every month in three letters, September included', () => {
+    const months = Array.from({ length: 12 }, (unused, month) =>
+      buildTallyCsv({
+        transactions: [], reversals: [],
+        adjustments: [{
+          _id: '507f191e810c19729de860ef', studentId: student, source: 'ADMIN', amount: 1,
+          createdAt: new Date(Date.UTC(2026, month, 15, 6)),
+        }],
+        paidTo: PAID_TO, timeZone: TIME_ZONE,
+      })
+    ).map((csv) => csvRows(csv)[1].split(',')[10]);
+
+    assert.deepEqual(months, [
+      '15 Jan 2026', '15 Feb 2026', '15 Mar 2026', '15 Apr 2026',
+      '15 May 2026', '15 Jun 2026', '15 Jul 2026', '15 Aug 2026',
+      '15 Sep 2026', '15 Oct 2026', '15 Nov 2026', '15 Dec 2026',
+    ]);
+  });
+
   test('quotes a name carrying a comma or a quote', () => {
     const csv = buildTallyCsv({
       transactions: [], reversals: [],

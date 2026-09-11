@@ -39,13 +39,30 @@ const amount = (rupees, { negative }) => {
   return negative && paise !== 0 ? `-${value}` : value;
 };
 
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
 /* The school's day, not the server's — "14 Aug 2026", as the uniform receipts
-   book writes it. An evening payment in Kolkata is still the previous date by
-   UTC, and dating it that way would move it into the wrong month's return. */
-const paymentDate = (date, timeZone) =>
-  new Intl.DateTimeFormat('en-GB', {
-    timeZone, day: '2-digit', month: 'short', year: 'numeric',
-  }).format(new Date(date));
+ * book writes it. An evening payment in Kolkata is still the previous date by
+ * UTC, and dating it that way would move it into the wrong month's return.
+ *
+ * Intl is asked only for the calendar date in the business timezone (en-CA,
+ * which yields YYYY-MM-DD — the same trick tallyXml.js uses) and never for the
+ * month's name. Locale short months are not all three letters: en-GB spells
+ * September "Sept", which silently made one month of the year print wider than
+ * the other eleven. The table above is the book's spelling, and it cannot
+ * drift with an ICU update.
+ */
+const paymentDate = (date, timeZone) => {
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+    .format(new Date(date))
+    .split('-');
+  return `${day} ${MONTHS[Number(month) - 1]} ${year}`;
+};
 
 /* A movement's student, flattened. A row whose student record has been hard
    deleted still has to appear — the money moved, and a book that silently

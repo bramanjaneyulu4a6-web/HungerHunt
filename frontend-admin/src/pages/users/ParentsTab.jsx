@@ -6,6 +6,8 @@ import api from '../../utils/api';
 import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 import { ParentActivityModal } from '../../components/WalletActivity';
 
+const SHOW_RESET_ACCESS = false;
+
 const EMPTY = { fatherName: '', phone: '', email: '', studentIds: [] };
 
 const statusOf = (parent) => {
@@ -215,9 +217,14 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   <td data-label="Status"><Badge variant={variant}>{status}</Badge></td>
                   <td data-label="Actions"><div className="cell-actions">
                     <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>
-                    <Button className="btn--sm" variant="ghost" disabled={workingId === parent.id} onClick={() => requirePasswordSetup(parent)}>
-                      {parent.active ? 'Reset access' : 'Reactivate'}
-                    </Button>
+                    {/* Reset access is hidden for now, by the owner's decision
+                        (2026-09-12). Reactivate stays: an archived parent has no
+                        other way back. Flip SHOW_RESET_ACCESS to bring it back. */}
+                    {(SHOW_RESET_ACCESS || !parent.active) && (
+                      <Button className="btn--sm" variant="ghost" disabled={workingId === parent.id} onClick={() => requirePasswordSetup(parent)}>
+                        {parent.active ? 'Reset access' : 'Reactivate'}
+                      </Button>
+                    )}
                     {parent.active && <Button className="btn--sm" variant="danger" disabled={workingId === parent.id} onClick={() => archive(parent)}>Archive</Button>}
                   </div></td>
                 </tr>

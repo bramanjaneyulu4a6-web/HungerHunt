@@ -26,6 +26,8 @@ import { useReceipt } from '../utils/walletActivity';
 import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
 import { useDismissableOverlay } from '../utils/overlay';
 
+const SHOW_PURCHASE_CODE = false;
+
 /* The student directory.
  *
  * The screen's one job is finding a student, so the table gets the whole page
@@ -635,13 +637,17 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       >
                         Edit
                       </Button>
-                      <Button
-                        variant="ghost"
-                        className="btn--sm"
-                        onClick={() => setCodeStudent(student)}
-                      >
-                        Purchase code
-                      </Button>
+                      {/* Hidden for now, by the owner's decision (2026-09-12).
+                          Flip SHOW_PURCHASE_CODE to bring it back. */}
+                      {SHOW_PURCHASE_CODE && (
+                        <Button
+                          variant="ghost"
+                          className="btn--sm"
+                          onClick={() => setCodeStudent(student)}
+                        >
+                          Purchase code
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

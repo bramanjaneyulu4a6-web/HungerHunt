@@ -14,6 +14,7 @@ process.env.NODE_ENV = 'test';
 
 const Admin = (await import('../models/Admin.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
@@ -72,6 +73,13 @@ describe('movement rows', () => {
     assert.equal(rows[2].reference, '#DE8608');
     assert.equal(rows[2].balanceAfter, 1750);
     assert.equal(rows[4].note, 'Out of stock');
+    // What the receipt route can print: a deposit by its adjustment, a
+    // refund by its reversal, and nothing for a charge.
+    assert.equal(rows[0].adjustmentId, 'a1');
+    assert.equal(rows[4].reversalId, 'r1');
+    assert.equal(rows[2].adjustmentId, null);
+    assert.equal(rows[2].reversalId, null);
+    assert.equal(rows[2].transactionId, 't1');
     assert.deepEqual(rows[0].student, {
       id: STUDENT_ID, name: student.name, admissionNumber: 'N24068',
       className: 'PREP-II', section: 'B', roomNumber: 'A-12',
@@ -93,6 +101,29 @@ describe('movement rows', () => {
     });
     assert.equal(row.student.name, '');
     assert.equal(row.student.id, STUDENT_ID);
+  });
+
+  test('carry the wallet before and after, the basket and the gateway handles', () => {
+    const rows = buildMovementRows({
+      adjustments: [{
+        _id: 'a', studentId: student, source: 'PARENT_UPI', amount: 500, createdAt: at('2026-08-14T06:00:00Z'),
+        previousBalance: 100, newBalance: 600, gateway: { reference: 'HHTOP1', utr: 'UTR123', upiApp: 'gpay' },
+      }],
+      transactions: [{
+        _id: 't', studentId: student, sourceType: 'DIRECT_CHECKOUT', totalAmount: 30, createdAt: at('2026-08-14T07:00:00Z'),
+        previousBalance: 600, remainingBalance: 570, items: [{ name: 'Frooti', quantity: 2, price: 10 }, { name: 'Pencil', quantity: 1, price: 10 }],
+      }],
+      reversals: [{
+        _id: 'r', studentId: student, amount: 30, createdAt: at('2026-08-14T08:00:00Z'), previousBalance: 570, newBalance: 600,
+        transactionId: 't', items: [{ name: 'Frooti', quantity: 2, price: 10 }],
+      }],
+    });
+    assert.deepEqual([rows[0].balanceBefore, rows[0].balanceAfter], [100, 600]);
+    assert.deepEqual(rows[0].gateway, { reference: 'HHTOP1', utr: 'UTR123', upiApp: 'gpay' });
+    assert.deepEqual(rows[1].items, [{ name: 'Frooti', quantity: 2, price: 10 }, { name: 'Pencil', quantity: 1, price: 10 }]);
+    assert.equal(rows[1].gateway, null);
+    assert.deepEqual(rows[2].items, [{ name: 'Frooti', quantity: 2, price: 10 }]);
+    assert.equal(rows[2].transactionId, 't');
   });
 
   test('total money in against money out', () => {
@@ -164,9 +195,49 @@ describe('GET /v1/accounting-exports/movements', () => {
     assert.deepEqual(body.data.map((row) => row.kind), ['CASH_DEPOSIT', 'WALLET_DEDUCTION']);
     assert.equal(body.data[0].processedBy, 'Bharat');
     assert.equal(body.data[0].receiptNumber, 'GMS1408N24068001');
+    assert.equal(body.data[0].adjustmentId, '507f191e810c19729de860ef');
     assert.equal(body.data[1].reference, '#E8608A');
     assert.deepEqual(body.meta.totals, { in: 1000, out: 250, net: 750, count: 2 });
     assert.equal(body.meta.count, 2);
     assert.equal(body.meta.range.timeZone, 'Asia/Kolkata');
+  });
+
+  test('names the gateway handles behind UPI rows and the basket behind a refund', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    mock.method(Admin, 'find', () => query([]));
+    const intentId = '507f191e810c19729de86100';
+    mock.method(WalletAdjustment, 'find', () => query([{
+      _id: '507f191e810c19729de860ef', studentId: student, source: 'PARENT_UPI', amount: 500,
+      paymentIntentId: intentId, previousBalance: 0, newBalance: 500, createdAt: at('2026-08-14T06:00:00Z'),
+    }]));
+    mock.method(Transaction, 'find', (filter) =>
+      // The reversed charge is read by id for its basket; the period read
+      // itself finds one UPI order payment.
+      filter?._id
+        ? query([{ _id: '507f191e810c19729de860aa', items: [{ name: 'Frooti', quantity: 1, price: 9 }] }])
+        : query([{
+            _id: '507f191e810c19729de860ee', studentId: student, sourceType: 'UPI_ORDER_PAYMENT',
+            totalAmount: 120, idempotencyKey: 'HHORD42', previousBalance: 500, remainingBalance: 500,
+            items: [{ name: 'Bhujia', quantity: 2, price: 60 }], createdAt: at('2026-08-14T07:00:00Z'),
+          }])
+    );
+    mock.method(WalletReversal, 'find', () => query([{
+      _id: '507f191e810c19729de860bb', studentId: student, amount: 9, transactionId: '507f191e810c19729de860aa',
+      performedBy: ADMIN_ID, previousBalance: 491, newBalance: 500, reason: 'Cancelled', createdAt: at('2026-08-14T08:00:00Z'),
+    }]));
+    mock.method(FulfillmentOrder, 'find', () => query([]));
+    mock.method(PaymentIntent, 'find', () => query([
+      { _id: intentId, merchantOrderId: 'HHTOP7', utr: 'UTR777', upiApp: 'phonepe' },
+      { _id: '507f191e810c19729de86101', merchantOrderId: 'HHORD42', utr: 'UTR042', upiApp: null },
+    ]));
+
+    const body = await (await read('from=2026-08-14&to=2026-08-14', adminToken)).json();
+
+    assert.deepEqual(body.data[0].gateway, { reference: 'HHTOP7', utr: 'UTR777', upiApp: 'phonepe' });
+    assert.deepEqual(body.data[1].gateway, { reference: 'HHORD42', utr: 'UTR042', upiApp: null });
+    assert.deepEqual(body.data[1].items, [{ name: 'Bhujia', quantity: 2, price: 60 }]);
+    assert.deepEqual(body.data[2].items, [{ name: 'Frooti', quantity: 1, price: 9 }]);
+    assert.equal(body.data[2].processedBy, 'Former staff');
+    assert.equal(body.data[2].reversalId, '507f191e810c19729de860bb');
   });
 });

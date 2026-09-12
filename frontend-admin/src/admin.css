@@ -2559,3 +2559,16 @@
   font-style: italic;
   color: var(--muted-soft);
 }
+
+/* A transaction opened on the Transactions page: the receipt first, since
+   that is what most rows are opened for, then the basket and the facts. */
+.tx-detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tx-detail .ledger-detail__facts {
+  margin-top: 12px;
+}

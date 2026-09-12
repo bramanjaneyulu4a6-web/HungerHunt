@@ -49,7 +49,26 @@ const studentOf = (studentId) => {
 
 const named = (names, id) => (id && names?.get(String(id))) || null;
 
-const row = ({ id, kind, at, amount, receiptNumber, reference, studentId, processedBy, balanceAfter, note }) => {
+const money = (value) => (Number.isFinite(value) ? value : null);
+
+const itemsOf = (items) =>
+  (items || [])
+    .filter((item) => item && (item.name || item.productId))
+    .map((item) => ({
+      name: item.name || 'Item',
+      quantity: Number(item.quantity) || 0,
+      price: Number(item.price) || 0,
+    }));
+
+/* `gateway` is what PhonePe knows the payment by, for the rare call to
+   support: the order reference, the bank's UTR, and the app it was paid
+   from. Only UPI rows carry one. `adjustmentId` / `reversalId` are the ids
+   the receipt route prints from — a deposit and a refund each have paper;
+   a wallet charge and a UPI order payment do not. */
+const row = ({
+  id, kind, at, amount, receiptNumber, reference, studentId, processedBy,
+  balanceBefore, balanceAfter, note, items, gateway, adjustmentId, reversalId, transactionId,
+}) => {
   const meta = MOVEMENT_KINDS[kind];
   const rupees = Number(amount) || 0;
   return {
@@ -65,8 +84,16 @@ const row = ({ id, kind, at, amount, receiptNumber, reference, studentId, proces
     reference: reference || null,
     student: studentOf(studentId),
     processedBy: processedBy || null,
-    balanceAfter: Number.isFinite(balanceAfter) ? balanceAfter : null,
+    balanceBefore: money(balanceBefore),
+    balanceAfter: money(balanceAfter),
     note: note || '',
+    items: itemsOf(items),
+    gateway: gateway?.reference || gateway?.utr
+      ? { reference: gateway.reference || null, utr: gateway.utr || null, upiApp: gateway.upiApp || null }
+      : null,
+    adjustmentId: adjustmentId ? String(adjustmentId) : null,
+    reversalId: reversalId ? String(reversalId) : null,
+    transactionId: transactionId ? String(transactionId) : null,
   };
 };
 
@@ -74,7 +101,8 @@ const row = ({ id, kind, at, amount, receiptNumber, reference, studentId, proces
    refunds a member of staff performed. Kiosk charges and parent payments
    have no staff behind them and read as nobody. `orderReference` on a
    transaction or reversal is the package's short handle, attached by the
-   controller the same way the CSV's is. */
+   controller the same way the CSV's is; `gateway` and a reversal's `items`
+   (the basket of the charge it undid) are attached there too. */
 export const buildMovementRows = ({
   transactions = [],
   adjustments = [],
@@ -92,7 +120,10 @@ export const buildMovementRows = ({
         reference: null,
         studentId: entry.studentId,
         processedBy: named(staffNames, entry.performedBy),
+        balanceBefore: entry.previousBalance,
         balanceAfter: entry.newBalance,
+        gateway: entry.gateway,
+        adjustmentId: entry._id,
       })
     ),
     ...transactions.map((entry) =>
@@ -105,7 +136,11 @@ export const buildMovementRows = ({
         reference: entry.orderReference,
         studentId: entry.studentId,
         processedBy: null,
+        balanceBefore: entry.previousBalance,
         balanceAfter: entry.remainingBalance,
+        items: entry.items,
+        gateway: entry.gateway,
+        transactionId: entry._id,
       })
     ),
     ...reversals.map((entry) =>
@@ -118,8 +153,12 @@ export const buildMovementRows = ({
         reference: entry.orderReference,
         studentId: entry.studentId,
         processedBy: named(staffNames, entry.performedBy),
+        balanceBefore: entry.previousBalance,
         balanceAfter: entry.newBalance,
         note: entry.reason,
+        items: entry.items,
+        reversalId: entry._id,
+        transactionId: entry.transactionId,
       })
     ),
   ].sort((left, right) => left.at.localeCompare(right.at) || left.id.localeCompare(right.id));

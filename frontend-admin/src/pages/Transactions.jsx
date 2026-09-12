@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Icon from '../components/Icon';
+import { ReceiptButton } from '../components/ReceiptButton';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import api from '../utils/api';
 import { formatINR } from '../utils/format';
@@ -67,6 +68,93 @@ const dateOf = (iso) =>
 const classOf = (student) =>
   [student?.className, student?.section].filter(Boolean).join('-') || '—';
 
+const whenOf = (iso) =>
+  new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(iso));
+
+const UPI_APPS = { phonepe: 'PhonePe', gpay: 'Google Pay', paytm: 'Paytm' };
+
+/* What opens under a row: the receipt where there is paper to print, the
+   basket where money bought something, and the facts a person asks about
+   when they ring the office — in the same layout the wallet ledger uses,
+   so a row reads the same here as it does on a student's page. */
+const RowDetails = ({ row }) => {
+  const printable = Boolean(row.adjustmentId || row.reversalId) && row.student.id;
+  const facts = [
+    ['When', whenOf(row.at)],
+    ['Type', `${KIND_LABELS[row.kind] || row.kind} · ${row.mode}`],
+    ['Student', row.student.name || 'Deleted student'],
+    ['Admission No.', row.student.admissionNumber],
+    ['Class', classOf(row.student) === '—' ? null : classOf(row.student)],
+    ['Room', row.student.roomNumber],
+    ['Amount', `${row.signedAmount < 0 ? '−' : '+'} ${formatINR(row.amount)}`],
+    ['Wallet before', row.balanceBefore == null ? null : formatINR(row.balanceBefore)],
+    ['Wallet after', row.balanceAfter == null ? null : formatINR(row.balanceAfter)],
+    ['Receipt No.', row.receiptNumber],
+    ['Order', row.reference],
+    ['Gateway Reference', row.gateway?.reference],
+    // The bank's settlement reference: the number a parent is given when
+    // they ask their own bank where the money went.
+    ['UTR', row.gateway?.utr],
+    ['Paid with', row.gateway?.upiApp ? UPI_APPS[row.gateway.upiApp] || row.gateway.upiApp : null],
+    ['Transaction ID', row.transactionId],
+    ['Processed by', row.processedBy],
+    ['Reason', row.note],
+  ].filter(([, value]) => value);
+
+  return (
+    <div className="ledger-detail tx-detail">
+      <div className="tx-detail__actions">
+        {printable ? (
+          <ReceiptButton studentId={row.student.id} entry={row} />
+        ) : (
+          <span className="cell-unset">
+            {row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
+          </span>
+        )}
+      </div>
+
+      {row.items.length > 0 && (
+        <table className="table table--stack ledger-detail__items">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th style={{ textAlign: 'center', width: 80 }}>Qty</th>
+              <th style={{ textAlign: 'right', width: 110 }}>Unit price</th>
+              <th style={{ textAlign: 'right', width: 120 }}>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {row.items.map((item, index) => (
+              <tr key={`${item.name}-${index}`}>
+                <td data-label="Item" style={{ fontWeight: 600 }}>{item.name}</td>
+                <td data-label="Qty" style={{ textAlign: 'center', color: 'var(--muted)' }}>{item.quantity}</td>
+                <td data-label="Unit price" style={{ textAlign: 'right', color: 'var(--muted)' }}>{formatINR(item.price)}</td>
+                <td data-label="Subtotal" style={{ textAlign: 'right', fontWeight: 600 }}>{formatINR(item.price * item.quantity)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <dl className="ledger-detail__facts">
+        {facts.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+};
+
 const Transactions = () => {
   const [period, setPeriod] = useState('today');
   const [custom, setCustom] = useState(periodRange('today'));
@@ -93,6 +181,16 @@ const Transactions = () => {
     }));
   const [panelOpen, setPanelOpen] = useState(false);
   const panelRef = useRef(null);
+  // Which rows are open, by id. More than one may be, so two entries can be
+  // compared side by side; a new period closes them all.
+  const [openRows, setOpenRows] = useState(() => new Set());
+  const toggleRow = (id) =>
+    setOpenRows((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [sort, setSort] = useState({ key: 'at', direction: 'asc' });
 
   // The panel closes on a click outside it or on Escape, like a menu.
@@ -142,6 +240,7 @@ const Transactions = () => {
   const showPeriod = useCallback((range) => {
     setLoading(true);
     setError('');
+    setOpenRows(new Set());
     setApplied(range);
   }, []);
 
@@ -455,6 +554,7 @@ const Transactions = () => {
                     </th>
                   );
                 })}
+                <th aria-label="Details" style={{ width: 40 }} />
               </tr>
             </thead>
             <tbody>
@@ -464,10 +564,16 @@ const Transactions = () => {
                       {COLUMNS.map((column) => (
                         <td key={column.key}><Skeleton height={14} /></td>
                       ))}
+                      <td />
                     </tr>
                   ))
                 : visible.map((row) => (
-                    <tr key={row.id}>
+                  <Fragment key={row.id}>
+                    <tr
+                      className="ledger-row--expandable"
+                      aria-expanded={openRows.has(row.id)}
+                      onClick={() => toggleRow(row.id)}
+                    >
                       <td data-label="Time" className="cell-mono">
                         {multiDay && <span className="tx-date">{dateOf(row.at)} </span>}
                         {timeOf(row.at)}
@@ -493,7 +599,23 @@ const Transactions = () => {
                         {row.note && <small className="tx-note">{row.note}</small>}
                       </td>
                       <td data-label="Processed by">{row.processedBy || <span className="cell-unset">—</span>}</td>
+                      <td className="ledger-actions">
+                        <span
+                          className={`ledger-chevron${openRows.has(row.id) ? ' ledger-chevron--open' : ''}`}
+                          aria-hidden="true"
+                        >
+                          <Icon name="caret" size={16} />
+                        </span>
+                      </td>
                     </tr>
+                    {openRows.has(row.id) && (
+                      <tr className="ledger-detail-row">
+                        <td colSpan={COLUMNS.length + 1}>
+                          <RowDetails row={row} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                   ))}
             </tbody>
           </table>

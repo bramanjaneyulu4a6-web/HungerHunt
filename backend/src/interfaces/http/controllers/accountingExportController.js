@@ -1,5 +1,6 @@
 import Admin from '../../../../models/Admin.js';
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
+import PaymentIntent from '../../../../models/PaymentIntent.js';
 import Transaction from '../../../../models/Transaction.js';
 import WalletAdjustment from '../../../../models/WalletAdjustment.js';
 import WalletReversal from '../../../../models/WalletReversal.js';
@@ -164,10 +165,12 @@ export const movements = async (req, res) => {
     await readMovements(req, {
       withStudents: true,
       select: {
-        transactions: '_id studentId totalAmount sourceType receiptNumber remainingBalance createdAt',
-        adjustments: '_id studentId source amount receiptNumber performedBy newBalance createdAt',
+        transactions:
+          '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance createdAt',
+        adjustments:
+          '_id studentId source amount receiptNumber performedBy paymentIntentId previousBalance newBalance createdAt',
         reversals:
-          '_id studentId amount receiptNumber fulfillmentOrderId performedBy newBalance reason createdAt',
+          '_id studentId amount receiptNumber fulfillmentOrderId transactionId performedBy previousBalance newBalance reason createdAt',
       },
     });
 
@@ -176,13 +179,38 @@ export const movements = async (req, res) => {
       [...adjustments, ...reversals].map((entry) => entry.performedBy).filter(Boolean).map(String)
     ),
   ];
-  const [orders, staff] = await Promise.all([
+  /* The handles PhonePe knows a UPI row by. A parent's top-up points at its
+     intent; a UPI order payment's idempotency key IS the intent's merchant
+     order id (see settlePaymentIntent), so both are read from one query. */
+  const intentIds = adjustments
+    .filter((entry) => entry.source === 'PARENT_UPI' && entry.paymentIntentId)
+    .map((entry) => entry.paymentIntentId);
+  const merchantOrderIds = transactions
+    .filter((entry) => entry.sourceType === 'UPI_ORDER_PAYMENT' && entry.idempotencyKey)
+    .map((entry) => entry.idempotencyKey);
+  const reversedIds = reversals.map((entry) => entry.transactionId).filter(Boolean);
+
+  const [orders, staff, intents, reversed] = await Promise.all([
     transactions.length
       ? FulfillmentOrder.find({ transactionId: { $in: transactions.map((entry) => entry._id) } })
           .select('_id transactionId')
           .lean()
       : [],
     staffIds.length ? Admin.find({ _id: { $in: staffIds } }).select('name').lean() : [],
+    intentIds.length || merchantOrderIds.length
+      ? PaymentIntent.find({
+          $or: [
+            ...(intentIds.length ? [{ _id: { $in: intentIds } }] : []),
+            ...(merchantOrderIds.length ? [{ merchantOrderId: { $in: merchantOrderIds } }] : []),
+          ],
+        })
+          .select('merchantOrderId utr upiApp')
+          .lean()
+      : [],
+    // A refund restores a whole charge, so its basket is that charge's basket.
+    reversedIds.length
+      ? Transaction.find({ _id: { $in: reversedIds } }).select('items').lean()
+      : [],
   ]);
   const orderByTransaction = new Map(
     orders.map((order) => [String(order.transactionId), order._id])
@@ -190,16 +218,29 @@ export const movements = async (req, res) => {
   // Former staff still took the money; their row keeps a name rather than a blank.
   const staffNames = new Map(staffIds.map((id) => [id, 'Former staff']));
   for (const admin of staff) staffNames.set(String(admin._id), admin.name);
+  const gatewayOf = (intent) =>
+    intent ? { reference: intent.merchantOrderId, utr: intent.utr, upiApp: intent.upiApp } : null;
+  const intentById = new Map(intents.map((intent) => [String(intent._id), intent]));
+  const intentByOrderId = new Map(intents.map((intent) => [intent.merchantOrderId, intent]));
+  const itemsByTransaction = new Map(reversed.map((txn) => [String(txn._id), txn.items]));
 
   const rows = buildMovementRows({
     transactions: transactions.map((entry) => ({
       ...entry,
       orderReference: orderReference(orderByTransaction.get(String(entry._id))),
+      gateway:
+        entry.sourceType === 'UPI_ORDER_PAYMENT'
+          ? gatewayOf(intentByOrderId.get(entry.idempotencyKey)) || { reference: entry.idempotencyKey }
+          : null,
     })),
-    adjustments,
+    adjustments: adjustments.map((entry) => ({
+      ...entry,
+      gateway: gatewayOf(intentById.get(String(entry.paymentIntentId))),
+    })),
     reversals: reversals.map((entry) => ({
       ...entry,
       orderReference: orderReference(entry.fulfillmentOrderId),
+      items: itemsByTransaction.get(String(entry.transactionId)) || [],
     })),
     staffNames,
   });

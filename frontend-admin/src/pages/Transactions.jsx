@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import Icon from '../components/Icon';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
@@ -6,15 +6,18 @@ import api from '../utils/api';
 import { formatINR } from '../utils/format';
 import {
   KIND_LABELS,
-  MODES,
   PERIODS,
   TABS,
+  activeFilterCount,
+  availableFilters,
+  emptyFilters,
   filterRows,
   nextSort,
   periodRange,
   rangeLabel,
   rangeProblem,
   sortRows,
+  staffIn,
 } from '../utils/transactions';
 
 /* Every rupee that moved in a period, on one screen.
@@ -76,9 +79,38 @@ const Transactions = () => {
 
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState('');
-  const [mode, setMode] = useState('');
+  /* One filter set per tab. Switching tabs restores that tab's own set, so
+     narrowing Deposits to cash does not follow the office over to
+     Deductions — and the panel only ever offers the kinds the tab can hold. */
+  const [filtersByTab, setFiltersByTab] = useState(() =>
+    Object.fromEntries(TABS.map((option) => [option.key, emptyFilters()]))
+  );
+  const filters = filtersByTab[tab];
+  const setFilters = (update) =>
+    setFiltersByTab((current) => ({
+      ...current,
+      [tab]: typeof update === 'function' ? update(current[tab]) : update,
+    }));
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef(null);
   const [sort, setSort] = useState({ key: 'at', direction: 'asc' });
+
+  // The panel closes on a click outside it or on Escape, like a menu.
+  useEffect(() => {
+    if (!panelOpen) return undefined;
+    const onPointer = (event) => {
+      if (!panelRef.current?.contains(event.target)) setPanelOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setPanelOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [panelOpen]);
 
   /* One request per applied period. The handlers that change the period put
      the table into its loading state; the effect only asks and answers, and
@@ -132,9 +164,12 @@ const Transactions = () => {
   };
 
   const visible = useMemo(
-    () => sortRows(filterRows(rows, { tab, query, kind, mode }), sort),
-    [rows, tab, query, kind, mode, sort]
+    () => sortRows(filterRows(rows, { tab, query, filters }), sort),
+    [rows, tab, query, filters, sort]
   );
+  const offered = useMemo(() => availableFilters(tab), [tab]);
+  const staff = useMemo(() => staffIn(rows.filter((row) => filterRows([row], { tab }).length)), [rows, tab]);
+  const activeFilters = activeFilterCount(filters);
 
   // Tiles describe what is on screen, so a filter narrows them too.
   const totals = useMemo(
@@ -151,8 +186,20 @@ const Transactions = () => {
   );
 
   const tabCount = (key) => filterRows(rows, { tab: key }).length;
-  const filtered = Boolean(query || kind || mode);
+  const filtered = Boolean(query) || activeFilters > 0;
   const multiDay = applied.from !== applied.to;
+
+  const toggleIn = (field, value) =>
+    setFilters((current) => ({
+      ...current,
+      [field]: current[field].includes(value)
+        ? current[field].filter((entry) => entry !== value)
+        : [...current[field], value],
+    }));
+  const clearAll = () => {
+    setQuery('');
+    setFilters(emptyFilters());
+  };
 
   return (
     <div className="page">
@@ -209,7 +256,7 @@ const Transactions = () => {
             role="tab"
             aria-selected={tab === option.key}
             className={`tab${tab === option.key ? ' tab--active' : ''}`}
-            onClick={() => setTab(option.key)}
+            onClick={() => { setTab(option.key); setPanelOpen(false); }}
           >
             <span>{option.label}</span>
             {option.hint && <small>{option.hint}</small>}
@@ -248,19 +295,109 @@ const Transactions = () => {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <select className="select toolbar-select" value={kind} onChange={(event) => setKind(event.target.value)} aria-label="Filter by type">
-          <option value="">All types</option>
-          {Object.entries(KIND_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select className="select toolbar-select" value={mode} onChange={(event) => setMode(event.target.value)} aria-label="Filter by mode">
-          <option value="">All modes</option>
-          {MODES.map((value) => <option key={value} value={value}>{value}</option>)}
-        </select>
+        <div className="tx-filter" ref={panelRef}>
+          <Button
+            variant={activeFilters ? 'primary' : 'ghost'}
+            aria-expanded={panelOpen}
+            aria-controls="tx-filter-panel"
+            onClick={() => setPanelOpen((open) => !open)}
+          >
+            <Icon name="filter" size={16} />
+            Filters
+            {activeFilters > 0 && <span className="tx-filter__count">{activeFilters}</span>}
+          </Button>
+
+          {panelOpen && (
+            <div className="tx-filter__panel" id="tx-filter-panel" role="dialog" aria-label={`Filters for ${TABS.find((option) => option.key === tab)?.label}`}>
+              <div className="tx-filter__head">
+                <strong>Filters</strong>
+                <small>{TABS.find((option) => option.key === tab)?.label}</small>
+              </div>
+
+              <fieldset className="tx-filter__group">
+                <legend>Type</legend>
+                {offered.kinds.map((value) => (
+                  <label key={value} className="tx-filter__option">
+                    <input
+                      type="checkbox"
+                      checked={filters.kinds.includes(value)}
+                      onChange={() => toggleIn('kinds', value)}
+                    />
+                    <span>{KIND_LABELS[value]}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset className="tx-filter__group">
+                <legend>Mode</legend>
+                {offered.modes.map((value) => (
+                  <label key={value} className="tx-filter__option">
+                    <input
+                      type="checkbox"
+                      checked={filters.modes.includes(value)}
+                      onChange={() => toggleIn('modes', value)}
+                    />
+                    <span>{value}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset className="tx-filter__group">
+                <legend>Amount</legend>
+                <div className="tx-filter__range">
+                  <label>
+                    <span className="field-label">Min ₹</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={filters.min}
+                      onChange={(event) => setFilters({ ...filters, min: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span className="field-label">Max ₹</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={filters.max}
+                      onChange={(event) => setFilters({ ...filters, max: event.target.value })}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              {staff.length > 0 && (
+                <fieldset className="tx-filter__group">
+                  <legend>Processed by</legend>
+                  <select
+                    className="select"
+                    value={filters.processedBy}
+                    onChange={(event) => setFilters({ ...filters, processedBy: event.target.value })}
+                  >
+                    <option value="">Anyone</option>
+                    {staff.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                </fieldset>
+              )}
+
+              <div className="tx-filter__actions">
+                <Button variant="ghost" className="btn--sm" disabled={!activeFilters} onClick={() => setFilters(emptyFilters())}>
+                  Clear
+                </Button>
+                <Button variant="primary" className="btn--sm" onClick={() => setPanelOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
         {filtered && (
-          <Button variant="ghost" className="btn--sm" onClick={() => { setQuery(''); setKind(''); setMode(''); }}>
-            Clear filters
+          <Button variant="ghost" className="btn--sm" onClick={clearAll}>
+            Clear all
           </Button>
         )}
         <span className="toolbar-count">
@@ -276,11 +413,11 @@ const Transactions = () => {
         <EmptyState
           icon="₹"
           title={rows.length === 0 ? 'No transactions in this period' : 'Nothing matches these filters'}
-          action={filtered ? <Button variant="ghost" onClick={() => { setQuery(''); setKind(''); setMode(''); }}>Clear filters</Button> : undefined}
+          action={filtered ? <Button variant="ghost" onClick={clearAll}>Clear filters</Button> : undefined}
         >
           {rows.length === 0
             ? 'Deposits, wallet payments and refunds will appear here as they happen.'
-            : 'Try a different search, type or mode.'}
+            : 'Try a different search or loosen the filters.'}
         </EmptyState>
       ) : (
         <div className="table-wrap">

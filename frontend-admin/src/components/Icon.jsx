@@ -26,6 +26,7 @@ const paths = {
   // Points down for descending and is flipped in CSS for ascending, so one
   // glyph carries both directions and only the sorted column shows it.
   caret: <path d="m6 9 6 6 6-6"/>,
+  filter: <path d="M3 5h18l-7 8v6l-4 2v-8Z"/>,
   help: <><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 0 1 4.9.8c0 1.7-2.5 2-2.5 3.7"/><path d="M12 17h.01"/></>,
   /* The warehouse portal's three tabs. Each one is the thing itself — a taped
      box going out, the shelf it came off, the lorry bringing more — so the

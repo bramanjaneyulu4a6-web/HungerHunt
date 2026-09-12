@@ -2,8 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  activeFilterCount,
+  availableFilters,
+  emptyFilters,
   filterRows,
   inTab,
+  staffIn,
   nextSort,
   periodRange,
   rangeLabel,
@@ -47,20 +51,41 @@ test('sorts amounts as numbers and names without regard to case', () => {
   assert.deepEqual(byName.map((r) => r.id), ['a', 'b']);
 });
 
-test('filters by tab, kind, mode and a search over the things a person quotes', () => {
+const f = (overrides) => ({ ...emptyFilters(), ...overrides });
+
+test('filters by tab, kinds, modes, amount, staff and a search over the things a person quotes', () => {
   const rows = [
-    row({ id: 'dep', kind: 'CASH_DEPOSIT', group: 'DEPOSIT', mode: 'Cash', receiptNumber: 'GMS1209N1001' }),
-    row({ id: 'pay', kind: 'WALLET_DEDUCTION', group: 'DEDUCTION', mode: 'Wallet', reference: '#AB12CD', signedAmount: -50 }),
-    row({ id: 'ref', kind: 'REFUND', group: 'DEDUCTION', mode: 'Refund', processedBy: 'Bharat', signedAmount: -50 }),
+    row({ id: 'dep', kind: 'CASH_DEPOSIT', group: 'DEPOSIT', mode: 'Cash', amount: 1000, signedAmount: 1000, receiptNumber: 'GMS1209N1001', processedBy: 'Santosh' }),
+    row({ id: 'pay', kind: 'WALLET_DEDUCTION', group: 'DEDUCTION', mode: 'Wallet', reference: '#AB12CD', amount: 50, signedAmount: -50 }),
+    row({ id: 'ref', kind: 'REFUND', group: 'DEDUCTION', mode: 'Refund', processedBy: 'Bharat', amount: 50, signedAmount: -50 }),
   ];
   assert.deepEqual(filterRows(rows, { tab: 'deductions' }).map((r) => r.id), ['pay', 'ref']);
-  assert.deepEqual(filterRows(rows, { kind: 'REFUND' }).map((r) => r.id), ['ref']);
-  assert.deepEqual(filterRows(rows, { mode: 'Cash' }).map((r) => r.id), ['dep']);
+  assert.deepEqual(filterRows(rows, { filters: f({ kinds: ['REFUND', 'CASH_DEPOSIT'] }) }).map((r) => r.id), ['dep', 'ref']);
+  assert.deepEqual(filterRows(rows, { filters: f({ modes: ['Cash'] }) }).map((r) => r.id), ['dep']);
+  assert.deepEqual(filterRows(rows, { filters: f({ min: '100' }) }).map((r) => r.id), ['dep']);
+  assert.deepEqual(filterRows(rows, { filters: f({ max: '60' }) }).map((r) => r.id), ['pay', 'ref']);
+  assert.deepEqual(filterRows(rows, { filters: f({ processedBy: 'Bharat' }) }).map((r) => r.id), ['ref']);
   assert.deepEqual(filterRows(rows, { query: 'gms1209' }).map((r) => r.id), ['dep']);
   assert.deepEqual(filterRows(rows, { query: '#ab12' }).map((r) => r.id), ['pay']);
   assert.deepEqual(filterRows(rows, { query: 'bharat' }).map((r) => r.id), ['ref']);
   // Amounts are not searched: "50" must not pull the two ₹50 rows.
   assert.deepEqual(filterRows(rows, { query: '50' }), []);
+  assert.deepEqual(staffIn(rows), ['Bharat', 'Santosh']);
+});
+
+test('each tab offers only the kinds and modes its rows can carry', () => {
+  assert.deepEqual(availableFilters('deposits'), { kinds: ['CASH_DEPOSIT', 'UPI_DEPOSIT'], modes: ['Cash', 'UPI'] });
+  assert.deepEqual(availableFilters('deductions'), {
+    kinds: ['WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT', 'REFUND'],
+    modes: ['UPI', 'Wallet', 'Refund'],
+  });
+  assert.equal(availableFilters('all').kinds.length, 5);
+});
+
+test('counts the filter groups in use, not the boxes ticked', () => {
+  assert.equal(activeFilterCount(emptyFilters()), 0);
+  assert.equal(activeFilterCount(f({ kinds: ['REFUND', 'CASH_DEPOSIT'], min: '10' })), 2);
+  assert.equal(activeFilterCount(f({ processedBy: 'Bharat', modes: ['UPI'] })), 2);
 });
 
 test('quick periods resolve in the school day, not the browser day', () => {

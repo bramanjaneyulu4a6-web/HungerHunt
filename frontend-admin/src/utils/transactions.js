@@ -33,6 +33,50 @@ export const KIND_LABELS = {
 
 export const MODES = ['Cash', 'UPI', 'Wallet', 'Refund'];
 
+const KIND_GROUP = {
+  CASH_DEPOSIT: 'DEPOSIT',
+  UPI_DEPOSIT: 'DEPOSIT',
+  WALLET_DEDUCTION: 'DEDUCTION',
+  UPI_ORDER_PAYMENT: 'DEDUCTION',
+  REFUND: 'DEDUCTION',
+};
+
+const KIND_MODE = {
+  CASH_DEPOSIT: 'Cash',
+  UPI_DEPOSIT: 'UPI',
+  WALLET_DEDUCTION: 'Wallet',
+  UPI_ORDER_PAYMENT: 'UPI',
+  REFUND: 'Refund',
+};
+
+/* What the Filters panel offers on a given tab. The Deposits tab has no
+   refunds to filter by and the Deductions tab no cash, so each tab shows only
+   the kinds and modes its rows can carry — a filter that can never match is
+   a filter that only confuses. */
+export const availableFilters = (tab) => {
+  const kinds = Object.keys(KIND_LABELS).filter((kind) => tab === 'all' || KIND_GROUP[kind] === TAB_GROUP[tab]);
+  const modes = MODES.filter((mode) => kinds.some((kind) => KIND_MODE[kind] === mode));
+  return { kinds, modes };
+};
+
+/* Nothing chosen. Each tab keeps its own copy, so narrowing Deposits to cash
+   does not follow the office over to Deductions. */
+export const emptyFilters = () => ({ kinds: [], modes: [], min: '', max: '', processedBy: '' });
+
+export const activeFilterCount = (filters) =>
+  (filters.kinds.length ? 1 : 0) +
+  (filters.modes.length ? 1 : 0) +
+  (filters.min !== '' || filters.max !== '' ? 1 : 0) +
+  (filters.processedBy ? 1 : 0);
+
+// The staff names present in the rows, for the Processed by filter.
+export const staffIn = (rows) =>
+  [...new Set(rows.map((row) => row.processedBy).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+const asNumber = (value) => (value === '' || value == null ? null : Number(value));
+
 /* One comparator per sortable column. Strings compare case-insensitively so
    "aarav" and "Bharat" sort as a person expects; numbers compare as numbers
    so ₹1,000 does not land between ₹10 and ₹2. A tie falls back to time so the
@@ -96,13 +140,21 @@ const haystack = (row) =>
     .join(' ')
     .toLocaleLowerCase();
 
-export const filterRows = (rows, { tab = 'all', query = '', kind = '', mode = '' } = {}) => {
+/* `filters` is one tab's set (see emptyFilters). Amount bounds compare the
+   unsigned amount — "over ₹500" means a ₹600 refund too — and a bound left
+   blank is no bound. */
+export const filterRows = (rows, { tab = 'all', query = '', filters = emptyFilters() } = {}) => {
   const needle = query.trim().toLocaleLowerCase();
+  const min = asNumber(filters.min);
+  const max = asNumber(filters.max);
   return rows.filter(
     (row) =>
       inTab(row, tab) &&
-      (!kind || row.kind === kind) &&
-      (!mode || row.mode === mode) &&
+      (!filters.kinds.length || filters.kinds.includes(row.kind)) &&
+      (!filters.modes.length || filters.modes.includes(row.mode)) &&
+      (min === null || Number.isNaN(min) || row.amount >= min) &&
+      (max === null || Number.isNaN(max) || row.amount <= max) &&
+      (!filters.processedBy || row.processedBy === filters.processedBy) &&
       (!needle || haystack(row).includes(needle))
   );
 };

@@ -2296,3 +2296,140 @@
     gap: 10px;
   }
 }
+
+/* ---- transactions page ------------------------------------------------- */
+
+.tx-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.tx-period__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tx-chip {
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tx-chip:hover:not(.tx-chip--active) {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.tx-chip--active {
+  color: var(--on-dark);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.tx-period__custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.tx-period__custom label {
+  display: grid;
+  gap: 4px;
+}
+
+.tx-period__custom .input {
+  min-width: 160px;
+}
+
+/* Three views, each announcing what it holds. */
+.tx-tabs {
+  margin-bottom: 16px;
+}
+
+.tx-tabs .tab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 8px;
+}
+
+.tx-tabs .tab small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.tx-tab-count {
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.tab--active .tx-tab-count {
+  color: var(--on-dark);
+  background: var(--primary);
+}
+
+.tx-tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .tx-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.tx-table td:first-child {
+  white-space: nowrap;
+}
+
+.tx-in {
+  color: var(--success);
+}
+
+.tx-out {
+  color: var(--danger);
+}
+
+.tx-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tx-table .stat-value,
+.tx-tiles .stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-date {
+  color: var(--muted);
+}
+
+.tx-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-family: inherit;
+  letter-spacing: 0;
+  color: var(--muted);
+}

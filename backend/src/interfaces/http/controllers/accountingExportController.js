@@ -1,8 +1,10 @@
+import Admin from '../../../../models/Admin.js';
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
 import Transaction from '../../../../models/Transaction.js';
 import WalletAdjustment from '../../../../models/WalletAdjustment.js';
 import WalletReversal from '../../../../models/WalletReversal.js';
 import { collectionFilters, parseIncluded } from '../../../application/accounting/movementTypes.js';
+import { buildMovementRows, movementTotals } from '../../../application/accounting/movementRows.js';
 import { buildTallyCsv } from '../../../application/accounting/tallyCsv.js';
 import { buildTallyVoucherXml } from '../../../application/accounting/tallyXml.js';
 import { ApplicationError } from '../../../shared/errors/applicationError.js';
@@ -74,7 +76,7 @@ const readMovements = async (req, { select, withStudents = false }) => {
     );
   }
 
-  return { transactions, adjustments, reversals, rowCount, timeZone };
+  return { transactions, adjustments, reversals, rowCount, timeZone, from, to };
 };
 
 export const tallyXml = async (req, res) => {
@@ -143,4 +145,72 @@ export const tallyCsv = async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('X-HungerHunt-Row-Count', String(rowCount));
   res.send(csv);
+};
+
+/* The same movements again, as the rows the Transactions page shows.
+ *
+ * Deliberately the reader the two exports use, with the same period rules
+ * and the same selection parameter, so what the office scrolls through on
+ * screen is exactly what the CSV would file for that period — the page is
+ * the export, read before it is downloaded. Sorting and filtering happen in
+ * the browser over the period fetched: a day is a few dozen rows, and even
+ * the longest period the reader allows is bounded by MAX_VOUCHERS.
+ *
+ * Staff names ride along for the deposits and refunds a person performed,
+ * so the column answers "who took this money" the way the dashboard feed
+ * does. A charge at the kiosk or a parent's own payment names nobody. */
+export const movements = async (req, res) => {
+  const { transactions, adjustments, reversals, rowCount, timeZone, from, to } =
+    await readMovements(req, {
+      withStudents: true,
+      select: {
+        transactions: '_id studentId totalAmount sourceType receiptNumber remainingBalance createdAt',
+        adjustments: '_id studentId source amount receiptNumber performedBy newBalance createdAt',
+        reversals:
+          '_id studentId amount receiptNumber fulfillmentOrderId performedBy newBalance reason createdAt',
+      },
+    });
+
+  const staffIds = [
+    ...new Set(
+      [...adjustments, ...reversals].map((entry) => entry.performedBy).filter(Boolean).map(String)
+    ),
+  ];
+  const [orders, staff] = await Promise.all([
+    transactions.length
+      ? FulfillmentOrder.find({ transactionId: { $in: transactions.map((entry) => entry._id) } })
+          .select('_id transactionId')
+          .lean()
+      : [],
+    staffIds.length ? Admin.find({ _id: { $in: staffIds } }).select('name').lean() : [],
+  ]);
+  const orderByTransaction = new Map(
+    orders.map((order) => [String(order.transactionId), order._id])
+  );
+  // Former staff still took the money; their row keeps a name rather than a blank.
+  const staffNames = new Map(staffIds.map((id) => [id, 'Former staff']));
+  for (const admin of staff) staffNames.set(String(admin._id), admin.name);
+
+  const rows = buildMovementRows({
+    transactions: transactions.map((entry) => ({
+      ...entry,
+      orderReference: orderReference(orderByTransaction.get(String(entry._id))),
+    })),
+    adjustments,
+    reversals: reversals.map((entry) => ({
+      ...entry,
+      orderReference: orderReference(entry.fulfillmentOrderId),
+    })),
+    staffNames,
+  });
+
+  res.json({
+    data: rows,
+    meta: {
+      requestId: req.context.requestId,
+      count: rowCount,
+      totals: movementTotals(rows),
+      range: { from, to, timeZone },
+    },
+  });
 };

@@ -15,6 +15,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Users = lazy(() => import('./pages/Users'));
 const Billing = lazy(() => import('./pages/Billing'));
 const RechargeHistory = lazy(() => import('./pages/RechargeHistory'));
+const Transactions = lazy(() => import('./pages/Transactions'));
 const WarehouseOverview = lazy(() => import('./pages/WarehouseOverview'));
 const FulfillmentOrders = lazy(() => import('./pages/FulfillmentOrders'));
 const ProcurementReview = lazy(() => import('./pages/ProcurementReview'));
@@ -56,6 +57,7 @@ function App() {
             <Route path="/rooms" element={<Navigate to="/dashboard" replace />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/recharge-history" element={<RechargeHistory />} />
+            <Route path="/transactions" element={<Transactions />} />
             <Route path="/accounting-export" element={<AccountingExport />} />
             <Route path="/reports" element={<StaffReports />} />
             <Route path="/warehouse" element={<WarehouseOverview />} />

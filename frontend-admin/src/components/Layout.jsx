@@ -8,6 +8,7 @@ const PRIMARY_NAV = [
   { path: "/billing", label: "Point of Sale", icon: "◫" },
   { path: "/reports", label: "Reports", icon: "✎" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },
+  { path: "/transactions", label: "Transactions", icon: "≡" },
   { path: "/accounting-export", label: "TallyPrime Export", icon: "⇩" },
 ];
 

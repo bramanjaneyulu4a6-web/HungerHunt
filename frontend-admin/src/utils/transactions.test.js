@@ -64,13 +64,17 @@ test('filters by tab, kinds, modes, amount, staff and a search over the things a
   assert.deepEqual(filterRows(rows, { filters: f({ modes: ['Cash'] }) }).map((r) => r.id), ['dep']);
   assert.deepEqual(filterRows(rows, { filters: f({ min: '100' }) }).map((r) => r.id), ['dep']);
   assert.deepEqual(filterRows(rows, { filters: f({ max: '60' }) }).map((r) => r.id), ['pay', 'ref']);
-  assert.deepEqual(filterRows(rows, { filters: f({ processedBy: 'Bharat' }) }).map((r) => r.id), ['ref']);
+  assert.deepEqual(filterRows(rows, { filters: f({ processedBy: ['Bharat'] }) }).map((r) => r.id), ['ref']);
+  assert.deepEqual(filterRows(rows, { filters: f({ processedBy: ['Bharat', 'Santosh'] }) }).map((r) => r.id), ['dep', 'ref']);
   assert.deepEqual(filterRows(rows, { query: 'gms1209' }).map((r) => r.id), ['dep']);
   assert.deepEqual(filterRows(rows, { query: '#ab12' }).map((r) => r.id), ['pay']);
   assert.deepEqual(filterRows(rows, { query: 'bharat' }).map((r) => r.id), ['ref']);
   // Amounts are not searched: "50" must not pull the two ₹50 rows.
   assert.deepEqual(filterRows(rows, { query: '50' }), []);
-  assert.deepEqual(staffIn(rows), ['Bharat', 'Santosh']);
+  assert.deepEqual(staffIn([...rows, row({ id: 'dep2', processedBy: 'Santosh' })]), [
+    { name: 'Bharat', count: 1 },
+    { name: 'Santosh', count: 2 },
+  ]);
 });
 
 test('each tab offers only the kinds and modes its rows can carry', () => {
@@ -85,7 +89,7 @@ test('each tab offers only the kinds and modes its rows can carry', () => {
 test('counts the filter groups in use, not the boxes ticked', () => {
   assert.equal(activeFilterCount(emptyFilters()), 0);
   assert.equal(activeFilterCount(f({ kinds: ['REFUND', 'CASH_DEPOSIT'], min: '10' })), 2);
-  assert.equal(activeFilterCount(f({ processedBy: 'Bharat', modes: ['UPI'] })), 2);
+  assert.equal(activeFilterCount(f({ processedBy: ['Bharat'], modes: ['UPI'] })), 2);
 });
 
 test('quick periods resolve in the school day, not the browser day', () => {

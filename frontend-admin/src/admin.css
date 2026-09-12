@@ -2542,3 +2542,20 @@
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+.tx-filter__option .tx-filter__tally {
+  margin-left: auto;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.tx-filter__none {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted-soft);
+}

@@ -61,19 +61,28 @@ export const availableFilters = (tab) => {
 
 /* Nothing chosen. Each tab keeps its own copy, so narrowing Deposits to cash
    does not follow the office over to Deductions. */
-export const emptyFilters = () => ({ kinds: [], modes: [], min: '', max: '', processedBy: '' });
+export const emptyFilters = () => ({ kinds: [], modes: [], min: '', max: '', processedBy: [] });
 
 export const activeFilterCount = (filters) =>
   (filters.kinds.length ? 1 : 0) +
   (filters.modes.length ? 1 : 0) +
   (filters.min !== '' || filters.max !== '' ? 1 : 0) +
-  (filters.processedBy ? 1 : 0);
+  (filters.processedBy.length ? 1 : 0);
 
-// The staff names present in the rows, for the Processed by filter.
-export const staffIn = (rows) =>
-  [...new Set(rows.map((row) => row.processedBy).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b)
-  );
+/* Every admin who processed something in the period, with how many entries
+   each handled — over the whole period, not the tab, so the list answers
+   "who was at the desk today" before the office narrows to what they did.
+   Kiosk charges and parents' own payments have nobody behind them and are
+   not counted. */
+export const staffIn = (rows) => {
+  const counts = new Map();
+  for (const row of rows) {
+    if (row.processedBy) counts.set(row.processedBy, (counts.get(row.processedBy) || 0) + 1);
+  }
+  return [...counts]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
 
 const asNumber = (value) => (value === '' || value == null ? null : Number(value));
 
@@ -154,7 +163,7 @@ export const filterRows = (rows, { tab = 'all', query = '', filters = emptyFilte
       (!filters.modes.length || filters.modes.includes(row.mode)) &&
       (min === null || Number.isNaN(min) || row.amount >= min) &&
       (max === null || Number.isNaN(max) || row.amount <= max) &&
-      (!filters.processedBy || row.processedBy === filters.processedBy) &&
+      (!filters.processedBy.length || filters.processedBy.includes(row.processedBy)) &&
       (!needle || haystack(row).includes(needle))
   );
 };

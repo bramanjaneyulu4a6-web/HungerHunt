@@ -168,7 +168,8 @@ const Transactions = () => {
     [rows, tab, query, filters, sort]
   );
   const offered = useMemo(() => availableFilters(tab), [tab]);
-  const staff = useMemo(() => staffIn(rows.filter((row) => filterRows([row], { tab }).length)), [rows, tab]);
+  // Everyone at the desk in this period, whichever tab is open.
+  const staff = useMemo(() => staffIn(rows), [rows]);
   const activeFilters = activeFilterCount(filters);
 
   // Tiles describe what is on screen, so a filter narrows them too.
@@ -370,19 +371,24 @@ const Transactions = () => {
                 </div>
               </fieldset>
 
-              {staff.length > 0 && (
-                <fieldset className="tx-filter__group">
-                  <legend>Processed by</legend>
-                  <select
-                    className="select"
-                    value={filters.processedBy}
-                    onChange={(event) => setFilters({ ...filters, processedBy: event.target.value })}
-                  >
-                    <option value="">Anyone</option>
-                    {staff.map((name) => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </fieldset>
-              )}
+              <fieldset className="tx-filter__group">
+                <legend>Processed by</legend>
+                {staff.length === 0 ? (
+                  <p className="tx-filter__none">No staff processed anything in this period.</p>
+                ) : (
+                  staff.map(({ name, count }) => (
+                    <label key={name} className="tx-filter__option">
+                      <input
+                        type="checkbox"
+                        checked={filters.processedBy.includes(name)}
+                        onChange={() => toggleIn('processedBy', name)}
+                      />
+                      <span>{name}</span>
+                      <b className="tx-filter__tally">{count}</b>
+                    </label>
+                  ))
+                )}
+              </fieldset>
 
               <div className="tx-filter__actions">
                 <Button variant="ghost" className="btn--sm" disabled={!activeFilters} onClick={() => setFilters(emptyFilters())}>

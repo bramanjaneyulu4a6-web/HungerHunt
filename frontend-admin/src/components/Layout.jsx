@@ -28,6 +28,22 @@ const WAREHOUSE_NAV = [
   { path: "/warehouse/suppliers", label: "Suppliers", icon: "⇄" },
 ];
 
+/* Hidden from the menus for now, by the owner's decision (2026-09-12): the
+   console shows Dashboard, Students, Parents and Wallet Ledger only. This is a
+   frontend hide, not a permission — the routes still answer to a typed URL.
+   To bring an item back, delete its path from this list. An emptied Warehouse
+   group hides its toggle as well. */
+const HIDDEN_NAV_PATHS = new Set([
+  "/billing",
+  "/reports",
+  "/accounting-export",
+  "/users/staff",
+  "/users/archived",
+  ...WAREHOUSE_NAV.map((item) => item.path),
+]);
+
+const visible = (items) => items.filter((item) => !HIDDEN_NAV_PATHS.has(item.path));
+
 const WarehouseContextBar = () => (
   <div className="warehouse-context" aria-label="Warehouse workspace navigation">
     <div className="warehouse-context__identity">
@@ -58,7 +74,7 @@ const UsersContextBar = () => (
       <span><small>Workspace</small><strong>Users</strong></span>
     </div>
     <nav className="warehouse-context__nav">
-      {USERS_NAV.map((item) => (
+      {visible(USERS_NAV).map((item) => (
         <NavLink
           key={item.path}
           to={item.path}
@@ -127,7 +143,7 @@ const Layout = () => {
 
         <nav className="sidenav-nav" aria-label="Main navigation">
           <p className="sidenav-section-label">Operations</p>
-          {PRIMARY_NAV.slice(0, 2).map((item) => (
+          {visible(PRIMARY_NAV.slice(0, 2)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -160,7 +176,7 @@ const Layout = () => {
 
             {isExpanded && usersOpen && (
               <div className="sidenav-subnav">
-                {USERS_NAV.map((item) => (
+                {visible(USERS_NAV).map((item) => (
                   <NavLink
                     key={item.path}
                     to={item.path}
@@ -176,7 +192,7 @@ const Layout = () => {
             )}
           </div>
 
-          {PRIMARY_NAV.slice(2).map((item) => (
+          {visible(PRIMARY_NAV.slice(2)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -190,6 +206,7 @@ const Layout = () => {
             </NavLink>
           ))}
 
+          {visible(WAREHOUSE_NAV).length > 0 && (
           <div className={`sidenav-group${inWarehouse ? " sidenav-group--active" : ""}`}>
             <button
               type="button"
@@ -209,7 +226,7 @@ const Layout = () => {
 
             {isExpanded && warehouseOpen && (
               <div className="sidenav-subnav">
-                {WAREHOUSE_NAV.map((item) => (
+                {visible(WAREHOUSE_NAV).map((item) => (
                   <NavLink
                     key={item.path}
                     to={item.path}
@@ -225,6 +242,7 @@ const Layout = () => {
               </div>
             )}
           </div>
+          )}
         </nav>
 
         <div className="sidenav-footer">

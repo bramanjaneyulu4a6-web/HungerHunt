@@ -47,6 +47,7 @@
   "products": [
     {
       "name": "Jim Jam",
+      "description": "Crunchy sandwich biscuits with a sweet cream and jam filling.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
@@ -65,6 +66,7 @@
     },
     {
       "name": "Oreo",
+      "description": "Chocolate sandwich cookies with a sweet vanilla-flavoured creme filling.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
@@ -83,6 +85,7 @@
     },
     {
       "name": "Dark Fantasy Choco Fills",
+      "description": "Cookies with a rich chocolate filling inside.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
@@ -101,6 +104,7 @@
     },
     {
       "name": "Hide and Seek",
+      "description": "Crisp chocolate chip cookies with bits of chocolate baked right in.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
@@ -119,6 +123,7 @@
     },
     {
       "name": "Lay's Magic Masala - Blue Lays",
+      "description": "Thin, crunchy potato chips tossed in a spicy Indian masala seasoning.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
@@ -137,6 +142,7 @@
     },
     {
       "name": "Lay's American Style Cream & Onion - Green Lays",
+      "description": "Thin, crunchy potato chips with a creamy, mild onion flavour.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
@@ -155,6 +161,7 @@
     },
     {
       "name": "Aloo Bhujia",
+      "description": "Crunchy, spicy namkeen strands made with potato and gram flour.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
@@ -162,10 +169,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 562,
+        "protein": 8.68,
+        "carbs": 46.1,
+        "fat": 38.12
+      },
+      "nutritionSource": "Open Food Facts 8904004400694, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 577 kcal, 9.7 g protein, 44.1 g carbs, 40.1 g fat"
     },
     {
       "name": "Khatta Meetha",
+      "description": "A crunchy namkeen mix that tastes sweet and tangy at the same time.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
@@ -173,10 +189,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100g",
+        "calories": 530,
+        "protein": 9.26,
+        "carbs": 57.38,
+        "fat": 29.25
+      },
+      "nutritionSource": "Open Food Facts 8904004401066, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 548 kcal, 11.6 g protein, 50 g carbs, 33.5 g fat"
     },
     {
       "name": "Pepsi",
+      "description": "A fizzy cola soft drink. Best served chilled. Contains caffeine.",
       "stockGroup": "Beverages",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
@@ -184,10 +209,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 43,
+        "protein": 0,
+        "carbs": 10.9,
+        "fat": 0
+      },
+      "nutritionSource": "Open Food Facts 8902080104581, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry"
     },
     {
       "name": "Mountain Dew",
+      "description": "A fizzy citrus-flavoured soft drink. Best served chilled. Contains caffeine.",
       "stockGroup": "Beverages",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
@@ -195,10 +229,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 49,
+        "protein": 0,
+        "carbs": 12.3,
+        "fat": 0
+      },
+      "nutritionSource": "Open Food Facts 8902080364022, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Six Indian pack sizes agree"
     },
     {
       "name": "7 UP",
+      "description": "A clear, fizzy lemon-lime soft drink. Best served chilled.",
       "stockGroup": "Beverages",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
@@ -206,10 +249,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 47,
+        "protein": 0,
+        "carbs": 11.7,
+        "fat": 0
+      },
+      "nutritionSource": "Open Food Facts 8902080304349, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry"
     },
     {
       "name": "Thums Up",
+      "description": "A strong, fizzy cola soft drink. Best served chilled. Contains caffeine.",
       "stockGroup": "Beverages",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
@@ -228,6 +280,7 @@
     },
     {
       "name": "Frooti",
+      "description": "A sweet mango drink in a handy pack.",
       "stockGroup": "Beverages",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
@@ -246,6 +299,7 @@
     },
     {
       "name": "Appy Fizz",
+      "description": "A sparkling apple drink with a fizzy kick.",
       "stockGroup": "Beverages",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
@@ -253,10 +307,19 @@
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
-      "active": true
+      "active": true,
+      "nutrition": {
+        "serving": "Per 100ml",
+        "calories": 51,
+        "protein": 0,
+        "carbs": 12.95,
+        "fat": 0
+      },
+      "nutritionSource": "Open Food Facts 8902579002039, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock"
     },
     {
       "name": "Lassi",
+      "description": "A chilled, sweet drink made from yoghurt.",
       "stockGroup": "Beverages",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
@@ -275,6 +338,7 @@
     },
     {
       "name": "Pens",
+      "description": "A pen for classwork, homework and exams.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
@@ -286,6 +350,7 @@
     },
     {
       "name": "Pencils",
+      "description": "A pencil for writing, drawing and rough work.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
@@ -297,6 +362,7 @@
     },
     {
       "name": "Notebooks",
+      "description": "A notebook for classwork and homework.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
@@ -308,6 +374,7 @@
     },
     {
       "name": "Geometry Box: DOMS GEOFINE",
+      "description": "A DOMS geometry box with the instruments you need for maths class.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",

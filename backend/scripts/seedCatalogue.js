@@ -139,6 +139,7 @@ try {
             safetyStock: p.safetyStock ?? 0,
             active: p.active ?? true,
             ...(p.nutrition ? { nutrition: p.nutrition } : {}),
+            ...(p.description ? { description: p.description } : {}),
           },
         },
         upsert: true,

@@ -40,6 +40,7 @@ const EMPTY_FORM = {
   nutritionCarbs: '',
   nutritionFat: '',
   nutritionServing: '',
+  description: '',
   image: null,
 };
 
@@ -200,6 +201,7 @@ const Products = () => {
       // back, and the server reads "" as clear-this-one.
       NUTRITION_FIELDS.forEach(([key]) => data.append(key, form[key]));
       data.append('nutritionServing', form.nutritionServing);
+      data.append('description', form.description);
       if (form.image) {
         data.append('image', form.image);
       }
@@ -251,6 +253,7 @@ const Products = () => {
       nutritionCarbs: String(product.nutrition?.carbs ?? ''),
       nutritionFat: String(product.nutrition?.fat ?? ''),
       nutritionServing: product.nutrition?.serving || '',
+      description: product.description || '',
       image: null,
     });
     goToStep(0);
@@ -1530,6 +1533,25 @@ const Products = () => {
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="field-label" htmlFor="product-description">
+                      Description
+                    </label>
+                    <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>
+                      Shown to students behind the tile&rsquo;s &ldquo;i&rdquo; button.
+                    </p>
+                    <textarea
+                      id="product-description"
+                      rows={3}
+                      maxLength={300}
+                      className="input"
+                      style={{ width: '100%', resize: 'vertical' }}
+                      placeholder="e.g., Crunchy potato chips with a tangy masala seasoning."
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    />
                   </div>
 
                   <div>

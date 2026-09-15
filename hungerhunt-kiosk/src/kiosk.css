@@ -2207,6 +2207,19 @@
   color: #6d6152;
 }
 
+.nutrition-description {
+  margin: 0;
+  padding: 16px 22px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #2c2318;
+  border-bottom: 1px solid #eee7db;
+}
+
+.nutrition-description:last-child {
+  border-bottom: 0;
+}
+
 .nutrition-energy {
   display: flex;
   align-items: baseline;

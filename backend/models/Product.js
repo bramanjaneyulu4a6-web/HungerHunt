@@ -104,6 +104,16 @@ const productSchema = new mongoose.Schema(
     default: ""
   },
 
+  // A sentence or two on what the thing is, shown to students behind the
+  // tile's "i" button above the nutrition figures. Optional and without a
+  // default, like packSize: the kiosk leaves the paragraph out entirely when
+  // there is none rather than printing an empty one.
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 300
+  },
+
   // Money remembers products: orders, receipts and transactions reference
   // these rows forever, which is why there is no delete anywhere — the same
   // rule suppliers follow. Rows from before the field have no `active`;

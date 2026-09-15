@@ -115,6 +115,7 @@ const toProduct = (item) => ({
   packSize: formatPackSize(item.productId?.packSize, item.productId?.unit?.symbol),
   subCategory: item.productId?.subCategory || "Others",
   nutrition: readNutrition(item.productId),
+  description: item.productId?.description?.trim() || "",
   purchaseAllowance: item.purchaseAllowance || null,
 });
 
@@ -1187,17 +1188,19 @@ const KioskBilling = ({ student, onLogout }) => {
                         <img src={cloudinaryTile(p.image || PLACEHOLDER)} alt="" />
                       </figure>
 
-                      {p.nutrition && (
+                      {(p.nutrition || p.description) && (
                         <Button
                           className="tile-info"
                           onClick={() => setNutritionFor(p)}
-                          aria-label={`Nutrition information for ${p.name}`}
+                          aria-label={`About ${p.name}`}
                         >
                           <span className="tile-info-calories money">
-                            {p.nutrition.calories !== null &&
-                            p.nutrition.calories !== undefined
+                            {p.nutrition?.calories !== null &&
+                            p.nutrition?.calories !== undefined
                               ? `${p.nutrition.calories} kcal`
-                              : "Nutrition"}
+                              : p.nutrition
+                                ? "Nutrition"
+                                : "About"}
                           </span>
                           <span className="tile-info-mark" aria-hidden="true">i</span>
                         </Button>
@@ -1294,19 +1297,24 @@ const KioskBilling = ({ student, onLogout }) => {
             className="modal till-modal nutrition"
             role="dialog"
             aria-modal="true"
-            aria-label={`Nutrition information for ${nutritionFor.name}`}
+            aria-label={`About ${nutritionFor.name}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="nutrition-head">
               <img src={cloudinaryThumb(nutritionFor.image || PLACEHOLDER, 640)} alt="" />
 
               <div className="nutrition-head-t">
-                <div className="nutrition-kicker">Nutrition</div>
+                <div className="nutrition-kicker">
+                  {nutritionFor.nutrition ? "Nutrition" : "About"}
+                </div>
                 <h3>{nutritionFor.name}</h3>
                 <p className="nutrition-serving">
-                  {nutritionFor.nutrition.serving || "Per unit as sold"}
+                  {nutritionFor.nutrition
+                    ? nutritionFor.nutrition.serving || "Per unit as sold"
+                    : ""}
+                  {nutritionFor.nutrition && nutritionFor.stockGroup?.name ? " · " : ""}
                   {nutritionFor.stockGroup?.name
-                    ? ` · ${titleCase(nutritionFor.stockGroup.name)}`
+                    ? titleCase(nutritionFor.stockGroup.name)
                     : ""}
                 </p>
               </div>
@@ -1315,38 +1323,46 @@ const KioskBilling = ({ student, onLogout }) => {
                 type="button"
                 className="btn nutrition-close"
                 onClick={() => setNutritionFor(null)}
-                aria-label="Close nutrition information"
+                aria-label="Close product information"
               >
                 ×
               </button>
             </div>
 
-            <div className="nutrition-energy">
-              <span>Energy</span>
-              <b className="money">
-                {nutritionFor.nutrition.calories === null
-                  ? BLANK
-                  : nutritionFor.nutrition.calories}
-                <i>kcal</i>
-              </b>
-            </div>
+            {nutritionFor.description && (
+              <p className="nutrition-description">{nutritionFor.description}</p>
+            )}
 
-            <div className="nutrition-body">
-              {[
-                { key: "protein", label: "Protein" },
-                { key: "carbs", label: "Carbohydrate" },
-                { key: "fat", label: "Fat" },
-              ].map((row) => (
-                <div className="nutrition-row" key={row.key}>
-                  <div className="nutrition-row-t">
-                    <span>{row.label}</span>
-                    <b className="money">
-                      {grams(nutritionFor.nutrition[row.key])}
-                    </b>
-                  </div>
+            {nutritionFor.nutrition && (
+              <>
+                <div className="nutrition-energy">
+                  <span>Energy</span>
+                  <b className="money">
+                    {nutritionFor.nutrition.calories === null
+                      ? BLANK
+                      : nutritionFor.nutrition.calories}
+                    <i>kcal</i>
+                  </b>
                 </div>
-              ))}
-            </div>
+
+                <div className="nutrition-body">
+                  {[
+                    { key: "protein", label: "Protein" },
+                    { key: "carbs", label: "Carbohydrate" },
+                    { key: "fat", label: "Fat" },
+                  ].map((row) => (
+                    <div className="nutrition-row" key={row.key}>
+                      <div className="nutrition-row-t">
+                        <span>{row.label}</span>
+                        <b className="money">
+                          {grams(nutritionFor.nutrition[row.key])}
+                        </b>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
           </div>
         </div>

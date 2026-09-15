@@ -14,6 +14,9 @@ const LIMIT_PERIODS = ["DAILY", "WEEKLY", "MONTHLY", "TOTAL"];
 // Matches the schema; packets state their basis in wildly varying words.
 const SERVING_MAX_LENGTH = 120;
 
+// Matches the schema.
+const DESCRIPTION_MAX_LENGTH = 300;
+
 // Forms send strings; both spellings of true mean true, as with `active`.
 const asBoolean = (value) => value === true || value === "true";
 
@@ -117,6 +120,23 @@ const readPackSize = (body) => {
   }
 
   return { present: true, value: Number(body.packSize) };
+};
+
+/* The same three states as the pack size: not mentioned, blanked (an explicit
+   null, so the old text does not survive the edit), or typed. */
+const readDescription = (body) => {
+  if (body.description === undefined) return { present: false };
+
+  const description = body.description === null ? "" : String(body.description).trim();
+
+  if (description.length > DESCRIPTION_MAX_LENGTH) {
+    return {
+      present: true,
+      error: `Description must be ${DESCRIPTION_MAX_LENGTH} characters or fewer.`,
+    };
+  }
+
+  return { present: true, value: description || null };
 };
 
 const readNutrition = (body) => {
@@ -257,6 +277,12 @@ export const addProduct = async (req, res) => {
       return res.status(400).json({ message: packSize.error });
     }
 
+    const description = readDescription(req.body);
+
+    if (description.error) {
+      return res.status(400).json({ message: description.error });
+    }
+
     const product = await Product.create({
 
       name: req.body.name,
@@ -278,6 +304,10 @@ export const addProduct = async (req, res) => {
       // Only when a figure was actually typed: a product created with a blank
       // box should carry no size at all rather than a null standing in for one.
       ...(packSize.present && packSize.value !== null ? { packSize: packSize.value } : {}),
+
+      ...(description.present && description.value !== null
+        ? { description: description.value }
+        : {}),
 
       // Forms send strings; both spellings of true mean true.
       ...(req.body.kioskVisible !== undefined
@@ -478,6 +508,16 @@ export const updateProduct = async (req, res) => {
 
     if (packSize.present) {
       updateData.packSize = packSize.value;
+    }
+
+    const description = readDescription(req.body);
+
+    if (description.error) {
+      return res.status(400).json({ message: description.error });
+    }
+
+    if (description.present) {
+      updateData.description = description.value;
     }
 
     if (req.file) {

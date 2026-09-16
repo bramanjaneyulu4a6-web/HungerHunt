@@ -74,7 +74,11 @@
   display: flex;
   flex-direction: column;
   padding: 22px 22px 24px;
-  height: 100%;
+  /* Hugs the receipt instead of the screen, so the fold handle — centred on
+     this column — stays beside the paper however short the order is. */
+  align-self: start;
+  height: auto;
+  max-height: 100%;
   min-height: 0;
   overflow: visible;
   animation: ticket-column-open 460ms cubic-bezier(0.22, 0.8, 0.2, 1) both;
@@ -128,7 +132,12 @@
    anyway, so it is drawn as one — visible at any ground colour. */
 .ticket {
   position: relative;
-  flex: 1;
+  /* A receipt is cut to the length of the order. The paper used to be stretched
+     to the full height of the column and the lines scrolled inside it, which
+     hid the back of a long basket behind a scroll the student had no reason to
+     expect. Now the paper grows with the list and only stops growing when it
+     runs out of screen. */
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -241,9 +250,13 @@
 }
 
 /* Ledger. Thumbnails so the paper can be checked against what is actually on
-   the counter without reading a word. */
+   the counter without reading a word.
+
+   No flex-grow: the list asks for exactly the height of its lines, which is
+   what lets the paper above be cut to length. It can still shrink and scroll,
+   but only once the basket is longer than the screen. */
 .ticket-lines {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 10px 0;
@@ -252,8 +265,8 @@
 .ticket-lhead,
 .ticket-line {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 24px 58px 30px;
-  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr) 82px 54px;
+  gap: 7px;
   align-items: center;
 }
 
@@ -542,36 +555,71 @@
   font-weight: 750;
 }
 
-/* A line can be filtered off the wall by category or search, which would put
-   its stepper out of reach — so removal lives on the ticket too. */
-.ticket-line-drop {
+/* The line counts itself. A quantity the student could only change back on the
+   wall was a quantity they could lose track of, because a category or a search
+   can put that tile out of reach while the line stays on the receipt. */
+.ticket-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 2px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+}
+
+.ticket-step-btn {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  margin: -7px 0;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  font-size: 17px;
+  font-size: 15px;
+  font-weight: 800;
   line-height: 1;
-  color: var(--dim);
-  background: transparent;
+  color: var(--ink);
+  background: var(--line-soft);
   border: 0;
   border-radius: var(--r-pill);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.ticket-line-drop::after {
-  /* Keeps the tap area at 44px without a 44px hole in the ledger. */
-  content: '';
-  position: absolute;
-  width: 44px;
-  height: 44px;
+.ticket-step-btn:hover:not(:disabled):not([aria-disabled='true']) {
+  background: var(--ink);
+  color: #fff5ec;
 }
 
-.ticket-line-drop:hover {
-  background: #fdecec;
+.ticket-step-btn:active:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(0.9);
+}
+
+/* Left live rather than disabled, so the tap can still say why it stopped. */
+.ticket-step-btn[aria-disabled='true'] {
+  color: var(--dim);
+  background: transparent;
+}
+
+.ticket-step-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The last one of something is taken off the order, not counted down to
+   nothing — so at one the minus is the delete, and the line never carries two
+   buttons that do the same thing. */
+.ticket-step-btn--drop {
+  font-size: 16px;
   color: var(--danger);
+  background: #fdecec;
+}
+
+.ticket-step-btn--drop:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
 }
 
 .ticket-empty {
@@ -3827,8 +3875,10 @@
     bottom: 0;
     z-index: 52;
     width: 100%;
-    height: min(82dvh, 760px);
-    min-height: 420px;
+    /* Height follows the order: a two-line basket gets a short sheet, and the
+       sheet only stops growing where it would cover the catalogue entirely. */
+    height: auto;
+    max-height: min(86dvh, 820px);
     padding: 14px 16px max(14px, env(safe-area-inset-bottom));
     overflow: hidden;
     border-radius: 26px 26px 0 0;
@@ -3981,6 +4031,25 @@
   .ticket-lines {
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  /* The sheet is a full-width screen the student is touching, not a counter
+     column being clicked, so the steps are worth the extra pixels. */
+  .ticket-lhead,
+  .ticket-line {
+    grid-template-columns: 34px minmax(0, 1fr) 104px 64px;
+    gap: 10px;
+  }
+
+  .ticket-step {
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
+    height: 40px;
+  }
+
+  .ticket-step-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
   }
 
   .wall-grid {
@@ -4325,7 +4394,7 @@
   }
 
   .ticket-col {
-    height: min(88dvh, 720px);
+    max-height: min(88dvh, 720px);
     padding-inline: 10px;
   }
 
@@ -4339,8 +4408,18 @@
 
   .ticket-lhead,
   .ticket-line {
-    grid-template-columns: 30px minmax(0, 1fr) 22px 52px 32px;
-    gap: 5px;
+    grid-template-columns: 34px minmax(0, 1fr) 96px 56px;
+    gap: 6px;
+  }
+
+  .ticket-step {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    height: 38px;
+  }
+
+  .ticket-step-btn {
+    width: 32px;
+    height: 32px;
   }
 
   .ticket-grand b {

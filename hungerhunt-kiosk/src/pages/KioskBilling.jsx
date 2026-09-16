@@ -918,29 +918,38 @@ const KioskBilling = ({ student, onLogout }) => {
                   <span>Item</span>
                   <span>Qty</span>
                   <span>Amount</span>
-                  <span />
                 </div>
 
-                {cart.map((item) => (
+                {cart.map((item) => {
+                  // Stock and the allowance can both move under a line that is
+                  // already in the basket, so the ceiling is read off the live
+                  // product the same way the wall's stepper reads it.
+                  const latest =
+                    products.find((p) => p._id === item._id) || item;
+                  const maxAllowed = Math.min(
+                    latest.stock ?? item.stock,
+                    allowanceCeiling(latest)
+                  );
+                  const quantity = parseInt(item.quantity, 10) || 1;
+                  const atCeiling = quantity >= maxAllowed;
+                  const removing = removingIds.includes(item._id);
+                  // One left means the next step down empties the line, so the
+                  // minus becomes the delete rather than sitting beside one.
+                  const lastOne = quantity <= 1;
+
+                  return (
                   <div
                     className={`ticket-line${
                       recentlyAdded === item._id
                         ? " ticket-line--paint-born"
                         : ""
-                    }${
-                      removingIds.includes(item._id)
-                        ? " ticket-line--paint-delete"
-                        : ""
-                    }`}
+                    }${removing ? " ticket-line--paint-delete" : ""}`}
                     key={item._id}
                   >
-                    {(recentlyAdded === item._id ||
-                      removingIds.includes(item._id)) && (
+                    {(recentlyAdded === item._id || removing) && (
                       <span
                         className={`ticket-paint${
-                          removingIds.includes(item._id)
-                            ? " ticket-paint--erase"
-                            : ""
+                          removing ? " ticket-paint--erase" : ""
                         }`}
                         aria-hidden="true"
                       >
@@ -954,25 +963,50 @@ const KioskBilling = ({ student, onLogout }) => {
                       <em className="money">{formatINR(item.price)} each</em>
                     </div>
 
-                    <div className="ticket-line-qty money">{item.quantity}</div>
+                    {/* A line can be filtered off the wall by category or
+                        search, which would put its stepper out of reach — so
+                        the counting lives on the ticket too. */}
+                    <div className="ticket-step">
+                      <button
+                        type="button"
+                        className={`ticket-step-btn${
+                          lastOne ? " ticket-step-btn--drop" : ""
+                        }`}
+                        onClick={() => stepQuantity(item._id, -1)}
+                        disabled={removing}
+                        aria-label={
+                          lastOne
+                            ? `Remove ${item.name} from the order`
+                            : `One fewer ${item.name}`
+                        }
+                      >
+                        {lastOne ? "×" : "−"}
+                      </button>
+
+                      <span className="ticket-line-qty money">
+                        {item.quantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        className="ticket-step-btn"
+                        aria-disabled={atCeiling}
+                        disabled={removing}
+                        onClick={() => stepQuantity(item._id, 1)}
+                        aria-label={`One more ${item.name}`}
+                      >
+                        +
+                      </button>
+                    </div>
 
                     <div className="ticket-line-amt money">
                       {formatINR(
                         item.price * (parseInt(item.quantity, 10) || 1)
                       )}
                     </div>
-
-                    <button
-                      type="button"
-                      className="ticket-line-drop"
-                      onClick={() => removeFromCart(item._id)}
-                      disabled={removingIds.includes(item._id)}
-                      aria-label={`Remove ${item.name} from the order`}
-                    >
-                      ×
-                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="ticket-tot">

@@ -27,7 +27,9 @@ import { useReceipt } from '../utils/walletActivity';
 import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
 import { useDismissableOverlay } from '../utils/overlay';
 
-const SHOW_PURCHASE_CODE = false;
+/* Hidden by the owner on 2026-09-12, asked for again on 2026-09-16. Kept as a
+   switch rather than deleted, because it has been wanted both ways. */
+const SHOW_PURCHASE_CODE = true;
 
 /* The student directory.
  *
@@ -706,8 +708,6 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       >
                         Edit
                       </Button>
-                      {/* Hidden for now, by the owner's decision (2026-09-12).
-                          Flip SHOW_PURCHASE_CODE to bring it back. */}
                       {SHOW_PURCHASE_CODE && (
                         <Button
                           variant="ghost"

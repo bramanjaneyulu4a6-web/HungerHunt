@@ -13,6 +13,13 @@ app.get('/read', (req, res) => res.json({ ok: true }));
 app.post('/write', (req, res) => res.json({ ok: true }));
 app.post('/refused', (req, res) => res.status(403).json({ ok: false }));
 app.post('/broken', (req, res) => res.status(500).json({ ok: false }));
+/* Real paths, because the exemption is decided by path: these succeed and
+   write, but what they write is nobody else's read model. */
+app.post('/api/parent/login', (req, res) => res.json({ ok: true }));
+app.post('/api/parent/save-fcm-token', (req, res) => res.json({ ok: true }));
+app.post('/api/students/kiosk-session', (req, res) => res.json({ ok: true }));
+app.post('/api/admin/reset-password/abc123', (req, res) => res.json({ ok: true }));
+app.post('/api/parent/packages/p1/simulate-warehouse', (req, res) => res.json({ ok: true }));
 
 let server;
 let base;
@@ -58,6 +65,34 @@ describe('the data revision counter', () => {
 
     assert.equal(currentDataRevision(), before, 'a rejected write invalidated the caches');
     assert.equal(response.headers.get('x-data-revision'), null);
+  });
+
+  /* Signing in, opening the kiosk, or a phone re-sending its push token are
+     writes to the requester's own session or device, not to anything another
+     screen shows. Counting them reloaded every open tab in the fleet on each
+     one, and the token re-send reloaded parent devices in a loop. */
+  for (const path of [
+    '/api/parent/login',
+    '/api/parent/save-fcm-token',
+    '/api/students/kiosk-session',
+    '/api/admin/reset-password/abc123',
+  ]) {
+    test(`${path} leaves it alone`, async () => {
+      const before = currentDataRevision();
+      const response = await call('POST', path);
+
+      assert.equal(response.status, 200);
+      assert.equal(currentDataRevision(), before, 'a session write reloaded the fleet');
+      assert.equal(response.headers.get('x-data-revision'), null);
+    });
+  }
+
+  test('a write under the same router that changes shared data still counts', async () => {
+    const before = currentDataRevision();
+    const response = await call('POST', '/api/parent/packages/p1/simulate-warehouse');
+
+    assert.equal(currentDataRevision(), before + 1);
+    assert.equal(response.headers.get('x-data-revision'), String(before + 1));
   });
 
   test('a write that blew up leaves it alone', async () => {

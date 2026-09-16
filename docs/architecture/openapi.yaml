@@ -975,7 +975,7 @@ components:
               type: string
               minLength: 4
               maxLength: 8
-              pattern: '^[A-Z0-9]{4,8}$'
+              pattern: '^[A-Z0-9]{4,9}$'
             roomNumber: { type: string }
             roomId:
               type: string

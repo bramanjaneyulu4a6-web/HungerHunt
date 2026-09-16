@@ -1,8 +1,8 @@
 export const ADMISSION_NUMBER_MIN_LENGTH = 4;
-export const ADMISSION_NUMBER_MAX_LENGTH = 8;
-export const ADMISSION_NUMBER_PATTERN = /^[A-Z0-9]{4,8}$/;
+export const ADMISSION_NUMBER_MAX_LENGTH = 9;
+export const ADMISSION_NUMBER_PATTERN = /^[A-Z0-9]{4,9}$/;
 export const ADMISSION_NUMBER_MESSAGE =
-  'Admission number must be 4 to 8 letters or numbers.';
+  'Admission number must be 4 to 9 letters or numbers.';
 
 // Admission numbers are identifiers, not quantities. Upper-casing gives the
 // database one canonical representation and makes kiosk sign-in insensitive

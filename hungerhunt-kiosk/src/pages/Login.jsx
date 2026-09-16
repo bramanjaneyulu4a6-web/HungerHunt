@@ -40,7 +40,7 @@ const Login = () => {
   }, [navigate, sessionReady]);
 
   const startSession = async (admissionNumber) => {
-    if (!/^[A-Z0-9]{4,8}$/.test(admissionNumber) || requestInFlight.current) return;
+    if (!/^[A-Z0-9]{4,9}$/.test(admissionNumber) || requestInFlight.current) return;
 
     setError("");
     requestInFlight.current = true;
@@ -162,9 +162,9 @@ const Login = () => {
               className="kiosk-login-admission"
               type="text"
               inputMode="text"
-              pattern="[A-Za-z0-9]{4,8}"
+              pattern="[A-Za-z0-9]{4,9}"
               minLength="4"
-              maxLength="8"
+              maxLength="9"
               autoCapitalize="characters"
               autoComplete="off"
               autoFocus

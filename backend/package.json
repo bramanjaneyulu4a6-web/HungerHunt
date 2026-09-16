@@ -31,6 +31,7 @@
     "seed:units": "node scripts/seedUnits.js",
     "student:demo": "node scripts/createDemoStudent.js",
     "products:clear-discounts": "node scripts/clearProductDiscounts.js",
+    "products:kiosk": "node scripts/setKioskVisibility.js",
     "migrate:class-names": "node scripts/normalizeStudentClasses.js"
   },
   "dependencies": {

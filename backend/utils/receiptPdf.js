@@ -47,13 +47,34 @@ export const itemDescription = (receipt) => {
   return detail ? `Wallet Recharge (UPI — ${detail})` : 'Wallet Recharge (UPI)';
 };
 
+/* The receipt is drawn in the space it was designed for — a full A4 landscape
+ * page — and then set into the top half of a portrait A4 sheet.
+ *
+ * That costs one scale factor and nothing else. Half a portrait A4 is an A5
+ * landscape, which is the same rectangle as A4 landscape at 1/√2, so the whole
+ * design drops in untouched: no field reflows, no letterhead is rebuilt, and
+ * the bottom half of the paper is left blank for the office to tear or fold
+ * along. Every coordinate below this transform is still in the landscape
+ * space, which is why the two figures are constants here rather than read off
+ * doc.page — that now reports the portrait sheet the receipt sits on.
+ */
+export const RECEIPT_SPACE = { width: 841.89, height: 595.28 };
+
+/* Exported to be checked as arithmetic rather than by reading a PDF: at A4
+ * the factor is 1/√2, and it must leave the receipt exactly half a page tall
+ * — a factor that merely fits would let the design drift off the fold. */
+export const halfSheetScale = (pageWidth) => pageWidth / RECEIPT_SPACE.width;
+
 export const renderReceiptPdf = (receipt, stream) => {
-  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+  const doc = new PDFDocument({ size: 'A4', margin: 0 });
   doc.pipe(stream);
 
-  const W = doc.page.width;   // 841.89
-  const H = doc.page.height;  // 595.28
-  const M = 36;               // inner content margin
+  // Applied before anything is drawn, so it governs every mark on the page.
+  doc.scale(halfSheetScale(doc.page.width));
+
+  const W = RECEIPT_SPACE.width;   // 841.89
+  const H = RECEIPT_SPACE.height;  // 595.28
+  const M = 36;                    // inner content margin
   const contentW = W - M * 2;
 
   // The rounded frame the whole receipt sits in.

@@ -76,7 +76,10 @@ const KioskResultScreen = ({
         </div>
         <p className="kiosk-result-kicker">{kicker}</p>
         <h1>{title}</h1>
-        <p>{body}</p>
+        {/* Guarded rather than always drawn: a screen whose heading says all
+            there is to say passes no body, and an empty paragraph would still
+            hold its margin and push the card off-centre. */}
+        {body && <p>{body}</p>}
         {(statusLabel || deliveryDate) && (
           <dl className="kiosk-result-order" aria-label="Current order details">
             {statusLabel && (

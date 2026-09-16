@@ -496,14 +496,20 @@ const KioskBilling = ({ student, onLogout }) => {
         purchaseToken,
       });
 
-      /* Nothing was debited server-side for a demo order, so the drop the
-         visitor expects to see after paying is drawn here instead. It lasts
-         until the next refreshWallet puts the real (unchanged) figure back,
-         which is the right lifetime: it is a thing shown on the confirmation,
-         not a balance anybody is keeping. */
-      if (isDemo) setWalletBalance((balance) => balance - invoiceTotal);
+      /* The demo ends on the approval screen rather than the confirmation,
+         though it took the paying route to get here.
 
-      setResult("paid");
+         It is the more useful of the two endings to show a visiting parent:
+         "sent to your parent, nothing has been charged yet" is the thing they
+         have come to be reassured about, where "order confirmed" only shows
+         that a till works. Nothing was recorded either way — the server
+         answered this bill without writing anything — so which ending is drawn
+         is purely what the visitor is told.
+
+         Not routed through requestApproval: that posts to /pending-orders,
+         which refuses demo students precisely because its job is to notify a
+         parent. The screen is borrowed; the request is not. */
+      setResult(isDemo ? "pending" : "paid");
       return true;
     } catch (err) {
       console.error("Checkout Error:", err);
@@ -554,7 +560,12 @@ const KioskBilling = ({ student, onLogout }) => {
          one action to the student. Replace the till immediately after the
          first succeeds so the unchanged ticket and Place Order button cannot
          flash back into view while the second request is still running. */
-      const nextPhase = data?.requiresApproval ? "approval" : "payment";
+      /* The demo takes the approval wording here too. This spinner is on
+         screen for the whole of the request that follows, so leaving it at
+         "Confirming your order…" would land the visitor on "Sent to your
+         parent" straight after being told the opposite. Only the label
+         changes: the branch below still sends a demo down the paying route. */
+      const nextPhase = data?.requiresApproval || isDemo ? "approval" : "payment";
       setShowVerifyModal(false);
       setPurchasePassword("");
       setCheckoutPhase(nextPhase);
@@ -701,8 +712,13 @@ const KioskBilling = ({ student, onLogout }) => {
         mark={result === "paid" ? "✓" : "⏳"}
         kicker={result === "paid" ? "All done" : "Request sent"}
         title={result === "paid" ? "Order confirmed" : "Sent to your parent"}
+        /* A confirmed order carries no supporting line: the heading and the
+           tick already say it, and the packages are delivered to the room
+           rather than collected anywhere, so there was nothing true left to
+           add. The approval ending still needs its sentence, because "sent"
+           on its own does not tell a student their money is untouched. */
         body={result === "paid"
-          ? "Collect your items at the counter. Enjoy!"
+          ? ""
           : "Nothing has been charged yet — your parent has been asked to approve it."}
         onDone={onLogout}
         tapLabel="Tap anywhere for next order"

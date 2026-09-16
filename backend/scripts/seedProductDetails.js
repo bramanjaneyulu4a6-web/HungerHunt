@@ -1,7 +1,8 @@
 // Fills in the details the kiosk shows behind a tile's "i" button — the
-// description and the nutrition figures — from scripts/data/catalogue.json.
+// description and the nutrition figures — and the pack size on the tile, from
+// scripts/data/catalogue.json.
 //
-// Only those two are written. seedCatalogue.js would write them too, but it
+// Only those three are written. seedCatalogue.js would write them too, but it
 // also resets price, stock group and the rest to the file's values, and the
 // live catalogue has moved on from the file since (prices the office changed,
 // for one). This touches nothing else.
@@ -9,6 +10,7 @@
 // Fills blanks only, because anything already there was typed in the admin
 // console by someone who meant it:
 //   - a description is written where the product has none;
+//   - a pack size is written where the product has none;
 //   - nutrition is written where the product has no figure and no serving at
 //     all. A partly filled panel is left whole rather than merged with the
 //     file, since mixing figures from two sources would print a set nobody
@@ -28,7 +30,7 @@ import mongoose from 'mongoose';
 import { connectForScript } from './lib/connect.mjs';
 
 import Product from '../models/Product.js';
-import { isNonNegativeNumber } from '../utils/quantities.js';
+import { isNonNegativeNumber, isPositiveNumber } from '../utils/quantities.js';
 
 
 const MACROS = ['calories', 'protein', 'carbs', 'fat'];
@@ -45,6 +47,10 @@ const problems = [];
 for (const p of catalogue.products) {
   if (p.description !== undefined && String(p.description).trim().length > 300) {
     problems.push(`${p.name}: description over 300 characters`);
+  }
+
+  if (p.packSize !== undefined && !isPositiveNumber(p.packSize)) {
+    problems.push(`${p.name}: pack size must be above zero, got ${p.packSize}`);
   }
 
   for (const key of MACROS) {
@@ -78,7 +84,7 @@ const describeNutrition = (n) =>
 await connectForScript();
 
 try {
-  const products = await Product.find({}).select('_id name description nutrition').sort({ name: 1 }).lean();
+  const products = await Product.find({}).select('_id name description nutrition packSize').sort({ name: 1 }).lean();
 
   const writes = [];
   const kept = [];
@@ -107,6 +113,15 @@ try {
       }
     }
 
+    if (entry.packSize !== undefined && product.packSize !== entry.packSize) {
+      if (product.packSize != null && !overwrite) {
+        kept.push(`${product.name} (pack size)`);
+      } else {
+        set.packSize = entry.packSize;
+        lines.push(`pack size: ${product.packSize ?? 'none'} -> ${entry.packSize}`);
+      }
+    }
+
     if (hasNutrition(entry.nutrition) && !sameNutrition(product.nutrition, entry.nutrition)) {
       if (hasNutrition(product.nutrition) && !overwrite) {
         kept.push(`${product.name} (nutrition)`);
@@ -117,6 +132,9 @@ try {
           ...Object.fromEntries(MACROS.map((key) => [key, entry.nutrition[key] ?? null])),
           serving: entry.nutrition.serving || null,
         };
+        if (hasNutrition(product.nutrition)) {
+          lines.push(`nutrition was: ${describeNutrition(product.nutrition)}`);
+        }
         lines.push(`nutrition: ${describeNutrition(entry.nutrition)}`);
         if (entry.nutritionSource) lines.push(`  source: ${entry.nutritionSource}`);
       }

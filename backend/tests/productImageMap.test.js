@@ -19,13 +19,18 @@ describe('productNameForImage', () => {
     assert.equal(productNameForImage('Pepsi.AVIF'), 'Pepsi');
   });
 
-  // The five the folder spells differently from the catalogue.
+  test('strips a converted file\'s leftover extension too', () => {
+    assert.equal(productNameForImage('Pilot V7 Blue Pen - 3 Pack .jpg.avif'), 'Pilot V7 Blue Pen - 3 Pack');
+  });
+
+  // The ones the folder spells differently from the catalogue.
   const aliases = [
     ["Blue Lay's.avif", "Lay's Magic Masala - Blue Lays"],
     ["Green Lay's.avif", "Lay's American Style Cream & Onion - Green Lays"],
     ['Amul Lassi.avif', 'Lassi'],
     ['Appy FIzz.avif', 'Appy Fizz'],
     ['7 Up.avif', '7 UP'],
+    ['Geometry Box.avif', 'Geometry Box: DOMS GEOFINE'],
   ];
 
   for (const [file, expected] of aliases) {
@@ -70,6 +75,18 @@ describe('planImageAssignments', () => {
     const plan = planImageAssignments(['Thums Up.avif'], products);
     assert.deepEqual(plan.unmatched, ['Thums Up.avif']);
     assert.deepEqual(plan.matched, []);
+  });
+
+  test('treats an en dash in a filename as the hyphen in the product name', () => {
+    const plan = planImageAssignments(
+      ['Notebook \u2013 Black.avif', 'Pilot V7 Blue Pen \u2013 3 Pack .jpg.avif'],
+      [
+        { _id: 'p5', name: 'Notebook - Black', image: '' },
+        { _id: 'p6', name: 'Pilot V7 Blue Pen - 3 Pack', image: '' },
+      ]
+    );
+    assert.deepEqual(plan.matched.map((m) => m.product.name), ['Notebook - Black', 'Pilot V7 Blue Pen - 3 Pack']);
+    assert.deepEqual(plan.unmatched, []);
   });
 
   test('matches a product regardless of case and surrounding space', () => {

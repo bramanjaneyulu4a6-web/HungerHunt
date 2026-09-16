@@ -12,7 +12,7 @@
 
 const IMAGE_EXTENSIONS = ['.avif', '.webp', '.png', '.jpg', '.jpeg'];
 
-/* Filename (without extension) → the name the catalogue uses. Only the five
+/* Filename (without extension) → the name the catalogue uses. Only the ones
    that differ; anything absent is already spelled correctly. */
 const ALIASES = new Map([
   ["blue lay's", "Lay's Magic Masala - Blue Lays"],
@@ -20,9 +20,14 @@ const ALIASES = new Map([
   ['amul lassi', 'Lassi'],
   ['appy fizz', 'Appy Fizz'],
   ['7 up', '7 UP'],
+  ['geometry box', 'Geometry Box: DOMS GEOFINE'],
 ]);
 
-const key = (value) => String(value ?? '').trim().toLowerCase();
+/* Case, surrounding space and the dash are all ignored. The dash because a
+   filename typed on a phone or copied from a shop page carries an en dash
+   ("Notebook – Black") where the catalogue has a plain hyphen, and the two
+   look identical to the person comparing them. */
+const key = (value) => String(value ?? '').replace(/[\u2013\u2014]/g, '-').trim().toLowerCase();
 
 const extensionOf = (file) => {
   const dot = String(file).lastIndexOf('.');
@@ -31,9 +36,16 @@ const extensionOf = (file) => {
 
 export const isImageFile = (file) => IMAGE_EXTENSIONS.includes(extensionOf(file));
 
+/* Every trailing image extension, not just the last: a picture converted from
+   a download arrives as "Pilot V7 Blue Pen – 3 Pack .jpg.avif", and the ".jpg"
+   left behind would stop it matching anything. */
 const stem = (file) => {
-  const dot = String(file).lastIndexOf('.');
-  return dot === -1 ? String(file) : String(file).slice(0, dot);
+  let name = String(file);
+  while (isImageFile(name.trim())) {
+    name = name.trim();
+    name = name.slice(0, name.lastIndexOf('.'));
+  }
+  return name.trim();
 };
 
 /* The catalogue name this file is art for. An unaliased file simply is its

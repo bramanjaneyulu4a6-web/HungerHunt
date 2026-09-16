@@ -57,12 +57,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 483,
-        "protein": 5,
-        "carbs": 73,
-        "fat": 19
-      }
+        "serving": "Per 57g pack",
+        "calories": 275,
+        "protein": 2.8,
+        "carbs": 41.6,
+        "fat": 10.8
+      },
+      "packSize": 57,
+      "nutritionScaling": "Scaled from per 100g (483 kcal, 5/73/19 g) to the 57g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Oreo",
@@ -76,12 +78,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 480,
-        "protein": 5.3,
-        "carbs": 70.7,
-        "fat": 19.5
-      }
+        "serving": "Per 41g pack",
+        "calories": 197,
+        "protein": 2.2,
+        "carbs": 29,
+        "fat": 8
+      },
+      "packSize": 41,
+      "nutritionScaling": "Scaled from per 100g (480 kcal, 5.3/70.7/19.5 g) to the 41g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Dark Fantasy Choco Fills",
@@ -95,15 +99,17 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 507,
-        "protein": 7,
-        "carbs": 61,
-        "fat": 27.3
-      }
+        "serving": "Per 69g pack",
+        "calories": 350,
+        "protein": 4.8,
+        "carbs": 42.1,
+        "fat": 18.8
+      },
+      "packSize": 69,
+      "nutritionScaling": "Scaled from per 100g (507 kcal, 7/61/27.3 g) to the 69g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
-      "name": "Hide and Seek",
+      "name": "Hide & Seek",
       "description": "Crisp chocolate chip cookies with bits of chocolate baked right in.",
       "stockGroup": "Food & Snacks",
       "subCategory": "Biscuits & Cookies",
@@ -114,12 +120,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 479,
-        "protein": 5.9,
-        "carbs": 73.4,
-        "fat": 18
-      }
+        "serving": "Per 33g pack",
+        "calories": 158,
+        "protein": 1.9,
+        "carbs": 24.2,
+        "fat": 5.9
+      },
+      "packSize": 33,
+      "nutritionScaling": "Scaled from per 100g (479 kcal, 5.9/73.4/18 g) to the 33g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Lay's Magic Masala - Blue Lays",
@@ -133,12 +141,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 539,
-        "protein": 6.9,
-        "carbs": 53.4,
-        "fat": 33.1
-      }
+        "serving": "Per 30g pack",
+        "calories": 162,
+        "protein": 2.1,
+        "carbs": 16,
+        "fat": 9.9
+      },
+      "packSize": 30,
+      "nutritionScaling": "Scaled from per 100g (539 kcal, 6.9/53.4/33.1 g) to the 30g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Lay's American Style Cream & Onion - Green Lays",
@@ -152,12 +162,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 537,
-        "protein": 6.7,
-        "carbs": 53,
-        "fat": 33.1
-      }
+        "serving": "Per 30g pack",
+        "calories": 161,
+        "protein": 2,
+        "carbs": 15.9,
+        "fat": 9.9
+      },
+      "packSize": 30,
+      "nutritionScaling": "Scaled from per 100g (537 kcal, 6.7/53/33.1 g) to the 30g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Aloo Bhujia",
@@ -171,13 +183,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 562,
-        "protein": 8.68,
-        "carbs": 46.1,
-        "fat": 38.12
+        "serving": "Per 42g pack",
+        "calories": 236,
+        "protein": 3.6,
+        "carbs": 19.4,
+        "fat": 16
       },
-      "nutritionSource": "Open Food Facts 8904004400694, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 577 kcal, 9.7 g protein, 44.1 g carbs, 40.1 g fat"
+      "nutritionSource": "Open Food Facts 8904004400694, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 577 kcal, 9.7 g protein, 44.1 g carbs, 40.1 g fat",
+      "packSize": 42,
+      "nutritionScaling": "Scaled from per 100g (562 kcal, 8.68/46.1/38.12 g) to the 42g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Khatta Meetha",
@@ -191,13 +205,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100g",
-        "calories": 530,
-        "protein": 9.26,
-        "carbs": 57.38,
-        "fat": 29.25
+        "serving": "Per 45g pack",
+        "calories": 239,
+        "protein": 4.2,
+        "carbs": 25.8,
+        "fat": 13.2
       },
-      "nutritionSource": "Open Food Facts 8904004401066, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 548 kcal, 11.6 g protein, 50 g carbs, 33.5 g fat"
+      "nutritionSource": "Open Food Facts 8904004401066, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Haldiram's (Delhi, 8904004 codes); Haldiram's Nagpur packs print about 548 kcal, 11.6 g protein, 50 g carbs, 33.5 g fat",
+      "packSize": 45,
+      "nutritionScaling": "Scaled from per 100g (530 kcal, 9.26/57.38/29.25 g) to the 45g pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Pepsi",
@@ -211,13 +227,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100ml",
-        "calories": 43,
+        "serving": "Per 400ml bottle",
+        "calories": 172,
         "protein": 0,
-        "carbs": 10.9,
+        "carbs": 43.6,
         "fat": 0
       },
-      "nutritionSource": "Open Food Facts 8902080104581, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry"
+      "nutritionSource": "Open Food Facts 8902080104581, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry",
+      "packSize": 400,
+      "nutritionScaling": "Scaled from per 100ml (43 kcal, 0/10.9/0 g) to the 400ml bottle the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Mountain Dew",
@@ -231,13 +249,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100ml",
-        "calories": 49,
+        "serving": "Per 250ml bottle",
+        "calories": 123,
         "protein": 0,
-        "carbs": 12.3,
+        "carbs": 30.8,
         "fat": 0
       },
-      "nutritionSource": "Open Food Facts 8902080364022, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Six Indian pack sizes agree"
+      "nutritionSource": "Open Food Facts 8902080364022, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Six Indian pack sizes agree",
+      "packSize": 250,
+      "nutritionScaling": "Scaled from per 100ml (49 kcal, 0/12.3/0 g) to the 250ml bottle the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "7 UP",
@@ -251,13 +271,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100ml",
-        "calories": 47,
+        "serving": "Per 400ml bottle",
+        "calories": 188,
         "protein": 0,
-        "carbs": 11.7,
+        "carbs": 46.8,
         "fat": 0
       },
-      "nutritionSource": "Open Food Facts 8902080304349, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry"
+      "nutritionSource": "Open Food Facts 8902080304349, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock. Single entry",
+      "packSize": 400,
+      "nutritionScaling": "Scaled from per 100ml (47 kcal, 0/11.7/0 g) to the 400ml bottle the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Thums Up",
@@ -290,12 +312,14 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 125ml pack",
-        "calories": 79,
+        "serving": "Per 160ml pack",
+        "calories": 101,
         "protein": 0,
-        "carbs": 20,
+        "carbs": 25.6,
         "fat": 0
-      }
+      },
+      "packSize": 160,
+      "nutritionScaling": "Scaled from per 125ml pack (79 kcal, 0/20/0 g) to the 160ml pack the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Appy Fizz",
@@ -309,13 +333,15 @@
       "safetyStock": 0,
       "active": true,
       "nutrition": {
-        "serving": "Per 100ml",
-        "calories": 51,
+        "serving": "Per 160ml bottle",
+        "calories": 82,
         "protein": 0,
-        "carbs": 12.95,
+        "carbs": 20.7,
         "fat": 0
       },
-      "nutritionSource": "Open Food Facts 8902579002039, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock"
+      "nutritionSource": "Open Food Facts 8902579002039, transcribed from a label photo; looked up online 2026-09-15, not read off the school's stock",
+      "packSize": 160,
+      "nutritionScaling": "Scaled from per 100ml (51 kcal, 0/12.95/0 g) to the 160ml bottle the school stocks, pack size given by the owner 2026-09-15; kcal rounded to whole, grams to 0.1"
     },
     {
       "name": "Lassi",
@@ -337,12 +363,12 @@
       }
     },
     {
-      "name": "Pens",
-      "description": "A pen for classwork, homework and exams.",
+      "name": "Pilot V7 3 Pack Pens - Blue",
+      "description": "A pack of three blue Pilot V7 Hi-Tecpoint pens with a 0.7 mm liquid-ink tip for smooth, neat writing.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
-      "mrp": 50,
+      "mrp": 220,
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,
@@ -361,8 +387,20 @@
       "active": true
     },
     {
-      "name": "Notebooks",
-      "description": "A notebook for classwork and homework.",
+      "name": "Notebook - Red",
+      "description": "A spiral-bound notebook with a bright red cover, for classwork and homework.",
+      "stockGroup": "Essentials",
+      "subCategory": "Stationery",
+      "unit": "Piece",
+      "mrp": 60,
+      "discountRate": 13,
+      "reorderLevel": 5,
+      "safetyStock": 0,
+      "active": true
+    },
+    {
+      "name": "Notebook - Black",
+      "description": "A spiral-bound notebook with a black cover, for classwork and homework.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
@@ -374,11 +412,11 @@
     },
     {
       "name": "Geometry Box: DOMS GEOFINE",
-      "description": "A DOMS geometry box with the instruments you need for maths class.",
+      "description": "A DOMS Geofine set of mathematical drawing instruments in a tin case, for geometry in maths class.",
       "stockGroup": "Essentials",
       "subCategory": "Stationery",
       "unit": "Piece",
-      "mrp": 60,
+      "mrp": 75,
       "discountRate": 13,
       "reorderLevel": 5,
       "safetyStock": 0,

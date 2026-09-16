@@ -26,7 +26,7 @@ import {
   isOrder,
   isTransaction,
 } from '../utils/ledgerEntry';
-import { useStudentLedger } from '../utils/walletActivity';
+import { receiptIdOf, useStudentLedger } from '../utils/walletActivity';
 import { ReceiptButton } from './ReceiptButton';
 import { useDismissableOverlay } from '../utils/overlay';
 import { Badge, Banner, Button, EmptyState, Skeleton } from './ui';
@@ -138,8 +138,7 @@ export const EntryDetails = ({ entry }) => {
 const EntryRow = ({ entry, studentId, showStudent }) => {
   const { label, variant } = entryLabel(entry);
   const { direction } = describeEntry(entry);
-  const canPrint =
-    Boolean(entry.adjustmentId || entry.reversalId) && (studentId || entry.student?.id);
+  const canPrint = Boolean(receiptIdOf(entry)) && (studentId || entry.student?.id);
   const [open, setOpen] = useState(false);
   const expandable = hasDetails(entry);
   const columns = showStudent ? 7 : 6;

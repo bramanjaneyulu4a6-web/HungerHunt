@@ -42,6 +42,10 @@ export const itemDescription = (receipt) => {
     const order = receipt.refund?.orderReference;
     return order ? `Refund — Cancelled Order ${order}` : 'Refund — Cancelled Order';
   }
+  if (receipt.kind === 'ORDER_PAYMENT') {
+    const order = receipt.order?.orderReference;
+    return order ? `Order ${order}` : 'Order';
+  }
   if (receipt.mode === 'CASH') return 'Wallet Recharge (Cash)';
   const detail = receipt.payment?.merchantOrderId || receipt.payment?.upiLabel;
   return detail ? `Wallet Recharge (UPI — ${detail})` : 'Wallet Recharge (UPI)';
@@ -58,6 +62,131 @@ export const itemDescription = (receipt) => {
  * space, which is why the two figures are constants here rather than read off
  * doc.page — that now reports the portrait sheet the receipt sits on.
  */
+/* An order's basket as table lines. The receipt lists them in its own
+ * table when they fit the half sheet; when they do not, it prints one
+ * summary line and the whole basket goes on the rest of the paper, so no
+ * item is ever left off. */
+export const orderLines = (items) =>
+  (items || []).map((item, index) => ({
+    cells: [
+      String(index + 1),
+      item.name,
+      String(item.quantity),
+      money(item.price),
+      money(item.quantity * item.price),
+    ],
+  }));
+
+const orderColumns = (width) => [
+  { label: 'S.No', width: 70, align: 'center' },
+  { label: 'Description', width: width - 70 - 60 - 100 - 130, align: 'left' },
+  { label: 'Qty', width: 60, align: 'center' },
+  { label: 'Rate', width: 100, align: 'right' },
+  { label: 'Amount', width: 130, align: 'right' },
+];
+
+/* One ruled table: a header row, then body rows. Returns its height.
+ * `headAlign` lets a header sit differently from its figures, as the paper
+ * form centres "Amount" over right-aligned numbers. */
+const drawTable = (doc, { x, y, columns, rows, headH = 22, rowH, bodyFont = 10 }) => {
+  const width = columns.reduce((sum, column) => sum + column.width, 0);
+  const bodyH = Math.max(1, rows.length) * rowH;
+
+  doc.lineWidth(0.8).strokeColor(INK);
+  doc.rect(x, y, width, headH + bodyH).stroke();
+  doc.moveTo(x, y + headH).lineTo(x + width, y + headH).stroke();
+  let edge = x;
+  for (const column of columns.slice(0, -1)) {
+    edge += column.width;
+    doc.moveTo(edge, y).lineTo(edge, y + headH + bodyH).stroke();
+  }
+
+  const cell = (text, left, column, top, align) => {
+    const pad = align === 'center' ? 0 : 10;
+    doc.text(text ?? '', left + pad, top, {
+      width: column.width - pad * 2,
+      align,
+      lineBreak: false,
+      ellipsis: true,
+    });
+  };
+
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(INK);
+  let left = x;
+  for (const column of columns) {
+    cell(column.label, left, column, y + 6, column.headAlign || column.align);
+    left += column.width;
+  }
+
+  doc.font('Helvetica').fontSize(bodyFont);
+  const inset = (rowH - bodyFont) / 2;
+  rows.forEach((row, index) => {
+    let cellLeft = x;
+    columns.forEach((column, columnIndex) => {
+      cell(row.cells[columnIndex], cellLeft, column, y + headH + inset + index * rowH, column.align);
+      cellLeft += column.width;
+    });
+  });
+
+  return headH + bodyH;
+};
+
+/* The rest of the paper, for a basket too long for the receipt's own table:
+ * the bottom half of the sheet first, then as many further sheets as it
+ * takes, a half at a time. Every half carries the receipt number, so a torn
+ * or loose piece still says which receipt it belongs to.
+ *
+ * Each half is drawn in its own coordinates and moved into place, rather
+ * than drawn at y > 841: PDFKit decides when to start a new page by an
+ * untransformed y, and text past the bottom of an A4 page — in its units,
+ * not ours — would start pages of its own. */
+const drawBasketContinuation = (doc, receipt, { M, contentW, H }) => {
+  const lines = orderLines(receipt.order?.items);
+  const columns = orderColumns(contentW - 20);
+  const rowH = 16;
+  const headH = 22;
+  const top = 30;
+  const room = Math.floor((H - top - 22 - headH - 30) / rowH);
+  const order = receipt.order?.orderReference;
+
+  let remaining = lines;
+  let half = 1; // 0: top half, 1: bottom half. Page one's top is the receipt.
+  while (remaining.length) {
+    if (half === 2) {
+      doc.addPage({ size: 'A4', margin: 0 });
+      doc.scale(halfSheetScale(doc.page.width));
+      half = 0;
+    }
+    const chunk = remaining.slice(0, room);
+    remaining = remaining.slice(room);
+
+    doc.save();
+    doc.translate(0, half * H);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(BLUE)
+      .text(
+        `Items in ${order ? `order ${order}` : 'this order'} — receipt ${receipt.receiptNumber}`,
+        M + 10,
+        top,
+        { width: contentW - 20, lineBreak: false }
+      );
+    drawTable(doc, { x: M + 10, y: top + 22, columns, rows: chunk, headH, rowH, bodyFont: 9.5 });
+    doc.restore();
+    half += 1;
+  }
+};
+
+const TITLES = {
+  RECHARGE: 'WALLET RECHARGE RECEIPT',
+  REFUND: 'WALLET REFUND RECEIPT',
+  ORDER_PAYMENT: 'ORDER PAYMENT RECEIPT',
+};
+
+const FOOTERS = {
+  RECHARGE: 'Wallet recharges are non-refundable and non-transferable',
+  REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+  ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
+};
+
 export const RECEIPT_SPACE = { width: 841.89, height: 595.28 };
 
 /* Exported to be checked as arithmetic rather than by reading a PDF: at A4
@@ -100,10 +229,11 @@ export const renderReceiptPdf = (receipt, stream) => {
   }
 
   const isRefund = receipt.kind === 'REFUND';
+  const isOrder = receipt.kind === 'ORDER_PAYMENT';
 
   doc.moveDown(1.2);
   doc.font('Helvetica-Bold').fontSize(12).fillColor(INK)
-    .text(isRefund ? 'WALLET REFUND RECEIPT' : 'WALLET RECHARGE RECEIPT', M, doc.y, {
+    .text(TITLES[receipt.kind] || TITLES.RECHARGE, M, doc.y, {
       width: contentW,
       align: 'center',
     });
@@ -166,10 +296,17 @@ export const renderReceiptPdf = (receipt, stream) => {
   field('Admission No.', receipt.student.admissionNumber, M, y, colW);
   field("Student's Name", receipt.student.name, M + colW, y, colW);
   y += gap;
-  field('Class', receipt.student.className || '—', M, y, colW);
-  field('Section', receipt.student.section || '—', M + colW, y, colW);
-  y += gap;
-  field('Room', receipt.student.roomNumber || '—', M, y, colW);
+  if (isOrder) {
+    // One line fewer than the other receipts: the basket needs the room.
+    const classLine = [receipt.student.className, receipt.student.section].filter(Boolean).join(' - ');
+    field('Class', classLine || '—', M, y, colW);
+    field('Room', receipt.student.roomNumber || '—', M + colW, y, colW);
+  } else {
+    field('Class', receipt.student.className || '—', M, y, colW);
+    field('Section', receipt.student.section || '—', M + colW, y, colW);
+    y += gap;
+    field('Room', receipt.student.roomNumber || '—', M, y, colW);
+  }
 
   y += gap + 4;
   heading('Parent Details', y);
@@ -196,7 +333,13 @@ export const renderReceiptPdf = (receipt, stream) => {
      here a parent can also find on their own bank statement. Cash receipts
      have no rails to reference, and a UPI payment PhonePe never gave a UTR
      for prints nothing rather than an empty label. */
-  if (receipt.mode === 'UPI' && receipt.payment?.utr) {
+  /* An order payment shares one row between the package and the bank's
+     reference: the half sheet needs every line it can spare for the basket. */
+  if (isOrder) {
+    y += gap;
+    field('Order', receipt.order?.orderReference || '—', M, y, colW);
+    if (receipt.payment?.utr) field('UTR', receipt.payment.utr, M + colW, y, colW);
+  } else if (receipt.mode === 'UPI' && receipt.payment?.utr) {
     y += gap;
     field('UTR', receipt.payment.utr, M, y, colW);
   }
@@ -212,35 +355,55 @@ export const renderReceiptPdf = (receipt, stream) => {
   }
 
   // ── The itemized table ─────────────────────────────────────────────────
-  y += gap + 10;
+  y += isOrder ? gap : gap + 10;
   const tableX = M + 10;
   const tableW = contentW - 20;
-  const snoW = 70;
-  const amountW = 200;
-  const descW = tableW - snoW - amountW;
+  const signY = H - 88;
   const headH = 22;
-  const rowH = 26;
 
-  doc.lineWidth(0.8).strokeColor(INK);
-  doc.rect(tableX, y, tableW, headH + rowH).stroke();
-  doc.moveTo(tableX, y + headH).lineTo(tableX + tableW, y + headH).stroke();
-  doc.moveTo(tableX + snoW, y).lineTo(tableX + snoW, y + headH + rowH).stroke();
-  doc.moveTo(tableX + snoW + descW, y).lineTo(tableX + snoW + descW, y + headH + rowH).stroke();
+  /* Everything between the table and the signatures is a fixed height —
+     total, remarks and a little air — so an order's rows get what is left. */
+  const belowTable = 14 + gap + 2 + 13 + 12;
+  const basket = isOrder ? orderLines(receipt.order?.items) : [];
+  const orderRowH = 15;
+  const fits = basket.length <= Math.floor((signY - belowTable - y - headH) / orderRowH);
+  const listedBelow = isOrder && !fits;
 
-  doc.font('Helvetica-Bold').fontSize(10).fillColor(INK);
-  doc.text('S.No', tableX, y + 6, { width: snoW, align: 'center' });
-  doc.text('Description', tableX + snoW + 10, y + 6, { width: descW - 20 });
-  doc.text('Amount', tableX + snoW + descW, y + 6, { width: amountW, align: 'center' });
-
-  const description = itemDescription(receipt);
-
-  doc.font('Helvetica').fontSize(10);
-  doc.text('1', tableX, y + headH + 8, { width: snoW, align: 'center' });
-  doc.text(description, tableX + snoW + 10, y + headH + 8, { width: descW - 20, lineBreak: false, ellipsis: true });
-  doc.text(money(receipt.amount), tableX + snoW + descW, y + headH + 8, { width: amountW - 14, align: 'right' });
+  let tableH;
+  if (isOrder) {
+    const order = receipt.order?.orderReference;
+    const count = basket.length;
+    const rows = listedBelow
+      ? [{
+          cells: [
+            '1',
+            `${order ? `Order ${order}` : 'Order'} — ${count} items, listed below`,
+            '',
+            '',
+            money(receipt.amount),
+          ],
+        }]
+      : basket;
+    tableH = drawTable(doc, {
+      x: tableX, y, columns: orderColumns(tableW), rows, headH, rowH: orderRowH, bodyFont: 9.5,
+    });
+  } else {
+    tableH = drawTable(doc, {
+      x: tableX,
+      y,
+      columns: [
+        { label: 'S.No', width: 70, align: 'center' },
+        { label: 'Description', width: tableW - 270, align: 'left' },
+        { label: 'Amount', width: 200, align: 'right', headAlign: 'center' },
+      ],
+      rows: [{ cells: ['1', itemDescription(receipt), money(receipt.amount)] }],
+      headH,
+      rowH: 26,
+    });
+  }
 
   // ── Total and remarks ──────────────────────────────────────────────────
-  y += headH + rowH + 14;
+  y += tableH + 14;
   doc.font('Helvetica-Bold').fontSize(10.5).fillColor(INK)
     .text('Total :', tableX, y, { width: 60, lineBreak: false });
   doc.text(`${money(receipt.amount)}  (${receipt.amountInWords})`, tableX + 60, y, {
@@ -249,7 +412,11 @@ export const renderReceiptPdf = (receipt, stream) => {
 
   y += gap + 2;
   const remarks = [
-    `Balance before Rs. ${money(receipt.previousBalance)}, after Rs. ${money(receipt.newBalance)}.`,
+    // An order paid by UPI never touched the wallet, so its balance is not
+    // news; saying so is.
+    isOrder
+      ? 'Paid directly by UPI; the student wallet was not charged.'
+      : `Balance before Rs. ${money(receipt.previousBalance)}, after Rs. ${money(receipt.newBalance)}.`,
     receipt.mode === 'UPI' && receipt.payment?.merchantOrderId
       ? `Order Ref: ${receipt.payment.merchantOrderId}.`
       : '',
@@ -266,7 +433,6 @@ export const renderReceiptPdf = (receipt, stream) => {
     .lineWidth(0.5).strokeColor('#999999').stroke();
 
   // ── Signatures and the footer line, anchored to the bottom ─────────────
-  const signY = H - 88;
   doc.font('Helvetica-Bold').fontSize(10).fillColor(INK);
   doc.text("Parent's Signature", M + 16, signY, { width: 200 });
   // A refund is signed off by the school, not receipted by it.
@@ -277,9 +443,7 @@ export const renderReceiptPdf = (receipt, stream) => {
 
   doc.font('Helvetica-Bold').fontSize(9).fillColor(RED)
     .text(
-      isRefund
-        ? 'Refunded to the student wallet; not payable in cash or transferable'
-        : 'Wallet recharges are non-refundable and non-transferable',
+      FOOTERS[receipt.kind] || FOOTERS.RECHARGE,
       M,
       H - 48,
       { width: contentW, align: 'center' }
@@ -290,6 +454,8 @@ export const renderReceiptPdf = (receipt, stream) => {
     .text('Computer-generated receipt; valid without a signature.', M, H - 34, {
       width: contentW, align: 'center',
     });
+
+  if (listedBelow) drawBasketContinuation(doc, receipt, { M, contentW, H });
 
   doc.end();
   return doc;

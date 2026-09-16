@@ -5,6 +5,7 @@ import { ReceiptButton } from '../components/ReceiptButton';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import api from '../utils/api';
 import { formatINR } from '../utils/format';
+import { receiptIdOf } from '../utils/walletActivity';
 import {
   KIND_LABELS,
   PERIODS,
@@ -80,12 +81,15 @@ const whenOf = (iso) =>
 
 const UPI_APPS = { phonepe: 'PhonePe', gpay: 'Google Pay', paytm: 'Paytm' };
 
-/* What opens under a row: the receipt where there is paper to print, the
-   basket where money bought something, and the facts a person asks about
-   when they ring the office — in the same layout the wallet ledger uses,
-   so a row reads the same here as it does on a student's page. */
+/* Deposits, refunds and orders paid straight over UPI have paper to print;
+   a wallet charge spent money already receipted on its way in. */
+const isPrintable = (row) => Boolean(receiptIdOf(row) && row.student.id);
+
+/* What opens under a row: the basket where money bought something, and the
+   facts a person asks about when they ring the office — in the same layout
+   the wallet ledger uses, so a row reads the same here as it does on a
+   student's page. */
 const RowDetails = ({ row }) => {
-  const printable = Boolean(row.adjustmentId || row.reversalId) && row.student.id;
   const facts = [
     ['When', whenOf(row.at)],
     ['Type', `${KIND_LABELS[row.kind] || row.kind} · ${row.mode}`],
@@ -110,15 +114,14 @@ const RowDetails = ({ row }) => {
 
   return (
     <div className="ledger-detail tx-detail">
-      <div className="tx-detail__actions">
-        {printable ? (
-          <ReceiptButton studentId={row.student.id} entry={row} />
-        ) : (
+      {/* The printable ones carry their Receipt button on the row itself. */}
+      {!isPrintable(row) && (
+        <div className="tx-detail__actions">
           <span className="cell-unset">
             {row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {row.items.length > 0 && (
         <table className="table table--stack ledger-detail__items">
@@ -554,7 +557,7 @@ const Transactions = () => {
                     </th>
                   );
                 })}
-                <th aria-label="Details" style={{ width: 40 }} />
+                <th aria-label="Receipt and details" className="ledger-actions" />
               </tr>
             </thead>
             <tbody>
@@ -600,6 +603,9 @@ const Transactions = () => {
                       </td>
                       <td data-label="Processed by">{row.processedBy || <span className="cell-unset">—</span>}</td>
                       <td className="ledger-actions">
+                        {isPrintable(row) && (
+                          <ReceiptButton studentId={row.student.id} entry={row} />
+                        )}
                         <span
                           className={`ledger-chevron${openRows.has(row.id) ? ' ledger-chevron--open' : ''}`}
                           aria-hidden="true"

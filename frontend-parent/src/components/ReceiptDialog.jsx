@@ -5,8 +5,9 @@ import WalletDialog from './WalletDialog';
 import { fetchReceipt, isShareCancel, saveReceiptPdf } from '../services/receipts';
 import { formatINR } from '../utils/format';
 
-/* One recharge, shown the way the office would hand it over the desk: the
-   company letterhead, then the facts of the payment. The server composes
+/* One payment, shown the way the office would hand it over the desk: the
+   company letterhead, then the facts of the payment — a wallet recharge, or
+   an order paid straight over UPI with the basket it bought. The server composes
    everything — this view and the downloadable PDF read the same data, so the
    receipt a parent screenshots and the one they share never disagree. */
 
@@ -19,6 +20,16 @@ const formatReceiptDate = (value) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
+const TITLES = {
+  ORDER_PAYMENT: 'Order Payment Receipt',
+  REFUND: 'Wallet Refund Receipt',
+};
+
+const FOOTNOTES = {
+  ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
+  REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+};
 
 const Row = ({ label, children }) => (
   <div className="receipt-row">
@@ -72,6 +83,7 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
   };
 
   const company = receipt?.company;
+  const isOrder = receipt?.kind === 'ORDER_PAYMENT';
 
   return (
     <WalletDialog
@@ -128,7 +140,9 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
               )}
             </header>
 
-            <h3 className="receipt-title">Wallet Recharge Receipt</h3>
+            <h3 className="receipt-title">
+              {TITLES[receipt.kind] || 'Wallet Recharge Receipt'}
+            </h3>
 
             <div className="receipt-marks">
               <span className="receipt-marks__note">Note :- Currency is in Rs.</span>
@@ -148,8 +162,31 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
             <Row label="Section">{receipt.student.section || '—'}</Row>
             <Row label="Room">{receipt.student.roomNumber || '—'}</Row>
 
+            {isOrder && (
+              <>
+                {receipt.order?.orderReference && (
+                  <Row label="Order">{receipt.order.orderReference}</Row>
+                )}
+                {/* Every item, always: the PDF may send a long basket to the
+                    lower half of the page, but this view has room for all. */}
+                <ul className="receipt-items">
+                  {(receipt.order?.items || []).map((item, index) => (
+                    <li key={`${item.name}-${index}`}>
+                      <span>
+                        {item.name}
+                        <small>
+                          {item.quantity} × {formatINR(item.price)}
+                        </small>
+                      </span>
+                      <strong>{formatINR(item.quantity * item.price)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
             <div className="receipt-amount">
-              <span>Amount received</span>
+              <span>{isOrder ? 'Amount paid' : 'Amount received'}</span>
               <strong>{formatINR(receipt.amount)}</strong>
               <em>{receipt.amountInWords}</em>
             </div>
@@ -188,12 +225,21 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
             )}
             {receipt.note && <Row label="Remarks">{receipt.note}</Row>}
 
-            <Row label="Balance before">{formatINR(receipt.previousBalance)}</Row>
-            <Row label="Balance after">{formatINR(receipt.newBalance)}</Row>
+            {/* An order paid over UPI never touched the wallet, so its
+                balance is not news; saying so is. */}
+            {isOrder ? (
+              <Row label="Wallet">Not charged — paid directly by UPI</Row>
+            ) : (
+              <>
+                <Row label="Balance before">{formatINR(receipt.previousBalance)}</Row>
+                <Row label="Balance after">{formatINR(receipt.newBalance)}</Row>
+              </>
+            )}
 
             <p className="receipt-footnote">
               <span className="receipt-footnote__policy">
-                Wallet recharges are non-refundable and non-transferable
+                {FOOTNOTES[receipt.kind] ||
+                  'Wallet recharges are non-refundable and non-transferable'}
               </span>
               Computer-generated receipt; valid without a signature.
             </p>

@@ -70,10 +70,27 @@ const findAdjustment = async (adjustmentId, res) => {
      back. The two collections never share an id, so trying both in order is
      not ambiguous. */
   const adjustment = await WalletAdjustment.findById(adjustmentId).lean();
-  if (adjustment) return { row: adjustment, Model: WalletAdjustment, refund: false };
+  if (adjustment) return { row: adjustment, Model: WalletAdjustment, kind: 'RECHARGE' };
 
   const reversal = await WalletReversal.findById(adjustmentId).lean();
-  if (reversal) return { row: reversal, Model: WalletReversal, refund: true };
+  if (reversal) return { row: reversal, Model: WalletReversal, kind: 'REFUND' };
+
+  /* An order paid straight over UPI is money that entered the school's books
+     like a top-up, and it is numbered from the same series — so it gets the
+     same piece of paper. A wallet-funded charge spent money already
+     receipted on its way in, and is not found here. The row is reshaped into
+     the adjustment's vocabulary so everything below reads one shape. */
+  const charge = await Transaction.findOne({
+    _id: adjustmentId,
+    sourceType: 'UPI_ORDER_PAYMENT',
+  }).lean();
+  if (charge) {
+    return {
+      row: { ...charge, amount: charge.totalAmount, newBalance: charge.remainingBalance },
+      Model: Transaction,
+      kind: 'ORDER_PAYMENT',
+    };
+  }
 
   res.status(404).json({ message: 'Receipt not found' });
   return null;
@@ -120,7 +137,9 @@ const loadReceipt = async (req, res) => {
 /* The document itself. `receivedFrom` is who the money came from, which the
  * parent route reads off the signed-in account and the staff route off the
  * student's registered parent — the receipt says the same thing either way. */
-const composeReceipt = async ({ row: adjustment, Model, refund }, receivedFrom, res) => {
+const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, res) => {
+  const refund = kind === 'REFUND';
+  const orderPayment = kind === 'ORDER_PAYMENT';
   const adjustmentId = String(adjustment._id);
 
   const student = await Student.findById(adjustment.studentId)
@@ -160,9 +179,12 @@ const composeReceipt = async ({ row: adjustment, Model, refund }, receivedFrom, 
     previousBalance: adjustment.previousBalance,
     newBalance: adjustment.newBalance,
     // A refund is its own kind of document: money the school gave back, not
-    // money it took in. The renderer titles and words it accordingly.
-    kind: refund ? 'REFUND' : 'RECHARGE',
-    mode: refund ? 'REFUND' : adjustment.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
+    // money it took in; an order payment bought a basket rather than wallet
+    // balance. The renderer titles and words each accordingly.
+    kind,
+    mode: refund
+      ? 'REFUND'
+      : orderPayment || adjustment.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
     student: {
       name: student.name,
       admissionNumber: student.admissionNumber,
@@ -210,6 +232,55 @@ const composeReceipt = async ({ row: adjustment, Model, refund }, receivedFrom, 
     if (adjustment.performedBy) {
       const admin = await Admin.findById(adjustment.performedBy).select('name').lean();
       if (admin) receipt.receivedBy = { name: admin.name };
+    }
+  } else if (orderPayment) {
+    /* What the money bought, and the handle the storeroom and the family
+       both know the package by. The intent is found by the charge it
+       settled; a charge written before intents kept that link is found by
+       the merchant order id it was written under. */
+    const [order, intent] = await Promise.all([
+      FulfillmentOrder.findOne({ transactionId: adjustment._id })
+        .select('_id status')
+        .lean(),
+      PaymentIntent.findOne(
+        adjustment.idempotencyKey
+          ? { $or: [{ transactionId: adjustment._id }, { merchantOrderId: adjustment.idempotencyKey }] }
+          : { transactionId: adjustment._id }
+      )
+        .select('provider merchantOrderId providerOrderId upiApp upiVpa utr checkoutMode')
+        .lean(),
+    ]);
+
+    receipt.order = {
+      orderReference: order ? `#${String(order._id).slice(-6).toUpperCase()}` : '',
+      orderStatus: order?.status || '',
+      items: (adjustment.items || [])
+        .filter((item) => item && (item.name || item.productId))
+        .map((item) => ({
+          name: item.name || 'Item',
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.price) || 0,
+        })),
+    };
+
+    if (intent) {
+      receipt.payment = {
+        provider: intent.provider,
+        merchantOrderId: intent.merchantOrderId,
+        providerOrderId: intent.providerOrderId || '',
+        upiApp: intent.upiApp || null,
+        upiLabel: upiLabelFor(intent),
+        utr: intent.utr || (await backfillUtr(intent)) || '',
+      };
+    } else if (adjustment.idempotencyKey) {
+      receipt.payment = {
+        provider: 'PHONEPE',
+        merchantOrderId: adjustment.idempotencyKey,
+        providerOrderId: '',
+        upiApp: null,
+        upiLabel: null,
+        utr: '',
+      };
     }
   } else if (adjustment.source === 'PARENT_UPI') {
     if (adjustment.paymentIntentId) {

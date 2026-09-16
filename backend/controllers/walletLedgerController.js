@@ -240,7 +240,12 @@ export const getLedgerFeed = async (req, res) => {
         processedBy: null,
         amount: entry.totalAmount,
         ...(entry.sourceType === 'UPI_ORDER_PAYMENT'
-          ? { transactionId: entry.idempotencyKey || null }
+          ? {
+              transactionId: entry.idempotencyKey || null,
+              // Receipted on its way in, so the row can open its receipt.
+              chargeId: String(entry._id),
+              receiptNumber: entry.receiptNumber || null,
+            }
           : { previousBalance: entry.previousBalance, newBalance: entry.remainingBalance }),
         date: entry.createdAt,
         // What was bought, so the feed can open a row into its basket the way

@@ -18,12 +18,18 @@ import api from './api';
  * URL handed back. The caller owns that URL and revokes it when its popup
  * closes. The filename comes from the response — a row written before
  * numbering moved to creation time may still be waiting for its number. */
+/* The id a ledger row's receipt is fetched by, or null for a row with no
+   paper — a wallet-funded charge spent money receipted on its way in. */
+export const receiptIdOf = (entry) =>
+  entry?.adjustmentId || entry?.reversalId || entry?.chargeId || null;
+
 export const fetchReceipt = async (studentId, entry) => {
   try {
     const response = await api.get(
-      // A deposit is opened by its adjustment, a refund by its reversal; the
-      // route takes either and answers with the document that row deserves.
-      `/students/${studentId}/receipts/${entry.adjustmentId || entry.reversalId}/pdf`,
+      // A deposit is opened by its adjustment, a refund by its reversal and
+      // a UPI-paid order by its charge; the route takes any of them and
+      // answers with the document that row deserves.
+      `/students/${studentId}/receipts/${receiptIdOf(entry)}/pdf`,
       { responseType: 'blob' }
     );
     const named = /filename="?([^";]+)"?/i.exec(

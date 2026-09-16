@@ -1238,15 +1238,17 @@ export default function ChildDetails() {
                               </div>
                             )}
 
-                            {/* Only ledger-backed top-ups have a receipt to
-                                fetch — money added, at the desk or over UPI. */}
-                            {r.kind === 'TOP_UP' && r.adjustmentId && (
+                            {/* Money that came in has a receipt to fetch:
+                                a top-up, at the desk or over UPI, and an
+                                order paid straight over UPI. */}
+                            {((r.kind === 'TOP_UP' && r.adjustmentId) ||
+                              (r.kind === 'UPI_ORDER_PAYMENT' && r.chargeId)) && (
                               <Button
                                 variant="ghost"
                                 block
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setReceiptFor(r.adjustmentId);
+                                  setReceiptFor(r.adjustmentId || r.chargeId);
                                 }}
                                 style={{ marginTop: 12 }}
                               >

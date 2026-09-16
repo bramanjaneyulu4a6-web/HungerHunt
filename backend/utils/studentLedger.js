@@ -266,6 +266,9 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
         ...(upiFunded
           ? {
               transactionId: entry.idempotencyKey || null,
+              // What the receipt route opens for this row, as adjustmentId is
+              // for a deposit and reversalId for a refund.
+              chargeId: String(entry._id),
               // The school's own receipt number beside the gateway's
               // reference, exactly as a UPI top-up carries both: this money
               // entered the school directly and was receipted on the way in.

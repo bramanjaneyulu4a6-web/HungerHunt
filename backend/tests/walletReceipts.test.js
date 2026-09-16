@@ -22,6 +22,7 @@ const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
 const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
+const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const phonepe = (await import('../src/domain/payments/providers/phonepe.js')).default;
 const { buildReceiptNumber, amountInWords, ensureReceiptNumbers } = await import('../utils/walletReceipts.js');
 const { authLimiter } = await import('../middleware/rateLimit.js');
@@ -603,6 +604,110 @@ describe('GET /api/parent/receipts/:adjustmentId', () => {
     assert.deepEqual(numbered.map((n) => n.id), [older._id, ADJUSTMENT_ID]);
     assert.equal(numbered[0].number, 'GMS0109990123001');
     assert.equal(receipt.receiptNumber, 'GMS0709990123002');
+  });
+
+  /* An order paid straight over UPI is receipted like a top-up, from the
+     same route: the id names no adjustment or reversal, so the loader finds
+     the charge. */
+  const CHARGE_ID = '507f191e810c19729de860c1';
+  const upiCharge = {
+    _id: CHARGE_ID,
+    studentId: STUDENT_ID,
+    sourceType: 'UPI_ORDER_PAYMENT',
+    idempotencyKey: 'HH-ORD-77',
+    items: [
+      { name: 'Parle-G', quantity: 2, price: 10 },
+      { name: 'Maggi', quantity: 1, price: 15 },
+    ],
+    totalAmount: 35,
+    previousBalance: 200,
+    remainingBalance: 200,
+    receiptNumber: 'GMS0709990123009',
+    createdAt: new Date('2026-09-07T08:00:00.000Z'),
+  };
+
+  const onlyTheChargeMatches = (charge) => {
+    adjustmentIs(null);
+    mock.method(WalletReversal, 'findById', () => ({ lean: async () => null }));
+    const filters = [];
+    mock.method(Transaction, 'findOne', (filter) => {
+      filters.push(filter);
+      return { lean: async () => charge };
+    });
+    return filters;
+  };
+
+  test('a UPI-paid order has a receipt with its basket and its package', async () => {
+    const filters = onlyTheChargeMatches(upiCharge);
+    ownsTheStudent();
+    studentIs(student);
+    unnumberedRows([]);
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      select: () => ({ lean: async () => ({ _id: '507f191e810c19729de8a1b2', status: 'PACKED' }) }),
+    }));
+    mock.method(PaymentIntent, 'findOne', () => ({
+      select: () => ({
+        lean: async () => ({
+          _id: INTENT_ID,
+          provider: 'PHONEPE',
+          merchantOrderId: 'HH-ORD-77',
+          providerOrderId: 'OMO77',
+          upiApp: 'gpay',
+          utr: '429800000077',
+        }),
+      }),
+    }));
+
+    const res = await get(`/api/parent/receipts/${CHARGE_ID}`);
+    assert.equal(res.status, 200);
+    const { receipt } = await res.json();
+
+    // Only an order paid over UPI is receipted; a wallet charge is not.
+    assert.equal(filters[0].sourceType, 'UPI_ORDER_PAYMENT');
+    assert.equal(receipt.kind, 'ORDER_PAYMENT');
+    assert.equal(receipt.mode, 'UPI');
+    assert.equal(receipt.receiptNumber, 'GMS0709990123009');
+    assert.equal(receipt.amount, 35);
+    assert.equal(receipt.amountInWords, 'Rupees Thirty Five Only');
+    assert.equal(receipt.order.orderReference, '#E8A1B2');
+    assert.deepEqual(receipt.order.items, [
+      { name: 'Parle-G', quantity: 2, price: 10 },
+      { name: 'Maggi', quantity: 1, price: 15 },
+    ]);
+    assert.equal(receipt.payment.merchantOrderId, 'HH-ORD-77');
+    assert.equal(receipt.payment.upiLabel, 'Google Pay');
+    assert.equal(receipt.payment.utr, '429800000077');
+  });
+
+  test('a wallet-funded order has no receipt of its own', async () => {
+    onlyTheChargeMatches(null);
+    const res = await get(`/api/parent/receipts/${CHARGE_ID}`);
+    assert.equal(res.status, 404);
+  });
+
+  test("someone else's order payment is refused", async () => {
+    onlyTheChargeMatches({ ...upiCharge, studentId: '507f191e810c19729de860ff' });
+    ownsTheStudent();
+    const res = await get(`/api/parent/receipts/${CHARGE_ID}`);
+    assert.equal(res.status, 403);
+  });
+
+  test('an order payment prints as a PDF', async () => {
+    onlyTheChargeMatches(upiCharge);
+    ownsTheStudent();
+    studentIs(student);
+    unnumberedRows([]);
+    mock.method(FulfillmentOrder, 'findOne', () => ({
+      select: () => ({ lean: async () => null }),
+    }));
+    mock.method(PaymentIntent, 'findOne', () => ({
+      select: () => ({ lean: async () => null }),
+    }));
+
+    const res = await get(`/api/parent/receipts/${CHARGE_ID}/pdf`);
+    assert.equal(res.status, 200);
+    const body = Buffer.from(await res.arrayBuffer());
+    assert.equal(body.subarray(0, 4).toString(), '%PDF');
   });
 
   test('the PDF route answers with a PDF', async () => {

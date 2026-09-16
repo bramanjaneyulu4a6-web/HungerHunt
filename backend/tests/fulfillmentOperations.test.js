@@ -835,6 +835,8 @@ describe('what the parent is shown about a package', () => {
     assert.deepEqual(packages[0].payment, {
       mode: 'UPI',
       transactionId: 'HH-507f191e810c19729de860ba',
+      // The charge itself, which the receipt route opens.
+      receiptId: TRANSACTION_ID,
       receiptNumber: 'GMS1008A010002',
     });
   });

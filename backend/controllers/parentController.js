@@ -479,6 +479,8 @@ const paymentsByTransaction = async (studentId, orders) => {
         ? {
             mode: 'UPI',
             transactionId: txn.idempotencyKey || null,
+            // What the receipt route opens: this payment was receipted.
+            receiptId: String(txn._id),
             receiptNumber:
               txn.receiptNumber || assigned.get(String(txn._id)) || null,
           }

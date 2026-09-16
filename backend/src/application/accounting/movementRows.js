@@ -63,8 +63,9 @@ const itemsOf = (items) =>
 /* `gateway` is what PhonePe knows the payment by, for the rare call to
    support: the order reference, the bank's UTR, and the app it was paid
    from. Only UPI rows carry one. `adjustmentId` / `reversalId` are the ids
-   the receipt route prints from — a deposit and a refund each have paper;
-   a wallet charge and a UPI order payment do not. */
+   the receipt route prints from — a deposit and a refund each have paper,
+   and so does an order paid straight over UPI, by `chargeId`. A wallet
+   charge spent money already receipted on its way in, and has none. */
 const row = ({
   id, kind, at, amount, receiptNumber, reference, studentId, processedBy,
   balanceBefore, balanceAfter, note, items, gateway, adjustmentId, reversalId, transactionId,
@@ -94,6 +95,7 @@ const row = ({
     adjustmentId: adjustmentId ? String(adjustmentId) : null,
     reversalId: reversalId ? String(reversalId) : null,
     transactionId: transactionId ? String(transactionId) : null,
+    chargeId: kind === 'UPI_ORDER_PAYMENT' && transactionId ? String(transactionId) : null,
   };
 };
 

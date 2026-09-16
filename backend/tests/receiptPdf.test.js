@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { PassThrough } from 'node:stream';
 
-const { itemDescription, paymentModeLine, renderReceiptPdf, halfSheetScale, RECEIPT_SPACE } =
+const { itemDescription, orderLines, paymentModeLine, renderReceiptPdf, halfSheetScale, RECEIPT_SPACE } =
   await import('../utils/receiptPdf.js');
 
 // A filled-in receipt, only so something can be rendered. Every field the
@@ -131,5 +131,60 @@ describe('the half sheet', () => {
     // still hold the receipt, but there would be no bottom half to tear.
     assert.ok(Math.abs(width - A4_PORTRAIT.width) < 1, `page is ${width}pt wide`);
     assert.ok(Math.abs(height - A4_PORTRAIT.height) < 1, `page is ${height}pt tall`);
+  });
+});
+
+/* An order paid straight over UPI prints its basket. What matters is that no
+   item is ever dropped: a short basket sits in the receipt's own table, and a
+   long one goes on the rest of the paper, however many sheets that takes. */
+describe('order payment receipts', () => {
+  const basket = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      name: `Item ${index + 1}`,
+      quantity: 2,
+      price: 12.5,
+    }));
+
+  const orderReceipt = (items) => ({
+    ...sampleReceipt,
+    kind: 'ORDER_PAYMENT',
+    mode: 'UPI',
+    amount: items.reduce((sum, item) => sum + item.quantity * item.price, 0),
+    order: { orderReference: '#A1B2C3', items },
+    payment: { merchantOrderId: 'HH-ORD-1', upiLabel: 'PhonePe', utr: '429812345678' },
+  });
+
+  const render = async (receipt) => {
+    const chunks = [];
+    const sink = new PassThrough();
+    sink.on('data', (chunk) => chunks.push(chunk));
+    const done = new Promise((resolve) => sink.on('end', resolve));
+    renderReceiptPdf(receipt, sink);
+    await done;
+    const pdf = Buffer.concat(chunks).toString('latin1');
+    return Number(pdf.match(/\/Count (\d+)/)[1]);
+  };
+
+  test('every item becomes a numbered line with its quantity, rate and amount', () => {
+    assert.deepEqual(orderLines(basket(2)).map((line) => line.cells), [
+      ['1', 'Item 1', '2', '12.50', '25.00'],
+      ['2', 'Item 2', '2', '12.50', '25.00'],
+    ]);
+  });
+
+  test('the table names the order it is for', () => {
+    assert.equal(itemDescription(orderReceipt(basket(1))), 'Order #A1B2C3');
+  });
+
+  test('a short basket fits on the one half sheet', async () => {
+    assert.equal(await render(orderReceipt(basket(4))), 1);
+  });
+
+  test('a long basket fills the bottom half before starting another sheet', async () => {
+    assert.equal(await render(orderReceipt(basket(30))), 1);
+  });
+
+  test('a basket longer than the first sheet continues on the next', async () => {
+    assert.equal(await render(orderReceipt(basket(80))), 2);
   });
 });

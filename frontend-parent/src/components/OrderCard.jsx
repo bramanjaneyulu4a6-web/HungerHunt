@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button, Card } from './ui';
 import Icon from './Icon';
 import { formatINR } from '../utils/format';
+import ReceiptDialog from './ReceiptDialog';
 import WarehouseSimulationDialog from './WarehouseSimulationDialog';
 
 /* The warehouse handing the package to the room (DELIVERED) is not
@@ -79,6 +80,7 @@ export default function OrderCard({
     ? `/child/${order.studentId}?tab=orders`
     : null;
   const [simulating, setSimulating] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   return (
     <>
@@ -190,7 +192,25 @@ export default function OrderCard({
           )}
         </div>
       )}
+      {/* Only a UPI payment was receipted: a wallet order spent money that
+          was receipted when it went into the wallet. */}
+      {order.payment?.receiptId && (
+        <Button
+          variant="ghost"
+          block
+          onClick={() => setReceiptOpen(true)}
+          style={{ marginTop: 12 }}
+        >
+          View receipt
+        </Button>
+      )}
     </Card>
+    {receiptOpen && (
+      <ReceiptDialog
+        adjustmentId={order.payment.receiptId}
+        onClose={() => setReceiptOpen(false)}
+      />
+    )}
     {simulating && (
       <WarehouseSimulationDialog
         order={order}

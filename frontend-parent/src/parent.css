@@ -391,6 +391,42 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* An order receipt's basket: one line per item, quantity and rate beneath
+   the name, the line total on the right. */
+.receipt-items {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px dashed rgba(26, 18, 11, 0.2);
+  list-style: none;
+}
+
+.receipt-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.receipt-items li span {
+  display: grid;
+  color: var(--parent-ink);
+  font-weight: 600;
+}
+
+.receipt-items small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.receipt-items strong {
+  flex-shrink: 0;
+  color: var(--parent-ink);
+}
+
 .receipt-amount {
   display: grid;
   gap: 2px;

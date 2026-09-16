@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import Icon from "../components/Icon";
 import api from "../utils/api";
+import { DATA_CHANGED_EVENT } from "../utils/dataAutoRefresh";
 import { formatINR } from "../utils/format";
 import {
   Badge,
@@ -81,18 +82,20 @@ const Dashboard = () => {
     }
   }, [selectedDate]);
 
-  // Refresh transaction history every 30 seconds, plus whenever the window
-  // regains focus.
+  // Refresh transaction history every 30 seconds, whenever the window regains
+  // focus, and the moment the backend announces a change.
   useEffect(() => {
     const initial = setTimeout(fetchHistory, 0);
 
     const interval = setInterval(fetchHistory, 30000);
     window.addEventListener("focus", fetchHistory);
+    window.addEventListener(DATA_CHANGED_EVENT, fetchHistory);
 
     return () => {
       clearTimeout(initial);
       clearInterval(interval);
       window.removeEventListener("focus", fetchHistory);
+      window.removeEventListener(DATA_CHANGED_EVENT, fetchHistory);
     };
   }, [fetchHistory]);
 

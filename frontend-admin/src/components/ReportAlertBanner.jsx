@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/api";
+import { DATA_CHANGED_EVENT } from "../utils/dataAutoRefresh";
 import { Banner } from "./ui";
 
 /* Unanswered reports, in front of every admin on every screen.
@@ -51,9 +52,11 @@ export default function ReportAlertBanner() {
 
     load();
     const timer = setInterval(load, POLL_MS);
+    window.addEventListener(DATA_CHANGED_EVENT, load);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      window.removeEventListener(DATA_CHANGED_EVENT, load);
     };
   }, []);
 

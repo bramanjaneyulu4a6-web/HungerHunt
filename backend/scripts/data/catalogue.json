@@ -1,7 +1,7 @@
 {
   "stockGroups": [
     {
-      "name": "Food & Snacks",
+      "name": "Snacks",
       "order": 0,
       "subCategories": [
         "Biscuits & Cookies",
@@ -48,7 +48,7 @@
     {
       "name": "Jim Jam",
       "description": "Crunchy sandwich biscuits with a sweet cream and jam filling.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
       "mrp": 20,
@@ -69,7 +69,7 @@
     {
       "name": "Oreo",
       "description": "Chocolate sandwich cookies with a sweet vanilla-flavoured creme filling.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
       "mrp": 20,
@@ -90,7 +90,7 @@
     {
       "name": "Dark Fantasy Choco Fills",
       "description": "Cookies with a rich chocolate filling inside.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
       "mrp": 40,
@@ -111,7 +111,7 @@
     {
       "name": "Hide & Seek",
       "description": "Crisp chocolate chip cookies with bits of chocolate baked right in.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Biscuits & Cookies",
       "unit": "Gram",
       "mrp": 26,
@@ -132,7 +132,7 @@
     {
       "name": "Lay's Magic Masala - Blue Lays",
       "description": "Thin, crunchy potato chips tossed in a spicy Indian masala seasoning.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
       "mrp": 20,
@@ -153,7 +153,7 @@
     {
       "name": "Lay's American Style Cream & Onion - Green Lays",
       "description": "Thin, crunchy potato chips with a creamy, mild onion flavour.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
       "mrp": 20,
@@ -174,7 +174,7 @@
     {
       "name": "Aloo Bhujia",
       "description": "Crunchy, spicy namkeen strands made with potato and gram flour.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
       "mrp": 10,
@@ -196,7 +196,7 @@
     {
       "name": "Khatta Meetha",
       "description": "A crunchy namkeen mix that tastes sweet and tangy at the same time.",
-      "stockGroup": "Food & Snacks",
+      "stockGroup": "Snacks",
       "subCategory": "Salty Snacks",
       "unit": "Gram",
       "mrp": 10,

@@ -14,7 +14,7 @@ const UNIT_ROWS = [
 
 describe('unitSymbolsForCategory', () => {
   const cases = [
-    ['Food & Snacks', ['g', 'pc', 'ml']],
+    ['Snacks', ['g', 'pc', 'ml']],
     ['Beverages', ['ml', 'L']],
     ['Essentials', ['pc', 'ml', 'g']],
   ];
@@ -59,8 +59,8 @@ describe('unitsForCategory', () => {
   });
 
   test('returns nothing when the unit list has not loaded', () => {
-    assert.deepEqual(unitsForCategory([], 'Food & Snacks'), []);
-    assert.deepEqual(unitsForCategory(undefined, 'Food & Snacks'), []);
+    assert.deepEqual(unitsForCategory([], 'Snacks'), []);
+    assert.deepEqual(unitsForCategory(undefined, 'Snacks'), []);
   });
 
   test('offers the full list for an unmapped category', () => {

@@ -105,6 +105,51 @@ export const getStudents = async (req, res) => {
     }
     if (req.query.roomId) filter.roomId = req.query.roomId;
 
+    /* Class and section are matched exactly, against the values the roster
+       actually holds rather than a list written here. The roll mixes Roman and
+       Arabic numerals and carries three spellings of one section, so anything
+       this file asserted about their shape would be wrong for some of it —
+       getStudentFilterOptions below reports what is really there and the
+       dropdowns are built from that. */
+    const className = String(req.query.className || '').trim();
+    const section = String(req.query.section || '').trim();
+
+    if (className) filter.className = className;
+    if (section) filter.section = section;
+
+    /* Whether the parent has ever signed in, which is the question the office
+       is really asking when it asks who is registered.
+     *
+     * isParentRegistered would have been one cheap field on this document, and
+     * it is useless for the purpose: the roster import sets it on every
+     * student it creates a parent for, so it is true for all but one of them.
+     * Activation lives on the parent, so answering honestly costs a lookup.
+     *
+     * activationRequired is the flag the parent app clears on first sign-in.
+     * Absent reads as activated, because accounts created before that field
+     * existed were password accounts that were already in use. */
+    const parentActivated = String(req.query.parentActivated || '').trim().toLowerCase();
+
+    if (parentActivated === 'yes' || parentActivated === 'no') {
+      /* The activated side is the one collected, and the answer is the set or
+         its complement. Two reasons, and the second is the load-bearing one.
+       *
+         It is the smaller set by a long way — fifty-odd activated against
+         several hundred waiting — so the $in list stays short.
+
+         And a student with no parent row at all has nobody who could have
+         signed in. Collecting the waiting side would leave them outside it,
+         and $nin would then report them as activated, which is the opposite of
+         the truth. Complementing the activated side puts them where they
+         belong without naming them as a special case. */
+      const activated = await Parent.distinct('studentIds', {
+        active: { $ne: false },
+        activationRequired: { $ne: true },
+      });
+
+      filter._id = parentActivated === 'yes' ? { $in: activated } : { $nin: activated };
+    }
+
     const page = Math.max(parseInt(req.query.page) || 0, 0);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 0, 0), 500);
     const sortField = STUDENT_SORT_FIELDS.has(req.query.sort) ? req.query.sort : 'name';
@@ -124,6 +169,51 @@ export const getStudents = async (req, res) => {
     const query = Student.find(filter);
     if (typeof query.sort !== 'function' || typeof query.limit !== 'function') return res.json(await query);
     res.json(await query.sort(sort).limit(500));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/* The class and section values the roster actually holds, for the dropdowns
+ * that filter by them.
+ *
+ * Reported rather than declared, because the roll disagrees with itself: it
+ * carries Roman and Arabic numerals for the same years, three spellings of one
+ * section, and students with no class recorded at all. A hardcoded list would
+ * be wrong for whichever half it did not describe, and would quietly hide the
+ * students it failed to mention.
+ *
+ * Pairs rather than two flat lists, so the console can narrow the section
+ * dropdown to the class in hand. Fifteen sections shown against a chosen class
+ * are mostly combinations that match nobody; the pairs say which ones exist.
+ * Blank sections are kept — a class whose students have no section is a real
+ * answer, and dropping it would make those students unreachable.
+ */
+export const getStudentFilterOptions = async (req, res) => {
+  try {
+    const archived = String(req.query.status || '').trim().toLowerCase() === 'archived';
+    const rows = await Student.aggregate([
+      { $match: archived ? { active: false } : { active: { $ne: false } } },
+      {
+        $group: {
+          _id: { className: '$className', section: '$section' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.className': 1, '_id.section': 1 } },
+    ]);
+
+    res.json({
+      // A student with no class is not a class anybody can pick, so the pair
+      // is dropped from the options; the unfiltered list still shows them.
+      pairs: rows
+        .filter((row) => row._id.className)
+        .map((row) => ({
+          className: row._id.className,
+          section: row._id.section || '',
+          count: row.count,
+        })),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

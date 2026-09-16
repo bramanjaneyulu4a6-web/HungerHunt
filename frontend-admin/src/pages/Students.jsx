@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
+import { classesFrom, sectionsFor } from '../utils/studentFilterOptions';
 import Icon from '../components/Icon';
 import { formatINR } from '../utils/format';
 import { readStudentSheet } from '../utils/readStudentSheet';
@@ -139,6 +140,17 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
 
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [roomFilter, setRoomFilter] = useState('');
+  /* Class and section are two controls over one fact, so choosing a class
+     clears the section beneath it — a section left behind from the previous
+     class usually names a combination nobody is in, and the list would empty
+     for a reason the screen does not explain. */
+  const [classFilter, setClassFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [parentFilter, setParentFilter] = useState('');
+  // The class/section pairs the roll actually holds, reported by the server
+  // rather than written here: the roll mixes numeral systems and spells one
+  // section three ways, so any list asserted here would be wrong for some of it.
+  const [classPairs, setClassPairs] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
   // Which dialog is open, if any: 'editor' | 'import' | 'topup'.
@@ -176,6 +188,9 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
         status: 'active',
         q: searchQuery.trim() || undefined,
         roomId: roomFilter || undefined,
+        className: classFilter || undefined,
+        section: sectionFilter || undefined,
+        parentActivated: parentFilter || undefined,
         sort: sortConfig.key,
         direction: sortConfig.direction,
       } });
@@ -189,7 +204,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
     } finally {
       setLoading(false);
     }
-  }, [roomFilter, searchQuery, sortConfig.direction, sortConfig.key]);
+  }, [roomFilter, classFilter, sectionFilter, parentFilter, searchQuery, sortConfig.direction, sortConfig.key]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => fetchStudents(1), 250);
@@ -199,8 +214,12 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   useEffect(() => {
     const timer = window.setTimeout(async () => {
       try {
-        const { data } = await api.get('/rooms');
-        setRooms(data || []);
+        const [roomRes, optionRes] = await Promise.all([
+          api.get('/rooms'),
+          api.get('/students/filter-options'),
+        ]);
+        setRooms(roomRes.data || []);
+        setClassPairs(optionRes.data?.pairs || []);
       } catch (error) {
         console.error(error);
         setLoadError(true);
@@ -427,8 +446,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   };
 
   const visible = students;
-  const filtering = Boolean(searchQuery.trim() || roomFilter);
+  const filtering = Boolean(
+    searchQuery.trim() || roomFilter || classFilter || sectionFilter || parentFilter
+  );
   const editingStudent = editingId ? students.find((row) => row._id === editingId) : null;
+
+  const classOptions = classesFrom(classPairs);
+  const sectionOptions = sectionsFor(classPairs, classFilter);
 
   const roomOptions = rooms.map((room) => (
     <option
@@ -488,6 +512,45 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           ))}
         </select>
 
+        <select
+          className="input toolbar-select"
+          aria-label="Filter by class"
+          value={classFilter}
+          onChange={(event) => {
+            setClassFilter(event.target.value);
+            setSectionFilter('');
+          }}
+        >
+          <option value="">All classes</option>
+          {classOptions.map((className) => (
+            <option key={className} value={className}>{className}</option>
+          ))}
+        </select>
+
+        <select
+          className="input toolbar-select"
+          aria-label="Filter by section"
+          value={sectionFilter}
+          disabled={sectionOptions.length === 0}
+          onChange={(event) => setSectionFilter(event.target.value)}
+        >
+          <option value="">{classFilter ? 'All sections' : 'Section'}</option>
+          {sectionOptions.map((section) => (
+            <option key={section} value={section}>{section}</option>
+          ))}
+        </select>
+
+        <select
+          className="input toolbar-select"
+          aria-label="Filter by parent sign-in"
+          value={parentFilter}
+          onChange={(event) => setParentFilter(event.target.value)}
+        >
+          <option value="">Any parent</option>
+          <option value="no">Parent never signed in</option>
+          <option value="yes">Parent signed in</option>
+        </select>
+
         <p className="toolbar-count">
           {loading
             ? 'Loading…'
@@ -520,7 +583,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             filtering ? (
               <Button
                 variant="ghost"
-                onClick={() => { setSearchQuery(''); setRoomFilter(''); }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setRoomFilter('');
+                  setClassFilter('');
+                  setSectionFilter('');
+                  setParentFilter('');
+                }}
               >
                 Clear filters
               </Button>
@@ -530,7 +599,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           }
         >
           {filtering
-            ? 'Nothing matches the current search and room filter.'
+            ? 'Nothing matches the filters currently applied.'
             : 'Add one at a time, or import the roll from a spreadsheet.'}
         </EmptyState>
       ) : (

@@ -6,6 +6,7 @@ import {
   deleteStudent,
   bulkImportStudents,
   searchStudents,
+  getStudentFilterOptions,
   getStudentCount,
   getActiveStudentCount,
   topUpWallet,
@@ -42,6 +43,8 @@ router.route('/')
   .get(protectAdmin, getStudents)
   .post(protectAdmin, addStudent);
 
+/* Before the /:id routes below, so "filter-options" is not read as an id. */
+router.get('/filter-options', protectAdmin, getStudentFilterOptions);
 router.get('/count', protectAdmin, getStudentCount);
 router.get('/active-count', protectAdmin, getActiveStudentCount);
 router.get('/:id/wallet', protectAdmin, getWalletBalance);

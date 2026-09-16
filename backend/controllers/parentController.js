@@ -7,6 +7,7 @@ import PendingOrder from "../models/PendingOrder.js";
 import bcrypt from "bcryptjs";
 import { isOverdue, OPEN_STATUSES } from "../src/domain/fulfillment/overdue.js";
 import { isTestAccountPhone } from "../config/paymentAccess.js";
+import { isDemoParentPhone } from "../config/demoAccess.js";
 import { OrderStatus } from "../src/domain/fulfillment/orderState.js";
 import { signParentToken } from "../utils/tokens.js";
 import { assertOwnsStudent } from "../middleware/ownership.js";
@@ -398,7 +399,7 @@ export const getChildRecharges = async (req, res) => {
  * stored at payment for exactly this reason, so the deadline the parent reads
  * is the deadline the storeroom is working to, and no client has to know the
  * 48-hour rule or the business timezone to display it. */
-export const parentPackageView = (order, now, payment = null, { testAccount = false } = {}) => ({
+export const parentPackageView = (order, now, payment = null, { canSimulate = false } = {}) => ({
   id: String(order._id),
   studentId: String(order.studentId),
   studentName: order.studentSnapshot?.name || "",
@@ -421,19 +422,24 @@ export const parentPackageView = (order, now, payment = null, { testAccount = fa
      shows for the charge — one story across both screens. Null where the
      caller did not look the payment up (the dashboard's ongoing orders). */
   payment,
-  /* Only on the PhonePe test account's packages, and only while the package
-     is still moving: the reviewer may stand in for the warehouse and the
-     caretaker (see warehouseSimulationController). A real family's package
-     never carries the key at all, so the app cannot draw the button on a
-     falsy-but-present value either. */
-  ...(testAccount
+  /* Only on the packages of an account allowed to stand in for the warehouse
+     and the caretaker — the PhonePe reviewer and the showroom parent (see
+     warehouseSimulationController) — and only while the package is still
+     moving. A real family's package never carries the key at all, so the app
+     cannot draw the button on a falsy-but-present value either. */
+  ...(canSimulate
     ? {
         warehouseSimulation: ![OrderStatus.COLLECTED, OrderStatus.CANCELLED].includes(order.status),
       }
     : {}),
 });
 
-const packageViewOptions = (req) => ({ testAccount: isTestAccountPhone(req.parent?.phone) });
+/* The same two lists simulateWarehouse admits, asked the same way. Drawing the
+   button for anyone the route would refuse, or refusing anyone it draws it
+   for, would be the same bug from either end. */
+const packageViewOptions = (req) => ({
+  canSimulate: isTestAccountPhone(req.parent?.phone) || isDemoParentPhone(req.parent?.phone),
+});
 
 /* The payment behind each of the listed orders, keyed by transaction id.
  * Mode plus the references wallet activity quotes: a wallet charge's own

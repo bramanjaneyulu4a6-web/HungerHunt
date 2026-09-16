@@ -152,7 +152,7 @@ export const simulateWarehouse = async (req, res) => {
 
     res.json({
       message: 'Delivered. The warehouse and caretaker steps were simulated.',
-      package: parentPackageView(updated, new Date(), null, { testAccount: true }),
+      package: parentPackageView(updated, new Date(), null, { canSimulate: true }),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

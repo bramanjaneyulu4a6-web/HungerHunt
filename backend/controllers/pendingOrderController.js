@@ -8,7 +8,11 @@ import { chargeCart } from "../utils/checkout.js";
 import { isDemoStudent } from "../utils/demoAccount.js";
 import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
-import { healDemoAccount, resetDemoRequest } from "../utils/demoParentReset.js";
+import {
+  healDemoAccount,
+  resetDemoRequest,
+  seedDemoBasketAfterApproval,
+} from "../utils/demoParentReset.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -543,6 +547,11 @@ export const approvePendingOrder = async (req, res) => {
         }
       );
     }
+
+    /* The showroom parent's next basket goes up the moment this one is paid
+       for, beside the confirmed package. After the commit, so the charge is
+       settled before anything new is created. No-op for every real family. */
+    await seedDemoBasketAfterApproval(order);
 
     res.json({
       message: "Order approved.",

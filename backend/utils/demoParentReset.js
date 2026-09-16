@@ -5,7 +5,6 @@ import Transaction from '../models/Transaction.js';
 import WalletReversal from '../models/WalletReversal.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import PendingOrder, { pendingOrderExpiry } from '../models/PendingOrder.js';
-import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { DEMO_OPENING_BALANCE, isDemoParentPhone } from '../config/demoAccess.js';
 import { isDemoParentStudent } from './demoParent.js';
 import { buildDemoBaskets, nextBasketAfter } from './demoBaskets.js';
@@ -19,7 +18,10 @@ import { buildDemoBaskets, nextBasketAfter } from './demoBaskets.js';
  * file: however an order ends, everything it created is removed and the next
  * basket in the rotation is put in its place.
  *
- * An order can end four ways, and each has a hook:
+ * The next basket is put in place as soon as an order is approved —
+ * seedDemoBasketAfterApproval — so a visitor always has a request to answer
+ * while the confirmed order walks through the warehouse. After that, an order
+ * can end four ways, and each has a hook to clear up behind it:
  *   - collected (the parent simulating the warehouse, or a caretaker taking the
  *     student's code)            -> resetDemoOrder
  *   - cancelled by staff before dispatch -> resetDemoOrder, after the refund
@@ -46,7 +48,6 @@ import { buildDemoBaskets, nextBasketAfter } from './demoBaskets.js';
  */
 
 const OPEN_REQUEST = ['PENDING', 'PROCESSING'];
-const FINISHED_PACKAGE = [OrderStatus.COLLECTED, OrderStatus.CANCELLED];
 
 const nonFatal = (label, work) => async (...args) => {
   try {
@@ -57,20 +58,15 @@ const nonFatal = (label, work) => async (...args) => {
   }
 };
 
-/* The next basket for a child, if the child is free to take one.
+/* The next basket for a child, if the child has no request open.
  *
- * Free means no request open and no package still on its way. The first is a
- * hard rule — one_pending_order_per_student would refuse the insert. The second
- * is the demo's own: one order at a time is what makes the five read as a
- * sequence, and seeding while a package was in flight would let a visitor pile
- * up approvals the rotation was never meant to hold. */
+ * That is the only condition, and it is a hard one — one_pending_order_per_student
+ * would refuse the insert. A package still on its way does not hold the next
+ * basket back: the moment a visitor approves an order, the next one is already
+ * waiting beside the confirmed package, so they can walk the first through the
+ * warehouse and approve the second in either order. */
 const seedNextBasket = async ({ studentId, parentId, afterItems = [] }) => {
-  const [open, inFlight] = await Promise.all([
-    PendingOrder.exists({ studentId, status: { $in: OPEN_REQUEST } }),
-    FulfillmentOrder.exists({ studentId, status: { $nin: FINISHED_PACKAGE } }),
-  ]);
-
-  if (open || inFlight) return false;
+  if (await PendingOrder.exists({ studentId, status: { $in: OPEN_REQUEST } })) return false;
 
   const catalogue = await Product.find({
     active: { $ne: false },
@@ -153,6 +149,25 @@ export const resetDemoOrder = nonFatal('reset', async (order) => {
   return true;
 });
 
+/* An order the parent has just approved. It is now a confirmed package that
+   can be walked through the warehouse, and the next basket goes up beside it
+   straight away rather than when that walk finishes. */
+export const seedDemoBasketAfterApproval = nonFatal('seed', async (request) => {
+  if (!request?.studentId) return false;
+
+  const student = await Student.findById(request.studentId)
+    .select('parentPhoneNumber')
+    .lean();
+
+  if (!(await isDemoParentStudent(student))) return false;
+
+  return seedNextBasket({
+    studentId: request.studentId,
+    parentId: request.parentId,
+    afterItems: request.items,
+  });
+});
+
 /* A request the parent answered with no — or one that lapsed. Nothing was
    charged and nothing was packed, so there is only the request itself to
    clear before the next basket takes its place. */
@@ -177,7 +192,7 @@ export const resetDemoRequest = nonFatal('request reset', async (request) => {
 });
 
 /* The net under every path: called when the demo parent's app lists its
-   requests. For each child with nothing waiting and nothing on its way, the
+   requests. For each child with nothing waiting, the
    leftovers — rejected and expired requests, and requests whose window has
    passed but whose status still says PENDING — are cleared, and a basket is
    seeded after the most recent of them.

@@ -302,23 +302,66 @@ describe('keeping a basket waiting', () => {
     assert.equal(find.mock.callCount(), 0);
   });
 
-  /* One order at a time is what makes the five read as a sequence. A basket
-     seeded while a package was still on its way would let a visitor pile up
-     approvals the rotation was never meant to hold. */
-  test('no basket is seeded while a package is still on its way', async () => {
+  /* The next basket goes up beside a confirmed package, not after it: a
+     visitor approves an order and immediately has another to answer while the
+     first walks through the warehouse. */
+  test('a basket is seeded even while a package is still on its way', async () => {
     process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
     const PendingOrder = (await import('../models/PendingOrder.js')).default;
-    const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+    const Product = (await import('../models/Product.js')).default;
 
     mock.method(Student, 'find', () => ({ select: () => ({ lean: async () => [{ _id: 's1' }] }) }));
     mock.method(PendingOrder, 'exists', async () => null);
     mock.method(PendingOrder, 'find', () => ({ sort: () => ({ select: () => ({ lean: async () => [] }) }) }));
-    mock.method(FulfillmentOrder, 'exists', async () => ({ _id: 'in-flight' }));
+    mock.method(Product, 'find', () => ({ select: () => ({ lean: async () => [
+      { _id: 'p1', name: 'A', price: 10 }, { _id: 'p2', name: 'B', price: 20 },
+    ] }) }));
     const create = mock.method(PendingOrder, 'create', async () => ({}));
 
     const { healDemoAccount } = await import('../utils/demoParentReset.js');
     await healDemoAccount({ parentId: 'p1', phone: DEMO_PHONE });
 
+    assert.equal(create.mock.callCount(), 1);
+  });
+
+  test('approving a demo order puts the next basket up at once', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    const Product = (await import('../models/Product.js')).default;
+    const catalogue = [
+      { _id: 'p1', name: 'A', price: 10 }, { _id: 'p2', name: 'B', price: 20 },
+      { _id: 'p3', name: 'C', price: 30 }, { _id: 'p4', name: 'D', price: 40 },
+    ];
+
+    mock.method(Student, 'findById', () => ({
+      select: () => ({ lean: async () => ({ parentPhoneNumber: DEMO_PHONE }) }),
+    }));
+    mock.method(PendingOrder, 'exists', async () => null);
+    mock.method(Product, 'find', () => ({ select: () => ({ lean: async () => catalogue }) }));
+    const create = mock.method(PendingOrder, 'create', async () => ({}));
+
+    const { buildDemoBaskets } = await import('../utils/demoBaskets.js');
+    const baskets = buildDemoBaskets(catalogue);
+    const { seedDemoBasketAfterApproval } = await import('../utils/demoParentReset.js');
+
+    await seedDemoBasketAfterApproval({ studentId: 's1', parentId: 'p1', items: baskets[0].items });
+
+    assert.equal(create.mock.callCount(), 1);
+    assert.deepEqual(create.mock.calls[0].arguments[0].items, baskets[1].items,
+      'the basket after the approved one, not the same one again');
+  });
+
+  test('approving a real family\'s order seeds nothing', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    mock.method(Student, 'findById', () => ({
+      select: () => ({ lean: async () => ({ parentPhoneNumber: REAL_PHONE }) }),
+    }));
+    const create = mock.method(PendingOrder, 'create', async () => ({}));
+
+    const { seedDemoBasketAfterApproval } = await import('../utils/demoParentReset.js');
+
+    assert.equal(await seedDemoBasketAfterApproval({ studentId: 's9', parentId: 'p9', items: [] }), false);
     assert.equal(create.mock.callCount(), 0);
   });
 
@@ -336,5 +379,25 @@ describe('keeping a basket waiting', () => {
     assert.equal(await resetDemoRequest({ _id: 'r1', studentId: 's9', parentId: 'p9', items: [] }), false);
     assert.equal(remove.mock.callCount(), 0, 'a real family\'s history must not be deleted');
     assert.equal(create.mock.callCount(), 0);
+  });
+});
+
+/* The simulate button is drawn from one key on the package, and only an
+   account the simulate route would admit may carry it. */
+describe('the simulate-the-warehouse button', () => {
+  const pkg = (status) => ({ _id: 'f1', status, items: [], totalAmount: 30, studentSnapshot: {} });
+
+  test('a package that may be simulated carries the key while it is still moving', async () => {
+    const { parentPackageView } = await import('../controllers/parentController.js');
+
+    assert.equal(parentPackageView(pkg('PENDING'), new Date(), null, { canSimulate: true }).warehouseSimulation, true);
+    assert.equal(parentPackageView(pkg('COLLECTED'), new Date(), null, { canSimulate: true }).warehouseSimulation, false);
+  });
+
+  test('a real family\'s package never carries the key at all', async () => {
+    const { parentPackageView } = await import('../controllers/parentController.js');
+    const view = parentPackageView(pkg('PENDING'), new Date(), null);
+
+    assert.equal('warehouseSimulation' in view, false);
   });
 });

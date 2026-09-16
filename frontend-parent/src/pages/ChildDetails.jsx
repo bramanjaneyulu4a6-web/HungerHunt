@@ -257,6 +257,14 @@ export default function ChildDetails() {
      saved before that rule may still be daily or monthly, and the tile
      should not claim "weekly" for a cap the server is enforcing per day. */
   const [walletType, setWalletType] = useState('WEEKLY');
+  /* Set the moment the parent touches any of the three wallet-control states
+     above, cleared once a save succeeds. `load` checks this before reseeding
+     them from the server — it's a ref rather than state so the background
+     refresh below always reads the latest value without having to re-run
+     (and refetch) on every keystroke. DATA_CHANGED_EVENT alone can fire
+     several times a minute, and none of these refreshes should revert a
+     limit the parent is mid-typing. */
+  const walletDirtyRef = useRef(false);
   const [walletBanner, setWalletBanner] = useState({ type: '', message: '' });
   // null | 'topup' | 'control' — which of the two wallet actions is open.
   const [walletDialog, setWalletDialog] = useState(null);
@@ -347,9 +355,14 @@ export default function ChildDetails() {
         const control = student.walletControl;
 
         if (control) {
-          setWalletEnabled(control.enabled);
-          setWalletLimit(control.limitAmount || WALLET_LIMIT_MAX);
-          setWalletType(control.limitType || 'WEEKLY');
+          // Skip while an edit is in flight — see walletDirtyRef above. The
+          // first load always runs this (the ref starts false), so the
+          // controls still seed from the server as before.
+          if (!walletDirtyRef.current) {
+            setWalletEnabled(control.enabled);
+            setWalletLimit(control.limitAmount || WALLET_LIMIT_MAX);
+            setWalletType(control.limitType || 'WEEKLY');
+          }
         }
 
         setData({ ...res.data, student, wallet: walletRes.data.wallet });
@@ -478,6 +491,9 @@ export default function ChildDetails() {
       // A pre-rule daily or monthly control has just been rewritten weekly,
       // and the summary tile should say so without a reload.
       setWalletType('WEEKLY');
+      // The save just landed, so the next background load is safe to reseed
+      // these from the server again.
+      walletDirtyRef.current = false;
       setWalletBanner({ type: 'success', message: 'Wallet control updated.' });
     } catch (err) {
       setWalletBanner({
@@ -619,7 +635,10 @@ export default function ChildDetails() {
         label="Spending limit"
         value={walletEnabled}
         disabled={saving}
-        onTap={() => setWalletEnabled(!walletEnabled)}
+        onTap={() => {
+          walletDirtyRef.current = true;
+          setWalletEnabled(!walletEnabled);
+        }}
         activeLabel="On"
         inactiveLabel="Off"
         activeIcon={<Icon name="shield" size={24} />}
@@ -641,7 +660,10 @@ export default function ChildDetails() {
             max={WALLET_LIMIT_MAX}
             value={walletLimit}
             disabled={!walletEnabled || saving}
-            onChange={(e) => setWalletLimit(Number(e.target.value))}
+            onChange={(e) => {
+              walletDirtyRef.current = true;
+              setWalletLimit(Number(e.target.value));
+            }}
             placeholder="Enter amount"
             aria-invalid={walletBanner.type === 'error'}
             aria-describedby={walletBanner.type === 'error' ? 'wallet-limit-error' : undefined}

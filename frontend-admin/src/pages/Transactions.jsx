@@ -194,7 +194,8 @@ const Transactions = () => {
       else next.add(id);
       return next;
     });
-  const [sort, setSort] = useState({ key: 'at', direction: 'asc' });
+  // Latest first: whoever opens the page is usually looking for what just happened.
+  const [sort, setSort] = useState({ key: 'at', direction: 'desc' });
 
   // The panel closes on a click outside it or on Escape, like a menu.
   useEffect(() => {

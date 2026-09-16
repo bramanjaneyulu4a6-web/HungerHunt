@@ -62,21 +62,18 @@ Kept:
 `window.location.reload()` no longer appears in the utility. The `ErrorBoundary`
 retry button in the parent app keeps its own reload; that one is a user action.
 
-### A tiny subscription hook per app
+### Subscribing
 
-Each React app gets `src/hooks/useRefreshOn.js`:
+`DATA_CHANGED_EVENT` is exported from `dataAutoRefresh.js` itself, so the four
+copies stay self-contained. A screen subscribes with one
+`window.addEventListener(DATA_CHANGED_EVENT, refresh)` line inside the effect
+that already owns its loader, removed in that effect's cleanup.
 
-```js
-export const useRefreshOn = (events, refresh) => { /* add/remove listeners for each event; call refresh() on any */ }
-```
-
-`refresh` is the screen's existing loader. The parent screens already have
-three copies of add/remove-listener boilerplate for `PUSH_EVENT`; they move to
-this hook and add `DATA_CHANGED_EVENT` to the list. Warehouse and admin screens
-subscribe to `DATA_CHANGED_EVENT` only.
-
-The hook must not re-subscribe on every render: callers pass a stable loader
-(`useCallback`) or the hook holds the latest `refresh` in a ref.
+No shared hook. The parent screens' listeners live inside effects that also
+carry cancellation flags and a payment-sheet guard; pulling them into a hook
+would mean restructuring those effects for the sake of removing four lines of
+boilerplate each, which is the wrong trade while the goal is to stop the
+disturbance. Warehouse and admin screens subscribe in the same one-line way.
 
 ### Per app
 
@@ -130,10 +127,9 @@ place of a write-driven one every few seconds.
   does not dispatch and dispatches once on becoming visible; `enabled: false`
   never calls the api; the returned stop function removes listeners and stops
   the interval; and `window.location.reload` is never called.
-- `useRefreshOn` is not unit-tested: the three apps that use it run
-  `node --test` with no React renderer, and the kiosk (which has vitest) has no
-  subscriber. It is a dozen lines of `useEffect`; the manual checks below cover
-  it.
+- The one-line subscriptions in screens are not unit-tested: the three apps
+  with subscribers run `node --test` with no React renderer. The manual checks
+  below cover them.
 - Existing suites stay green: backend 1069, parent 67, and the admin,
   warehouse, kiosk suites at their current counts.
 - Manual: two parent devices on the same child, kiosk sale on that child;

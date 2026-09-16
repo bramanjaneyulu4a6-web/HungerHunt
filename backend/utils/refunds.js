@@ -6,6 +6,8 @@ import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { sessionOptions, withMongoTransaction } from './mongoTransaction.js';
 import { creditWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
+import { isDemoParentPhone } from '../config/demoAccess.js';
+import { resetDemoOrder } from './demoParentReset.js';
 
 const cancellable = [OrderStatus.PENDING, OrderStatus.PACKED];
 
@@ -21,7 +23,7 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
   }
 
   try {
-    return await withMongoTransaction(async (session) => {
+    const result = await withMongoTransaction(async (session) => {
       const now = new Date();
       const currentQuery = FulfillmentOrder.findById(orderId);
       const current = session ? await currentQuery.session(session) : await currentQuery;
@@ -82,7 +84,15 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
         throw error;
       }
 
-      for (const item of transaction.items) {
+      /* A showroom order never took stock — chargeCart skips the decrement for
+         it — so putting its lines back would add to the shelves items nobody
+         ever removed, and every cancelled demo package would inflate the
+         storeroom's counts. Read off the student creditWallet just returned,
+         not looked up: this is inside the money transaction, and the phone is
+         already in hand. */
+      const demoOrder = isDemoParentPhone(student.parentPhoneNumber);
+
+      for (const item of demoOrder ? [] : transaction.items) {
         await Inventory.updateOne(
           { productId: item.productId },
           { $inc: { stock: item.quantity } },
@@ -115,6 +125,10 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
       );
       return { reversal, order, student, replayed: false };
     });
+    // Outside the transaction: the refund is committed before the showroom
+    // account clears it away and seeds its next basket.
+    await resetDemoOrder(result.order);
+    return result;
   } catch (error) {
     if (error?.code !== 11000) throw error;
     const replay = await WalletReversal.findOne({ performedBy: actorId, idempotencyKey });

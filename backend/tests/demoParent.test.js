@@ -280,3 +280,61 @@ describe('the showroom wallet', () => {
     assert.notEqual(result.ok, true, 'an empty real wallet must still refuse the purchase');
   });
 });
+
+/* However a demo order ends, a basket must take its place — and a real family
+   opening their app must never set any of this off. */
+describe('keeping a basket waiting', () => {
+  test('a real family opening the app touches nothing at all', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    const find = mock.method(Student, 'find');
+    const { healDemoAccount } = await import('../utils/demoParentReset.js');
+
+    assert.equal(await healDemoAccount({ parentId: 'p1', phone: REAL_PHONE }), false);
+    assert.equal(find.mock.callCount(), 0, 'a real parent must not cost a single query');
+  });
+
+  test('with no demo account declared, not even the demo number heals', async () => {
+    process.env.DEMO_PARENT_PHONES = '';
+    const find = mock.method(Student, 'find');
+    const { healDemoAccount } = await import('../utils/demoParentReset.js');
+
+    assert.equal(await healDemoAccount({ parentId: 'p1', phone: DEMO_PHONE }), false);
+    assert.equal(find.mock.callCount(), 0);
+  });
+
+  /* One order at a time is what makes the five read as a sequence. A basket
+     seeded while a package was still on its way would let a visitor pile up
+     approvals the rotation was never meant to hold. */
+  test('no basket is seeded while a package is still on its way', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
+
+    mock.method(Student, 'find', () => ({ select: () => ({ lean: async () => [{ _id: 's1' }] }) }));
+    mock.method(PendingOrder, 'exists', async () => null);
+    mock.method(PendingOrder, 'find', () => ({ sort: () => ({ select: () => ({ lean: async () => [] }) }) }));
+    mock.method(FulfillmentOrder, 'exists', async () => ({ _id: 'in-flight' }));
+    const create = mock.method(PendingOrder, 'create', async () => ({}));
+
+    const { healDemoAccount } = await import('../utils/demoParentReset.js');
+    await healDemoAccount({ parentId: 'p1', phone: DEMO_PHONE });
+
+    assert.equal(create.mock.callCount(), 0);
+  });
+
+  test('a rejected request from a real family is left exactly as it is', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    const PendingOrder = (await import('../models/PendingOrder.js')).default;
+    mock.method(Student, 'findById', () => ({
+      select: () => ({ lean: async () => ({ parentPhoneNumber: REAL_PHONE }) }),
+    }));
+    const remove = mock.method(PendingOrder, 'deleteOne', async () => ({}));
+    const create = mock.method(PendingOrder, 'create', async () => ({}));
+
+    const { resetDemoRequest } = await import('../utils/demoParentReset.js');
+
+    assert.equal(await resetDemoRequest({ _id: 'r1', studentId: 's9', parentId: 'p9', items: [] }), false);
+    assert.equal(remove.mock.callCount(), 0, 'a real family\'s history must not be deleted');
+    assert.equal(create.mock.callCount(), 0);
+  });
+});

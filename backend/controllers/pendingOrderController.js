@@ -8,6 +8,7 @@ import { chargeCart } from "../utils/checkout.js";
 import { isDemoStudent } from "../utils/demoAccount.js";
 import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
+import { healDemoAccount, resetDemoRequest } from "../utils/demoParentReset.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -295,6 +296,13 @@ export const createPendingOrder = async (req, res) => {
 ========================================================= */
 export const getParentPendingOrders = async (req, res) => {
   try {
+    /* The showroom parent's account repairs itself here, before it is read:
+       a rejected or lapsed basket leaves nothing waiting, and this is the
+       moment a visitor would notice. No-op for every real family — it answers
+       on the phone alone before touching the database. See
+       utils/demoParentReset.js. */
+    await healDemoAccount({ parentId: req.parent.id, phone: req.parent.phone });
+
     const orders = await PendingOrder.find({
       parentId: req.parent.id,
       status: "PENDING",
@@ -581,6 +589,9 @@ export const rejectPendingOrder = async (req, res) => {
         message: "This order changed while it was being rejected. Refresh and try again.",
       });
     }
+
+    // A demo basket said no to is cleared and the next one put in its place.
+    await resetDemoRequest(rejected);
 
     res.json({ message: "Order rejected." });
   } catch (err) {

@@ -36,6 +36,7 @@ import { requestContext } from './src/interfaces/http/middleware/requestContext.
 import { logger } from './src/shared/observability/logger.js';
 import { v1ProcurementEnabled } from './config/features.js';
 import { paymentAccessSummary } from './config/paymentAccess.js';
+import { demoAccessSummary } from './config/demoAccess.js';
 import { paymentConfigurationProblems, sandboxOnProductionService } from './config/paymentConfig.js';
 import { parentSecretIsShared, studentSecretIsShared } from './utils/tokens.js';
 import { graceUntil, unverifiedBillsAccepted } from './utils/purchaseAuthorization.js';
@@ -124,6 +125,13 @@ if (phonepePaymentsEnabled && problems.length) {
    PHONEPE_TEST_PARENT_PHONES leaves payments open to every family on the
    roll, and nothing else would report it. */
 if (phonepePaymentsEnabled) console.log(paymentAccessSummary());
+/* Unconditionally, unlike the line above. A demo parent account is switched on
+   by a variable and by nothing else, so the only way to find out whether a
+   running server believes in one is to ask it — and a server that quietly
+   believed in one, whose orders delete themselves and whose wallet refills,
+   is the dangerous direction for this to fail in. Saying "none" out loud is
+   the point: it is what makes a mistyped variable name visible. */
+console.log(demoAccessSummary());
 
 /* Said as loudly as the log allows, because everything else about this boot
    looks normal. A production service on the sandbox gateway completes

@@ -141,9 +141,19 @@ try {
     console.log(`    ${index + 1}. Rs.${String(basket.totalAmount).padEnd(5)} ${lines}`);
   });
 
+  /* Read from the environment of whatever machine is running this, which on a
+     --prod run is a laptop and not the server. It therefore says nothing about
+     what Render has, and saying "declared" flatly would read as confirmation
+     that the live backend is configured when it is only this shell that is. */
   const declared = demoParentPhones().has(phone);
   console.log(
-    `\n  DEMO_PARENT_PHONES  ${declared ? 'declares this number' : 'DOES NOT declare this number'}`
+    `\n  DEMO_PARENT_PHONES  ${
+      declared ? 'declares this number' : 'does not declare this number'
+    } in THIS shell's environment.`
+  );
+  console.log(
+    '                      That is not the server. Check Render: without it there,' +
+      ' the account takes real stock and nothing resets.'
   );
 
   if (!apply) {
@@ -217,13 +227,11 @@ try {
 
     console.log(`\nApplied. ${child.name} has Rs.${written.pocketMoney} and asks a parent to approve.`);
 
-    if (!declared) {
-      console.log(
-        `\nNot a demo account yet. Add ${phone} to DEMO_PARENT_PHONES on both Render services` +
-          ' and redeploy, or its orders will behave like any real family\'s: stock will be taken' +
-          ' and nothing will reset.'
-      );
-    }
+    console.log(
+      `\nThe data is ready. The account is only a demo account once ${phone} is in` +
+        ' DEMO_PARENT_PHONES on both Render services and they have been redeployed —' +
+        " until then its orders behave like any real family's: stock is taken and nothing resets."
+    );
   }
 } finally {
   await mongoose.disconnect();

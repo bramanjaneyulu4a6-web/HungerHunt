@@ -5,6 +5,7 @@ import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { caretakerProductTotals, filterCaretakerOrders } from '../utils/caretakerOrders';
 import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 
@@ -170,6 +171,14 @@ const CaretakerOrders = () => {
   useEffect(() => {
     const interval = window.setInterval(() => loadArrivals({ silent: true }), REFRESH_INTERVAL_MS);
     return () => window.clearInterval(interval);
+  }, [loadArrivals]);
+
+  // The backend announces every change within seconds; the interval above is
+  // the safety net for when that announcement is missed.
+  useEffect(() => {
+    const refresh = () => loadArrivals({ silent: true });
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(DATA_CHANGED_EVENT, refresh);
   }, [loadArrivals]);
 
   useEffect(() => {

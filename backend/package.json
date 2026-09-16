@@ -29,7 +29,8 @@
     "stock:opening": "node scripts/setOpeningStock.js",
     "student:checkout": "node scripts/setStudentCheckout.js",
     "seed:units": "node scripts/seedUnits.js",
-    "student:demo": "node scripts/createDemoStudent.js"
+    "student:demo": "node scripts/createDemoStudent.js",
+    "products:clear-discounts": "node scripts/clearProductDiscounts.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

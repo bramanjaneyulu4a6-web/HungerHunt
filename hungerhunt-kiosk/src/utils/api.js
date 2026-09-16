@@ -1,4 +1,5 @@
 import axios from "axios";
+import { LOGIN_DISABLED } from "../constants/kioskMode";
 import { observeMutationRevision } from "./dataAutoRefresh";
 
 const api = axios.create({
@@ -25,8 +26,12 @@ api.interceptors.response.use(
       localStorage.removeItem("kioskToken");
       localStorage.removeItem("kioskStudent");
 
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+      // With no gate there is nowhere to send them but back to the start,
+      // which opens a fresh demo session rather than a login screen.
+      const start = LOGIN_DISABLED ? "/" : "/login";
+
+      if (window.location.pathname !== start) {
+        window.location.href = start;
       }
     }
 

@@ -10,8 +10,10 @@ import { Toaster } from "react-hot-toast";
 
 import KioskBilling from "./pages/KioskBilling";
 import Login from "./pages/Login";
+import DemoKiosk from "./pages/DemoKiosk";
 import ProtectedRoute from "./components/ProtectedRoute";
 import api from "./utils/api";
+import { LOGIN_DISABLED } from "./constants/kioskMode";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
 /* The kiosk owns the end of a session, and there are four ways to reach it:
@@ -56,18 +58,32 @@ function App() {
   return (
     <Router>
       <Toaster position="top-center" />
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <KioskScreen />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {/* Two kiosks, and only ever one of them built: the terminal that asks
+          who is standing at it, and the one that does not. The gate is not
+          hidden behind a redirect when it is off — Login is not mounted at
+          all, so there is no field to type a real admission number into and
+          nothing is sent on anybody's behalf. See src/constants/kioskMode.js. */}
+      {LOGIN_DISABLED ? (
+        <Routes>
+          <Route path="/" element={<DemoKiosk />} />
+          {/* Including /login, which the APK's deep link and any bookmark
+              still ask for. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <KioskScreen />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      )}
     </Router>
   );
 }

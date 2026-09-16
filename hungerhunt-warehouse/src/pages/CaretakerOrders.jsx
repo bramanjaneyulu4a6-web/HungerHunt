@@ -8,6 +8,7 @@ import api from '../utils/api';
 import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { caretakerProductTotals, filterCaretakerOrders } from '../utils/caretakerOrders';
 import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
+import { useFeature } from '../utils/currentStaff';
 
 const HISTORY_PAGE_SIZE = 25;
 const REFRESH_INTERVAL_MS = 15_000;
@@ -49,6 +50,7 @@ const STATUS_DETAILS = {
 const DeliveredActions = ({ order }) => {
   const navigate = useNavigate();
   const [reporting, setReporting] = useState(false);
+  const canReport = useFeature('caretaker.reportPackage');
 
   if (reporting) {
     return (
@@ -75,9 +77,11 @@ const DeliveredActions = ({ order }) => {
       >
         Order Complete
       </button>
-      <button type="button" className="wh-report-link" onClick={() => setReporting(true)}>
-        Issue with this package
-      </button>
+      {canReport && (
+        <button type="button" className="wh-report-link" onClick={() => setReporting(true)}>
+          Issue with this package
+        </button>
+      )}
     </div>
   );
 };
@@ -114,6 +118,8 @@ const StudentDetails = ({ order }) => (
 );
 
 const CaretakerOrders = () => {
+  // History can be hidden from this account by a super admin.
+  const canHistory = useFeature('caretaker.history');
   const [view, setView] = useState('arriving');
   const [orders, setOrders] = useState([]);
   const [history, setHistory] = useState([]);
@@ -226,9 +232,11 @@ const CaretakerOrders = () => {
         <button type="button" className={view === 'arriving' ? 'active' : ''} onClick={() => showView('arriving')}>
           Current ({orders.length})
         </button>
-        <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}>
-          History
-        </button>
+        {canHistory && (
+          <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}>
+            History
+          </button>
+        )}
       </div>
 
       {view === 'arriving' ? (

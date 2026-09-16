@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 
 import api from '../utils/api';
+import { useCurrentStaff } from '../utils/currentStaff';
 import { Banner, PageHeader } from '../components/ui';
 import Students from './Students';
 import ParentsTab from './users/ParentsTab';
@@ -10,8 +11,19 @@ import ArchivedUsersTab from './users/ArchivedUsersTab';
 
 const SECTIONS = new Set(['students', 'parents', 'staff', 'archived']);
 
+/* The roster answers only to the super admin. For anyone else it is 403 —
+   a refusal, not a failure — so it reads as an empty list rather than taking
+   the students and parents down with it. */
+const staffOrNone = () => api.get('/admin/users/staff')
+  .then((response) => response.data || [])
+  .catch((error) => {
+    if (error.response?.status === 403) return [];
+    throw error;
+  });
+
 export default function Users() {
   const { section } = useParams();
+  const { me, loaded } = useCurrentStaff();
   const [parents, setParents] = useState([]);
   const [staff, setStaff] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -22,13 +34,13 @@ export default function Users() {
     setLoading(true);
     setError(false);
     try {
-      const [parentRes, staffRes, roomRes] = await Promise.all([
+      const [parentRes, staffRows, roomRes] = await Promise.all([
         api.get('/admin/users/parents'),
-        api.get('/admin/users/staff'),
+        staffOrNone(),
         api.get('/rooms'),
       ]);
       setParents(parentRes.data || []);
-      setStaff(staffRes.data || []);
+      setStaff(staffRows);
       setRooms(roomRes.data || []);
     } catch (loadError) {
       console.error(loadError);
@@ -71,8 +83,11 @@ export default function Users() {
       {section === 'parents' && (
         <ParentsTab parents={activeParents} loading={loading} onChanged={load} />
       )}
-      {section === 'staff' && (
-        <StaffTab staff={activeStaff} rooms={rooms} loading={loading} onChanged={load} />
+      {section === 'staff' && loaded && !me.isSuperAdmin && (
+        <Banner variant="warn">Only a super admin can see and manage staff accounts.</Banner>
+      )}
+      {section === 'staff' && loaded && me.isSuperAdmin && (
+        <StaffTab staff={activeStaff} rooms={rooms} loading={loading} onChanged={load} me={me} />
       )}
       {section === 'archived' && (
         <ArchivedUsersTab parents={parents} staff={staff} loadingAccounts={loading} onChanged={load} />

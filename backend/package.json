@@ -33,7 +33,8 @@
     "products:clear-discounts": "node scripts/clearProductDiscounts.js",
     "products:kiosk": "node scripts/setKioskVisibility.js",
     "parent:demo": "node scripts/createDemoParent.js",
-    "migrate:class-names": "node scripts/normalizeStudentClasses.js"
+    "migrate:class-names": "node scripts/normalizeStudentClasses.js",
+    "admin:super": "node scripts/grantSuperAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

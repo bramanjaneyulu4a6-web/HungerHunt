@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import Icon from "../components/Icon";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
+import { useFeature } from "../utils/currentStaff";
 
 /* The supplier side of the storeroom, which used to be two tabs: what has been
    ordered and is still owed, and what has already been booked in. They are the
@@ -32,6 +33,9 @@ const damagedIn = (receipt) =>
   receipt.lines.reduce((sum, line) => sum + (line.damaged || 0), 0);
 
 const Purchases = () => {
+  // Receiving can be hidden from this account; the list of what is coming
+  // still shows.
+  const canReceive = useFeature("warehouse.receive");
   const navigate = useNavigate();
   const [view, setView] = useState("coming");
   const [orders, setOrders] = useState([]);
@@ -68,7 +72,7 @@ const Purchases = () => {
     </EmptyState>
   ) : (
     orders.map((po) => {
-      const receivable = ["APPROVED", "PARTIALLY_RECEIVED"].includes(po.status);
+      const receivable = canReceive && ["APPROVED", "PARTIALLY_RECEIVED"].includes(po.status);
       const open = () => receivable && navigate(`/purchases/receive/${po.id}`);
 
       return (

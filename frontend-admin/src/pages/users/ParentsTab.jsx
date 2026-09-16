@@ -3,12 +3,9 @@ import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
+import { useCurrentStaff } from '../../utils/currentStaff';
 import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 import { ParentActivityModal } from '../../components/WalletActivity';
-
-/* Hidden by the owner on 2026-09-12, asked for again on 2026-09-16. Kept as a
-   switch rather than deleted, because it has been wanted both ways. */
-const SHOW_RESET_ACCESS = true;
 
 const EMPTY = { fatherName: '', phone: '', email: '', studentIds: [] };
 
@@ -21,6 +18,10 @@ const statusOf = (parent) => {
 export default function ParentsTab({ parents, loading, onChanged }) {
   const [searchParams] = useSearchParams();
   const focusedParentId = searchParams.get('focus') || '';
+  // Hidden by the owner on 2026-09-12, asked for again on 2026-09-16, and
+  // now a super admin's choice per role or account (Feature visibility).
+  const { me } = useCurrentStaff();
+  const showResetAccess = me.isSuperAdmin || !me.hiddenFeatures.includes('parents.resetAccess');
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -221,7 +222,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                     <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>
                     {/* Reactivate is never gated: an archived parent has no
                         other way back. Reset access answers to the switch. */}
-                    {(SHOW_RESET_ACCESS || !parent.active) && (
+                    {(showResetAccess || !parent.active) && (
                       <Button className="btn--sm" variant="ghost" disabled={workingId === parent.id} onClick={() => requirePasswordSetup(parent)}>
                         {parent.active ? 'Reset access' : 'Reactivate'}
                       </Button>

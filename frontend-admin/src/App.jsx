@@ -25,6 +25,7 @@ const Products = lazy(() => import('./pages/Products'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const AccountingExport = lazy(() => import('./pages/AccountingExport'));
 const StaffReports = lazy(() => import('./pages/StaffReports'));
+const FeatureVisibility = lazy(() => import('./pages/FeatureVisibility'));
 
 const RouteFallback = () => (
   <div className="route-fallback" role="status" aria-live="polite">
@@ -60,6 +61,7 @@ function App() {
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/accounting-export" element={<AccountingExport />} />
             <Route path="/reports" element={<StaffReports />} />
+            <Route path="/features" element={<FeatureVisibility />} />
             <Route path="/warehouse" element={<WarehouseOverview />} />
             <Route path="/warehouse/student-orders" element={<FulfillmentOrders />} />
             <Route path="/warehouse/review" element={<ProcurementReview />} />

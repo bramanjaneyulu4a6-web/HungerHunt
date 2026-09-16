@@ -2,11 +2,18 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 import api from '../../utils/api';
+import { refreshCurrentStaff } from '../../utils/currentStaff';
 import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 
-const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [] };
+const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [], isSuperAdmin: false };
 
-export default function StaffTab({ staff, rooms, loading, onChanged }) {
+const roleLabel = (account) => {
+  if (account.role === 'warehouse') return 'Warehouse';
+  if (account.role === 'caretaker') return 'Caretaker';
+  return account.isSuperAdmin ? 'Super admin' : 'Admin';
+};
+
+export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
   const [confirming, setConfirming] = useState(null);
@@ -19,6 +26,7 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
     setForm({
       name: account.name || '', phone: account.phone || '', email: account.email || '', password: '',
       role: account.role || 'admin', roomIds: (account.rooms || []).map((room) => room.id),
+      isSuperAdmin: account.isSuperAdmin === true,
     });
   };
   const close = () => { setEditing(undefined); setForm(EMPTY); };
@@ -30,20 +38,21 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
       return;
     }
     setSaving(true);
+    const payload = {
+      ...form,
+      roomIds: form.role === 'caretaker' ? form.roomIds : [],
+      isSuperAdmin: form.role === 'admin' && form.isSuperAdmin,
+    };
     try {
       if (editing) {
-        await api.put(`/admin/users/staff/${editing.id}`, {
-          ...form,
-          roomIds: form.role === 'caretaker' ? form.roomIds : [],
-        });
+        await api.put(`/admin/users/staff/${editing.id}`, payload);
       } else {
-        await api.post('/admin/register', {
-          ...form,
-          roomIds: form.role === 'caretaker' ? form.roomIds : [],
-        });
+        await api.post('/admin/register', payload);
       }
       toast.success(editing ? 'Staff account updated' : 'Staff account created');
       close();
+      // Editing your own row can change the name the sidebar shows.
+      if (editing?.id === me?.id) refreshCurrentStaff();
       await onChanged();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Could not save staff account');
@@ -94,12 +103,12 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
             <tr key={account.id}>
               <td data-label="Name"><strong>{account.name}</strong></td>
               <td data-label="Contact"><div>{account.phone}</div><small>{account.email || 'No email'}</small></td>
-              <td data-label="Role">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}</td>
+              <td data-label="Role">{roleLabel(account)}{account.id === me?.id && <small> · you</small>}</td>
               <td data-label="Assignment">{(account.rooms || []).map((room) => room.code).join(' · ') || '—'}</td>
               <td data-label="Status"><Badge variant={account.active ? 'success' : 'neutral'}>{account.active ? 'Active' : 'Inactive'}</Badge></td>
               <td data-label="Actions"><div className="cell-actions">
                 <Button className="btn--sm" variant="ghost" onClick={() => openEdit(account)}>Edit</Button>
-                <Button className="btn--sm" variant="danger" disabled={workingId === account.id} onClick={() => setActive(account, false)}>Archive</Button>
+                <Button className="btn--sm" variant="danger" disabled={workingId === account.id || account.id === me?.id} title={account.id === me?.id ? 'You cannot archive the account you are using' : undefined} onClick={() => setActive(account, false)}>Archive</Button>
               </div></td>
             </tr>
           ))}</tbody>
@@ -109,15 +118,26 @@ export default function StaffTab({ staff, rooms, loading, onChanged }) {
       {editing !== undefined && (
         <div className="modal-backdrop" onClick={() => !saving && close()}>
           <form className="modal" style={{ maxWidth: 560 }} onSubmit={submit} onClick={(event) => event.stopPropagation()}>
-            <header className="modal-head"><div><h3 className="modal-title">{editing ? 'Edit staff account' : 'Add staff account'}</h3><p className="modal-sub">Access is enforced by the selected role.</p></div></header>
+            <header className="modal-head"><div><h3 className="modal-title">{editing ? 'Edit staff account' : 'Add staff account'}</h3><p className="modal-sub">Access is enforced by the selected role. A super admin also manages every account here.</p></div></header>
             <div className="modal-fields">
               <label><span className="field-label">Full name</span><input className="input" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
               <label><span className="field-label">Phone</span><input className="input" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
               <label><span className="field-label">Email{form.role === 'admin' ? '' : ' (optional)'}</span><input className="input" type="email" required={form.role === 'admin'} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
               {!editing && <label><span className="field-label">Temporary password</span><input className="input" type="password" minLength={8} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>}
-              <label><span className="field-label">Role</span><select className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [] })}>
+              <label><span className="field-label">Role</span><select className="input" value={form.role} disabled={editing?.id === me?.id} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [], isSuperAdmin: event.target.value === 'admin' ? form.isSuperAdmin : false })}>
                 <option value="admin">Admin — full back office</option><option value="warehouse">Warehouse</option><option value="caretaker">Caretaker</option>
               </select></label>
+              {form.role === 'admin' && (
+                <label className="student-picker__row">
+                  <input
+                    type="checkbox"
+                    checked={form.isSuperAdmin}
+                    disabled={editing?.id === me?.id}
+                    onChange={(event) => setForm({ ...form, isSuperAdmin: event.target.checked })}
+                  />
+                  <span><strong>Super admin</strong><small>Sees every menu and controls every account, including other admins.{editing?.id === me?.id ? ' You cannot change this on your own account.' : ''}</small></span>
+                </label>
+              )}
               {form.role === 'caretaker' && <fieldset className="student-picker"><legend>Assigned rooms</legend>
                 {rooms.filter((room) => room.active).map((room) => (
                   <label key={room._id} className="student-picker__row">

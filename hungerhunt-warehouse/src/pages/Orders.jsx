@@ -6,6 +6,7 @@ import { Banner, EmptyState, Skeleton } from "../components/ui";
 import api from "../utils/api";
 import { groupOrdersByBlock } from "../utils/orderGroups";
 import { isShareCancel, openOrdersPrintSheet } from "../utils/ordersPrintSheet";
+import { useFeature } from "../utils/currentStaff";
 
 const VIEWS = [
   ["PENDING", "New orders"],
@@ -35,7 +36,7 @@ const ItemList = ({ items }) => (
 
 /* A unit is the rooms one caretaker holds, and they travel as one delivery, so
    the board gives them one tile and one button rather than a row each. */
-const UnitTile = ({ unit, status, busy, onAdvance, onReport }) => (
+const UnitTile = ({ unit, status, busy, onAdvance, onReport, canReport = true }) => (
   <article className="wh-unit-tile">
     <div className="wh-unit-tile-head">
       <div>
@@ -64,7 +65,7 @@ const UnitTile = ({ unit, status, busy, onAdvance, onReport }) => (
               ? "Deliver"
               : "Record handover"}
       </button>
-      {status === "PENDING" && (
+      {status === "PENDING" && canReport && (
         <button type="button" className="wh-report-tile" disabled={busy} onClick={() => onReport(unit)}>
           Report
         </button>
@@ -74,6 +75,9 @@ const UnitTile = ({ unit, status, busy, onAdvance, onReport }) => (
 );
 
 const Orders = () => {
+  // Two actions a super admin may hide from this account.
+  const canPrint = useFeature("warehouse.printOrders");
+  const canReport = useFeature("warehouse.reportIssue");
   const [view, setView] = useState("PENDING");
   const [orders, setOrders] = useState([]);
   // Which rooms travel together is the server's answer, not this screen's.
@@ -258,10 +262,12 @@ const Orders = () => {
           <h1 className="wh-title">Active orders</h1>
           <p className="wh-subtitle">Pack and deliver by block and room</p>
         </div>
+        {canPrint && (
         <button type="button" className="wh-block-action" disabled={printing || loading}
           onClick={() => setPrintChoice({ PENDING: true, PACKED: true, OUT_FOR_DELIVERY: true })}>
           {printing ? "Preparing…" : "Print orders list"}
         </button>
+        )}
       </div>
 
       <div className="wh-view-tabs wh-order-tabs" role="tablist" aria-label="Active order stages">
@@ -306,7 +312,7 @@ const Orders = () => {
           </div>
           <div className="wh-unit-grid">
             {activeBlock.units.map((unit) => (
-              <UnitTile key={unit.key} unit={unit} status={view}
+              <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport}
                 busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit}
                 onReport={(selected) => setReporting({ unit: selected, category: "", note: "" })} />
             ))}
@@ -327,7 +333,7 @@ const Orders = () => {
               </header>
               <div className="wh-unit-scroll">
                 {block.units.map((unit) => (
-                  <UnitTile key={unit.key} unit={unit} status={view}
+                  <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport}
                     busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit} />
                 ))}
               </div>

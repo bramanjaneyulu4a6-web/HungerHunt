@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Outlet, Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import StockAlertBanner from "./StockAlertBanner";
 import ReportAlertBanner from "./ReportAlertBanner";
+import { visibleNav } from "../utils/nav";
+import { clearCurrentStaff, useCurrentStaff } from "../utils/currentStaff";
 
 const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
@@ -29,22 +31,6 @@ const WAREHOUSE_NAV = [
   { path: "/warehouse/suppliers", label: "Suppliers", icon: "⇄" },
 ];
 
-/* Hidden from the menus for now, by the owner's decision (2026-09-12): the
-   console shows Dashboard, Students, Parents and Wallet Ledger only. This is a
-   frontend hide, not a permission — the routes still answer to a typed URL.
-   To bring an item back, delete its path from this list. An emptied Warehouse
-   group hides its toggle as well. */
-const HIDDEN_NAV_PATHS = new Set([
-  "/billing",
-  "/reports",
-  "/accounting-export",
-  "/users/staff",
-  "/users/archived",
-  ...WAREHOUSE_NAV.map((item) => item.path),
-]);
-
-const visible = (items) => items.filter((item) => !HIDDEN_NAV_PATHS.has(item.path));
-
 const WarehouseContextBar = () => (
   <div className="warehouse-context" aria-label="Warehouse workspace navigation">
     <div className="warehouse-context__identity">
@@ -68,7 +54,7 @@ const WarehouseContextBar = () => (
   </div>
 );
 
-const UsersContextBar = () => (
+const UsersContextBar = ({ visible }) => (
   <div className="warehouse-context" aria-label="Users workspace navigation">
     <div className="warehouse-context__identity">
       <span className="warehouse-context__mark" aria-hidden="true">U</span>
@@ -98,9 +84,17 @@ const Layout = () => {
   const [isExpanded, setIsExpanded] = useState(() => window.innerWidth > 768);
   const [usersOpen, setUsersOpen] = useState(inUsers);
   const [warehouseOpen, setWarehouseOpen] = useState(inWarehouse);
+  // What this account does not see, as the server settled it: the admin
+  // role's default (a super admin's choice, or the built-in list until one is
+  // made) plus this account's own exceptions. Nothing is hidden from a super
+  // admin, who also gets the Features page to change all of this.
+  const { me } = useCurrentStaff();
+  const hiddenPaths = new Set(me.hiddenFeatures);
+  const visible = (items) => visibleNav(items, hiddenPaths, { isSuperAdmin: me.isSuperAdmin });
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
+    clearCurrentStaff();
     navigate("/login");
   };
 
@@ -244,9 +238,31 @@ const Layout = () => {
             )}
           </div>
           )}
+
+          {me.isSuperAdmin && (
+            <>
+              <p className="sidenav-section-label">Super admin</p>
+              <NavLink
+                to="/features"
+                className={({ isActive }) =>
+                  `sidenav-link${isActive ? " sidenav-link--active" : ""}`
+                }
+                title={isExpanded ? undefined : "Feature visibility"}
+              >
+                <span className="sidenav-icon" aria-hidden="true">◎</span>
+                {isExpanded && <span className="sidenav-label">Feature visibility</span>}
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div className="sidenav-footer">
+          {isExpanded && me.name && (
+            <div className="sidenav-identity" title={me.email || undefined}>
+              <strong>{me.name}</strong>
+              <small>{me.isSuperAdmin ? "Super admin" : "Admin"}</small>
+            </div>
+          )}
           <button
             type="button"
             className="sidenav-logout"
@@ -260,7 +276,7 @@ const Layout = () => {
       </aside>
 
       <main className="layout-main">
-        {inUsers && <UsersContextBar />}
+        {inUsers && <UsersContextBar visible={visible} />}
         {inWarehouse && <WarehouseContextBar />}
         {inWarehouse && <StockAlertBanner />}
         {/* Every screen except the queue itself, which already is the queue. */}

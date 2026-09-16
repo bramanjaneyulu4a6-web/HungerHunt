@@ -70,7 +70,7 @@ Set `TRUST_PROXY` when deploying behind a proxy or managed host (usually `1`, th
 
 The API has three explicit token boundaries:
 
-- **Staff** (`protectAdmin` and role-specific staff guards) use `JWT_SECRET` for the office, warehouse and caretaker experiences.
+- **Staff** (`protectAdmin` and role-specific staff guards) use `JWT_SECRET` for the office, warehouse and caretaker experiences. One or more admins also carry the **super admin** flag (`isSuperAdmin`): only they see and manage the staff roster, create accounts once the system is bootstrapped, and grant the flag to other admins. The first account ever registered is a super admin; afterwards `npm run admin:super -- <email> [--prod]` in `backend/` grants it by email. The admin console unhides every menu for a super admin.
 - **Parents** (`protectParent`) use `PARENT_JWT_SECRET`. Parents may only act on linked students; the server enforces ownership on every child-scoped endpoint.
 - **Students** (`protectStudent`) receive short-lived kiosk sessions signed with `STUDENT_JWT_SECRET` after entering their admission number. The kiosk device itself is deliberately public and has no account, device credential or enrollment step. The four-digit purchase code is still required at checkout before money can move.
 

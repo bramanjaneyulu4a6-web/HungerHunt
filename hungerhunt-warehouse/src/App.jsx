@@ -6,6 +6,8 @@ import Icon from "./components/Icon";
 import { clearSession } from "./utils/session";
 import api from "./utils/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
+import { clearCurrentStaff, useCurrentStaff, useFeature } from "./utils/currentStaff";
+import { visibleTabs } from "./utils/features";
 
 /* One chunk per screen, fetched when that screen is opened. A caretaker only
    ever reaches three of these and never downloads the storeroom's; the
@@ -30,9 +32,15 @@ const TABS = [
   { to: "/records", icon: "receipt", label: "Records" },
 ];
 
-const TabBar = () => (
+/* Tabs a super admin has hidden for this role or this account are left out.
+   A hide, not a permission: the route still answers if typed, and every
+   request behind it is judged by the server. */
+const TabBar = () => {
+  const { me } = useCurrentStaff();
+
+  return (
   <nav className="wh-tabbar">
-    {TABS.map((tab) => (
+    {visibleTabs(TABS, me.hiddenFeatures).map((tab) => (
       <NavLink
         key={tab.to}
         to={tab.to}
@@ -44,13 +52,15 @@ const TabBar = () => (
       </NavLink>
     ))}
   </nav>
-);
+  );
+};
 
 const SignOutButton = ({ bare = false }) => {
   const navigate = useNavigate();
 
   const signOut = () => {
     clearSession(["warehouseToken", "staffRole", "staffProfile"]);
+    clearCurrentStaff();
     navigate("/login", { replace: true });
   };
 
@@ -101,6 +111,7 @@ const ReportsButton = () => {
 
 const CaretakerShell = ({ children, identity = true }) => {
   const profile = readStaffProfile();
+  const reportsAllowed = useFeature("caretaker.reports");
   /* Devices already in the field hold the single-room profile written by the
      old login and will keep it until the caretaker signs in again, so the one
      room is read as a list of one rather than shown as missing. */
@@ -115,7 +126,7 @@ const CaretakerShell = ({ children, identity = true }) => {
           <span><strong>Hunger Hunt</strong><small>Caretaker</small></span>
         </div>
         <div className="caretaker-header__actions">
-          <ReportsButton />
+          {reportsAllowed && <ReportsButton />}
           <SignOutButton bare />
         </div>
       </header>
@@ -175,6 +186,21 @@ const roleFromToken = () => {
   }
 };
 
+// The reports screen when a super admin has hidden it from this caretaker:
+// back to the packages, the same as a tab the bar does not show.
+const CaretakerReportsRoute = () => {
+  const { loaded } = useCurrentStaff();
+  const allowed = useFeature("caretaker.reports");
+
+  if (loaded && !allowed) return <Navigate to="/" replace />;
+
+  return (
+    <ProtectedRoute>
+      <CaretakerShell identity={false}><CaretakerReports /></CaretakerShell>
+    </ProtectedRoute>
+  );
+};
+
 const StaffRoutes = () => {
   // The route tree follows the role stamped into the signed token, not the
   // mutable companion value in localStorage. The backend remains the security
@@ -197,14 +223,7 @@ const StaffRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <CaretakerShell identity={false}><CaretakerReports /></CaretakerShell>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/reports" element={<CaretakerReportsRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

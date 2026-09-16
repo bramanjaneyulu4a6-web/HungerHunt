@@ -62,6 +62,92 @@
   text-transform: uppercase;
 }
 
+/* Who is signed in, above sign-out. The role line is the one place the
+   console says "Super admin" outside the roster itself. */
+.sidenav-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px 12px;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.sidenav-identity strong {
+  color: var(--on-dark);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidenav-identity small {
+  color: var(--muted-soft);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---- feature visibility (super admin) -------------------------------- */
+.feature-card + .feature-card {
+  margin-top: 20px;
+}
+
+.feature-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.feature-group {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.feature-group legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.feature-role-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.feature-role-tab {
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.feature-role-tab.active {
+  color: var(--on-primary, #fff);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.feature-account-pick {
+  display: block;
+  max-width: 420px;
+  margin-bottom: 16px;
+}
+
 .sidenav-section-label {
   margin: 8px 16px 4px;
   color: var(--slate-500);

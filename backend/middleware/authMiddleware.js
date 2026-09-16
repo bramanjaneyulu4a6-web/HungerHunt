@@ -66,6 +66,27 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
 // narrower audience rather than quietly gaining a wider one.
 export const protectAdmin = staffGate(['admin'], 'This action needs a full admin account.');
 
+/* The staff roster: who may sign in at all, and as what. Runs after
+   protectAdmin — the token and the row are already proven — and asks the one
+   further question, is this row the super admin. Answered from the row on
+   every request rather than from a token claim, so granting or revoking the
+   flag lands on the next request and nobody has to sign in again.
+
+   403 rather than 401 for the same reason as every other role refusal: a
+   plain admin reaching for the roster is not a broken session. */
+export const requireSuperAdmin = async (req, res, next) => {
+  try {
+    const found = await Admin.exists({ _id: req.staff.id, active: { $ne: false }, isSuperAdmin: true });
+    if (!found) return forbidden(res, 'This action needs a super admin account.');
+    req.staff.isSuperAdmin = true;
+    next();
+  } catch (_error) {
+    denied(res, 'Token failed, invalid authorization');
+  }
+};
+
+export const protectSuperAdmin = [protectAdmin, requireSuperAdmin];
+
 /* The till's routes: look a student up, verify a code, take the payment, raise
    an approval request.
  *
@@ -98,6 +119,15 @@ export const protectCaretaker = staffGate(
  * staff role appears, so they stay separate. */
 export const protectAnyStaff = staffGate(
   ['admin', 'warehouse'],
+  'This action needs a staff account.'
+);
+
+/* Every signed-in staff account, whatever its role: the one gate for "who am
+   I", which each app asks on start-up to learn its name and which features are
+   hidden from it. Nothing else should sit here — a route that means to admit
+   everybody should say so on one of the narrower gates above. */
+export const protectEveryStaff = staffGate(
+  ['admin', 'warehouse', 'caretaker'],
   'This action needs a staff account.'
 );
 
@@ -149,8 +179,9 @@ export const orStudent = (staffGate) => (req, res, next) => {
 };
 
 // Admin registration is open only long enough to create the very first account.
-// Once one exists it demands a signed-in admin, so that authorization is decided
-// here rather than inferred inside the controller from a merely-truthy req.adminId.
+// Once one exists it demands a signed-in super admin, so that authorization is
+// decided here rather than inferred inside the controller from a merely-truthy
+// req.adminId.
 export const protectAdminUnlessBootstrap = async (req, res, next) => {
   let adminCount;
 
@@ -165,10 +196,10 @@ export const protectAdminUnlessBootstrap = async (req, res, next) => {
   // Answer the common case in the caller's own terms; protectAdmin's generic
   // "no token" would not explain why a registration form stopped accepting.
   if (!readToken(req)) {
-    return denied(res, 'Only a signed-in admin can create additional admin accounts.');
+    return denied(res, 'Only a signed-in super admin can create additional accounts.');
   }
 
-  return protectAdmin(req, res, next);
+  return protectAdmin(req, res, (error) => (error ? next(error) : requireSuperAdmin(req, res, next)));
 };
 
 // A parent token is good for seven days, and until tokenVersion existed that

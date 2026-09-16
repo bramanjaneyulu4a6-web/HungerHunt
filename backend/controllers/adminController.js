@@ -7,6 +7,9 @@ import Room from '../models/Room.js';
 import Student from '../models/Student.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
+import FeatureVisibility from '../models/FeatureVisibility.js';
+import { effectiveHidden } from '../utils/featureCatalogue.js';
+import { overridesOf } from './featureController.js';
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -44,6 +47,11 @@ export const registerAdmin = async (req, res) => {
 
     const requested = req.body?.role;
     const role = adminCount > 0 && LIMITS[requested] ? requested : 'admin';
+
+    // The founding account owns the roster, or nobody ever would. After that
+    // the flag is the caller's to give — the route has already proven the
+    // caller a super admin — and only ever to an admin.
+    const isSuperAdmin = adminCount === 0 || (role === 'admin' && req.body?.isSuperAdmin === true);
 
     const contactProblem = phoneProblem(phone)
       || (role === 'admin' ? emailProblem(email) : optionalEmailProblem(email));
@@ -94,7 +102,7 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const admin = new Admin({ name, phone, email: email || undefined, password, role, roomIds });
+    const admin = new Admin({ name, phone, email: email || undefined, password, role, roomIds, isSuperAdmin });
     await admin.save();
 
     return res.status(201).json({
@@ -110,6 +118,39 @@ export const registerAdmin = async (req, res) => {
         ? `That ${error.keyPattern?.phone ? 'phone number' : 'email'} is already in use.`
         : error.message
     });
+  }
+};
+
+// The account behind the token, as the console needs it: enough to greet the
+// person and to know whether the super admin's menus apply. Read from the row
+// on each call, so a flag granted a minute ago shows without a fresh sign-in.
+export const currentStaff = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.staff.id)
+      .select('name email phone role isSuperAdmin featureOverrides').lean();
+    if (!admin) return res.status(401).json({ message: 'Not authorized', code: 'AUTH_REQUIRED' });
+    const role = admin.role || 'admin';
+    const isSuperAdmin = role === 'admin' && admin.isSuperAdmin === true;
+    // What this console hides, settled here so the client never holds the
+    // rule: the role's list, then this account's exceptions, and nothing at
+    // all for a super admin.
+    const roleRow = isSuperAdmin ? null : await FeatureVisibility.findOne({ role }).lean();
+    res.json({
+      id: String(admin._id),
+      name: admin.name || '',
+      email: admin.email || '',
+      phone: admin.phone || '',
+      role,
+      isSuperAdmin,
+      hiddenFeatures: effectiveHidden({
+        role,
+        isSuperAdmin,
+        roleHidden: roleRow ? roleRow.hidden : null,
+        overrides: overridesOf(admin),
+      }),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -166,11 +207,15 @@ export const loginAdmin = async (req, res) => {
 
     const roomList = rooms.map((room) => ({ id: String(room._id), code: room.code, name: room.name }));
 
+    // Like rooms, present only on the role it means something for.
+    const superFlag = role === 'admin' ? { isSuperAdmin: admin.isSuperAdmin === true } : {};
+
     const staff = {
       name: admin.name,
       phone: admin.phone,
       email: admin.email || '',
       role,
+      ...superFlag,
       ...(role === 'caretaker' ? { rooms: roomList } : {}),
     };
 
@@ -178,6 +223,7 @@ export const loginAdmin = async (req, res) => {
       token: signStaffToken(admin._id, role),
       email: admin.email || '',
       role,
+      ...superFlag,
       name: admin.name,
       phone: admin.phone,
       staff,

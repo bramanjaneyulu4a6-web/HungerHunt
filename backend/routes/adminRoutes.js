@@ -2,6 +2,7 @@ import express from "express";
 import {
   registerAdmin,
   loginAdmin,
+  currentStaff,
   forgotPassword,
   resetPassword
 } from "../controllers/adminController.js";
@@ -9,12 +10,15 @@ import { authLimiter, passwordResetRequestLimiter } from "../middleware/rateLimi
 /* Staff have their OWN gate, separate from the parents'. Recharges are done by
    an admin, so the office must stay able to sign in while parents flood. */
 import { adminAuthGate } from "../middleware/authConcurrency.js";
-import { protectAdminUnlessBootstrap } from "../middleware/authMiddleware.js";
+import { protectAdminUnlessBootstrap, protectEveryStaff } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 router.post("/register", authLimiter, adminAuthGate, protectAdminUnlessBootstrap, registerAdmin);
 router.post("/login", authLimiter, adminAuthGate, loginAdmin);
+// Who holds this token, and what its app should hide. Every staff role asks
+// this once after sign-in; nothing else about the session lives on the client.
+router.get("/me", protectEveryStaff, currentStaff);
 // Emails on every hit; same reasoning as the parent route.
 router.post("/forgot-password", passwordResetRequestLimiter, forgotPassword);
 router.post("/reset-password/:token", authLimiter, adminAuthGate, resetPassword);

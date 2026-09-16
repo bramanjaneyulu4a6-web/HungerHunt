@@ -26,10 +26,7 @@ import { ReceiptModal } from '../components/Receipt';
 import { useReceipt } from '../utils/walletActivity';
 import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
 import { useDismissableOverlay } from '../utils/overlay';
-
-/* Hidden by the owner on 2026-09-12, asked for again on 2026-09-16. Kept as a
-   switch rather than deleted, because it has been wanted both ways. */
-const SHOW_PURCHASE_CODE = true;
+import { useCurrentStaff } from '../utils/currentStaff';
 
 /* The student directory.
  *
@@ -128,6 +125,10 @@ const ModalHead = ({ title, subtitle, onClose }) => (
 
 const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChanged }) => {
   const [searchParams] = useSearchParams();
+  // Hidden by the owner on 2026-09-12, asked for again on 2026-09-16, and
+  // now a super admin's choice per role or account (Feature visibility).
+  const { me } = useCurrentStaff();
+  const showPurchaseCode = me.isSuperAdmin || !me.hiddenFeatures.includes('students.purchaseCode');
   // The student whose orders and receipts are open, if any.
   const [activityStudent, setActivityStudent] = useState(null);
   const focusedStudentId = searchParams.get('focus') || '';
@@ -778,7 +779,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       >
                         Edit
                       </Button>
-                      {SHOW_PURCHASE_CODE && (
+                      {showPurchaseCode && (
                         <Button
                           variant="ghost"
                           className="btn--sm"

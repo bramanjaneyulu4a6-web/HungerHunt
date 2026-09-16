@@ -31,6 +31,23 @@ const adminSchema = new mongoose.Schema({
     default: 'admin',
   },
 
+  // The super admin: an admin who also owns the staff roster — sees every
+  // account, creates and archives them, and hands this flag on. A flag rather
+  // than a fourth role so every gate that admits 'admin' keeps admitting this
+  // account unchanged; only the roster asks the extra question. Legal on the
+  // admin role alone. Stored false explicitly on new rows so nothing has to
+  // ask about a missing field the way FULL_ADMIN must for role.
+  isSuperAdmin: {
+    type: Boolean,
+    default: false,
+    validate: {
+      validator(value) {
+        return !value || (this.role || 'admin') === 'admin';
+      },
+      message: 'Only an admin account can be a super admin.',
+    },
+  },
+
   roomIds: {
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Room' }],
     default: [],
@@ -41,6 +58,20 @@ const adminSchema = new mongoose.Schema({
       },
       message: 'At least one room is required for caretaker accounts and rooms are not allowed for other roles.',
     },
+  },
+
+  // Per-account exceptions to the role's feature visibility: a list of
+  // { key, value } with value 'hidden' or 'shown'. A list rather than a Map
+  // because Mongo map keys may not contain dots and most feature keys do
+  // ('students.purchaseCode'). Absent keys follow the role. Written only
+  // through the super admin's panel (featureController), never by updateStaff.
+  featureOverrides: {
+    type: [{
+      _id: false,
+      key: { type: String, required: true },
+      value: { type: String, enum: ['hidden', 'shown'], required: true },
+    }],
+    default: undefined,
   },
 
   resetPasswordToken: String,
@@ -66,5 +97,10 @@ adminSchema.pre('save', async function () {
 export const FULL_ADMIN = {
   $or: [{ role: 'admin' }, { role: { $exists: false } }],
 };
+
+// The one row shape the roster's gate accepts. Always spelled with the flag
+// set, never `$ne: false`, so a row from before the flag existed is a plain
+// admin rather than a super admin by omission.
+export const SUPER_ADMIN = { ...FULL_ADMIN, isSuperAdmin: true };
 
 export default mongoose.model('Admin', adminSchema);

@@ -11,9 +11,15 @@ import { mock } from 'node:test';
 // dynamically import their models before anything else — importing Admin at
 // this module's top level would race that ordering, and mock.method has to
 // patch the same model instance the app under test resolves to.
-export const accountMatcher = (Admin, staffId) => (role) => {
+//
+// The super admin gate asks a second question of the same row, with
+// {isSuperAdmin: true} and no role branch at all; `superAdmin` is the row's
+// answer to that one.
+export const accountMatcher = (Admin, staffId) => (role, { superAdmin = false } = {}) => {
   mock.method(Admin, 'exists', async (filter) => {
     if (String(filter._id) !== staffId) return null;
+
+    if (filter.isSuperAdmin === true) return superAdmin ? { _id: staffId } : null;
 
     const branches = filter.$or ?? [];
     const allowed = branches.find((b) => b.role?.$in)?.role.$in ?? [];

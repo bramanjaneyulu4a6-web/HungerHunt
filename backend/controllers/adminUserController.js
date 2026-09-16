@@ -229,6 +229,7 @@ const staffView = async (account) => {
     phone: account.phone,
     email: account.email || '',
     role: account.role || 'admin',
+    isSuperAdmin: (account.role || 'admin') === 'admin' && account.isSuperAdmin === true,
     active: account.active !== false,
     rooms: rooms.map((room) => ({
       id: String(room._id),
@@ -268,6 +269,22 @@ export const updateStaff = async (req, res) => {
     if (remaining === 0) return res.status(409).json({ message: 'At least one active admin account is required.' });
   }
   update.role = role;
+  /* The super admin flag. Only the roster's gate reaches here, so the caller
+     is a super admin by construction and may give or take the flag freely —
+     except from the account it is signed in as, which is what keeps at least
+     one super admin standing after every edit. Leaving the admin role takes
+     the flag with it, since it means nothing on any other role. */
+  if (req.body?.isSuperAdmin !== undefined) {
+    const wanted = Boolean(req.body.isSuperAdmin);
+    if (wanted && role !== 'admin') {
+      return res.status(400).json({ message: 'Only an admin account can be a super admin.' });
+    }
+    if (String(account._id) === String(req.staff.id) && !wanted && account.isSuperAdmin === true) {
+      return res.status(409).json({ message: 'You cannot remove super admin from the account you are currently using.' });
+    }
+    update.isSuperAdmin = wanted;
+  }
+  if (role !== 'admin') update.isSuperAdmin = false;
   /* Rooms are only touched when the caller actually sends them. Requiring them
      on every update made archiveStaff — which sends nothing but { active:false }
      — fail with a 400 for caretakers, and made a phone-only edit impossible

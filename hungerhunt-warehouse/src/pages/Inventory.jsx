@@ -9,6 +9,7 @@ import ProductThumb from "../components/ProductThumb";
 import OrderReviewSheet from "../components/OrderReviewSheet";
 import { Banner, ConfirmDialog, EmptyState, Skeleton } from "../components/ui";
 import { formatPackSize } from "../utils/format";
+import { useFeature } from "../utils/currentStaff";
 
 /* The shelf, and the order raised off it.
    Ordering used to be its own screen, which meant deciding what was short in
@@ -41,6 +42,9 @@ const readStored = () => {
 };
 
 const Inventory = () => {
+  // Ordering can be hidden from this account by a super admin; the shelf
+  // list itself always shows.
+  const canOrder = useFeature("warehouse.orderStock");
   const navigate = useNavigate();
 
   const [rows, setRows] = useState([]);
@@ -315,6 +319,7 @@ const Inventory = () => {
         </div>
       </div>
 
+      {canOrder && (
       <div className="wh-modebar">
         <button
           type="button"
@@ -335,6 +340,7 @@ const Inventory = () => {
           {drafting ? "Checking…" : "Suggest what is low"}
         </button>
       </div>
+      )}
 
       <div className="wh-search">
         <Icon name="search" size={20} />

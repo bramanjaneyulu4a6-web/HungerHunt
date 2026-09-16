@@ -2,7 +2,7 @@ import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import PendingOrder, { pendingOrderExpiry } from '../models/PendingOrder.js';
-import { creditWallet } from './walletAccount.js';
+import { DEMO_OPENING_BALANCE } from '../config/demoAccess.js';
 import { isDemoParentStudent } from './demoParent.js';
 import Product from '../models/Product.js';
 import { buildDemoBaskets, nextBasketAfter } from './demoBaskets.js';
@@ -74,8 +74,19 @@ const clearAndReseed = async (order) => {
 
   /* Money first. Every step after this removes something, and a failure part
      way through should leave the wallet whole rather than a balance short by
-     an order that no longer exists to explain it. */
-  await creditWallet(order.studentId, order.totalAmount);
+     an order that no longer exists to explain it.
+
+     Set rather than credited back. Refunding exactly what this order spent
+     would be the honest bookkeeping, and for a real family it would be the
+     only defensible choice — but it also preserves whatever the balance
+     happened to be, including money lost to an earlier visitor who approved an
+     order and wandered off before collecting it. Those never reset, so the
+     account would drift down over an open day until it could not afford the
+     next basket. A stage prop should read the same to every visitor. */
+  await Student.updateOne(
+    { _id: order.studentId },
+    { $set: { pocketMoney: DEMO_OPENING_BALANCE } }
+  );
 
   await FulfillmentOrder.deleteOne({ _id: order._id });
 

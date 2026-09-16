@@ -9,7 +9,11 @@ import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
-import { isDemoParentPhone } from '../config/demoAccess.js';
+import {
+  DEMO_LOW_BALANCE,
+  DEMO_OPENING_BALANCE,
+  isDemoParentPhone,
+} from '../config/demoAccess.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -239,6 +243,34 @@ export const chargeCart = async ({
   // wallet is left exactly as it was and the transaction records an
   // unchanged before/after as proof it was never touched.
   let debited = student;
+
+  /* The showroom wallet fills itself back up before it is spent.
+     
+     Collecting a package resets the balance, so in ordinary use it is 3000 at
+     the start of every order and this never fires. What it catches is the one
+     case that reset cannot: a visitor who approved an order and walked away
+     before collecting it. That order never completes, so its money stays
+     spent — and enough of them would leave the account unable to afford the
+     next basket, which is a demo that has quietly broken itself in front of
+     the next family to pick up the tablet.
+
+     Topped up when the balance is low OR when it simply cannot cover this
+     basket, because either one ends the demonstration. Only ever for a demo
+     account: a real child's empty wallet is the whole point of the refusal
+     below, and must keep working exactly as it does. */
+  if (
+    demoParentOrder &&
+    funding === 'WALLET' &&
+    (student.pocketMoney < DEMO_LOW_BALANCE || student.pocketMoney < totalAmount)
+  ) {
+    const refilled = await Student.findOneAndUpdate(
+      { _id: studentId },
+      { $set: { pocketMoney: DEMO_OPENING_BALANCE } },
+      { new: true, ...(session ? { session } : {}) }
+    );
+
+    if (refilled) student.pocketMoney = refilled.pocketMoney;
+  }
 
   if (funding === 'WALLET') {
     debited = await debitWallet(studentId, totalAmount, { session });

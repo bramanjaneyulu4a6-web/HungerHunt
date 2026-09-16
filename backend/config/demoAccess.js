@@ -17,6 +17,20 @@
  * — a parent walking their own package through the warehouse, orders deleting
  * themselves, a wallet resetting — has to be unreachable by a real family.
  */
+/* What the showroom wallet is worth, and the point at which it is filled back
+ * up. Both are constants rather than settings: a demo balance is a stage prop,
+ * and one that differed between two tablets would only ever be confusing.
+ *
+ * 3000 comfortably covers any basket the rotation can build from the catalogue,
+ * so a visitor is never stopped by a price. The low-water mark exists for the
+ * one case the per-order reset cannot cover: a visitor who approves an order
+ * and walks away before collecting it. Nothing resets that order, so the money
+ * stays spent, and enough abandoned demos would eventually leave the account
+ * unable to afford the next basket — a demo that has quietly broken itself.
+ */
+export const DEMO_OPENING_BALANCE = 3000;
+export const DEMO_LOW_BALANCE = 500;
+
 export const demoParentPhones = (env = process.env) =>
   new Set(
     String(env.DEMO_PARENT_PHONES ?? '')

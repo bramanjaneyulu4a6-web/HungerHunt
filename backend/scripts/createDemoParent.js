@@ -30,7 +30,7 @@ import Transaction from '../models/Transaction.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import PendingOrder, { pendingOrderExpiry } from '../models/PendingOrder.js';
 import { buildDemoBaskets } from '../utils/demoBaskets.js';
-import { demoParentPhones } from '../config/demoAccess.js';
+import { DEMO_OPENING_BALANCE, demoParentPhones } from '../config/demoAccess.js';
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
@@ -42,7 +42,10 @@ const valueOf = (flag, fallback = null) => {
 };
 
 const phone = String(valueOf('--phone', '7995601391')).trim();
-const balance = Number(valueOf('--balance', '2000'));
+/* Defaults to the same constant the reset writes, so the account a visitor
+   first meets and the account every later visitor meets are the same account.
+   A --balance that differed would last exactly until the first collection. */
+const balance = Number(valueOf('--balance', String(DEMO_OPENING_BALANCE)));
 
 if (!/^\d{10}$/.test(phone)) {
   throw new Error(`--phone must be a ten-digit number. Got "${phone}".`);

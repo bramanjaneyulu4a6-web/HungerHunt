@@ -203,3 +203,80 @@ describe('resetting a collected order', () => {
     assert.equal(await resetDemoOrder({}), false);
   });
 });
+
+/* The wallet is a stage prop: it should read the same to every visitor who
+   picks up the tablet, whatever the one before them did with it. */
+describe('the showroom wallet', () => {
+  const cart = [{ productId: 'p1', quantity: 1 }];
+
+  /* debitWallet reaches for findOneAndUpdate too, so counting every call would
+     count the purchase itself as a top-up. A top-up SETS the balance; a debit
+     INCREMENTS it, and that is what separates them. */
+  const topUps = (spy) =>
+    spy.mock.calls.filter(({ arguments: [, update] }) => update?.$set?.pocketMoney !== undefined);
+
+  const stubCatalogue = () => {
+    mock.method(Inventory, 'findOne', () => ({
+      populate: () => ({
+        session: async () => ({ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
+        then: (resolve) => resolve({ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
+      }),
+    }));
+    mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: 98 }));
+  };
+
+  test('a demo wallet that has run low is filled back to 3000 before it is spent', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    stubCatalogue();
+    const { DEMO_OPENING_BALANCE, DEMO_LOW_BALANCE } = await import('../config/demoAccess.js');
+
+    mock.method(Student, 'findById', async () => ({
+      _id: 's1', active: true, parentPhoneNumber: DEMO_PHONE, pocketMoney: DEMO_LOW_BALANCE - 1,
+    }));
+    const refill = mock.method(Student, 'findOneAndUpdate', async () => ({
+      _id: 's1', pocketMoney: DEMO_OPENING_BALANCE,
+    }));
+
+    const { chargeCart } = await import('../utils/checkout.js');
+    await chargeCart({ studentId: 's1', items: cart, idempotencyKey: 'low' }).catch(() => {});
+
+    const applied = topUps(refill);
+    assert.equal(applied.length, 1, 'a low demo wallet should be topped up exactly once');
+    assert.equal(applied[0].arguments[1].$set.pocketMoney, DEMO_OPENING_BALANCE);
+  });
+
+  test('a demo wallet with plenty in it is left alone', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    stubCatalogue();
+    const { DEMO_OPENING_BALANCE } = await import('../config/demoAccess.js');
+
+    mock.method(Student, 'findById', async () => ({
+      _id: 's1', active: true, parentPhoneNumber: DEMO_PHONE, pocketMoney: DEMO_OPENING_BALANCE,
+    }));
+    const refill = mock.method(Student, 'findOneAndUpdate', async () => ({}));
+
+    const { chargeCart } = await import('../utils/checkout.js');
+    await chargeCart({ studentId: 's1', items: cart, idempotencyKey: 'full' }).catch(() => {});
+
+    assert.equal(topUps(refill).length, 0, 'a healthy demo wallet needs no top-up');
+  });
+
+  /* The refusal a real family depends on. An empty wallet is supposed to stop
+     a purchase, and a top-up that reached one child too far would be the
+     school silently giving away food. */
+  test('a real child with an empty wallet is refused, never topped up', async () => {
+    process.env.DEMO_PARENT_PHONES = DEMO_PHONE;
+    stubCatalogue();
+
+    mock.method(Student, 'findById', async () => ({
+      _id: 's2', active: true, parentPhoneNumber: REAL_PHONE, pocketMoney: 0,
+    }));
+    const refill = mock.method(Student, 'findOneAndUpdate', async () => ({}));
+
+    const { chargeCart } = await import('../utils/checkout.js');
+    const result = await chargeCart({ studentId: 's2', items: cart, idempotencyKey: 'real' }).catch(() => ({}));
+
+    assert.equal(topUps(refill).length, 0, 'a real wallet must never be topped up');
+    assert.notEqual(result.ok, true, 'an empty real wallet must still refuse the purchase');
+  });
+});

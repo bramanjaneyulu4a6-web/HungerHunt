@@ -19,7 +19,7 @@ const BY_CATEGORY = {
   // comes in a millilitre cup as often as a countable bar, and Personal Care
   // sits under Essentials beside stationery counted in pieces.
   'Snacks': ['g', 'pc', 'ml'],
-  'Beverages': ['ml', 'L'],
+  'Drinks': ['ml', 'L'],
   'Essentials': ['pc', 'ml', 'g'],
 };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
@@ -149,6 +149,9 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [classFilter, setClassFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [parentFilter, setParentFilter] = useState('');
+  // The filters live behind one button, as on Transactions.
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const filterPanelRef = useRef(null);
   // The class/section pairs the roll actually holds, reported by the server
   // rather than written here: the roll mixes numeral systems and spells one
   // section three ways, so any list asserted here would be wrong for some of it.
@@ -207,6 +210,23 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
       setLoading(false);
     }
   }, [roomFilter, classFilter, sectionFilter, parentFilter, searchQuery, sortConfig.direction, sortConfig.key]);
+
+  // The panel closes on a click outside it or on Escape, like a menu.
+  useEffect(() => {
+    if (!filterPanelOpen) return undefined;
+    const onPointer = (event) => {
+      if (!filterPanelRef.current?.contains(event.target)) setFilterPanelOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setFilterPanelOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [filterPanelOpen]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => fetchStudents(1), 250);
@@ -448,9 +468,18 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   };
 
   const visible = students;
-  const filtering = Boolean(
-    searchQuery.trim() || roomFilter || classFilter || sectionFilter || parentFilter
-  );
+  const activeFilters = [roomFilter, classFilter, sectionFilter, parentFilter].filter(Boolean).length;
+  const filtering = Boolean(searchQuery.trim()) || activeFilters > 0;
+  const clearFilters = () => {
+    setRoomFilter('');
+    setClassFilter('');
+    setSectionFilter('');
+    setParentFilter('');
+  };
+  const clearAll = () => {
+    setSearchQuery('');
+    clearFilters();
+  };
   const editingStudent = editingId ? students.find((row) => row._id === editingId) : null;
 
   const classOptions = classesFrom(classPairs);
@@ -500,58 +529,105 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           />
         </div>
 
-        <select
-          className="input toolbar-select"
-          aria-label="Filter by room"
-          value={roomFilter}
-          onChange={(event) => setRoomFilter(event.target.value)}
-        >
-          <option value="">All rooms</option>
-          {rooms.map((room) => (
-            <option key={room._id} value={room._id}>
-              {room.code}{room.name ? ` — ${room.name}` : ''}
-            </option>
-          ))}
-        </select>
+        <div className="tx-filter" ref={filterPanelRef}>
+          <Button
+            variant={activeFilters ? 'primary' : 'ghost'}
+            aria-expanded={filterPanelOpen}
+            aria-controls="students-filter-panel"
+            onClick={() => setFilterPanelOpen((open) => !open)}
+          >
+            <Icon name="filter" size={16} />
+            Filters
+            {activeFilters > 0 && <span className="tx-filter__count">{activeFilters}</span>}
+          </Button>
 
-        <select
-          className="input toolbar-select"
-          aria-label="Filter by class"
-          value={classFilter}
-          onChange={(event) => {
-            setClassFilter(event.target.value);
-            setSectionFilter('');
-          }}
-        >
-          <option value="">All classes</option>
-          {classOptions.map((className) => (
-            <option key={className} value={className}>{className}</option>
-          ))}
-        </select>
+          {filterPanelOpen && (
+            <div className="tx-filter__panel" id="students-filter-panel" role="dialog" aria-label="Filters for students">
+              <div className="tx-filter__head">
+                <strong>Filters</strong>
+                <small>Students</small>
+              </div>
 
-        <select
-          className="input toolbar-select"
-          aria-label="Filter by section"
-          value={sectionFilter}
-          disabled={sectionOptions.length === 0}
-          onChange={(event) => setSectionFilter(event.target.value)}
-        >
-          <option value="">{classFilter ? 'All sections' : 'Section'}</option>
-          {sectionOptions.map((section) => (
-            <option key={section} value={section}>{section}</option>
-          ))}
-        </select>
+              <label className="tx-filter__group tx-filter__field">
+                <span className="tx-filter__legend">Room</span>
+                <select
+                  className="input"
+                  value={roomFilter}
+                  onChange={(event) => setRoomFilter(event.target.value)}
+                >
+                  <option value="">All</option>
+                  {rooms.map((room) => (
+                    <option key={room._id} value={room._id}>
+                      {room.code}{room.name ? ` — ${room.name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-        <select
-          className="input toolbar-select"
-          aria-label="Filter by parent sign-in"
-          value={parentFilter}
-          onChange={(event) => setParentFilter(event.target.value)}
-        >
-          <option value="">Any parent</option>
-          <option value="no">Parent never signed in</option>
-          <option value="yes">Parent signed in</option>
-        </select>
+              <label className="tx-filter__group tx-filter__field">
+                <span className="tx-filter__legend">Class</span>
+                <select
+                  className="input"
+                  value={classFilter}
+                  onChange={(event) => {
+                    setClassFilter(event.target.value);
+                    setSectionFilter('');
+                  }}
+                >
+                  <option value="">All</option>
+                  {classOptions.map((className) => (
+                    <option key={className} value={className}>{className}</option>
+                  ))}
+                </select>
+              </label>
+
+              {/* Sections only mean something inside a class, so the choice
+                  appears once a class is picked, starting at All. */}
+              {classFilter && sectionOptions.length > 0 && (
+                <label className="tx-filter__group tx-filter__field">
+                  <span className="tx-filter__legend">Section</span>
+                  <select
+                    className="input"
+                    value={sectionFilter}
+                    onChange={(event) => setSectionFilter(event.target.value)}
+                  >
+                    <option value="">All</option>
+                    {sectionOptions.map((section) => (
+                      <option key={section} value={section}>{section}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <label className="tx-filter__group tx-filter__field">
+                <span className="tx-filter__legend">Parent sign-in</span>
+                <select
+                  className="input"
+                  value={parentFilter}
+                  onChange={(event) => setParentFilter(event.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="no">Parent never signed in</option>
+                  <option value="yes">Parent signed in</option>
+                </select>
+              </label>
+
+              <div className="tx-filter__actions">
+                <Button variant="ghost" className="btn--sm" disabled={!activeFilters} onClick={clearFilters}>
+                  Reset
+                </Button>
+                <Button variant="primary" className="btn--sm" onClick={() => setFilterPanelOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+        {filtering && (
+          <Button variant="ghost" className="btn--sm" onClick={clearAll}>
+            Clear all
+          </Button>
+        )}
 
         <p className="toolbar-count">
           {loading
@@ -585,13 +661,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
             filtering ? (
               <Button
                 variant="ghost"
-                onClick={() => {
-                  setSearchQuery('');
-                  setRoomFilter('');
-                  setClassFilter('');
-                  setSectionFilter('');
-                  setParentFilter('');
-                }}
+                onClick={clearAll}
               >
                 Clear filters
               </Button>

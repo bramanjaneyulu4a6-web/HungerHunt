@@ -15,7 +15,7 @@ const UNIT_ROWS = [
 describe('unitSymbolsForCategory', () => {
   const cases = [
     ['Snacks', ['g', 'pc', 'ml']],
-    ['Beverages', ['ml', 'L']],
+    ['Drinks', ['ml', 'L']],
     ['Essentials', ['pc', 'ml', 'g']],
   ];
 
@@ -26,7 +26,7 @@ describe('unitSymbolsForCategory', () => {
   }
 
   test('matches regardless of case and surrounding space', () => {
-    assert.deepEqual(unitSymbolsForCategory('  beverages '), ['ml', 'L']);
+    assert.deepEqual(unitSymbolsForCategory('  drinks '), ['ml', 'L']);
   });
 
   // Categories are code-defined, but a database seeded before this map — or
@@ -45,7 +45,7 @@ describe('unitSymbolsForCategory', () => {
 describe('unitsForCategory', () => {
   test('keeps the map order, not the order the rows arrived in', () => {
     assert.deepEqual(
-      unitsForCategory(UNIT_ROWS, 'Beverages').map((unit) => unit.symbol),
+      unitsForCategory(UNIT_ROWS, 'Drinks').map((unit) => unit.symbol),
       ['ml', 'L']
     );
   });
@@ -53,7 +53,7 @@ describe('unitsForCategory', () => {
   test('drops a mapped symbol that has no row on the server yet', () => {
     const withoutLitre = UNIT_ROWS.filter((unit) => unit.symbol !== 'L');
     assert.deepEqual(
-      unitsForCategory(withoutLitre, 'Beverages').map((unit) => unit.symbol),
+      unitsForCategory(withoutLitre, 'Drinks').map((unit) => unit.symbol),
       ['ml']
     );
   });

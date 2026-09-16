@@ -220,7 +220,8 @@ try {
           codes.map((code) => ({
             updateOne: {
               filter: { code },
-              update: { $setOnInsert: { code, name: rows.find((row) => row.code === code).block, active: true } },
+              // No name: the block is already in the code, and repeating it prints twice.
+              update: { $setOnInsert: { code, active: true } },
               upsert: true,
             },
           })),

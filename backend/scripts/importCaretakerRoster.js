@@ -274,8 +274,9 @@ try {
                 filter: { code },
                 update: {
                   $setOnInsert: {
+                    // No name: the hostel is already the code's block, and a
+                    // name repeating it prints the block twice on screen.
                     code,
-                    name: roster.find((entry) => entry.codes.includes(code)).hostel,
                     active: true,
                   },
                 },

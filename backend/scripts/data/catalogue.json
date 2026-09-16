@@ -10,7 +10,7 @@
       ]
     },
     {
-      "name": "Beverages",
+      "name": "Drinks",
       "order": 1,
       "subCategories": [
         "Soft Drinks",
@@ -218,7 +218,7 @@
     {
       "name": "Pepsi",
       "description": "A fizzy cola soft drink. Best served chilled. Contains caffeine.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
       "mrp": 20,
@@ -240,7 +240,7 @@
     {
       "name": "Mountain Dew",
       "description": "A fizzy citrus-flavoured soft drink. Best served chilled. Contains caffeine.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
       "mrp": 20,
@@ -262,7 +262,7 @@
     {
       "name": "7 UP",
       "description": "A clear, fizzy lemon-lime soft drink. Best served chilled.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
       "mrp": 20,
@@ -284,7 +284,7 @@
     {
       "name": "Thums Up",
       "description": "A strong, fizzy cola soft drink. Best served chilled. Contains caffeine.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Soft Drinks",
       "unit": "Millilitre",
       "mrp": 20,
@@ -303,7 +303,7 @@
     {
       "name": "Frooti",
       "description": "A sweet mango drink in a handy pack.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
       "mrp": 10,
@@ -324,7 +324,7 @@
     {
       "name": "Appy Fizz",
       "description": "A sparkling apple drink with a fizzy kick.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
       "mrp": 10,
@@ -346,7 +346,7 @@
     {
       "name": "Lassi",
       "description": "A chilled, sweet drink made from yoghurt.",
-      "stockGroup": "Beverages",
+      "stockGroup": "Drinks",
       "subCategory": "Other Drinks",
       "unit": "Millilitre",
       "mrp": 10,

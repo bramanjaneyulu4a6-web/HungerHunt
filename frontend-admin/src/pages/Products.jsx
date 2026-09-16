@@ -491,7 +491,7 @@ const Products = () => {
 
   /* The units this product's category allows, plus — when editing — whatever
      the product is already saved as. Every product in the opening catalogue
-     was seeded as `pc`, and Beverages now maps to ml and L, so dropping an
+     was seeded as `pc`, and Drinks now maps to ml and L, so dropping an
      unmapped current unit would silently re-measure a drink the moment
      somebody opened it to fix a typo in its name. */
   const allowedUnits = unitsForCategory(units, selectedCategoryName);

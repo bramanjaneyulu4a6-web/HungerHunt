@@ -835,6 +835,7 @@
    wordmark floats centered between them. The card shrinks first — its name
    ellipsizes, and below 480px the identity gives way to the balance alone. */
 .wall-top {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -900,9 +901,6 @@
   font-size: 16px;
 }
 
-.kiosk-wordmark--wall {
-  margin-inline: auto;
-}
 
 .kiosk-wordmark {
   color: #24170c;
@@ -914,8 +912,34 @@
   white-space: nowrap;
 }
 
-.kiosk-wordmark--category {
-  margin-inline: auto;
+/* Centred on the bar, not on what is left of it.
+   These wordmarks used to centre themselves with `margin-inline: auto`, which
+   centres an item in the leftover space — true only while the flanks either
+   side weigh the same. They never quite did, and the session clock is drawn
+   only for a student who is being timed, so a demo session lost the clock's
+   width off the right flank and pushed the wordmark visibly off centre. Taking
+   it out of flow makes the page's centre the thing it is measured against,
+   whoever is standing at the till. */
+.kiosk-wordmark--category,
+.kiosk-wordmark--wall {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Out of flow, the wordmark can no longer hold the clock and the × over to the
+   right, so they hold themselves there. Whichever comes first takes the free
+   space; the × gives it up again when the clock is in front of it, so the two
+   stay together as one group rather than drifting apart. */
+.kiosk-category-topbar > .kiosk-session-clock,
+.wall-top > .kiosk-session-clock,
+.kiosk-category-topbar > .kiosk-exit,
+.wall-top > .kiosk-exit {
+  margin-left: auto;
+}
+
+.kiosk-session-clock + .kiosk-exit {
+  margin-left: 0;
 }
 
 /* ---- glass ------------------------------------------------------------- */

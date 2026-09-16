@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
+import { fetchAllStudents } from "../utils/studentRoll";
 import { formatINR } from "../utils/format";
 import { describeEntry } from "../utils/ledgerEntry";
 import { ReceiptButton } from "../components/ReceiptButton";
@@ -42,8 +43,9 @@ const RechargeHistory = () => {
     setLoadError(false);
 
     try {
-      const res = await api.get("/students");
-      setStudents(res.data || []);
+      // Paged, because the unpaged list stops at 500 and the roll is past
+      // that: a ledger missing the back half of the alphabet is not a ledger.
+      setStudents(await fetchAllStudents((path, config) => api.get(path, config)));
     } catch (err) {
       console.error(err);
       setLoadError(true);

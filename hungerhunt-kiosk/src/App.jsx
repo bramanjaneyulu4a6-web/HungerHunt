@@ -49,11 +49,10 @@ function KioskScreen() {
 }
 
 function App() {
-  useEffect(() => startDataAutoRefresh(api, {
-    // Never interrupt a student's basket. Inventory is read again at checkout,
-    // and the pending revision reloads as soon as that short session ends.
-    pauseWhen: () => Boolean(localStorage.getItem("kioskToken")),
-  }), []);
+  // Nothing on the kiosk subscribes to the change signal: the till reads
+  // inventory fresh at checkout, and a student's basket is never interrupted.
+  // Polling still runs so the shared utility behaves the same on every app.
+  useEffect(() => startDataAutoRefresh(api), []);
 
   return (
     <Router>

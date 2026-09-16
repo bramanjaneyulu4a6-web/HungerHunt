@@ -51,7 +51,7 @@ import { connectForScript } from './lib/connect.mjs';
 import Room, { normalizeRoomCode } from '../models/Room.js';
 import Student from '../models/Student.js';
 import Parent from '../models/Parent.js';
-import { splitGrade } from '../utils/studentClass.js';
+import { normalizeClassName, splitGrade } from '../utils/studentClass.js';
 import { isValidAdmissionNumber, normalizeAdmissionNumber } from '../utils/admissionNumber.js';
 
 const apply = process.argv.includes('--apply');
@@ -82,7 +82,12 @@ for (const row of source.students) {
     continue;
   }
 
-  const { className, section } = splitGrade(row.classSection);
+  // The sheet writes classes in Roman numerals; the database stores numbers.
+  // Converted on the way in so a later import cannot reintroduce the spelling
+  // that scripts/normalizeStudentClasses.js was written to remove.
+  const split = splitGrade(row.classSection);
+  const className = normalizeClassName(split.className);
+  const { section } = split;
   rows.push({
     sheetRow: row.sheetRow,
     name,

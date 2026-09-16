@@ -24,6 +24,7 @@ import {
 } from "../utils/studentLinks.js";
 import bcrypt from "bcryptjs";
 import { purchaseCodeProblem } from "../utils/validation.js";
+import { normalizeClassName } from '../utils/studentClass.js';
 
 // The fields describing who a student is, and the only ones any admin route
 // will write. The rest of the document belongs to a flow with rules of its own:
@@ -44,7 +45,14 @@ const pickWritable = (body) => {
         field,
         field === 'admissionNumber'
           ? normalizeAdmissionNumber(source[field])
-          : source[field],
+          // Classes are stored as numbers whatever the typist or the
+          // spreadsheet calls them. Applied here rather than in each caller so
+          // the Add form, the Edit form and the CSV importer cannot disagree —
+          // they all write through this one function. See utils/studentClass.js
+          // for why the conversion is a table and not a parser.
+          : field === 'className'
+            ? normalizeClassName(source[field])
+            : source[field],
       ])
   );
 };
@@ -106,12 +114,16 @@ export const getStudents = async (req, res) => {
     if (req.query.roomId) filter.roomId = req.query.roomId;
 
     /* Class and section are matched exactly, against the values the roster
-       actually holds rather than a list written here. The roll mixes Roman and
-       Arabic numerals and carries three spellings of one section, so anything
-       this file asserted about their shape would be wrong for some of it —
-       getStudentFilterOptions below reports what is really there and the
-       dropdowns are built from that. */
-    const className = String(req.query.className || '').trim();
+       actually holds rather than a list written here. Sections especially:
+       this roll spells one of them three ways, and anything asserted here
+       about their shape would be wrong for some of it. getStudentFilterOptions
+       below reports what is really there and the dropdowns are built from that.
+
+       The class is put through the same conversion the write side uses, so a
+       caller asking for "VIII" finds class 8 rather than nothing. The stored
+       values are all numeric now; this is for links, bookmarks and scripts
+       written while they were not. */
+    const className = normalizeClassName(req.query.className);
     const section = String(req.query.section || '').trim();
 
     if (className) filter.className = className;

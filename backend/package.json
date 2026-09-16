@@ -30,7 +30,8 @@
     "student:checkout": "node scripts/setStudentCheckout.js",
     "seed:units": "node scripts/seedUnits.js",
     "student:demo": "node scripts/createDemoStudent.js",
-    "products:clear-discounts": "node scripts/clearProductDiscounts.js"
+    "products:clear-discounts": "node scripts/clearProductDiscounts.js",
+    "migrate:class-names": "node scripts/normalizeStudentClasses.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -64,26 +64,34 @@ const list = async (query) => {
 
 describe('class and section', () => {
   test('narrow the list to exactly the value asked for', async () => {
-    const applied = await list('className=VIII&section=MB%202');
+    const applied = await list('className=8&section=MB%202');
 
-    assert.equal(applied.className, 'VIII');
+    assert.equal(applied.className, '8');
     assert.equal(applied.section, 'MB 2');
   });
 
   test('a class on its own leaves the section open', async () => {
-    const applied = await list('className=IX');
+    const applied = await list('className=9');
 
-    assert.equal(applied.className, 'IX');
+    assert.equal(applied.className, '9');
     assert.equal('section' in applied, false);
   });
 
-  /* The roll carries Roman and Arabic numerals for the same years, so "VIII"
-     must not also match "8". Exact, not a pattern — unlike the search box. */
+  /* Exact, not a pattern — unlike the search box above it. A class filter that
+     matched loosely would put class 1's students inside class 10. */
   test('are matched exactly, not as a pattern', async () => {
-    const applied = await list('className=VIII');
+    const applied = await list('className=1');
 
-    assert.equal(applied.className, 'VIII');
+    assert.equal(applied.className, '1');
     assert.ok(!(applied.className instanceof RegExp));
+  });
+
+  /* Classes are stored as numbers now. A link or a bookmark made before that
+     migration still names them in Roman numerals, and should still find the
+     students it always meant rather than an empty table. */
+  test('a class named the old way still finds its students', async () => {
+    assert.equal((await list('className=VIII')).className, '8');
+    assert.equal((await list('className=X')).className, '10');
   });
 
   test('blank values are ignored rather than matching students with no class', async () => {

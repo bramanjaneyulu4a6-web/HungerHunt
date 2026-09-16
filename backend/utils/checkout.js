@@ -9,6 +9,7 @@ import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
+import { isDemoParentPhone } from '../config/demoAccess.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -78,6 +79,30 @@ export const chargeCart = async ({
     };
   }
 
+  /* The showroom family's orders are real in every other respect — a real
+     transaction, a real package, a real wallet debit — but they must not eat
+     the shelves. Five baskets per visitor across an open day would drain stock
+     no student ever received, and the storeroom's counts would drift by however
+     many people walked past the tablet.
+
+     Skipped rather than put back afterwards. Restoring on collection would
+     leave the shelf short for as long as a visitor took to finish, and short
+     indefinitely if they wandered off mid-demo — a shortfall nobody could
+     explain from the till, because the order it belonged to had deleted
+     itself. Never taking it has no window to get stuck in.
+
+     Asked once, here, because it governs two separate steps below: the shelf
+     is neither checked nor decremented. A demo basket is therefore priced and
+     sold against an empty shelf, which is the right way round — a visitor
+     shown an item they could not really have costs nothing, and a real student
+     turned away from a shelf a demo emptied costs a meal. */
+  /* Read straight off the document rather than through isDemoParentStudent.
+     The student is already loaded here, unprojected, so the phone is in hand —
+     and asking the helper would spend a second query to learn what this row
+     already says. A caller holding a partial student would send that query
+     somewhere it cannot be answered. */
+  const demoParentOrder = isDemoParentPhone(student.parentPhoneNumber);
+
   let totalAmount = 0;
   const transactionItems = [];
   const limitedEntries = [];
@@ -103,7 +128,7 @@ export const chargeCart = async ({
       };
     }
 
-    if (inventory.stock < orderItem.quantity) {
+    if (!demoParentOrder && inventory.stock < orderItem.quantity) {
       return {
         ok: false,
         status: 400,
@@ -190,7 +215,7 @@ export const chargeCart = async ({
   // Anything already applied is restored if a later step fails.
   const applied = [];
 
-  for (const orderItem of items) {
+  for (const orderItem of demoParentOrder ? [] : items) {
     const updated = await Inventory.findOneAndUpdate(
       { productId: orderItem.productId, stock: { $gte: orderItem.quantity } },
       { $inc: { stock: -orderItem.quantity } },

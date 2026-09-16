@@ -32,6 +32,7 @@
     "student:demo": "node scripts/createDemoStudent.js",
     "products:clear-discounts": "node scripts/clearProductDiscounts.js",
     "products:kiosk": "node scripts/setKioskVisibility.js",
+    "parent:demo": "node scripts/createDemoParent.js",
     "migrate:class-names": "node scripts/normalizeStudentClasses.js"
   },
   "dependencies": {

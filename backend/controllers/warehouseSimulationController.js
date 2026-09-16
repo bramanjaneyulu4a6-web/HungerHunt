@@ -3,24 +3,33 @@ import mongoose from 'mongoose';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import Parent from '../models/Parent.js';
 import { isTestAccountPhone } from '../config/paymentAccess.js';
+import { isDemoParentPhone } from '../config/demoAccess.js';
 import { OrderStatus, canTransitionOrder } from '../src/domain/fulfillment/orderState.js';
 import { buildProofOfDelivery } from '../src/domain/fulfillment/proofOfDelivery.js';
 import { parentPackageView } from './parentController.js';
+import { resetDemoOrder } from '../utils/demoParentReset.js';
 
-/* The PhonePe reviewer standing in for the storeroom and the dorm.
+/* A parent standing in for the storeroom and the dorm.
  *
- * A review order has to end the way a real one does — packed, out for
- * delivery, handed to the caretaker, collected by the student's code — and
- * nobody is going to walk a reviewer's package across a campus. So the test
- * parent may run the whole chain themselves, in one call, with the proof of
- * delivery filled in with placeholders instead of typed.
+ * An order has to end the way a real one does — packed, out for delivery,
+ * handed to the caretaker, collected by the student's code — and nobody is
+ * going to walk it across a campus for the sake of a demonstration. So two
+ * accounts may run the whole chain themselves, in one call, with the proof of
+ * delivery filled in with placeholders instead of typed: the PhonePe reviewer,
+ * who must see a review order finish, and the showroom parent being shown the
+ * app at an open day.
  *
- * Only the test account. The gate is PHONEPE_TEST_PARENT_PHONES and nothing
- * else: no list, no test account, and a real family gets a refusal before a
- * single package is looked up. The state machine is walked, not skipped —
- * every step is a legal transition and is recorded in the trail, so the
- * warehouse and admin screens read a simulated package the same way they
- * read a real one, apart from the note on each step saying who did it. */
+ * Only those two. The gates are PHONEPE_TEST_PARENT_PHONES and
+ * DEMO_PARENT_PHONES and nothing else: no list, no account, and a real family
+ * gets a refusal before a single package is looked up. The state machine is
+ * walked, not skipped — every step is a legal transition and is recorded in
+ * the trail, so the warehouse and admin screens read a simulated package the
+ * same way they read a real one, apart from the note on each step saying who
+ * did it.
+ *
+ * The two part company at the end. A reviewer's order stays, because it is the
+ * record of a real review; a demo order deletes itself and re-seeds the basket
+ * it came from, so the next visitor finds the account untouched. */
 
 const ROUTE = Object.freeze([
   OrderStatus.PACKED,
@@ -44,12 +53,21 @@ export const SIMULATED_RECEIVER = Object.freeze({
 // The trail carries no actorId on these steps, like a migration's entries: no
 // member of staff did this, and the note says what did instead.
 const SIMULATION_NOTE = 'Simulated by the PhonePe test parent';
+const DEMO_SIMULATION_NOTE = 'Simulated by the demo parent';
 
 export const simulateWarehouse = async (req, res) => {
   try {
-    if (!isTestAccountPhone(req.parent?.phone)) {
+    /* Two accounts may do this now, for two different reasons. The PhonePe
+       reviewer, who has to see a review order end the way a real one does; and
+       the showroom parent at an open day, who is being shown the same thing by
+       a member of staff. Neither is a real family, and both are declared by an
+       environment variable that names nobody when it is unset. */
+    const testParent = isTestAccountPhone(req.parent?.phone);
+    const demoParent = isDemoParentPhone(req.parent?.phone);
+
+    if (!testParent && !demoParent) {
       return res.status(403).json({
-        message: 'Only the PhonePe test account can simulate the warehouse.',
+        message: 'Only a test or demo account can simulate the warehouse.',
       });
     }
 
@@ -88,6 +106,7 @@ export const simulateWarehouse = async (req, res) => {
     /* Each step a second apart, so the trail and the timestamps read in the
        order they would have happened, and a report that measures one stage
        against the next never sees a zero. */
+    const note = demoParent ? DEMO_SIMULATION_NOTE : SIMULATION_NOTE;
     const startedAt = Date.now();
     const set = { status: OrderStatus.COLLECTED };
     const transitions = [];
@@ -105,10 +124,10 @@ export const simulateWarehouse = async (req, res) => {
           recordedBy: req.parent.id,
           recordedAt: at,
         });
-        set.deliveryNote = SIMULATION_NOTE;
+        set.deliveryNote = note;
       }
 
-      transitions.push({ from, to, at, note: SIMULATION_NOTE });
+      transitions.push({ from, to, at, note });
       from = to;
     });
 
@@ -123,6 +142,13 @@ export const simulateWarehouse = async (req, res) => {
         message: 'The package moved while it was being simulated. Refresh and try again.',
       });
     }
+
+    /* The showroom account puts itself back. The view below is built from the
+       document we already hold, so the visitor still sees the package they
+       just walked to collection — and on the next refresh the basket is
+       waiting as a fresh request for whoever picks the tablet up next. The
+       reviewer's orders are left alone: theirs are a record of a real review. */
+    if (demoParent) await resetDemoOrder(updated);
 
     res.json({
       message: 'Delivered. The warehouse and caretaker steps were simulated.',

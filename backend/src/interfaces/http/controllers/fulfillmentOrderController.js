@@ -37,6 +37,7 @@ import { parseBusinessDateRange } from '../../../shared/http/businessDateRange.j
 import { cancelAndRefundFulfillment } from '../../../../utils/refunds.js';
 import { renderOrdersPrintSheet } from '../../../../utils/ordersPrintSheetPdf.js';
 import { buildRoomUnits } from '../../../../utils/roomUnits.js';
+import { resetDemoOrder } from '../../../../utils/demoParentReset.js';
 
 const transitionFields = Object.freeze({
   [OrderStatus.PACKED]: ['packedAt', 'packedBy'],
@@ -330,6 +331,14 @@ export const confirmCollection = async (req, res) => {
   if (!updated) {
     throw new ConflictError('Package changed while it was being collected. Refresh and retry.');
   }
+
+  /* The showroom family's packages put themselves back once collected, and a
+     caretaker's scan is one of the two ways to get there — the other being the
+     demo parent simulating the warehouse. Both call this, or a demo order
+     would linger depending on which way it happened to finish. It answers
+     false for every real student, so the ordinary path below is unchanged.
+     See utils/demoParentReset.js. */
+  await resetDemoOrder(updated);
 
   res.json({
     data: serialize(updated, { includeMoney: false }),

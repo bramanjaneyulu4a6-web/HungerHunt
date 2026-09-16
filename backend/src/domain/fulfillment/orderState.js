@@ -28,14 +28,19 @@ const transitions = Object.freeze({
 
 export const canTransitionOrder = (from, to) => transitions[from]?.has(to) ?? false;
 
-// The back office may correct a package that was put in the wrong active
-// column. This is deliberately separate from the warehouse state machine:
-// storeroom accounts still advance work in sequence, while a full admin can
-// move a paid order between the three live operational states.
+// The back office may put a package in whichever column it truly belongs in.
+// This is deliberately separate from the warehouse state machine: storeroom
+// accounts still advance work in sequence and the student's code still ends a
+// package at the room, while a full admin can move a paid order between any
+// of the five life stages, forwards or back, to correct what was recorded.
+// Cancellation stays outside this: it moves money, so it has one door (the
+// cancel-and-refund flow) and no way back.
 export const ADMIN_EDITABLE_ORDER_STATUSES = Object.freeze([
   OrderStatus.PENDING,
   OrderStatus.PACKED,
   OrderStatus.OUT_FOR_DELIVERY,
+  OrderStatus.DELIVERED,
+  OrderStatus.COLLECTED,
 ]);
 
 export const canAdminEditOrderStatus = (from, to) =>

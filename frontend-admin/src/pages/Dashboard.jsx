@@ -14,6 +14,7 @@ import {
   Skeleton,
 } from "../components/ui";
 import { EntryDetails } from "../components/WalletActivity";
+import FulfillmentStatusPicker from "../components/FulfillmentStatusPicker";
 import {
   businessDateToday,
   describeEntry,
@@ -22,6 +23,7 @@ import {
   entryLabel,
   entryReference,
   hasDetails,
+  pickerOrderOf,
 } from "../utils/ledgerEntry";
 import { ReceiptButton } from "../components/ReceiptButton";
 
@@ -368,7 +370,16 @@ const Dashboard = () => {
                           {new Date(entry.date).toLocaleString()}
                         </td>
                         <td data-label="Type">
-                          <Badge variant={variant}>{label}</Badge>
+                          {pickerOrderOf(entry) ? (
+                            <FulfillmentStatusPicker
+                              order={pickerOrderOf(entry)}
+                              label={label}
+                              variant={variant}
+                              onChanged={fetchHistory}
+                            />
+                          ) : (
+                            <Badge variant={variant}>{label}</Badge>
+                          )}
                         </td>
                         <td
                           data-label="Processed by"

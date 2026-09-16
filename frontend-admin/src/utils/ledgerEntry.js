@@ -173,3 +173,19 @@ const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
    browser's UTC date would open the dashboard on a day that has not started. */
 export const businessDateToday = (now = new Date()) =>
   new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
+/* The order a ledger row stands for, in the shape the status picker takes.
+   The ledger flattens the storeroom's record (backend utils/studentLedger.js),
+   so the receiver is `receivedBy` and the amount is `total`. Null for a row
+   that is not an order. */
+export const pickerOrderOf = (entry) => (
+  isOrder(entry) && entry.order?.id
+    ? {
+        id: entry.order.id,
+        status: entry.order.status,
+        receivedBy: entry.order.receivedBy,
+        totalAmount: entry.order.total,
+        student: entry.student,
+      }
+    : null
+);

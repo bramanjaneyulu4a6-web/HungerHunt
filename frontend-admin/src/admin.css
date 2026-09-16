@@ -786,6 +786,13 @@
 .fulfillment-status-menu button:hover,
 .fulfillment-status-menu button:focus-visible { background: var(--slate-100); }
 
+.fulfillment-status-menu .fulfillment-status-menu__danger {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 7px 7px;
+  color: var(--danger-bg-strong, #b91c1c);
+}
+
 .fulfillment-order-detail {
   display: grid;
   grid-template-columns: 1.5fr 1fr;

@@ -123,12 +123,17 @@ describe('dorm fulfilment policy', () => {
     assert.equal(canTransitionOrder('COLLECTED', 'DELIVERED'), false);
   });
 
-  test('admin corrections can move between any of the three active states', () => {
+  test('admin corrections can move between any of the five life stages, but never through cancellation', () => {
     assert.equal(canAdminEditOrderStatus('PENDING', 'OUT_FOR_DELIVERY'), true);
     assert.equal(canAdminEditOrderStatus('PACKED', 'PENDING'), true);
     assert.equal(canAdminEditOrderStatus('OUT_FOR_DELIVERY', 'PACKED'), true);
-    assert.equal(canAdminEditOrderStatus('OUT_FOR_DELIVERY', 'DELIVERED'), false);
-    assert.equal(canAdminEditOrderStatus('DELIVERED', 'PENDING'), false);
+    assert.equal(canAdminEditOrderStatus('OUT_FOR_DELIVERY', 'DELIVERED'), true);
+    assert.equal(canAdminEditOrderStatus('DELIVERED', 'PENDING'), true);
+    assert.equal(canAdminEditOrderStatus('PENDING', 'COLLECTED'), true);
+    assert.equal(canAdminEditOrderStatus('COLLECTED', 'PACKED'), true);
+    assert.equal(canAdminEditOrderStatus('PACKED', 'PACKED'), false);
+    assert.equal(canAdminEditOrderStatus('PACKED', 'CANCELLED'), false);
+    assert.equal(canAdminEditOrderStatus('CANCELLED', 'PENDING'), false);
   });
 
   test('records an atomic expected-state transition and staff audit entry', async () => {
@@ -230,10 +235,9 @@ describe('dorm fulfilment policy', () => {
     assert.equal(response.status, 200);
     assert.equal((await response.json()).data.status, 'PENDING');
     assert.deepEqual(update.$unset, {
-      packedAt: 1,
-      packedBy: 1,
-      dispatchedAt: 1,
-      dispatchedBy: 1,
+      packedAt: 1, packedBy: 1, dispatchedAt: 1, dispatchedBy: 1,
+      deliveredAt: 1, deliveredBy: 1, proofOfDelivery: 1, deliveryNote: 1,
+      collectedAt: 1, collectedBy: 1,
     });
     assert.equal(update.$push.transitions.from, 'PACKED');
     assert.equal(update.$push.transitions.to, 'PENDING');
@@ -279,13 +283,112 @@ describe('dorm fulfilment policy', () => {
     assert.equal(response.status, 200);
     assert.equal((await response.json()).data.status, 'PENDING');
     assert.deepEqual(update.$unset, {
-      packedAt: 1,
-      packedBy: 1,
-      dispatchedAt: 1,
-      dispatchedBy: 1,
+      packedAt: 1, packedBy: 1, dispatchedAt: 1, dispatchedBy: 1,
+      deliveredAt: 1, deliveredBy: 1, proofOfDelivery: 1, deliveryNote: 1,
+      collectedAt: 1, collectedBy: 1,
     });
     assert.equal(update.$push.transitions.from, 'OUT_FOR_DELIVERY');
     assert.equal(update.$push.transitions.to, 'PENDING');
+  });
+
+  const orderRow = (overrides) => ({
+    _id: ORDER_ID,
+    transactionId: TRANSACTION_ID,
+    studentId: STUDENT_ID,
+    studentSnapshot: { name: 'Asha', roomNumber: 'D-4' },
+    items: [],
+    totalAmount: 40,
+    businessWeekStart: new Date(),
+    orderedAt: new Date(),
+    deliverBy: new Date(),
+    ...overrides,
+  });
+
+  const adminTransition = (body) => fetch(`${base}/api/v1/fulfillment-orders/${ORDER_ID}/transition`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify(body),
+  });
+
+  test('an admin can record a collection as a correction, named in the audit trail', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({ lean: async () => orderRow({ status: 'DELIVERED' }) }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
+      update = requestedUpdate;
+      return { lean: async () => orderRow({ status: 'COLLECTED', transitions: [requestedUpdate.$push.transitions] }) };
+    });
+
+    const response = await adminTransition({ status: 'COLLECTED' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).data.status, 'COLLECTED');
+    assert.equal(String(update.$set.collectedBy), STAFF_ID);
+    assert.ok(update.$set.collectedAt instanceof Date);
+    assert.equal(update.$unset, undefined);
+    assert.equal(update.$push.transitions.to, 'COLLECTED');
+    assert.equal(String(update.$push.transitions.actorId), STAFF_ID);
+  });
+
+  test('an admin undoing a collection clears the collection and keeps the recorded handover', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({
+      lean: async () => orderRow({
+        status: 'COLLECTED',
+        deliveredAt: new Date(),
+        proofOfDelivery: { receivedBy: 'Meera', receiverPhone: '9876543210', recordedBy: STAFF_ID, recordedAt: new Date() },
+        collectedAt: new Date(),
+      }),
+    }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
+      update = requestedUpdate;
+      return { lean: async () => orderRow({ status: 'DELIVERED', transitions: [requestedUpdate.$push.transitions] }) };
+    });
+
+    const response = await adminTransition({ status: 'DELIVERED' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(update.$unset, { collectedAt: 1, collectedBy: 1 });
+    assert.equal(update.$set.proofOfDelivery, undefined);
+    assert.equal(update.$set.status, 'DELIVERED');
+  });
+
+  test('an admin marking a handover on an order with no proof must still name the receiver', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({ lean: async () => orderRow({ status: 'PENDING' }) }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => { throw new Error('must not run'); });
+
+    const response = await adminTransition({ status: 'DELIVERED' });
+    assert.equal(response.status, 400);
+    assert.deepEqual((await response.json()).error.details.map((detail) => detail.field), ['receivedBy', 'receiverPhone']);
+    assert.equal(update.mock.callCount(), 0);
+  });
+
+  test('an admin moving a collected order back to packed clears every later stage', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({ lean: async () => orderRow({ status: 'COLLECTED' }) }));
+    let update;
+    mock.method(FulfillmentOrder, 'findOneAndUpdate', (_filter, requestedUpdate) => {
+      update = requestedUpdate;
+      return { lean: async () => orderRow({ status: 'PACKED', transitions: [requestedUpdate.$push.transitions] }) };
+    });
+
+    assert.equal((await adminTransition({ status: 'PACKED' })).status, 200);
+    assert.deepEqual(update.$unset, {
+      dispatchedAt: 1, dispatchedBy: 1,
+      deliveredAt: 1, deliveredBy: 1, proofOfDelivery: 1, deliveryNote: 1,
+      collectedAt: 1, collectedBy: 1,
+    });
+    assert.equal(String(update.$set.packedBy), STAFF_ID);
+  });
+
+  test('a cancelled order is not revived by an admin correction', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
+    mock.method(FulfillmentOrder, 'findById', () => ({ lean: async () => orderRow({ status: 'CANCELLED' }) }));
+    const update = mock.method(FulfillmentOrder, 'findOneAndUpdate', () => { throw new Error('must not run'); });
+
+    const response = await adminTransition({ status: 'PENDING' });
+    assert.equal(response.status, 409);
+    assert.equal(update.mock.callCount(), 0);
   });
 
   test('the warehouse records delivery by naming who at the room took it', async () => {
@@ -357,7 +460,7 @@ describe('dorm fulfilment policy', () => {
     assert.match(receiverPhoneProblem('1234'), /10-digit/);
   });
 
-  test('no member of staff can collect a package on a student\'s behalf', async () => {
+  test('the storeroom cannot collect a package on a student\'s behalf', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: STAFF_ID }));
     const find = mock.method(FulfillmentOrder, 'findById', () => { throw new Error('must not run'); });
 

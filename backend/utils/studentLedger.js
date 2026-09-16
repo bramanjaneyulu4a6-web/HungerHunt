@@ -42,7 +42,7 @@ export const fulfillmentDetail = (order) => {
     note: order.deliveryNote || '',
     // Who took the package at the hostel door. A name only — the storeroom is
     // asked for one and the server refuses anything more.
-    receivedBy: order.proofOfDelivery?.receiverName || null,
+    receivedBy: order.proofOfDelivery?.receivedBy || null,
   };
 };
 

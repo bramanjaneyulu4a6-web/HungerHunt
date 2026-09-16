@@ -25,9 +25,11 @@ import {
   hasDetails,
   isOrder,
   isTransaction,
+  pickerOrderOf,
 } from '../utils/ledgerEntry';
 import { receiptIdOf, useStudentLedger } from '../utils/walletActivity';
 import { ReceiptButton } from './ReceiptButton';
+import FulfillmentStatusPicker from './FulfillmentStatusPicker';
 import { useDismissableOverlay } from '../utils/overlay';
 import { Badge, Banner, Button, EmptyState, Skeleton } from './ui';
 
@@ -135,8 +137,9 @@ export const EntryDetails = ({ entry }) => {
   );
 };
 
-const EntryRow = ({ entry, studentId, showStudent }) => {
+const EntryRow = ({ entry, studentId, showStudent, onOrderChanged }) => {
   const { label, variant } = entryLabel(entry);
+  const pickerOrder = pickerOrderOf(entry);
   const { direction } = describeEntry(entry);
   const canPrint = Boolean(receiptIdOf(entry)) && (studentId || entry.student?.id);
   const [open, setOpen] = useState(false);
@@ -157,7 +160,9 @@ const EntryRow = ({ entry, studentId, showStudent }) => {
         <td data-label="Student">{entry.student?.name || 'Deleted account'}</td>
       )}
       <td data-label="Status">
-        <Badge variant={variant}>{label}</Badge>
+        {pickerOrder
+          ? <FulfillmentStatusPicker order={pickerOrder} label={label} variant={variant} onChanged={onOrderChanged} />
+          : <Badge variant={variant}>{label}</Badge>}
       </td>
       <td data-label="Reference" className="ledger-mono">
         {entryReference(entry) || '—'}
@@ -198,7 +203,7 @@ const EntryRow = ({ entry, studentId, showStudent }) => {
   );
 };
 
-export const LedgerTable = ({ entries, studentId, showStudent = false }) => (
+export const LedgerTable = ({ entries, studentId, showStudent = false, onOrderChanged }) => (
   <div className="table-wrap">
     <table className="table table--stack table--hover">
       <thead>
@@ -219,6 +224,7 @@ export const LedgerTable = ({ entries, studentId, showStudent = false }) => (
             entry={entry}
             studentId={studentId}
             showStudent={showStudent}
+            onOrderChanged={onOrderChanged}
           />
         ))}
       </tbody>
@@ -226,14 +232,14 @@ export const LedgerTable = ({ entries, studentId, showStudent = false }) => (
   </div>
 );
 
-const Section = ({ title, entries, studentId, empty }) => (
+const Section = ({ title, entries, studentId, empty, onOrderChanged }) => (
   <section style={{ marginTop: 20 }}>
     <h4 className="section-title" style={{ marginBottom: 8 }}>
       {title} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({entries.length})</span>
     </h4>
     {entries.length === 0
       ? <p className="modal-note">{empty}</p>
-      : <LedgerTable entries={entries} studentId={studentId} />}
+      : <LedgerTable entries={entries} studentId={studentId} onOrderChanged={onOrderChanged} />}
   </section>
 );
 
@@ -268,6 +274,9 @@ const LedgerBody = ({ ledger, studentId }) => {
         entries={ledger.entries.filter(isOrder)}
         studentId={studentId}
         empty="Nothing has been bought on this wallet."
+        // A status change is re-read rather than patched: the row's label,
+        // timeline and any refund line all come from the server's ledger.
+        onOrderChanged={ledger.retry}
       />
       <Section
         title="Transactions"

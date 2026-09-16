@@ -47,6 +47,24 @@ const transitionFields = Object.freeze({
   [OrderStatus.CANCELLED]: ['cancelledAt', 'cancelledBy'],
 });
 
+// The life of a package in order, and what each stage writes on the order.
+// An admin correction that sets a stage clears everything after it.
+const STAGES = Object.freeze([
+  [OrderStatus.PENDING, []],
+  [OrderStatus.PACKED, ['packedAt', 'packedBy']],
+  [OrderStatus.OUT_FOR_DELIVERY, ['dispatchedAt', 'dispatchedBy']],
+  [OrderStatus.DELIVERED, ['deliveredAt', 'deliveredBy', 'proofOfDelivery', 'deliveryNote']],
+  [OrderStatus.COLLECTED, ['collectedAt', 'collectedBy']],
+]);
+
+const fieldsAfterStage = (status) => {
+  const index = STAGES.findIndex(([stage]) => stage === status);
+  if (index === -1) return {};
+  return Object.fromEntries(
+    STAGES.slice(index + 1).flatMap(([, fields]) => fields).map((field) => [field, 1])
+  );
+};
+
 // Every list read here is bounded. None of these screens paginate past the
 // first answer, so the cap is what stands between a busy week and a response
 // that has to be scrolled to be useless.
@@ -525,30 +543,43 @@ export const transition = async (req, res) => {
   }
   /* Only the student can finish a package, and they do it by typing their
      code on the caretaker's screen — never through this route, which is the
-     storeroom's. See confirmCollection. */
-  if (to === OrderStatus.COLLECTED) {
+     storeroom's. See confirmCollection. The back office is the one exception:
+     an admin may record a collection that happened, or undo one that did not,
+     as a correction that the audit trail names them for. */
+  if (to === OrderStatus.COLLECTED && req.staff.role !== 'admin') {
     throw new ApplicationError(
       'A package is collected by the student entering their purchase code, not by staff.',
       { status: 403, code: 'FORBIDDEN' }
     );
   }
 
+  /* The handover proof. Required whenever a package is being marked handed
+     over — except that an admin moving an order back to DELIVERED, from a
+     later stage that already carries the proof, keeps what was recorded
+     rather than being made to type it again. That case is settled once the
+     order is loaded, so the problems are held rather than thrown here. */
   let deliveryProofInput = null;
+  let deliveryProofProblems = [];
   if (to === OrderStatus.DELIVERED) {
     const receivedBy = String(req.body.receivedBy ?? '').trim();
     const receiverPhone = String(req.body.receiverPhone ?? '').trim();
-    const details = [
+    deliveryProofProblems = [
       ['receivedBy', proofOfDeliveryProblem(receivedBy)],
       ['receiverPhone', receiverPhoneProblem(receiverPhone)],
     ]
       .filter(([, message]) => message)
       .map(([field, message]) => ({ field, message }));
 
-    if (details.length) throw new ValidationError(details);
-    deliveryProofInput = {
-      receivedBy,
-      receiverPhone: normalizeReceiverPhone(receiverPhone),
-    };
+    const nothingTyped = !receivedBy && !receiverPhone;
+    if (deliveryProofProblems.length && !(nothingTyped && req.staff.role === 'admin')) {
+      throw new ValidationError(deliveryProofProblems);
+    }
+    if (!deliveryProofProblems.length) {
+      deliveryProofInput = {
+        receivedBy,
+        receiverPhone: normalizeReceiverPhone(receiverPhone),
+      };
+    }
   }
 
   if (to === OrderStatus.CANCELLED) {
@@ -601,6 +632,11 @@ export const transition = async (req, res) => {
       { currentStatus: current.status, requestedStatus: to }
     );
   }
+  const keepsExistingProof =
+    to === OrderStatus.DELIVERED && !deliveryProofInput && adminCorrection && Boolean(current.proofOfDelivery);
+  if (to === OrderStatus.DELIVERED && !deliveryProofInput && !keepsExistingProof) {
+    throw new ValidationError(deliveryProofProblems);
+  }
 
   const now = new Date();
   const note = String(req.body.note || '').trim().slice(0, 200);
@@ -615,19 +651,14 @@ export const transition = async (req, res) => {
   // Rolling work back must roll its derived timestamps back too. Counts in
   // the warehouse are status-based and update immediately; clearing these
   // prevents reports and parent timelines from still claiming a later step
-  // happened after the admin corrected it.
-  const unset = adminCorrection
-    ? to === OrderStatus.PENDING
-      ? { packedAt: 1, packedBy: 1, dispatchedAt: 1, dispatchedBy: 1 }
-      : to === OrderStatus.PACKED
-        ? { dispatchedAt: 1, dispatchedBy: 1 }
-        : {}
-    : {};
+  // happened after the admin corrected it. Every stage after the one being
+  // set is cleared, whichever stage that is.
+  const unset = adminCorrection ? fieldsAfterStage(to) : {};
 
   /* Delivery is the warehouse handing the package over at the room. The
      receiver name and callback number come from the handoff form; the staff
      account and time come from the authenticated session and server clock. */
-  if (to === OrderStatus.DELIVERED) {
+  if (to === OrderStatus.DELIVERED && !keepsExistingProof) {
     set.proofOfDelivery = buildProofOfDelivery({
       ...deliveryProofInput,
       recordedBy: req.staff.id,

@@ -11,33 +11,54 @@ export const FULFILLMENT_STATUS_LABELS = Object.freeze({
   COLLECTED: 'Delivered',
 });
 
-const ACTIVE_STATUSES = Object.freeze(['PENDING', 'PACKED', 'OUT_FOR_DELIVERY']);
+// The five life stages of a paid package, in order. A cancelled order has
+// left this line and does not come back.
+export const FULFILLMENT_STAGES = Object.freeze(['PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COLLECTED']);
+
+// The storeroom may still cancel a package that has not left it.
+const CANCELLABLE_STATUSES = Object.freeze(['PENDING', 'PACKED']);
 
 export const fulfillmentStatusLabel = (status) =>
   FULFILLMENT_STATUS_LABELS[status] || String(status || '').replaceAll('_', ' ');
 
 // The admin's badge: a handed-over package names its receiver, so the office
 // can see where inside "out for delivery" it actually is.
-export const fulfillmentStatusDisplay = (order) =>
-  order?.status === 'DELIVERED' && order.proofOfDelivery?.receivedBy
-    ? `Out for delivery, handed to ${order.proofOfDelivery.receivedBy}`
+export const fulfillmentStatusDisplay = (order) => {
+  // The board carries the proof object; the ledger flattens it to receivedBy.
+  const receiver = order?.proofOfDelivery?.receivedBy || order?.receivedBy;
+  return order?.status === 'DELIVERED' && receiver
+    ? `Out for delivery, handed to ${receiver}`
     : fulfillmentStatusLabel(order?.status);
+};
 
-// Two statuses now share the "out for delivery" label, so the transition that
-// records the handover needs its own verb in menus, dialogs and toasts.
-export const fulfillmentActionLabel = (status) =>
-  status === 'DELIVERED' ? 'handed over to the room' : fulfillmentStatusLabel(status);
+// Two statuses share the "out for delivery" label and two share "delivered",
+// so the transitions need their own verbs in menus, dialogs and toasts.
+export const fulfillmentActionLabel = (status) => {
+  if (status === 'DELIVERED') return 'handed over to the room';
+  if (status === 'COLLECTED') return 'delivered (collected by the student)';
+  return fulfillmentStatusLabel(status);
+};
 
+export const fulfillmentBadgeVariant = (status) => {
+  if (status === 'PENDING') return 'warn';
+  if (status === 'CANCELLED') return 'alert';
+  if (['OUT_FOR_DELIVERY', 'DELIVERED', 'COLLECTED'].includes(status)) return 'success';
+  return 'neutral';
+};
+
+/* Every stage an admin may move this order to: all of them but the one it is
+   in. The server is the judge of who may do this (a storeroom account is held
+   to the forward sequence); the console is admin-only, so it offers the lot.
+   Older API responses do not carry paymentProcessed. Active fulfilment orders
+   are only created after checkout, and the transition endpoint also verifies
+   the transaction, so absence of the newer hint must not hide the editor. An
+   explicit false still locks a known unpaid/corrupt record. */
 export const availableFulfillmentStatuses = (order) => {
-  // Older API responses do not carry paymentProcessed. Active fulfilment
-  // orders are only created after checkout, and the transition endpoint also
-  // verifies the transaction, so absence of the newer hint must not hide the
-  // editor. An explicit false still locks a known unpaid/corrupt record.
-  if (!order || order.paymentProcessed === false || !ACTIVE_STATUSES.includes(order.status)) {
+  if (!order || order.paymentProcessed === false || !FULFILLMENT_STAGES.includes(order.status)) {
     return [];
   }
-
-  const choices = ACTIVE_STATUSES.filter((status) => status !== order.status);
-  if (order.status === 'OUT_FOR_DELIVERY') choices.push('DELIVERED');
-  return choices;
+  return FULFILLMENT_STAGES.filter((status) => status !== order.status);
 };
+
+export const isCancellableFulfillment = (order) =>
+  Boolean(order) && order.paymentProcessed !== false && CANCELLABLE_STATUSES.includes(order.status);

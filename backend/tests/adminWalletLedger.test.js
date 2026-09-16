@@ -166,7 +166,7 @@ describe('one student, for the office', () => {
           deliverBy: new Date('2026-09-04T08:00:00.000Z'),
           deliveredAt: new Date('2026-09-03T08:00:00.000Z'),
           collectedAt: new Date('2026-09-03T10:00:00.000Z'),
-          proofOfDelivery: { receiverName: 'Dev Caretaker', receiverPhone: '9000000013' },
+          proofOfDelivery: { receivedBy: 'Dev Caretaker', receiverPhone: '9000000013' },
         }],
       }),
     }));
@@ -307,7 +307,7 @@ describe('one student, for the office', () => {
           _id: '507f191e810c19729de860ab',
           transactionId: '507f191e810c19729de860aa',
           status: 'COLLECTED',
-          proofOfDelivery: { receiverName: 'Dev Caretaker' },
+          proofOfDelivery: { receivedBy: 'Dev Caretaker' },
         }],
       }),
     }));

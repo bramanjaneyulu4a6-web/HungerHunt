@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import api from "../utils/api";
 import { formatINR, formatPackSize } from "../utils/format";
 import { sellable } from "../utils/availability";
@@ -21,6 +21,9 @@ const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 // Matches PURCHASE_CODE_LENGTH in backend/utils/validation.js, which is what
 // actually enforces it. Here it only shapes the field.
 const PURCHASE_CODE_LENGTH = 4;
+
+// The ticket is cut for a basket this size; lines past it scroll.
+const TICKET_VISIBLE_LINES = 4;
 
 // Category names arrive however they were typed into the admin console
 // ("CHIPS", "biscuits"), so they are title-cased for display only. Filtering
@@ -174,6 +177,7 @@ const KioskBilling = ({ student, onLogout }) => {
   const categoryTimerRef = useRef(null);
   const searchInputRef = useRef(null);
   const removeTimersRef = useRef(new Map());
+  const ticketLinesRef = useRef(null);
 
   /* How the sale ended: null while it is still going, then 'paid' or
      'pending'. Once set the session is over — the wall is gone, the timers
@@ -664,6 +668,52 @@ const KioskBilling = ({ student, onLogout }) => {
     return () => window.cancelAnimationFrame(focus);
   }, [searchOpen]);
 
+  /* The paper grows with the order up to four lines, then the lines scroll.
+     The cut is measured off the fifth row rather than fixed in CSS, because a
+     row's height changes with the breakpoint. offsetTop ignores the rows'
+     print-in transforms, so the cut does not jitter while one is animating.
+
+     The list scrolls without a visible bar, so whatever was just added is
+     scrolled to — a line landing below the cut would otherwise look like it
+     never arrived. */
+  useLayoutEffect(() => {
+    const lines = ticketLinesRef.current;
+    if (!lines) return undefined;
+
+    // The list's own bottom padding, kept under the last line both when
+    // cutting and when scrolling, so the cut lands between two rows.
+    const padBottom = parseFloat(getComputedStyle(lines).paddingBottom) || 0;
+
+    const cut = () => {
+      const rows = lines.querySelectorAll(".ticket-line");
+      if (rows.length <= TICKET_VISIBLE_LINES) {
+        lines.style.maxHeight = "";
+        return;
+      }
+      const height =
+        rows[TICKET_VISIBLE_LINES].offsetTop - lines.offsetTop + padBottom;
+      lines.style.maxHeight = `${height}px`;
+    };
+    cut();
+
+    const added =
+      recentlyAdded &&
+      Array.from(lines.children).find((el) => el.dataset.line === recentlyAdded);
+    if (added) {
+      const box = lines.getBoundingClientRect();
+      const row = added.getBoundingClientRect();
+      if (row.bottom > box.bottom || row.top < box.top) {
+        lines.scrollTo({
+          top: lines.scrollTop + row.bottom - box.bottom + padBottom,
+          behavior: "smooth",
+        });
+      }
+    }
+
+    window.addEventListener("resize", cut);
+    return () => window.removeEventListener("resize", cut);
+  }, [cart, ticketFolded, recentlyAdded]);
+
   const closeSearch = () => {
     setSearchOpen(false);
     setProductSearchQuery("");
@@ -912,7 +962,7 @@ const KioskBilling = ({ student, onLogout }) => {
                 </div>
               </div>
 
-              <div className="ticket-lines">
+              <div className="ticket-lines" ref={ticketLinesRef}>
                 <div className="ticket-lhead">
                   <span />
                   <span>Item</span>
@@ -945,6 +995,7 @@ const KioskBilling = ({ student, onLogout }) => {
                         : ""
                     }${removing ? " ticket-line--paint-delete" : ""}`}
                     key={item._id}
+                    data-line={item._id}
                   >
                     {(recentlyAdded === item._id || removing) && (
                       <span

@@ -19,6 +19,7 @@
 import { Capacitor } from '@capacitor/core';
 import API from '../services/api';
 import { firebaseConfig, firebaseConfigured, getFirebaseApp } from '../firebase';
+import { alreadySent, markSent, takeSent } from './pushTokenStore';
 
 const platform = () => Capacitor.getPlatform();
 const isNative = () => Capacitor.isNativePlatform();
@@ -37,10 +38,8 @@ const CHANNEL = {
   vibration: true,
 };
 
-/* The token the backend currently has for this device. Kept so that logout can
-   withdraw exactly that one, and so a re-register does not re-POST an
-   unchanged token on every app start. */
-let currentToken = null;
+/* The token the backend currently has for this device lives in pushTokenStore,
+   not here: it has to outlive a page reload, or every boot re-sends it. */
 
 let started = false;
 
@@ -55,11 +54,11 @@ let nativeListenersAttached = false;
 let webListenerAttached = false;
 
 const sendToken = async (token) => {
-  if (!token || token === currentToken) return;
+  if (!token || alreadySent(token)) return;
 
   try {
     await API.post('/parent/save-fcm-token', { token, platform: platform() });
-    currentToken = token;
+    markSent(token);
   } catch (err) {
     // A failed save means this device silently gets no notifications, which is
     // worth a console line — but never worth blocking sign-in over.
@@ -218,8 +217,7 @@ export const startPush = async (onPush) => {
 export const stopPush = async () => {
   started = false;
 
-  const token = currentToken;
-  currentToken = null;
+  const token = takeSent();
 
   if (!token) return;
 

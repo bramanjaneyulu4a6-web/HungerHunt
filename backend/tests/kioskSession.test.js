@@ -35,15 +35,16 @@ describe('the Student schema carries the kiosk fields', () => {
     assert.ok(path.options.required);
     assert.equal(path.options.trim, true);
     assert.equal(path.options.minlength[0], 4);
-    assert.equal(path.options.maxlength[0], 8);
+    assert.equal(path.options.maxlength[0], 9);
   });
 
-  test('admission numbers accept 4–8 letters or numbers and normalize case', () => {
+  test('admission numbers accept 4–9 letters or numbers and normalize case', () => {
     assert.equal(new Student({ admissionNumber: ' hh7a42 ' }).admissionNumber, 'HH7A42');
     assert.equal(new Student({ admissionNumber: 'A123' }).validateSync()?.errors.admissionNumber, undefined);
     assert.ok(new Student({ admissionNumber: 'A12' }).validateSync().errors.admissionNumber);
     assert.ok(new Student({ admissionNumber: 'AB-12' }).validateSync().errors.admissionNumber);
-    assert.ok(new Student({ admissionNumber: 'ABCDEFGHI' }).validateSync().errors.admissionNumber);
+    assert.equal(new Student({ admissionNumber: 'ABCDEFGHI' }).validateSync()?.errors.admissionNumber, undefined);
+    assert.ok(new Student({ admissionNumber: 'ABCDEFGHIJ' }).validateSync().errors.admissionNumber);
   });
 
   test('lockout fields default to unlocked', () => {
@@ -171,6 +172,9 @@ describe('opening a kiosk session', () => {
       id: STUDENT_ID,
       name: 'Asha Rao',
       admissionNumber: 'ADM1042',
+      // Every session says whether it is a demo one, so the till knows
+      // whether to draw its clocks. An ordinary student's is false.
+      demo: false,
       pocketMoney: 350,
       wallet: {
         studentId: STUDENT_ID,
@@ -273,7 +277,7 @@ describe('opening a kiosk session', () => {
 
     const res = await postSession({ admissionNumber: 'AB-12' });
     assert.equal(res.status, 400);
-    assert.match((await res.json()).message, /4 to 8 letters or numbers/i);
+    assert.match((await res.json()).message, /4 to 9 letters or numbers/i);
     assert.equal(findOne.mock.callCount(), 0);
   });
 });

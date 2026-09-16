@@ -58,6 +58,15 @@ const studentSchema = new mongoose.Schema({
     set: normalizeAdmissionNumber,
   },
 
+  /* The showroom account. A demo student drives the whole kiosk — catalogue,
+     cart, purchase code, confirmation — and none of it is written: no
+     transaction, no fulfillment order, no stock movement, no wallet debit and
+     no notification to the parent phone on this row. See utils/demoAccount.js
+     for why this is a field rather than an environment variable, and for the
+     whitelist that keeps every admin route and the CSV importer from setting
+     it. Nothing but scripts/createDemoStudent.js writes it. */
+  demoAccount: { type: Boolean, default: false },
+
   pocketMoney: { type: Number, default: 0 },
   rechargeHistory: [
   {

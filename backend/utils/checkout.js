@@ -8,6 +8,7 @@ import { checkPurchaseLimits } from './purchaseLimits.js';
 import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
+import { isDemoStudent } from './demoAccount.js';
 
 /* Charging a wallet is now reached two ways — the till billing at the counter,
    and a parent approving a request raised earlier — and both have to be equally
@@ -57,6 +58,24 @@ export const chargeCart = async ({
 
   if (!student || student.active === false) {
     return { ok: false, status: 404, message: 'Student record not found.' };
+  }
+
+  /* The demo account never gets this far: generateBill answers it before the
+     transaction opens, and that short-circuit is what actually delivers "the
+     order is not saved". This is the backstop under it.
+
+     It is a refusal rather than a silent success because of which way the two
+     failures point. A demo student that slipped through and was charged would
+     write a real transaction, move real stock and raise a real package for a
+     child who does not exist — and nobody would find out until the storeroom
+     tried to pick it. A demo student refused here breaks the demo loudly, in
+     front of the person running it. The second is the one worth having. */
+  if (await isDemoStudent(student, { session })) {
+    return {
+      ok: false,
+      status: 409,
+      message: 'Demo accounts cannot be charged. Nothing was recorded.',
+    };
   }
 
   let totalAmount = 0;

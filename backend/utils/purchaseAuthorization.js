@@ -33,14 +33,20 @@ export const hashCart = (items) => {
   return crypto.createHash('sha256').update(canonical).digest('hex');
 };
 
-export const issueAuthorization = async ({ studentId, items }) => {
+// ttlSeconds is widened for the demo account and for nothing else. Two
+// minutes is set for a counter, where the next thing that happens is the
+// client's own follow-up request; at an open day the next thing that happens
+// is a conversation, and an expiry landing in the middle of one is exactly
+// the interruption the demo exists to avoid. The binding that does the real
+// work here — single use, one student, one cart — is unchanged by the length.
+export const issueAuthorization = async ({ studentId, items, ttlSeconds = TTL_SECONDS }) => {
   const token = crypto.randomBytes(32).toString('hex');
 
   await PurchaseAuthorization.create({
     token,
     studentId,
     cartHash: hashCart(items),
-    expiresAt: new Date(Date.now() + TTL_SECONDS * 1000),
+    expiresAt: new Date(Date.now() + ttlSeconds * 1000),
   });
 
   return token;

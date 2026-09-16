@@ -70,9 +70,15 @@ export const signAdminToken = (id) => signStaffToken(id, 'admin');
 // The student standing at the kiosk. admissionNumber rides along so the
 // terminal can name whose session it is without a second lookup; it is the
 // id that authorizes anything.
-export const signStudentToken = (id, admissionNumber) =>
+//
+// ttlSeconds is how the demo account gets a session with no visible clock:
+// the countdown on screen is only a drawing of this number, so lengthening it
+// there without lengthening it here would manufacture 401s mid-demo. The
+// default is the one every real student gets, so a caller that says nothing
+// is capped exactly as before.
+export const signStudentToken = (id, admissionNumber, ttlSeconds = STUDENT_SESSION_SECONDS) =>
   jwt.sign({ id, admissionNumber, role: 'student' }, studentSecret(), {
-    expiresIn: STUDENT_SESSION_SECONDS,
+    expiresIn: ttlSeconds,
   });
 
 // v carries the account's tokenVersion, which is what makes a parent session

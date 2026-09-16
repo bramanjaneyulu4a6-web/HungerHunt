@@ -5,6 +5,7 @@ import Inventory from "../models/Inventory.js";
 import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
+import { isDemoStudent } from "../utils/demoAccount.js";
 import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
@@ -189,6 +190,19 @@ export const createPendingOrder = async (req, res) => {
 
     if (!student || student.active === false) {
       return res.status(404).json({ message: "Student record not found." });
+    }
+
+    /* The demo account cannot raise an approval request. It should never get
+       here — requiresParentApproval is off on that row and the check below
+       would turn a kiosk away anyway — but the console can raise an order for
+       any student it can see, and this route's whole purpose is to send a
+       notification to a parent. The one thing a demo must never do is make
+       somebody's phone buzz, so it is refused by name rather than left to be
+       caught by a setting somebody could change. */
+    if (await isDemoStudent(student)) {
+      return res.status(400).json({
+        message: 'This is a demo account. It cannot raise an order for approval.',
+      });
     }
 
     /* The setting binds the kiosk, not the console. A student who needs no

@@ -28,7 +28,8 @@
     "assign:product-images": "node scripts/assignProductImages.js",
     "stock:opening": "node scripts/setOpeningStock.js",
     "student:checkout": "node scripts/setStudentCheckout.js",
-    "seed:units": "node scripts/seedUnits.js"
+    "seed:units": "node scripts/seedUnits.js",
+    "student:demo": "node scripts/createDemoStudent.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -4,6 +4,7 @@ import WalletReversal from '../models/WalletReversal.js';
 import PendingOrder from '../models/PendingOrder.js';
 import { businessPeriodStart } from './businessTime.js';
 import { isTestAccountStudent } from './testAccount.js';
+import { isDemoStudent } from './demoAccount.js';
 
 /* Per-product purchase limits: how many units of one product a single student
  * may buy in a period.
@@ -151,7 +152,12 @@ export const getPurchaseAllowances = async ({
   // An empty map reads as "nothing is limited" to every caller — the kiosk
   // draws no counters and checkPurchaseLimits finds nothing to refuse — which
   // is why the bypass lives here and not in each of them.
+  //
+  // The demo account is exempt for a different reason: a visitor trying the
+  // kiosk must never be told they have reached a cap belonging to a child who
+  // does not exist. Same empty map, same silence at every caller.
   if (await isTestAccountStudent(student ?? studentId, { session })) return result;
+  if (await isDemoStudent(student ?? studentId, { session })) return result;
 
   const productIds = limited.map(({ product }) => product._id);
   const pending = await pendingQuantities({

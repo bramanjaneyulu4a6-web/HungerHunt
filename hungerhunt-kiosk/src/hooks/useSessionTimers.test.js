@@ -191,3 +191,32 @@ describe('when the session is over', () => {
     expect(onExpire).not.toHaveBeenCalled();
   });
 });
+
+/* The demo account, which runs this kiosk at an open day. Both clocks exist to
+   protect a child's wallet on an unattended terminal; a demo session has no
+   wallet to protect and a member of staff standing beside it, and being hurried
+   or logged out mid-explanation is the one thing it cannot do. */
+describe('a session with the clocks turned off', () => {
+  test('never expires, however long it is left', () => {
+    const { result, onExpire } = start({ enabled: false });
+
+    // Well past the hard cap, and without a single touch — so the idle prompt
+    // would have ended an ordinary session more than six times over.
+    tick(HARD_CAP_SECONDS * 2);
+
+    expect(onExpire).not.toHaveBeenCalled();
+    expect(result.current.idlePrompt).toBe(false);
+    expect(result.current.capWarning).toBe(false);
+  });
+
+  test('turning them back on starts a full session, not a resumed one', () => {
+    const { result, rerender, onExpire } = start({ enabled: false });
+
+    tick(HARD_CAP_SECONDS * 2);
+    rerender();
+
+    // The countdown never ran, so it is still whole.
+    expect(result.current.capRemaining).toBe(HARD_CAP_SECONDS);
+    expect(onExpire).not.toHaveBeenCalled();
+  });
+});

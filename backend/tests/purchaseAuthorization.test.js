@@ -77,6 +77,9 @@ const queryFor = (value) => {
   const query = Promise.resolve(value);
   query.select = () => query;
   query.populate = () => query;
+  // generateBill asks isDemoStudent whether this student is the showroom
+  // account before it opens the transaction, and that read is .lean().
+  query.lean = () => query;
   return query;
 };
 

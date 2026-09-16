@@ -142,6 +142,13 @@ const limitMessage = (product) => {
 };
 
 const KioskBilling = ({ student, onLogout }) => {
+  /* The showroom session, told to us by createKioskSession rather than worked
+     out here — whether an order is real is the server's answer, and a till
+     that decided it locally could disagree with the thing actually recording
+     (or not recording) the sale. Everything it changes on this screen is
+     presentation: no clocks, and a balance that falls without anything having
+     been spent. */
+  const isDemo = student.demo === true;
   const [walletBalance, setWalletBalance] = useState(
     Number(student.wallet?.balance ?? student.pocketMoney ?? 0)
   );
@@ -489,6 +496,13 @@ const KioskBilling = ({ student, onLogout }) => {
         purchaseToken,
       });
 
+      /* Nothing was debited server-side for a demo order, so the drop the
+         visitor expects to see after paying is drawn here instead. It lasts
+         until the next refreshWallet puts the real (unchanged) figure back,
+         which is the right lifetime: it is a thing shown on the confirmation,
+         not a balance anybody is keeping. */
+      if (isDemo) setWalletBalance((balance) => balance - invoiceTotal);
+
       setResult("paid");
       return true;
     } catch (err) {
@@ -656,6 +670,9 @@ const KioskBilling = ({ student, onLogout }) => {
       active: !result && !checkoutPhase,
       onExpire: onLogout,
       isBusy: () => payingRef.current,
+      // The demo account runs no clocks at all. createKioskSession says so,
+      // and issues a token long enough to match.
+      enabled: !isDemo,
     });
 
   /* Keeps the pay sheet above the on-screen keyboard while the purchase code
@@ -749,7 +766,7 @@ const KioskBilling = ({ student, onLogout }) => {
               className="kiosk-student-card--category"
             />
             <div className="kiosk-wordmark kiosk-wordmark--category">Hunger Hunt</div>
-            <SessionClock remaining={capRemaining} />
+            {!isDemo && <SessionClock remaining={capRemaining} />}
             <button
               type="button"
               className="kiosk-exit"
@@ -1044,7 +1061,7 @@ const KioskBilling = ({ student, onLogout }) => {
 
             <div className="kiosk-wordmark kiosk-wordmark--wall">Hunger Hunt</div>
 
-            <SessionClock remaining={capRemaining} />
+            {!isDemo && <SessionClock remaining={capRemaining} />}
 
             <button
               type="button"

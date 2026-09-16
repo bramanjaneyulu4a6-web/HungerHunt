@@ -1,7 +1,9 @@
 import Transaction from '../models/Transaction.js';
 import Parent from "../models/Parent.js";
 import { sendToParent } from "../utils/sendNotification.js";
+import Inventory from "../models/Inventory.js";
 import { chargeCart } from "../utils/checkout.js";
+import { DEMO_SESSION_SECONDS, isDemoStudent } from "../utils/demoAccount.js";
 import { withMongoTransaction } from "../utils/mongoTransaction.js";
 import { checkPurchaseCode } from "../src/domain/students/purchaseCodeCheck.js";
 import {
@@ -11,6 +13,67 @@ import {
   issueAuthorization,
   unverifiedBillsAccepted,
 } from "../utils/purchaseAuthorization.js";
+
+/* A demo checkout: the answer the kiosk would have got, with nothing behind it.
+ *
+ * It is not a stub that returns a constant. The purchase code is still spent
+ * here, exactly once, against exactly this cart — a demo that skipped that
+ * would be showing a parent a lock that is not there. And the lines are still
+ * priced from the live catalogue, so the total the visitor sees is the total
+ * the school actually charges.
+ *
+ * What it does not do is write. No wallet, no stock, no Transaction, no
+ * FulfillmentOrder, no receipt number and no notification. The single write in
+ * this whole path is the authorization row being deleted as it is claimed,
+ * which is the deletion of something this same flow created a moment ago.
+ *
+ * Stock is priced but deliberately not checked: a visitor is demonstrating the
+ * kiosk, not competing for the last samosa, and refusing their basket over a
+ * shelf they are not going to empty would be a confusing end to a demo. The
+ * shelf is safe either way, because nothing here decrements it.
+ */
+const settleDemoBill = async ({ studentId, items, purchaseToken }) => {
+  const authorization = await consumeAuthorization({ token: purchaseToken, studentId, items });
+
+  if (!authorization.ok && !(authorization.reason === 'missing' && unverifiedBillsAccepted())) {
+    return { status: 403, body: { message: AUTHORIZATION_MESSAGES[authorization.reason] } };
+  }
+
+  let totalAmount = 0;
+  const lines = [];
+
+  for (const orderItem of items) {
+    const inventory = await Inventory.findOne({ productId: orderItem.productId }).populate('productId');
+
+    if (!inventory?.productId) {
+      return { status: 404, body: { message: 'Inventory record not found.' } };
+    }
+
+    const price = inventory.productId.price;
+
+    totalAmount += price * orderItem.quantity;
+    lines.push({
+      productId: inventory.productId._id,
+      name: inventory.productId.name,
+      quantity: orderItem.quantity,
+      price,
+    });
+  }
+
+  /* Shaped like a real bill's response so the kiosk needs no demo branch of
+     its own, but pointedly not a Transaction: no _id, because there is no row
+     to fetch, and a `demo` flag so anything that ever does read this can tell
+     it apart from a sale. */
+  return {
+    status: 201,
+    body: {
+      message: 'Checkout successful!',
+      demo: true,
+      transaction: { demo: true, studentId, items: lines, totalAmount, createdAt: new Date() },
+      fulfillmentOrder: null,
+    },
+  };
+};
 
 export const generateBill = async (req, res) => {
   // As in verifyPayment: a student session names its own student, and the
@@ -27,6 +90,23 @@ export const generateBill = async (req, res) => {
   }
 
   try {
+    /* The showroom ending, decided before the transaction opens.
+     *
+     * Everything below this block writes: the wallet is debited, stock moves,
+     * a Transaction and a FulfillmentOrder are created and the parent's phone
+     * buzzes. A demo order must do none of it, and the cheapest way to be sure
+     * is to never reach the code that does — rather than to thread a flag
+     * through chargeCart, createFulfillmentOrder and sendToParent and rely on
+     * every future edit to each of them remembering it exists.
+     *
+     * One extra projected read per bill is the price of that, on a route that
+     * already opens a Mongo transaction. */
+    if (await isDemoStudent(studentId)) {
+      const demo = await settleDemoBill({ studentId, items, purchaseToken });
+
+      return res.status(demo.status).json(demo.body);
+    }
+
     // The parent's purchase password is checked by verifyPayment, which hands
     // back a token bound to this student and this exact cart. Spending it here
     // is what makes that check part of the charge instead of a step the client
@@ -166,7 +246,15 @@ export const verifyPayment = async (req, res) => {
         });
       }
 
-      purchaseToken = await issueAuthorization({ studentId: student._id, items });
+      /* The demo account keeps the code step — a parent watching their child
+         be unable to spend without it is most of what the demo is for — but
+         not the two-minute window on it, which is set for a counter where the
+         next event is an HTTP request rather than a conversation. */
+      purchaseToken = await issueAuthorization({
+        studentId: student._id,
+        items,
+        ...(student.demoAccount === true ? { ttlSeconds: DEMO_SESSION_SECONDS } : {}),
+      });
     }
 
     // The till asks for the password the same way either way; what changes is

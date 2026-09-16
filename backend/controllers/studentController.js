@@ -11,6 +11,7 @@ import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js'
 import { mintReceiptNumber } from '../utils/walletReceipts.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import { isTestAccountStudent } from '../utils/testAccount.js';
+import { DEMO_SESSION_SECONDS, isDemoStudent } from '../utils/demoAccount.js';
 import {
   ADMISSION_NUMBER_MESSAGE,
   isValidAdmissionNumber,
@@ -429,7 +430,10 @@ export const createKioskSession = async (req, res) => {
       admissionNumber,
       active: { $ne: false },
     })
-      .select('name admissionNumber pocketMoney updatedAt requiresParentApproval parentPhoneNumber +purchasePassword');
+      // demoAccount must be named here: isDemoStudent reads the field off the
+      // document, and a projection that omits it reads as not-demo rather
+      // than as unknown. See utils/demoAccount.js.
+      .select('name admissionNumber pocketMoney updatedAt requiresParentApproval parentPhoneNumber demoAccount +purchasePassword');
 
     if (!student) {
       return res.status(404).json({ message: 'No student found with that admission number.' });
@@ -464,8 +468,14 @@ export const createKioskSession = async (req, res) => {
        delivered, or every review order waits on a real warehouse round. The
        unanswered-approval gate below still holds for them: that one is about
        the parent answering, not about how many orders a week may carry. */
+    /* The demo account skips both gates, not just the package one. It raises
+       no orders of either kind — nothing it does is written — so any row that
+       could match is debris from before the flag was set, and a visitor being
+       turned away by a stranger's leftover order is the one failure an open
+       day cannot absorb. */
     const now = new Date();
-    const [pendingApproval, fulfillmentOrder] = await Promise.all([
+    const demo = await isDemoStudent(student);
+    const [pendingApproval, fulfillmentOrder] = demo ? [null, null] : await Promise.all([
       PendingOrder.findOne({
         studentId: student._id,
         $or: [
@@ -512,9 +522,14 @@ export const createKioskSession = async (req, res) => {
       });
     }
 
+    // The session's length and the terminal's clocks are the same fact told
+    // twice, so they are decided together here rather than inferred on the
+    // kiosk. `demo` rides along so the screen knows to draw no countdown.
+    const sessionSeconds = demo ? DEMO_SESSION_SECONDS : STUDENT_SESSION_SECONDS;
+
     res.json({
-      token: signStudentToken(student._id.toString(), student.admissionNumber),
-      expiresInSeconds: STUDENT_SESSION_SECONDS,
+      token: signStudentToken(student._id.toString(), student.admissionNumber, sessionSeconds),
+      expiresInSeconds: sessionSeconds,
       student: {
         id: student._id.toString(),
         name: student.name,
@@ -522,6 +537,7 @@ export const createKioskSession = async (req, res) => {
         pocketMoney: student.pocketMoney,
         wallet: walletView(student),
         requiresParentApproval: Boolean(student.requiresParentApproval),
+        demo,
       },
     });
   } catch (error) {

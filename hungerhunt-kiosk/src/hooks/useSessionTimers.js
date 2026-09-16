@@ -23,7 +23,16 @@ export const WARNING_SECONDS = 30;
 export const IDLE_SECONDS = 60;
 export const PROMPT_SECONDS = 10;
 
-export const useSessionTimers = ({ active, onExpire, isBusy }) => {
+/* `enabled` turns both clocks off for the demo account, which runs the kiosk
+   at an open day and must never hurry a visitor or reset itself in the middle
+   of a conversation. It is an argument rather than a second hook because the
+   session is otherwise identical, and because the thing that actually ends a
+   demo session is the same thing that ends any other: somebody tapping Done.
+
+   Turning this off alone would not lengthen anything — the cap on screen is a
+   drawing of the token's own lifetime, and the server issues demo tokens with
+   a matching one. Both halves are decided in createKioskSession. */
+export const useSessionTimers = ({ active, onExpire, isBusy, enabled = true }) => {
   const [capRemaining, setCapRemaining] = useState(HARD_CAP_SECONDS);
   const [idlePrompt, setIdlePrompt] = useState(false);
   const [idleRemaining, setIdleRemaining] = useState(PROMPT_SECONDS);
@@ -48,7 +57,7 @@ export const useSessionTimers = ({ active, onExpire, isBusy }) => {
   const restartQuietRef = useRef(() => {});
 
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active || !enabled) return undefined;
 
     let capLeft = HARD_CAP_SECONDS;
     let quietFor = 0;
@@ -117,11 +126,14 @@ export const useSessionTimers = ({ active, onExpire, isBusy }) => {
       window.removeEventListener("pointerdown", present);
       window.removeEventListener("keydown", present);
     };
-  }, [active]);
+  }, [active, enabled]);
 
   return {
     capRemaining,
-    capWarning: capRemaining <= WARNING_SECONDS && capRemaining > 0,
+    // Explicitly false rather than left to capRemaining sitting at its
+    // initial value: a demo session must not flash "session ending" if the
+    // cap ever starts being seeded from somewhere else.
+    capWarning: enabled && capRemaining <= WARNING_SECONDS && capRemaining > 0,
     idlePrompt,
     idleRemaining,
     dismissIdle: () => restartQuietRef.current(),

@@ -18,7 +18,7 @@ vi.mock('./utils/api', () => ({
 }));
 
 vi.mock('./utils/dataAutoRefresh', () => ({
-  startDataAutoRefresh: () => () => {},
+  startDataAutoRefresh: vi.fn(() => () => {}),
   observeMutationRevision: (response) => response,
 }));
 
@@ -95,6 +95,16 @@ describe('with the login gate switched off', () => {
       admissionNumber: 'DEMO01',
     });
     expect(screen.queryByLabelText('Admission number')).toBeNull();
+  });
+
+  test('the till never polls the change counter — nothing on it would act on the answer', async () => {
+    await renderAppAt('/');
+    await screen.findByText('Till for Demo Student');
+
+    // Same module registry the App just imported from, so this is the very
+    // mock App would have called.
+    const { startDataAutoRefresh } = await import('./utils/dataAutoRefresh');
+    expect(startDataAutoRefresh).not.toHaveBeenCalled();
   });
 
   test('the gate is unreachable even by asking for it directly', async () => {

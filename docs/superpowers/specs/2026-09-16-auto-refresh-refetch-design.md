@@ -82,7 +82,7 @@ disturbance. Warehouse and admin screens subscribe in the same one-line way.
 | Parent | yes | `Dashboard`, `Accounts`, `ChildDetails` (both loaders) | none to keep; `PUSH_EVENT` stays |
 | Warehouse | yes | `CaretakerOrders` (`loadArrivals({ silent: true })`) | 15 s interval stays as safety net |
 | Admin | yes | `Dashboard` (`fetchHistory`), `ReportAlertBanner`, `StockAlertBanner` (their `load`) | 30 s / 60 s intervals stay |
-| Kiosk | yes | none — the till reads `/inventory` at checkout and never reloads mid-session today | — |
+| Kiosk | yes (file kept identical) | none — the till reads `/inventory` at checkout and never reloads mid-session today. **Amended 2026-09-16:** the kiosk no longer calls `startDataAutoRefresh` at all; with no subscriber every poll was a free GET from every till, so the owner asked for it cut. | — |
 
 The utility is four identical copies. They stay four copies (there is no
 shared package between the apps); the change is applied to each and the copies

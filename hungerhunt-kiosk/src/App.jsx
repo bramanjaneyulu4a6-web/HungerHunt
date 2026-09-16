@@ -5,16 +5,13 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
-import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 
 import KioskBilling from "./pages/KioskBilling";
 import Login from "./pages/Login";
 import DemoKiosk from "./pages/DemoKiosk";
 import ProtectedRoute from "./components/ProtectedRoute";
-import api from "./utils/api";
 import { LOGIN_DISABLED } from "./constants/kioskMode";
-import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
 
 /* The kiosk owns the end of a session, and there are four ways to reach it:
    the student taps Done, the idle prompt runs out, the hard cap arrives, or
@@ -49,11 +46,11 @@ function KioskScreen() {
 }
 
 function App() {
-  // Nothing on the kiosk subscribes to the change signal: the till reads
-  // inventory fresh at checkout, and a student's basket is never interrupted.
-  // Polling still runs so the shared utility behaves the same on every app.
-  useEffect(() => startDataAutoRefresh(api), []);
-
+  // The kiosk does not poll the change counter at all: nothing on the till
+  // would act on the answer (inventory is read fresh at checkout, and a
+  // student's basket is never interrupted), so every poll was a free GET
+  // from every till against the backend. The shared dataAutoRefresh utility
+  // stays in src/utils, byte-identical to the other apps, unused here.
   return (
     <Router>
       <Toaster position="top-center" />

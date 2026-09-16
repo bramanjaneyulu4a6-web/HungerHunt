@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
 import { AnimateIn, Banner, EmptyState, PageHeader, Skeleton, Card } from '../components/ui';
 import PendingApprovalCard from '../components/PendingApprovalCard';
@@ -67,11 +68,13 @@ export default function Dashboard() {
 
     load();
     window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
     window.addEventListener('focus', refresh);
     const stopWaitingOnPayment = onBackgroundRefreshResumed(load);
     return () => {
       ignore = true;
       window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener(DATA_CHANGED_EVENT, refresh);
       window.removeEventListener('focus', refresh);
       stopWaitingOnPayment();
     };

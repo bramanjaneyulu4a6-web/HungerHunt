@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { formatClass, formatINR } from '../utils/format';
 import { AnimateIn, Badge, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import Icon from '../components/Icon';
@@ -46,10 +47,12 @@ export default function Accounts() {
     };
     load();
     window.addEventListener(PUSH_EVENT, load);
+    window.addEventListener(DATA_CHANGED_EVENT, load);
     window.addEventListener('focus', load);
     return () => {
       ignore = true;
       window.removeEventListener(PUSH_EVENT, load);
+      window.removeEventListener(DATA_CHANGED_EVENT, load);
       window.removeEventListener('focus', load);
     };
   }, [attempt]);

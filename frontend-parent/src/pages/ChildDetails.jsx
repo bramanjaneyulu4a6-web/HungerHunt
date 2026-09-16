@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import API from '../services/api';
 import { PUSH_EVENT } from '../utils/events';
+import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
 import { formatClass, formatINR } from '../utils/format';
 import {
@@ -216,10 +217,12 @@ const usePagedList = (path, key, enabled) => {
 
     const refresh = () => reload();
     window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
     window.addEventListener('focus', refresh);
 
     return () => {
       window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener(DATA_CHANGED_EVENT, refresh);
       window.removeEventListener('focus', refresh);
     };
   }, [enabled, reload]);
@@ -393,12 +396,14 @@ export default function ChildDetails() {
     };
 
     window.addEventListener(PUSH_EVENT, refresh);
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
     window.addEventListener('focus', refresh);
     const stopWaitingOnPayment = onBackgroundRefreshResumed(load);
 
     return () => {
       ignore = true;
       window.removeEventListener(PUSH_EVENT, refresh);
+      window.removeEventListener(DATA_CHANGED_EVENT, refresh);
       window.removeEventListener('focus', refresh);
       stopWaitingOnPayment();
     };

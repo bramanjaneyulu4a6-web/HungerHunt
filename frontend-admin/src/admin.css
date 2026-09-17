@@ -2684,10 +2684,6 @@
   color: var(--muted);
 }
 
-.tx-deleted-badge {
-  margin-left: 6px;
-}
-
 .tx-deleted {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2750,13 +2746,14 @@
 }
 
 .row-actions .row-actions__delete {
-  color: var(--danger);
+  color: var(--on-dark);
+  background: var(--danger);
   border-color: var(--danger);
 }
 
 .row-actions .row-actions__delete:hover:not(:disabled) {
-  color: var(--on-dark);
-  background: var(--danger);
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
 }
 
 /* Raised from inside a row's actions cell, which keeps its text on one

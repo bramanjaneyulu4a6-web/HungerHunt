@@ -201,9 +201,9 @@ describe('a deleted ledger row', () => {
   test('is labelled deleted', () => {
     assert.deepEqual(
       { label: describeEntry(deposit).label, variant: describeEntry(deposit).variant },
-      { label: 'Cash Deposit · Deleted', variant: 'alert' }
+      { label: 'Deleted Cash Deposit', variant: 'alert' }
     );
-    assert.equal(entryLabel({ kind: 'ORDER_PAYMENT', deleted: true, order: { status: 'PENDING' } }).label, 'Order – Payment deleted');
+    assert.equal(entryLabel({ kind: 'ORDER_PAYMENT', deleted: true, order: { status: 'PENDING' } }).label, 'Deleted Student Wallet Payment');
   });
 
   test('carries no sign and counts toward nothing', () => {

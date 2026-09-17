@@ -423,7 +423,7 @@ const RechargeHistory = () => {
                                       {new Date(entry.date).toLocaleString()}
                                     </td>
                                     <td data-label="Type">
-                                      <Badge variant="neutral">
+                                      <Badge variant={isDeleted(entry) ? "alert" : "neutral"}>
                                         {describeEntry(entry).label}
                                       </Badge>
                                     </td>

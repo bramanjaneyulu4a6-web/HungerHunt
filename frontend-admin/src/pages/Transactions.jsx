@@ -620,8 +620,10 @@ const Transactions = () => {
                         {timeOf(row.at)}
                       </td>
                       <td data-label="Type">
-                        <Badge variant={KIND_BADGE[row.kind] || 'neutral'}>{KIND_LABELS[row.kind] || row.kind}</Badge>
-                        {row.deleted && <Badge variant="alert" className="tx-deleted-badge">Deleted</Badge>}
+                        {/* A deleted row is named as one: "Deleted Cash Deposit". */}
+                        <Badge variant={row.deleted ? 'alert' : KIND_BADGE[row.kind] || 'neutral'}>
+                          {row.deleted ? 'Deleted ' : ''}{KIND_LABELS[row.kind] || row.kind}
+                        </Badge>
                       </td>
                       <td data-label="Student" className="cell-name">
                         {row.student.name || <span className="cell-unset">Deleted student</span>}

@@ -31,7 +31,8 @@ const ENTRY_KINDS = {
    amount is struck through, and no total counts it. */
 export const isDeleted = (entry) => Boolean(entry?.deleted);
 
-const asDeleted = (kind) => ({ ...kind, label: `${kind.label} · Deleted`, variant: 'alert' });
+// One label, not the kind plus a tag: "Deleted Cash Deposit".
+const asDeleted = (kind) => ({ ...kind, label: `Deleted ${kind.label}`, variant: 'alert' });
 
 export const describeEntry = (entry) => {
   const known = ENTRY_KINDS[entry.kind] ?? { direction: 'out', label: entry.kind, variant: 'neutral' };
@@ -91,7 +92,7 @@ const asOrder = (state) => `Order – ${state}`;
 
 const describeOrder = (entry) => {
   // The package may still be moving, but the money is what the row is about.
-  if (isDeleted(entry)) return { label: asOrder('Payment deleted'), variant: 'alert' };
+  if (isDeleted(entry)) return describeEntry(entry);
   if (entry.refunded) return { label: asOrder('Refunded'), variant: 'success' };
   const status = entry.order?.status;
   if (!status) {

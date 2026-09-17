@@ -1151,7 +1151,7 @@ export default function ChildDetails() {
                         : r.mode === 'UPI'
                           ? 'UPI Deposit'
                           : 'Cash Deposit';
-              const label = deleted ? `${kindLabel} (Deleted)` : kindLabel;
+              const label = deleted ? `Deleted ${kindLabel}` : kindLabel;
               const moneyOut =
                 r.kind === 'ORDER_PAYMENT' || r.kind === 'UPI_ORDER_PAYMENT';
               /* Refunds sometimes carry no note and no references — such a

@@ -79,6 +79,28 @@ const SHARED = [
     file: 'src/utils/cloudinaryThumb.js',
     apps: ['frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
   },
+  // Polls /version.json and reloads a tab onto a newer build, deferred while
+  // the user is mid-edit or a dialog is open. All four apps ship the same
+  // watcher, so a fix to the editing guard in one is a fix to all of them —
+  // or it's supposed to be, which is what this entry is for.
+  {
+    file: 'src/utils/deployWatch.js',
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
+  },
+  // The watcher's own test suite, mirrored everywhere but the kiosk: the
+  // kiosk's is a vitest suite, deliberately different, so it is not listed
+  // here.
+  {
+    file: 'src/utils/deployWatch.test.js',
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-warehouse'],
+  },
+  // Polls the change counter and fires a refetch rather than a reload. Same
+  // reasoning as deployWatch.js above: one behavior, four copies, nothing
+  // else keeping them in step.
+  {
+    file: 'src/utils/dataAutoRefresh.js',
+    apps: ['frontend-parent', 'frontend-admin', 'hungerhunt-kiosk', 'hungerhunt-warehouse'],
+  },
 ];
 
 const digest = (path) =>

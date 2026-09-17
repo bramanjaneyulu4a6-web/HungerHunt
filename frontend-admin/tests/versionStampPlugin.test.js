@@ -52,6 +52,24 @@ describe('versionStampPlugin', () => {
     assert.equal(emitted.length, 0);
   });
 
+  // With no `app` given, the plugin cannot fall back to its own cwd — that is
+  // the repo root, not the app being built — so it reads the Vite root Vite
+  // itself resolved and names the app after that directory instead.
+  test('names the app after the Vite root when none is given', () => {
+    const plugin = versionStampPlugin({ env: ENV, gitSha: null, now: AT });
+    const config = plugin.config(
+      { root: '/tmp/some/hungerhunt-kiosk' },
+      { command: 'build', mode: 'production' }
+    );
+    const emitted = [];
+    plugin.generateBundle.call({ emitFile: (file) => emitted.push(file) });
+    assert.equal(JSON.parse(emitted[0].source).app, 'hungerhunt-kiosk');
+    assert.equal(
+      JSON.parse(config.define[STAMP_DEFINE_KEY]),
+      'ff0ca7c@2026-09-17T10:00:00.000Z'
+    );
+  });
+
   test('falls back to the local commit when Vercel says nothing', () => {
     const { config } = build({ app: 'x', env: {}, gitSha: 'abc1234567', now: AT });
     assert.equal(JSON.parse(config.define[STAMP_DEFINE_KEY]), 'abc1234@2026-09-17T10:00:00.000Z');

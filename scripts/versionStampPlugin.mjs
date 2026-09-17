@@ -10,13 +10,13 @@
  * import.meta.env.VITE_BUILD_STAMP, and written out as version.json at the end
  * of the same build. The dev server gets neither: with no stamp the watcher
  * does nothing, which is right for a page Vite is already hot-reloading. */
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { buildVersionPayload, localGitSha } from './build-version.mjs';
 
 export const STAMP_DEFINE_KEY = 'import.meta.env.VITE_BUILD_STAMP';
 
 export const versionStampPlugin = ({
-  app = basename(process.cwd()),
+  app,
   env = process.env,
   gitSha,
   now,
@@ -26,10 +26,10 @@ export const versionStampPlugin = ({
   return {
     name: 'hungerhunt-version-stamp',
 
-    config(_config, { command }) {
+    config(config, { command }) {
       if (command !== 'build') return undefined;
       payload = buildVersionPayload({
-        app,
+        app: app ?? basename(resolve(config.root ?? process.cwd())),
         env,
         gitSha: gitSha === undefined ? localGitSha() : gitSha,
         now: now ?? new Date(),

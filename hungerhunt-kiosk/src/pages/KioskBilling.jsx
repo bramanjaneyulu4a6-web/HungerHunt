@@ -9,6 +9,7 @@ import { Button } from "../components/ui";
 import { useSessionTimers } from "../hooks/useSessionTimers";
 import { useVisualViewportBox } from "../hooks/useVisualViewportBox";
 import { useKeepFocusedInView } from "../hooks/useKeepFocusedInView";
+import { useOrderSession } from "../hooks/useOrderSession";
 import hungerLogo from "../assets/Logo.png";
 import KioskResultScreen from "../components/KioskResultScreen";
 import SessionClock from "../components/SessionClock";
@@ -145,6 +146,10 @@ const limitMessage = (product) => {
 };
 
 const KioskBilling = ({ student, onLogout }) => {
+  // While this till is on screen a student is mid-order, and no deploy may
+  // reload it; see src/utils/kioskSession.js.
+  useOrderSession();
+
   /* The showroom session, told to us by createKioskSession rather than worked
      out here — whether an order is real is the server's answer, and a till
      that decided it locally could disagree with the thing actually recording

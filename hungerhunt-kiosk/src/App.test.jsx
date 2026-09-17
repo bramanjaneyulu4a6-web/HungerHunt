@@ -22,6 +22,11 @@ vi.mock('./utils/dataAutoRefresh', () => ({
   observeMutationRevision: (response) => response,
 }));
 
+vi.mock('./utils/deployWatch', () => ({
+  startDeployWatch: vi.fn(() => () => {}),
+  reloadIfDeployPending: vi.fn(() => false),
+}));
+
 /* The till itself is a thousand lines about baskets and money, and none of it
    is what these tests are about: they are about who gets as far as it. */
 vi.mock('./pages/KioskBilling', () => ({
@@ -105,6 +110,23 @@ describe('with the login gate switched off', () => {
     // mock App would have called.
     const { startDataAutoRefresh } = await import('./utils/dataAutoRefresh');
     expect(startDataAutoRefresh).not.toHaveBeenCalled();
+  });
+
+  test('watches for new deploys, but never lets one reload an order session', async () => {
+    const { startDeployWatch } = await import('./utils/deployWatch');
+    startDeployWatch.mockClear();
+
+    await renderAppAt('/');
+    await screen.findByText('Till for Demo Student');
+
+    const { setOrderSessionActive } = await import('./utils/kioskSession');
+    expect(startDeployWatch).toHaveBeenCalledTimes(1);
+    const [{ canReload }] = startDeployWatch.mock.calls[0];
+
+    setOrderSessionActive(true);
+    expect(canReload()).toBe(false);
+    setOrderSessionActive(false);
+    expect(canReload()).toBe(true);
   });
 
   test('the gate is unreachable even by asking for it directly', async () => {

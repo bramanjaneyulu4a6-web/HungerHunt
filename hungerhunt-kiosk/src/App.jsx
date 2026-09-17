@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import {
   BrowserRouter as Router,
   Routes,
@@ -12,6 +14,8 @@ import Login from "./pages/Login";
 import DemoKiosk from "./pages/DemoKiosk";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { LOGIN_DISABLED } from "./constants/kioskMode";
+import { startDeployWatch } from "./utils/deployWatch";
+import { isOrderSessionActive } from "./utils/kioskSession";
 
 /* The kiosk owns the end of a session, and there are four ways to reach it:
    the student taps Done, the idle prompt runs out, the hard cap arrives, or
@@ -51,6 +55,17 @@ function App() {
   // student's basket is never interrupted), so every poll was a free GET
   // from every till against the backend. The shared dataAutoRefresh utility
   // stays in src/utils, byte-identical to the other apps, unused here.
+
+  /* New deploys, though, do reach the web kiosk — between students only. The
+     periodic check may reload the login screen or the demo's "Opening the
+     store" screen; a session in progress holds it, and the end of that
+     session lets it in (src/utils/kioskSession.js). The sideloaded APK serves
+     its own version.json, so the watcher does not start there. */
+  useEffect(() => startDeployWatch({
+    bakedStamp: import.meta.env.VITE_BUILD_STAMP,
+    canReload: () => !isOrderSessionActive(),
+  }), []);
+
   return (
     <Router>
       <Toaster position="top-center" />

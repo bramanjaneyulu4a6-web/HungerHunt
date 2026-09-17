@@ -341,14 +341,14 @@ describe('exporting only some movement types', () => {
 
   test('leaves the collections nothing was selected from unread', async () => {
     mockAll();
-    const response = await fetch(`${base}/api/v1/accounting-exports/tally.csv?${range}&include=REFUND`, {
+    const response = await fetch(`${base}/api/v1/accounting-exports/tally.csv?${range}&include=CASH_DEPOSIT`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
 
     assert.equal(response.status, 200);
     assert.equal(Transaction.find.mock.callCount(), 0);
-    assert.equal(WalletAdjustment.find.mock.callCount(), 0);
-    assert.equal(WalletReversal.find.mock.callCount(), 1);
+    assert.equal(WalletReversal.find.mock.callCount(), 0);
+    assert.equal(WalletAdjustment.find.mock.callCount(), 1);
   });
 
   test('asks the deposit ledger only for the half that was selected', async () => {
@@ -369,24 +369,33 @@ describe('exporting only some movement types', () => {
     mockAll();
     // A deposit the selection did not ask for. It has to be absent because the
     // filter excluded it, not because the fixture was empty.
-    mock.method(WalletAdjustment, 'find', () => query([{
-      _id: '507f191e810c19729de860ef', studentId: student, source: 'ADMIN', amount: 1000,
-      receiptNumber: 'GMS1408N24068001', createdAt: new Date('2026-08-14T05:00:00.000Z'),
-    }]));
-    mock.method(WalletReversal, 'find', () => query([{
-      _id: '507f191e810c19729de860ea', studentId: student, amount: 250,
-      receiptNumber: 'GMS1408N24068004', fulfillmentOrderId: ORDER_ID,
-      createdAt: new Date('2026-08-14T06:00:00.000Z'),
-    }]));
+    mock.method(WalletAdjustment, 'find', (filter) => query(
+      filter.source === 'PARENT_UPI' ? [] : [{
+        _id: '507f191e810c19729de860ef', studentId: student, source: 'ADMIN', amount: 1000,
+        receiptNumber: 'GMS1408N24068001', createdAt: new Date('2026-08-14T05:00:00.000Z'),
+      }]
+    ));
 
+    const response = await fetch(`${base}/api/v1/accounting-exports/tally.csv?${range}&include=UPI_DEPOSIT`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const rows = (await response.text()).replace(/^\uFEFF/, '').trim().split('\r\n');
+
+    assert.equal(rows.length, 1);
+    assert.equal(response.headers.get('x-hungerhunt-row-count'), '0');
+  });
+
+  test('files no refund, even when refunds alone were asked for', async () => {
+    mockAll();
     const response = await fetch(`${base}/api/v1/accounting-exports/tally.csv?${range}&include=REFUND`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     const rows = (await response.text()).replace(/^\uFEFF/, '').trim().split('\r\n');
 
-    assert.equal(rows.length, 2);
-    assert.match(rows[1], /Refund - Order #E8608A,14 Aug 2026,Credit Note$/);
-    assert.equal(response.headers.get('x-hungerhunt-row-count'), '1');
+    assert.equal(response.status, 200);
+    assert.equal(rows.length, 1);
+    assert.equal(Transaction.find.mock.callCount(), 0);
+    assert.equal(WalletReversal.find.mock.callCount(), 0);
   });
 
   test('refuses a type it does not recognise rather than exporting less', async () => {
@@ -408,5 +417,78 @@ describe('exporting only some movement types', () => {
     assert.equal(Transaction.find.mock.callCount(), 0);
     assert.equal(WalletReversal.find.mock.callCount(), 0);
     assert.equal(WalletAdjustment.find.mock.callCount(), 1);
+  });
+});
+
+describe('cancelled packages in the exports', () => {
+  let base;
+
+  before(async () => {
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    base = `http://127.0.0.1:${server.address().port}`;
+    server.unref();
+  });
+
+  afterEach(() => mock.restoreAll());
+
+  const range = 'from=2026-08-01&to=2026-08-31';
+  const WALLET_CHARGE = '507f191e810c19729de860c1';
+  const UPI_CHARGE = '507f191e810c19729de860c2';
+  const KEPT_CHARGE = '507f191e810c19729de860c3';
+
+  const mockCancelled = () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    mock.method(Transaction, 'find', () => query([
+      {
+        _id: WALLET_CHARGE, studentId: student, totalAmount: 120, sourceType: 'DIRECT_CHECKOUT',
+        createdAt: new Date('2026-08-14T05:00:00.000Z'),
+      },
+      {
+        _id: UPI_CHARGE, studentId: student, totalAmount: 80, sourceType: 'UPI_ORDER_PAYMENT',
+        receiptNumber: 'GMS1408N24068003', createdAt: new Date('2026-08-14T06:00:00.000Z'),
+      },
+      {
+        _id: KEPT_CHARGE, studentId: student, totalAmount: 45, sourceType: 'DIRECT_CHECKOUT',
+        createdAt: new Date('2026-08-14T07:00:00.000Z'),
+      },
+    ]));
+    mock.method(WalletAdjustment, 'find', () => query([]));
+    // Asked only which of this period's charges were ever cancelled, on any day.
+    mock.method(WalletReversal, 'find', (filter) => {
+      assert.deepEqual(filter, {
+        transactionId: { $in: [WALLET_CHARGE, UPI_CHARGE, KEPT_CHARGE] },
+      });
+      return query([{ transactionId: WALLET_CHARGE }, { transactionId: UPI_CHARGE }]);
+    });
+    mock.method(FulfillmentOrder, 'find', () => query([]));
+  };
+
+  test('the CSV drops a cancelled wallet order and files a cancelled UPI order as a deposit', async () => {
+    mockCancelled();
+    const response = await fetch(`${base}/api/v1/accounting-exports/tally.csv?${range}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const rows = (await response.text()).replace(/^\uFEFF/, '').trim().split('\r\n');
+
+    assert.equal(rows.length, 3);
+    assert.match(rows[1], /^1,GMS1408N24068003,.*,80\.00,.*,UPI,UPI Deposit,14 Aug 2026,Receipt$/);
+    assert.match(rows[2], /^2,.*,-45\.00,.*,Wallet,Student Wallet Deduction,14 Aug 2026,Sales$/);
+    assert.doesNotMatch(rows.join('\n'), /Refund|120\.00/);
+    assert.equal(response.headers.get('x-hungerhunt-row-count'), '2');
+  });
+
+  test('the XML files the same two movements', async () => {
+    mockCancelled();
+    const response = await fetch(`${base}/api/v1/accounting-exports/tally.xml?${range}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    const xml = await response.text();
+
+    assert.match(xml, new RegExp(`HH-R-${UPI_CHARGE}`));
+    assert.match(xml, new RegExp(`HH-S-${KEPT_CHARGE}`));
+    assert.doesNotMatch(xml, new RegExp(WALLET_CHARGE));
+    assert.doesNotMatch(xml, /HH-CN-/);
+    assert.equal(response.headers.get('x-hungerhunt-voucher-count'), '2');
   });
 });

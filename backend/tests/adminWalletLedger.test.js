@@ -421,6 +421,32 @@ describe('the whole school, for the dashboard', () => {
     }
   });
 
+  test('a charge refunded on a later day is still marked refunded on its own day', async () => {
+    authenticate();
+    const feedRead = (rows) => ({
+      populate: () => ({ sort: () => ({ limit: () => ({ lean: async () => rows }) }) }),
+    });
+    mock.method(WalletAdjustment, 'find', () => feedRead([]));
+    mock.method(PaymentIntent, 'find', () => feedRead([]));
+    mock.method(FulfillmentOrder, 'find', () => ({ select: () => ({ lean: async () => [] }) }));
+    mock.method(Transaction, 'find', () => feedRead([{
+      ...charge('507f191e810c19729de860aa', 58, '2026-09-02T09:30:57.000Z'),
+      studentId: { _id: STUDENT_ID, name: 'Asha' },
+    }]));
+    // The day's refunds are none; the lookup by charge finds the later one.
+    mock.method(WalletReversal, 'find', (filter) => (filter.transactionId
+      ? { select: () => ({ lean: async () => [{ transactionId: '507f191e810c19729de860aa' }] }) }
+      : feedRead([])));
+
+    const body = await (await get('/api/transactions/ledger?date=2026-09-02')).json();
+
+    assert.deepEqual(
+      WalletReversal.find.mock.calls.at(-1).arguments[0],
+      { transactionId: { $in: ['507f191e810c19729de860aa'] } }
+    );
+    assert.equal(body.entries[0].refunded, true);
+  });
+
   /* The desk asks "who took this?" of a deposit and "who gave this back?" of
      a refund, and the row has always known — performedBy is on both — but the
      feed dropped it. A UPI deposit and every purchase have no admin behind

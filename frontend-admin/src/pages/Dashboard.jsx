@@ -28,6 +28,7 @@ import {
   hasDetails,
   isDeleted,
   pickerOrderOf,
+  exportableEntries,
 } from "../utils/ledgerEntry";
 import { DeleteTransactionButton } from "../components/DeleteTransaction";
 import { ReceiptButton } from "../components/ReceiptButton";
@@ -132,7 +133,9 @@ const Dashboard = () => {
   const totalAdded = sumWhere("in");
 
   const downloadExcel = () => {
-    if (filteredHistory.length === 0) {
+    // Only money that really moved: no failed, deleted or cancelled rows.
+    const exported = exportableEntries(filteredHistory);
+    if (exported.length === 0) {
       toast.error("No data available to export for the current filters");
       return;
     }
@@ -155,9 +158,8 @@ const Dashboard = () => {
 
     const csvRows = [
       headers.join(","),
-      ...filteredHistory.map((entry, index) => {
+      ...exported.map((entry, index) => {
         const { label } = entryLabel(entry);
-        // A deleted row is listed, labelled, and left out of both money columns.
         const direction = countedDirection(entry);
         const studentName = `"${(entry.student?.name || "Deleted Account").replace(/"/g, '""')}"`;
         const timestamp = `"${new Date(entry.date).toLocaleString().replace(/"/g, '""')}"`;

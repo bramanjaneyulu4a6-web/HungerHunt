@@ -179,8 +179,16 @@ export const getLedgerFeed = async (req, res) => {
     const intentById = new Map(intents.map((intent) => [String(intent._id), intent]));
 
     const orderById = new Map(orders.map((order) => [String(order._id), order]));
+    /* Asked of the charges themselves, not of this page's refunds: a package
+       bought today and cancelled tomorrow is refunded on today's page too, and
+       the dashboard export leaves it out by this mark. */
+    const refundedCharges = charges.length
+      ? await WalletReversal.find({ transactionId: { $in: charges.map((charge) => charge._id) } })
+          .select('transactionId')
+          .lean()
+      : [];
     const refundedTransactionIds = new Set(
-      refunds.map((refund) => String(refund.transactionId))
+      [...refunds, ...refundedCharges].map((refund) => String(refund.transactionId))
     );
 
     /* The settlement reference a refund gave back. A cancellation moves no

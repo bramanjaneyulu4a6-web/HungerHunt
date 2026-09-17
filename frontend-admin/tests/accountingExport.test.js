@@ -47,15 +47,15 @@ const { MOVEMENT_TYPES, quickRange, quickRangeLabel, includeParam } = await impo
 );
 
 describe('the movement types an export can be narrowed to', () => {
-  test('offers the five the ledger actually distinguishes', () => {
+  test('offers the four that move money, and not refunds, which an export never files', () => {
     assert.deepEqual(
       MOVEMENT_TYPES.map((type) => type.key),
-      ['CASH_DEPOSIT', 'UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT', 'REFUND']
+      ['CASH_DEPOSIT', 'UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT']
     );
   });
 
   test('sends the selection as the comma list the server parses', () => {
-    assert.equal(includeParam(['CASH_DEPOSIT', 'REFUND']), 'CASH_DEPOSIT,REFUND');
+    assert.equal(includeParam(['CASH_DEPOSIT', 'UPI_DEPOSIT']), 'CASH_DEPOSIT,UPI_DEPOSIT');
   });
 });
 

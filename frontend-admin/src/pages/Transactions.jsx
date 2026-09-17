@@ -25,8 +25,9 @@ import {
 
 /* Every rupee that moved in a period, on one screen.
  *
- * The rows come from the same reader the TallyPrime export uses, so this page
- * is the export read before it is downloaded. Sorting, filtering and the tabs
+ * The rows come from the same reader the TallyPrime export uses, but this page
+ * lists everything — deleted rows, refunds and the charges they cancelled —
+ * while the export files only money that really moved. Sorting, filtering and the tabs
  * all happen here over the period fetched: a day is a few dozen rows, and a
  * period is bounded by the server. The period is the only thing that goes
  * back to the server. */

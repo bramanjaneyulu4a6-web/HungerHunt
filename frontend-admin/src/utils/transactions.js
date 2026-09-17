@@ -6,9 +6,9 @@
  * resolves to. Pure so every one of those rules is tested without a browser,
  * and so the page is only a table.
  *
- * Rows are what GET /v1/accounting-exports/movements returns — the same rows
- * the TallyPrime CSV files, which is the point: what the office scrolls
- * through here is what it would download. */
+ * Rows are what GET /v1/accounting-exports/movements returns — the rows the
+ * TallyPrime CSV files, plus the deleted rows, refunds and cancelled charges
+ * the CSV leaves out. */
 
 export const TABS = [
   { key: 'all', label: 'All Transactions' },

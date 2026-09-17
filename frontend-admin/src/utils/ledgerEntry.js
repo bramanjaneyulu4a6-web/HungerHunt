@@ -58,6 +58,24 @@ export const isOrder = (entry) =>
 
 export const isTransaction = (entry) => !isOrder(entry);
 
+/* The rows an export file lists: money that really moved, and nothing else.
+ *
+ * A failed top-up, a deleted row, a refund and the order it cancelled are all
+ * left out — together the last two moved nothing. The exception is an order
+ * paid straight over UPI: that money reached the bank and the cancellation put
+ * it in the wallet, so it is listed as the UPI deposit it became. The same
+ * rule as the TallyPrime exports (backend realMovements.js). */
+const NOT_MONEY = new Set(['TOPUP_FAILED', 'ORDER_CANCELLATION_REFUND']);
+
+export const exportableEntries = (entries) => entries.flatMap((entry) => {
+  if (isDeleted(entry) || NOT_MONEY.has(entry.kind)) return [];
+  if (!entry.refunded) return [entry];
+  if (entry.kind !== 'UPI_ORDER_PAYMENT') return [];
+  return [{
+    ...entry, kind: 'TOP_UP', mode: 'UPI', refunded: false, items: [], order: null, orderId: null,
+  }];
+});
+
 /* One reference per row, and only one.
  *
  * A deposit is quoted by its receipt number — the figure printed on the paper

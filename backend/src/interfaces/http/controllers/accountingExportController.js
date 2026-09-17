@@ -8,6 +8,7 @@ import { deletionView } from '../../../../models/ledgerDeletion.js';
 import { deleteLedgerEntry } from '../../../../utils/ledgerDeletion.js';
 import { collectionFilters, parseIncluded } from '../../../application/accounting/movementTypes.js';
 import { buildMovementRows, movementTotals } from '../../../application/accounting/movementRows.js';
+import { exportChargeFilter, realMovements } from '../../../application/accounting/realMovements.js';
 import { buildTallyCsv } from '../../../application/accounting/tallyCsv.js';
 import { buildTallyVoucherXml } from '../../../application/accounting/tallyXml.js';
 import { ApplicationError } from '../../../shared/errors/applicationError.js';
@@ -50,17 +51,24 @@ const ledgers = () => ({
  * the CSV against the XML.
  *
  * The selection is parsed before anything is read, so a request naming a type
- * that does not exist costs a validation error rather than three queries. */
-/* A deleted row stays in its collection but its money was moved back, so the
- * exports read only the rows still standing (`includeDeleted` false). The
- * Transactions page reads them all and marks the deleted ones. Reversals are
- * never deleted and need no filter. */
-const readMovements = async (req, { select, withStudents = false, includeDeleted = false }) => {
+ * that does not exist costs a validation error rather than three queries.
+ *
+ * The Transactions page reads every row (`realOnly` false) and marks the
+ * deleted and refunded ones. The two exports read only money that really
+ * moved (`realOnly` true): no deleted row, since its money was moved back; no
+ * failed top-up, which is never read here; and no cancelled package — see
+ * realMovements.js. Reversals are never deleted and need no filter. */
+const readMovements = async (req, { select, withStudents = false, realOnly = false }) => {
   const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
-  const filters = collectionFilters(parseIncluded(req.query.include));
+  const included = parseIncluded(req.query.include);
+  const filters = collectionFilters(included);
   const range = { createdAt: { $gte: from, $lt: to } };
 
-  const standing = includeDeleted ? {} : { deletion: null };
+  const standing = realOnly ? { deletion: null } : {};
+  if (realOnly) {
+    filters.transactions = exportChargeFilter(included);
+    filters.reversals = null;
+  }
 
   const read = (Model, filter, fields) => {
     if (!filter) return [];
@@ -71,11 +79,27 @@ const readMovements = async (req, { select, withStudents = false, includeDeleted
       .lean();
   };
 
-  const [transactions, adjustments, reversals] = await Promise.all([
+  let [transactions, adjustments, reversals] = await Promise.all([
     read(Transaction, filters.transactions && { ...filters.transactions, ...standing }, select.transactions),
     read(WalletAdjustment, filters.adjustments && { ...filters.adjustments, ...standing }, select.adjustments),
     read(WalletReversal, filters.reversals, select.reversals),
   ]);
+
+  if (realOnly) {
+    /* A charge counts as cancelled whenever its refund was written, so a
+       package bought in this period and cancelled after it is still left out. */
+    const refunded = transactions.length
+      ? await WalletReversal.find({ transactionId: { $in: transactions.map((row) => row._id) } })
+          .select('transactionId')
+          .lean()
+      : [];
+    ({ transactions, adjustments } = realMovements({
+      transactions,
+      adjustments,
+      cancelledIds: new Set(refunded.map((row) => String(row.transactionId))),
+      included,
+    }));
+  }
 
   const rowCount = transactions.length + adjustments.length + reversals.length;
   if (rowCount > MAX_VOUCHERS) {
@@ -90,8 +114,10 @@ const readMovements = async (req, { select, withStudents = false, includeDeleted
 
 export const tallyXml = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone } = await readMovements(req, {
+    realOnly: true,
     select: {
-      transactions: '_id studentId totalAmount createdAt',
+      // sourceType and receiptNumber: a cancelled UPI order is filed as a deposit.
+      transactions: '_id studentId totalAmount sourceType receiptNumber createdAt',
       adjustments: '_id studentId amount createdAt',
       reversals: '_id studentId amount createdAt',
     },
@@ -109,13 +135,14 @@ export const tallyXml = async (req, res) => {
 /* The same movements as the XML above, flattened into the spreadsheet the
  * office already keeps its uniform receipts in.
  *
- * Failed top-up attempts are deliberately absent: the ledger records them
- * because a parent asks about them, but no money moved and a book that lists
- * non-events will not reconcile to the bank.
+ * Failed top-ups, deleted rows and cancelled packages are deliberately absent:
+ * the ledger records them because a parent asks about them, but no money
+ * moved and a book that lists non-events will not reconcile to the bank.
  */
 export const tallyCsv = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone } = await readMovements(req, {
     withStudents: true,
+    realOnly: true,
     select: {
       transactions: '_id studentId totalAmount sourceType receiptNumber createdAt',
       adjustments: '_id studentId source amount receiptNumber createdAt',
@@ -159,9 +186,9 @@ export const tallyCsv = async (req, res) => {
 /* The same movements again, as the rows the Transactions page shows.
  *
  * Deliberately the reader the two exports use, with the same period rules
- * and the same selection parameter, so what the office scrolls through on
- * screen is exactly what the CSV would file for that period — the page is
- * the export, read before it is downloaded. Sorting and filtering happen in
+ * and the same selection parameter. The page shows every row, though, and
+ * the exports only the money that really moved: a deleted row, a refund and
+ * the charge it cancelled are listed here and left out of the files. Sorting and filtering happen in
  * the browser over the period fetched: a day is a few dozen rows, and even
  * the longest period the reader allows is bounded by MAX_VOUCHERS.
  *
@@ -172,7 +199,6 @@ export const movements = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone, from, to } =
     await readMovements(req, {
       withStudents: true,
-      includeDeleted: true,
       select: {
         transactions:
           '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance deletion createdAt',

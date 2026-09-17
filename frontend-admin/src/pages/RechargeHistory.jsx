@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 import { fetchAllStudents } from "../utils/studentRoll";
 import { formatINR } from "../utils/format";
-import { depositTarget, describeEntry, isDeleted } from "../utils/ledgerEntry";
+import { depositTarget, describeEntry, exportableEntries, isDeleted } from "../utils/ledgerEntry";
 import { useFeature } from "../utils/currentStaff";
 import { DeleteTransactionButton } from "../components/DeleteTransaction";
 import { ReceiptButton } from "../components/ReceiptButton";
@@ -155,7 +155,8 @@ const RechargeHistory = () => {
   const downloadExcel = (e, student) => {
     e.stopPropagation();
 
-    const entries = ledgers[student._id]?.entries || [];
+    // A deleted deposit's money went back, so the statement leaves it out.
+    const entries = exportableEntries(ledgers[student._id]?.entries || []);
     if (entries.length === 0) {
       toast.error("No recharges to export for this student");
       return;

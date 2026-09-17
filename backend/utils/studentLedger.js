@@ -9,6 +9,7 @@
  * Paging stays with the caller: this returns the whole sorted list, because
  * the totals each surface shows are counted from it.
  */
+import Admin from '../models/Admin.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import PaymentIntent from '../models/PaymentIntent.js';
 import Student from '../models/Student.js';
@@ -122,6 +123,23 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
         .lean()
     : [];
   const intentById = new Map(upiIntents.map((intent) => [String(intent._id), intent]));
+
+  /* Who took each desk deposit, for the office's copy: a deposit opens into
+   * that name, and the delete popup says who made the row it is about to
+   * undo. An admin removed since reads as former staff, as the feed does. */
+  const depositorIds = staffView
+    ? [...new Set(topups.map((entry) => entry.performedBy).filter(Boolean).map(String))]
+    : [];
+  const depositors = depositorIds.length
+    ? await Admin.find({ _id: { $in: depositorIds } }).select('name role').lean()
+    : [];
+  const depositorById = new Map(
+    depositors.map((admin) => [String(admin._id), { name: admin.name, role: admin.role ?? 'admin' }])
+  );
+  const depositorOf = (entry) =>
+    entry.source === 'PARENT_UPI' || !entry.performedBy
+      ? null
+      : depositorById.get(String(entry.performedBy)) ?? { name: 'Former staff', role: null };
   const orderIdByIntent = new Map(
     upiIntents.map((intent) => [String(intent._id), intent.merchantOrderId])
   );
@@ -218,6 +236,7 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
         ? {
             utr: intentById.get(String(entry.paymentIntentId))?.utr || null,
             upiApp: intentById.get(String(entry.paymentIntentId))?.upiApp || null,
+            processedBy: depositorOf(entry),
           }
         : {}),
       ...deletionFields(entry, { staffView }),

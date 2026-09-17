@@ -1,13 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
 
 import Icon from '../components/Icon';
+import { DeleteTransactionButton } from '../components/DeleteTransaction';
 import { ReceiptButton } from '../components/ReceiptButton';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import api from '../utils/api';
-import { useCurrentStaff } from '../utils/currentStaff';
 import { formatINR } from '../utils/format';
-import { useDismissableOverlay } from '../utils/overlay';
 import { receiptIdOf } from '../utils/walletActivity';
 import {
   KIND_LABELS,
@@ -88,119 +86,28 @@ const UPI_APPS = { phonepe: 'PhonePe', gpay: 'Google Pay', paytm: 'Paytm' };
    a wallet charge spent money already receipted on its way in. */
 const isPrintable = (row) => Boolean(receiptIdOf(row) && row.student.id);
 
-const REASON_MAX = 200;
-
-/* Who a row's money was moved by, as the delete popup names it before the
-   server has taken its own copy. A kiosk sale and a parent's approval have no
-   person behind them, and say so rather than leaving the line blank. */
-const madeByOf = (row) =>
-  row.processedBy ||
-  (row.kind === 'WALLET_DEDUCTION' ? 'Student at kiosk or parent approval' : null);
-
-/* The popup that deletes a row. It asks for the reason and names both people:
-   whoever made the row, and the signed-in admin who is deleting it. The server
-   records both, with the reason, and moves the money back — so the popup says
-   exactly which way the wallet will move before anything is sent. */
-const DeleteTransactionDialog = ({ row, onClose, onDeleted }) => {
-  const { me } = useCurrentStaff();
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  useDismissableOverlay(() => !saving && onClose());
-
-  const deposit = row.kind === 'CASH_DEPOSIT';
-  const studentName = row.student.name || 'this student';
-
-  const submit = async (event) => {
-    event.preventDefault();
-    if (!reason.trim() || saving) return;
-    setSaving(true);
-    setError('');
-    try {
-      await api.post(`/v1/accounting-exports/movements/${row.id}/delete`, {
+/* The popup's view of a row. A kiosk sale and a parent's approval have no
+   person behind them, and say so rather than leaving "Made by" blank. */
+const deleteTarget = (row) =>
+  row.deletable
+    ? {
+        id: row.id,
         kind: row.kind,
-        reason: reason.trim(),
-      });
-      toast.success('Transaction deleted');
-      onDeleted();
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Couldn't delete this transaction. Try again."
-      );
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-backdrop" onClick={() => !saving && onClose()}>
-      <form
-        className="modal tx-delete-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tx-delete-title"
-        onSubmit={submit}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="modal-title" id="tx-delete-title">Delete this transaction?</h2>
-        <p className="tx-delete__copy">
-          {deposit
-            ? `${formatINR(row.amount)} will be taken back out of ${studentName}'s wallet.`
-            : `${formatINR(row.amount)} will be returned to ${studentName}'s wallet. The package and the stock are not changed.`}
-          {' '}The entry stays on this page, marked deleted, and its receipt is withdrawn.
-        </p>
-
-        <dl className="tx-delete__facts">
-          <div>
-            <dt>Transaction</dt>
-            <dd>
-              {KIND_LABELS[row.kind]} · {formatINR(row.amount)}
-              {row.receiptNumber ? ` · ${row.receiptNumber}` : ''}
-              {row.reference ? ` · ${row.reference}` : ''}
-            </dd>
-          </div>
-          <div>
-            <dt>Made by</dt>
-            <dd>{madeByOf(row) || '—'}</dd>
-          </div>
-          <div>
-            <dt>Deleted by</dt>
-            <dd>{me.name || 'You'}</dd>
-          </div>
-        </dl>
-
-        {error && <Banner variant="alert" icon="⚠️">{error}</Banner>}
-
-        <label className="fulfillment-cancel-label" htmlFor="tx-delete-reason">Reason for deletion</label>
-        <textarea
-          id="tx-delete-reason"
-          className="input"
-          rows="3"
-          maxLength={REASON_MAX}
-          autoFocus
-          required
-          value={reason}
-          placeholder="e.g. Entered twice by mistake"
-          onChange={(event) => setReason(event.target.value)}
-        />
-        <div className="fulfillment-cancel-count">{reason.length}/{REASON_MAX}</div>
-
-        <div className="modal-actions fulfillment-cancel-actions">
-          <Button variant="ghost" disabled={saving} onClick={onClose}>Keep it</Button>
-          <Button type="submit" variant="danger" disabled={saving || !reason.trim()}>
-            <Icon name="trash" size={16} />
-            {saving ? 'Deleting…' : 'Delete transaction'}
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-};
+        amount: row.amount,
+        receiptNumber: row.receiptNumber,
+        reference: row.reference,
+        studentName: row.student.name,
+        madeBy:
+          row.processedBy ||
+          (row.kind === 'WALLET_DEDUCTION' ? 'Student at kiosk or parent approval' : null),
+      }
+    : null;
 
 /* What opens under a row: the basket where money bought something, and the
    facts a person asks about when they ring the office — in the same layout
    the wallet ledger uses, so a row reads the same here as it does on a
    student's page. */
-const RowDetails = ({ row, onDelete }) => {
+const RowDetails = ({ row }) => {
   const deletion = row.deletion;
   const facts = [
     ['When', whenOf(row.at)],
@@ -237,29 +144,15 @@ const RowDetails = ({ row, onDelete }) => {
         </div>
       )}
 
-      {/* The printable ones carry their Receipt button on the row itself. */}
-      {(!isPrintable(row) || row.deletable) && (
+      {/* The printable ones carry their Receipt button on the row itself, and
+          the deletable ones their Delete button beneath it. */}
+      {!isPrintable(row) && (
         <div className="tx-detail__actions">
-          {!isPrintable(row) && (
-            <span className="cell-unset">
-              {deletion
-                ? 'The receipt was withdrawn when this entry was deleted.'
-                : row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
-            </span>
-          )}
-          {row.deletable && (
-            <Button
-              variant="ghost"
-              className="btn--sm tx-delete-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete(row);
-              }}
-            >
-              <Icon name="trash" size={14} />
-              Delete transaction
-            </Button>
-          )}
+          <span className="cell-unset">
+            {deletion
+              ? 'The receipt was withdrawn when this entry was deleted.'
+              : row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
+          </span>
         </div>
       )}
 
@@ -309,7 +202,6 @@ const Transactions = () => {
   const [error, setError] = useState('');
   // Bumped after a deletion, to read the period again with the row marked.
   const [reloads, setReloads] = useState(0);
-  const [deleting, setDeleting] = useState(null);
 
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
@@ -756,21 +648,33 @@ const Transactions = () => {
                         {row.deleted && <small className="tx-note">Deleted by {row.deletion.byName}</small>}
                       </td>
                       <td className="ledger-actions">
-                        {isPrintable(row) && (
-                          <ReceiptButton studentId={row.student.id} entry={row} />
-                        )}
-                        <span
-                          className={`ledger-chevron${openRows.has(row.id) ? ' ledger-chevron--open' : ''}`}
-                          aria-hidden="true"
-                        >
-                          <Icon name="caret" size={16} />
-                        </span>
+                        <div className="row-actions row-actions--chevron">
+                          <div className="row-actions__line">
+                            {isPrintable(row) && (
+                              <ReceiptButton studentId={row.student.id} entry={row} />
+                            )}
+                            <span
+                              className={`ledger-chevron${openRows.has(row.id) ? ' ledger-chevron--open' : ''}`}
+                              aria-hidden="true"
+                            >
+                              <Icon name="caret" size={16} />
+                            </span>
+                          </div>
+                          {/* Offered only on an opened row, under the Receipt
+                              button, so it is never one stray click away. */}
+                          {openRows.has(row.id) && (
+                            <DeleteTransactionButton
+                              target={deleteTarget(row)}
+                              onDeleted={() => setReloads((count) => count + 1)}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {openRows.has(row.id) && (
                       <tr className="ledger-detail-row">
                         <td colSpan={COLUMNS.length + 1}>
-                          <RowDetails row={row} onDelete={setDeleting} />
+                          <RowDetails row={row} />
                         </td>
                       </tr>
                     )}
@@ -781,16 +685,6 @@ const Transactions = () => {
         </div>
       )}
 
-      {deleting && (
-        <DeleteTransactionDialog
-          row={deleting}
-          onClose={() => setDeleting(null)}
-          onDeleted={() => {
-            setDeleting(null);
-            setReloads((count) => count + 1);
-          }}
-        />
-      )}
     </div>
   );
 };

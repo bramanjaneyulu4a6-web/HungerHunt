@@ -18,6 +18,7 @@ import { formatINR } from '../utils/format';
 import { fulfillmentStatusLabel } from '../utils/fulfillmentStatus';
 import {
   deletionFacts,
+  depositTarget,
   describeEntry,
   entryAmount,
   entryChannel,
@@ -30,6 +31,7 @@ import {
   pickerOrderOf,
 } from '../utils/ledgerEntry';
 import { receiptIdOf, useStudentLedger } from '../utils/walletActivity';
+import { DeleteTransactionButton } from './DeleteTransaction';
 import { ReceiptButton } from './ReceiptButton';
 import FulfillmentStatusPicker from './FulfillmentStatusPicker';
 import { useDismissableOverlay } from '../utils/overlay';
@@ -139,7 +141,7 @@ export const EntryDetails = ({ entry }) => {
   );
 };
 
-const EntryRow = ({ entry, studentId, showStudent, onOrderChanged }) => {
+const EntryRow = ({ entry, studentId, studentName, showStudent, onOrderChanged, onDeleted }) => {
   const { label, variant } = entryLabel(entry);
   const pickerOrder = pickerOrderOf(entry);
   const { direction } = describeEntry(entry);
@@ -184,14 +186,23 @@ const EntryRow = ({ entry, studentId, showStudent, onOrderChanged }) => {
         {entry.newBalance === undefined ? '—' : formatINR(entry.newBalance)}
       </td>
       <td className="ledger-actions">
-        {canPrint && (
-          <ReceiptButton studentId={studentId || entry.student.id} entry={entry} />
-        )}
-        {expandable && (
-          <span className={`ledger-chevron${open ? ' ledger-chevron--open' : ''}`} aria-hidden="true">
-            <Icon name="caret" size={16} />
-          </span>
-        )}
+        <div className={`row-actions${expandable ? ' row-actions--chevron' : ''}`}>
+          <div className="row-actions__line">
+            {canPrint && (
+              <ReceiptButton studentId={studentId || entry.student.id} entry={entry} />
+            )}
+            {expandable && (
+              <span className={`ledger-chevron${open ? ' ledger-chevron--open' : ''}`} aria-hidden="true">
+                <Icon name="caret" size={16} />
+              </span>
+            )}
+          </div>
+          {/* Under Receipt once the row is opened — at once, on a row that
+              has nothing to open into. Cash deposits only. */}
+          {(open || !expandable) && (
+            <DeleteTransactionButton target={depositTarget(entry, studentName)} onDeleted={onDeleted} />
+          )}
+        </div>
       </td>
     </tr>
     {open && (
@@ -205,7 +216,9 @@ const EntryRow = ({ entry, studentId, showStudent, onOrderChanged }) => {
   );
 };
 
-export const LedgerTable = ({ entries, studentId, showStudent = false, onOrderChanged }) => (
+export const LedgerTable = ({
+  entries, studentId, studentName, showStudent = false, onOrderChanged, onDeleted,
+}) => (
   <div className="table-wrap">
     <table className="table table--stack table--hover">
       <thead>
@@ -225,8 +238,10 @@ export const LedgerTable = ({ entries, studentId, showStudent = false, onOrderCh
             key={`${entry.kind}-${entry._id}`}
             entry={entry}
             studentId={studentId}
+            studentName={studentName}
             showStudent={showStudent}
             onOrderChanged={onOrderChanged}
+            onDeleted={onDeleted}
           />
         ))}
       </tbody>
@@ -234,18 +249,26 @@ export const LedgerTable = ({ entries, studentId, showStudent = false, onOrderCh
   </div>
 );
 
-const Section = ({ title, entries, studentId, empty, onOrderChanged }) => (
+const Section = ({ title, entries, studentId, studentName, empty, onOrderChanged, onDeleted }) => (
   <section style={{ marginTop: 20 }}>
     <h4 className="section-title" style={{ marginBottom: 8 }}>
       {title} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({entries.length})</span>
     </h4>
     {entries.length === 0
       ? <p className="modal-note">{empty}</p>
-      : <LedgerTable entries={entries} studentId={studentId} onOrderChanged={onOrderChanged} />}
+      : (
+        <LedgerTable
+          entries={entries}
+          studentId={studentId}
+          studentName={studentName}
+          onOrderChanged={onOrderChanged}
+          onDeleted={onDeleted}
+        />
+      )}
   </section>
 );
 
-const LedgerBody = ({ ledger, studentId }) => {
+const LedgerBody = ({ ledger, studentId, studentName }) => {
   if (ledger.loading && ledger.entries.length === 0) {
     return (
       <div>
@@ -284,7 +307,11 @@ const LedgerBody = ({ ledger, studentId }) => {
         title="Transactions"
         entries={ledger.entries.filter(isTransaction)}
         studentId={studentId}
+        studentName={studentName}
         empty="No money has moved on this wallet."
+        // A deletion is re-read too: the row comes back marked, and every
+        // balance after it is the server's to say.
+        onDeleted={ledger.retry}
       />
       {ledger.hasMore && (
         <div style={{ marginTop: 16, textAlign: 'center' }}>
@@ -341,7 +368,7 @@ export const StudentActivityModal = ({ student, onClose }) => {
       ].filter(Boolean).join(' · ')}
       onClose={onClose}
     >
-      <LedgerBody ledger={ledger} studentId={studentId} />
+      <LedgerBody ledger={ledger} studentId={studentId} studentName={student?.name} />
     </Dialog>
   );
 };
@@ -361,7 +388,7 @@ const ChildSection = ({ student }) => {
           <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {student.admissionNumber}</span>
         )}
       </h4>
-      <LedgerBody ledger={ledger} studentId={student.id} />
+      <LedgerBody ledger={ledger} studentId={student.id} studentName={student.name} />
     </section>
   );
 };

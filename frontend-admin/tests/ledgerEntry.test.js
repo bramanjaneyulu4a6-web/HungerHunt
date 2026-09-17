@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const { entryReference, businessDateToday, receiptEntryFromTopUp, entryLabel, entryActor, entryChannel } =
   await import('../src/utils/ledgerEntry.js');
-const { countedDirection, deletionFacts, describeEntry, entryAmount, hasDetails } =
+const { countedDirection, deletionFacts, depositTarget, describeEntry, entryAmount, hasDetails } =
   await import('../src/utils/ledgerEntry.js');
 
 /* The Reference column is what an admin reads back to a parent on the phone,
@@ -221,5 +221,25 @@ describe('a deleted ledger row', () => {
       ['Made by', 'Bharat'],
     ]);
     assert.deepEqual(deletionFacts({ kind: 'TOP_UP' }, () => ''), []);
+  });
+});
+
+/* Outside the Transactions page, only a cash deposit still standing offers
+   Delete under its Receipt button. */
+describe('which ledger rows offer Delete', () => {
+  const cash = { _id: 'a1', kind: 'TOP_UP', mode: 'CASH', amount: 500, receiptNumber: 'GMS1', processedBy: { name: 'Bharat' } };
+
+  test('a cash deposit does, naming who took it', () => {
+    assert.deepEqual(depositTarget(cash, 'ASHA'), {
+      id: 'a1', kind: 'CASH_DEPOSIT', amount: 500, receiptNumber: 'GMS1',
+      reference: null, studentName: 'ASHA', madeBy: 'Bharat',
+    });
+  });
+
+  test('a UPI deposit, a deleted deposit, a charge and a refund do not', () => {
+    assert.equal(depositTarget({ ...cash, mode: 'UPI' }), null);
+    assert.equal(depositTarget({ ...cash, deleted: true }), null);
+    assert.equal(depositTarget({ _id: 'c', kind: 'ORDER_PAYMENT', amount: 5 }), null);
+    assert.equal(depositTarget({ _id: 'r', kind: 'ORDER_CANCELLATION_REFUND', amount: 5 }), null);
   });
 });

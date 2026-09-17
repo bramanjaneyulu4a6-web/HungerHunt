@@ -2723,12 +2723,49 @@
   color: var(--muted);
 }
 
-.tx-delete-button {
-  margin-left: auto;
-  color: var(--danger);
+/* A ledger row's own buttons (Transactions, the dashboard feed, a student's
+   activity, the recharge registry): Receipt — and the chevron, where the row
+   opens — on one line, and Delete beneath them. On a row with a chevron,
+   Delete stops short of it so its right edge lines up with Receipt's. */
+.row-actions {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
-.tx-delete-modal { max-width: 520px; }
+.row-actions__line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.row-actions .btn {
+  justify-content: center;
+  min-width: 96px;
+}
+
+.row-actions--chevron .row-actions__delete {
+  margin-right: 22px;
+}
+
+.row-actions .row-actions__delete {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.row-actions .row-actions__delete:hover:not(:disabled) {
+  color: var(--on-dark);
+  background: var(--danger);
+}
+
+/* Raised from inside a row's actions cell, which keeps its text on one
+   right-aligned line; the popup sets both back. */
+.tx-delete-modal {
+  max-width: 520px;
+  text-align: left;
+  white-space: normal;
+}
 .tx-delete-modal textarea { width: 100%; resize: vertical; }
 .tx-delete__copy { margin: -5px 0 16px; line-height: 1.6; }
 

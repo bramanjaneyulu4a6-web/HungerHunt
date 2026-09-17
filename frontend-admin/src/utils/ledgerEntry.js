@@ -163,6 +163,22 @@ export const hasDetails = (entry) =>
       entry.deletion
   );
 
+/* What the delete popup (components/DeleteTransaction.jsx) needs to know
+   about a ledger row. Only a cash deposit still standing can be deleted from
+   a ledger; anything else answers null and gets no button. */
+export const depositTarget = (entry, studentName) =>
+  entry?.kind === 'TOP_UP' && entry.mode === 'CASH' && !isDeleted(entry) && entry._id
+    ? {
+        id: String(entry._id),
+        kind: 'CASH_DEPOSIT',
+        amount: entry.amount,
+        receiptNumber: entry.receiptNumber || null,
+        reference: null,
+        studentName: studentName || entry.student?.name || '',
+        madeBy: entry.processedBy?.name || null,
+      }
+    : null;
+
 /* Who made a deleted row, who deleted it, when and why — the facts a deleted
    row opens into, first, because they are why anyone opens it. */
 export const deletionFacts = (entry, when) =>

@@ -18,6 +18,7 @@ import FulfillmentStatusPicker from "../components/FulfillmentStatusPicker";
 import {
   businessDateToday,
   countedDirection,
+  depositTarget,
   describeEntry,
   entryAmount,
   entryActor,
@@ -27,6 +28,7 @@ import {
   isDeleted,
   pickerOrderOf,
 } from "../utils/ledgerEntry";
+import { DeleteTransactionButton } from "../components/DeleteTransaction";
 import { ReceiptButton } from "../components/ReceiptButton";
 
 /* The feed is the whole ledger now — money in as well as out. The day filter
@@ -418,21 +420,32 @@ const Dashboard = () => {
                             : formatINR(entry.newBalance)}
                         </td>
                         <td className="ledger-actions">
-                          {(entry.adjustmentId || entry.reversalId) &&
-                            !isDeleted(entry) &&
-                            entry.student?.id && (
-                            <ReceiptButton studentId={entry.student.id} entry={entry} />
-                          )}
-                          {expandable && (
-                            <span
-                              className={`ledger-chevron${
-                                isExpanded ? " ledger-chevron--open" : ""
-                              }`}
-                              aria-hidden="true"
-                            >
-                              <Icon name="caret" size={16} />
-                            </span>
-                          )}
+                          <div className={`row-actions${expandable ? " row-actions--chevron" : ""}`}>
+                            <div className="row-actions__line">
+                              {(entry.adjustmentId || entry.reversalId) &&
+                                !isDeleted(entry) &&
+                                entry.student?.id && (
+                                <ReceiptButton studentId={entry.student.id} entry={entry} />
+                              )}
+                              {expandable && (
+                                <span
+                                  className={`ledger-chevron${
+                                    isExpanded ? " ledger-chevron--open" : ""
+                                  }`}
+                                  aria-hidden="true"
+                                >
+                                  <Icon name="caret" size={16} />
+                                </span>
+                              )}
+                            </div>
+                            {/* Cash deposits only, under Receipt once opened. */}
+                            {(isExpanded || !expandable) && (
+                              <DeleteTransactionButton
+                                target={depositTarget(entry)}
+                                onDeleted={fetchHistory}
+                              />
+                            )}
+                          </div>
                         </td>
                       </tr>
 

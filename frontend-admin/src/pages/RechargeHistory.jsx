@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import api from "../utils/api";
 import { fetchAllStudents } from "../utils/studentRoll";
 import { formatINR } from "../utils/format";
-import { describeEntry } from "../utils/ledgerEntry";
+import { depositTarget, describeEntry, isDeleted } from "../utils/ledgerEntry";
+import { DeleteTransactionButton } from "../components/DeleteTransaction";
 import { ReceiptButton } from "../components/ReceiptButton";
 import {
   Badge,
@@ -38,8 +39,9 @@ const RechargeHistory = () => {
     fetchStudents();
   }, []);
 
-  async function fetchStudents() {
-    setLoading(true);
+  // `quiet` refreshes the balances in place, without blanking the open list.
+  async function fetchStudents({ quiet = false } = {}) {
+    if (!quiet) setLoading(true);
     setLoadError(false);
 
     try {
@@ -442,9 +444,13 @@ const RechargeHistory = () => {
                                       data-label="Amount Added"
                                       style={{ textAlign: "center" }}
                                     >
-                                      <Badge variant="success">
-                                        + {formatINR(entry.amount)}
-                                      </Badge>
+                                      {isDeleted(entry) ? (
+                                        <span className="amount-void">{formatINR(entry.amount)}</span>
+                                      ) : (
+                                        <Badge variant="success">
+                                          + {formatINR(entry.amount)}
+                                        </Badge>
+                                      )}
                                     </td>
                                     <td
                                       data-label="Closing Balance"
@@ -457,9 +463,21 @@ const RechargeHistory = () => {
                                       {formatINR(entry.newBalance)}
                                     </td>
                                     <td style={{ textAlign: "right" }}>
-                                      {entry.adjustmentId && (
-                                        <ReceiptButton studentId={st._id} entry={entry} />
-                                      )}
+                                      <div className="row-actions">
+                                        {entry.adjustmentId && (
+                                          <ReceiptButton studentId={st._id} entry={entry} />
+                                        )}
+                                        {/* Cash deposits only. The balances
+                                            on the roster move too, so both
+                                            are read again. */}
+                                        <DeleteTransactionButton
+                                          target={depositTarget(entry, st.name)}
+                                          onDeleted={() => {
+                                            loadLedger(st._id);
+                                            fetchStudents({ quiet: true });
+                                          }}
+                                        />
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}

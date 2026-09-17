@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node ../scripts/build-version.mjs",
-    "build:release": "node ../scripts/validate-frontend-release-env.mjs --payments && vite build && node ../scripts/build-version.mjs",
+    "build": "vite build",
+    "build:release": "node ../scripts/validate-frontend-release-env.mjs --payments && vite build",
     "check:native": "node scripts/check-native-config.mjs",
     "check:native:android": "cd android && ./gradlew :hungerhunt-phonepe-payment:compileDebugJavaWithJavac",
     "check:native:ios": "cd ios/App && xcodebuild -quiet -project App.xcodeproj -scheme App -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build",

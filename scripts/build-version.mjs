@@ -35,7 +35,7 @@ export const buildVersionPayload = ({ app, env = {}, gitSha = null, now = new Da
   };
 };
 
-const localGitSha = () => {
+export const localGitSha = () => {
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch {

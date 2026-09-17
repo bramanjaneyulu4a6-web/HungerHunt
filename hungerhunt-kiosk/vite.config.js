@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { versionStampPlugin } from '../scripts/versionStampPlugin.mjs'
 
 // https://vite.dev/config/
 export default defineConfig(() => {
   const proxyTarget = process.env.VITE_DEV_PROXY_TARGET
 
   return {
-    plugins: [react()],
+    plugins: [react(), versionStampPlugin()],
     server: {
       port: 5175,
       strictPort: true,

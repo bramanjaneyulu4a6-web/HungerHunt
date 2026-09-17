@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
+import { useFeature } from "../utils/currentStaff";
 import { Banner, Skeleton } from "../components/ui";
 import { formatPackSize } from "../utils/format";
 
@@ -16,6 +17,8 @@ import { formatPackSize } from "../utils/format";
 const Receive = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  // The Purchases card hides the way in; a typed or saved link lands here.
+  const canReceive = useFeature("warehouse.receive");
 
   const [po, setPo] = useState(null);
   const [lines, setLines] = useState({});      // lineKey -> {received, damaged, reason, price}
@@ -147,6 +150,14 @@ const Receive = () => {
       setSaving(false);
     }
   };
+
+  if (!canReceive) {
+    return (
+      <div className="wh-page">
+        <Banner variant="alert" icon="⚠️">Receiving deliveries is switched off for this account.</Banner>
+      </div>
+    );
+  }
 
   if (loadError) {
     return (

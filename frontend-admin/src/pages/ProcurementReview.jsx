@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import { formatINR } from '../utils/format';
 
@@ -11,6 +12,8 @@ const totalOf = (order) =>
   );
 
 export default function ProcurementReview() {
+  // Deciding can be switched off on /features; the queue still reads.
+  const canDecide = useFeature('procurement.decide');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -109,7 +112,7 @@ export default function ProcurementReview() {
               <div><small>Estimated order value</small><strong>{formatINR(totalOf(order))}</strong></div>
             </div>
 
-            {rejection?.id === order.id ? (
+            {!canDecide ? null : rejection?.id === order.id ? (
               <div className="warehouse-rejection-panel">
                 <label className="field-label" htmlFor={`reject-${order.id}`}>Rejection reason</label>
                 <textarea

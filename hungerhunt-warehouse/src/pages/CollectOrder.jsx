@@ -6,6 +6,7 @@ import HandoverResult from '../components/HandoverResult';
 import Icon from '../components/Icon';
 import { Banner, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import {
   NOTE_MAX_LENGTH,
   NOTE_MIN_LENGTH,
@@ -32,6 +33,9 @@ const CODE_LENGTH = 4;
  * package in front of them does not match the receipt; reporting never holds
  * the package, so the way back always lands on the code field. */
 const CollectOrder = () => {
+  // Help only leads to reporting a problem, so it follows the same switch
+  // as the card's "Issue with this package".
+  const canReport = useFeature('caretaker.reportPackage');
   const { orderId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -195,7 +199,7 @@ const CollectOrder = () => {
         <h1 className="wh-title wh-handover-title">
           {screen === 'code' ? 'Complete order' : 'Help'}
         </h1>
-        {screen === 'code' ? (
+        {screen === 'code' && canReport ? (
           <button type="button" className="wh-help-btn" onClick={() => setScreen('options')}>
             <Icon name="help" size={18} />
             <span>Help</span>

@@ -5,6 +5,7 @@ import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import {
   COMPLAINT_CATEGORIES,
   REPORT_STATUS_BADGE,
@@ -20,6 +21,8 @@ const PAGE_SIZE = 25;
  * what makes this one worth typing into is that the answer lands here, in the
  * same place, under the thing it answers. */
 const CaretakerReports = () => {
+  // Filing a new one can be hidden; the list of past reports still shows.
+  const canFile = useFeature('caretaker.newReport');
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [outstanding, setOutstanding] = useState(0);
@@ -61,7 +64,7 @@ const CaretakerReports = () => {
         </div>
       </div>
 
-      {composing ? (
+      {!canFile ? null : composing ? (
         <section className="wh-card" aria-label="New report">
           <h2 className="wh-product">Raise something with the office</h2>
           <p className="wh-status-detail">

@@ -1,4 +1,4 @@
-import test, { afterEach, before, describe, mock } from 'node:test';
+import test, { afterEach, beforeEach, before, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -8,6 +8,8 @@ process.env.FEATURE_V1_PROCUREMENT = 'true';
 process.env.BUSINESS_TIME_ZONE = 'Asia/Kolkata';
 
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
+const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const { fulfillmentSchedule, createFulfillmentOrder } = await import('../utils/fulfillment.js');
@@ -45,6 +47,7 @@ before(async () => {
   server.unref();
 });
 
+beforeEach(() => featuresOpen(Admin, FeatureVisibility));
 afterEach(() => mock.restoreAll());
 
 describe('dorm fulfilment policy', () => {

@@ -66,3 +66,11 @@ export const useCurrentStaff = () => {
 
   return { me: me ?? PLAIN_ADMIN, loaded: me !== null };
 };
+
+/* Whether the signed-in account sees one hideable feature (backend
+   utils/featureCatalogue.js). A super admin sees everything. False until the
+   account has loaded, so a switched-off button never flashes up first. */
+export const useFeature = (key) => {
+  const { me, loaded } = useCurrentStaff();
+  return loaded && (me.isSuperAdmin || !me.hiddenFeatures.includes(key));
+};

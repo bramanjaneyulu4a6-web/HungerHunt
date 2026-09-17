@@ -1,4 +1,5 @@
 import express from "express";
+import { requireFeature } from "../middleware/featureGate.js";
 
 import {
   createPurchase,
@@ -32,7 +33,7 @@ router.get("/completed", protectAdmin, getCompletedPurchases);
 router.put("/complete/:id", protectAdmin, completePurchase);
 router.put("/cancel/:id", protectAdmin, cancelPurchase);
 
-router.post("/:id/receipts", protectWarehouse, receiveDelivery);
+router.post("/:id/receipts", protectWarehouse, requireFeature("warehouse.receive"), receiveDelivery);
 router.get("/:id/receipts", protectWarehouse, getReceiptsForPurchase);
 
 router.get("/:id", protectWarehouse, getPurchase);

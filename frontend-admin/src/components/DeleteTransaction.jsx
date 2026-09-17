@@ -17,7 +17,7 @@ import toast from 'react-hot-toast';
 import Icon from './Icon';
 import { Banner, Button } from './ui';
 import api from '../utils/api';
-import { useCurrentStaff } from '../utils/currentStaff';
+import { useCurrentStaff, useFeature } from '../utils/currentStaff';
 import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { formatINR } from '../utils/format';
 import { useDismissableOverlay } from '../utils/overlay';
@@ -129,10 +129,14 @@ export const DeleteTransactionDialog = ({ target, onClose, onDeleted }) => {
   );
 };
 
-/* The red Delete button that sits under a row's Receipt button. */
+/* The red Delete button that sits under a row's Receipt button. A super admin
+   can switch it off per role or per account on /features (the server refuses
+   the delete too); it stays away until the account's settings have loaded, so
+   it never flashes up for someone it is hidden from. */
 export const DeleteTransactionButton = ({ target, onDeleted }) => {
   const [open, setOpen] = useState(false);
-  if (!target) return null;
+  const allowed = useFeature('transactions.delete');
+  if (!target || !allowed) return null;
 
   return (
     <>

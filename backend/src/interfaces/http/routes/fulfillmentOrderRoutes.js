@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { protectWarehouse } from '../../../../middleware/authMiddleware.js';
+import { requireFeature } from '../../../../middleware/featureGate.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import * as controller from '../controllers/fulfillmentOrderController.js';
 import { createWarehouseOrderIssue } from '../controllers/staffReportController.js';
@@ -16,7 +17,13 @@ router.get('/history', protectWarehouse, asyncHandler(controller.history));
 router.get('/report', protectWarehouse, asyncHandler(controller.report));
 router.get('/print', protectWarehouse, asyncHandler(controller.print));
 router.post('/warehouse-reports', protectWarehouse, asyncHandler(createWarehouseOrderIssue));
-router.post('/:id/transition', protectWarehouse, asyncHandler(controller.transition));
+// A cancellation refunds the wallet, so switching it off refuses it too.
+router.post(
+  '/:id/transition',
+  protectWarehouse,
+  requireFeature('orders.cancelRefund', { applies: (req) => req.body?.status === 'CANCELLED' }),
+  asyncHandler(controller.transition)
+);
 router.post('/:id/alerts/acknowledge', protectWarehouse, asyncHandler(controller.acknowledgeAlert));
 
 export default router;

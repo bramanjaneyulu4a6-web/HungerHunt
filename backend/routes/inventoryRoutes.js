@@ -1,4 +1,5 @@
 import express from "express";
+import { requireFeature } from "../middleware/featureGate.js";
 import { getInventory, adjustStock, getAdjustments, getStockAlerts } from "../controllers/inventoryController.js";
 import { orStudent, protectAdmin, protectAnyStaff, protectWarehouse } from "../middleware/authMiddleware.js";
 import { readCache } from "../middleware/readCache.js";
@@ -20,7 +21,7 @@ router.get("/alerts", protectWarehouse, getStockAlerts);
 
 // Manual movements are the office's alone — the storeroom's stock changes
 // arrive as goods receipts, and a student obviously never writes the shelf.
-router.post("/:productId/adjust", protectAdmin, adjustStock);
+router.post("/:productId/adjust", protectAdmin, requireFeature("inventory.adjustStock"), adjustStock);
 router.get("/:productId/adjustments", protectAdmin, getAdjustments);
 
 export default router;

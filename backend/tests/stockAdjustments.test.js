@@ -2,7 +2,7 @@
 // with the same discipline as goods receipts: the Inventory number stays
 // derivable, and every movement has a row saying who and why. No movement
 // without a row, in either direction.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -12,6 +12,8 @@ process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
+const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const Inventory = (await import('../models/Inventory.js')).default;
 const StockAdjustment = (await import('../models/StockAdjustment.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
@@ -35,6 +37,7 @@ before(async () => {
   server.unref();
 });
 
+beforeEach(() => featuresOpen(Admin, FeatureVisibility));
 afterEach(() => mock.restoreAll());
 
 const accountIs = accountMatcher(Admin, STAFF_ID);

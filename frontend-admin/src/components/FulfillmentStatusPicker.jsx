@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import Icon from './Icon';
 import { Badge, Banner, Button } from './ui';
 import { formatINR } from '../utils/format';
@@ -48,8 +49,11 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
   const rootRef = useRef(null);
   const cancellationKeyRef = useRef('');
 
-  const statuses = availableFulfillmentStatuses(order);
-  const cancellable = isCancellableFulfillment(order);
+  // Either half of the menu can be switched off on /features.
+  const canMove = useFeature('orders.changeStatus');
+  const canCancel = useFeature('orders.cancelRefund');
+  const statuses = canMove ? availableFulfillmentStatuses(order) : [];
+  const cancellable = canCancel && isCancellableFulfillment(order);
   const badge = (
     <Badge variant={variant || fulfillmentBadgeVariant(order?.status)}>
       {label || fulfillmentStatusDisplay(order)}

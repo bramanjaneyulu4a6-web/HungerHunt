@@ -56,7 +56,9 @@ const Inventory = () => {
   const [group, setGroup] = useState(ALL);
 
   // Coming back to a half-built order lands in the mode it was being built in.
-  const [orderMode, setOrderMode] = useState(() => Object.keys(readStored().cart).length > 0);
+  const [orderModeChosen, setOrderMode] = useState(() => Object.keys(readStored().cart).length > 0);
+  // A cart saved before ordering was hidden must not bring the order tools back.
+  const orderMode = canOrder && orderModeChosen;
   const [typed, setTyped] = useState({});
   const [cart, setCart] = useState(() => readStored().cart);
   const [draft, setDraft] = useState(() => readStored().draft);
@@ -460,7 +462,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {cartIds.length > 0 && !reviewOpen && (
+      {canOrder && cartIds.length > 0 && !reviewOpen && (
         <button
           type="button"
           className="wh-fab"

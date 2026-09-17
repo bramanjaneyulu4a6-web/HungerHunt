@@ -26,7 +26,7 @@ import { ReceiptModal } from '../components/Receipt';
 import { useReceipt } from '../utils/walletActivity';
 import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
 import { useDismissableOverlay } from '../utils/overlay';
-import { useCurrentStaff } from '../utils/currentStaff';
+import { useCurrentStaff, useFeature } from '../utils/currentStaff';
 
 /* The student directory.
  *
@@ -129,6 +129,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   // now a super admin's choice per role or account (Feature visibility).
   const { me } = useCurrentStaff();
   const showPurchaseCode = me.isSuperAdmin || !me.hiddenFeatures.includes('students.purchaseCode');
+  // The rest of the page's actions, each switchable on /features.
+  const canAdd = useFeature('students.add');
+  const canImport = useFeature('students.import');
+  const canEdit = useFeature('students.edit');
+  const canArchive = useFeature('students.archive');
+  const canRecharge = useFeature('students.recharge');
+  const canOpenActivity = useFeature('students.activity');
   // The student whose orders and receipts are open, if any.
   const [activityStudent, setActivityStudent] = useState(null);
   const focusedStudentId = searchParams.get('focus') || '';
@@ -505,14 +512,18 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
         subtitle="Find a student, manage their profile, and see whether parent access is active."
         actions={
           <div className="header-actions">
-            <Button variant="ghost" className="btn--sm" onClick={() => { setImportErrors([]); setImportOpen(true); }}>
-              <Icon name="upload" size={16} />
-              Import from Excel
-            </Button>
-            <Button className="btn--sm" onClick={openCreate}>
-              <Icon name="plus" size={16} />
-              Add Student
-            </Button>
+            {canImport && (
+              <Button variant="ghost" className="btn--sm" onClick={() => { setImportErrors([]); setImportOpen(true); }}>
+                <Icon name="upload" size={16} />
+                Import from Excel
+              </Button>
+            )}
+            {canAdd && (
+              <Button className="btn--sm" onClick={openCreate}>
+                <Icon name="plus" size={16} />
+                Add Student
+              </Button>
+            )}
           </div>
         }
       />
@@ -666,9 +677,9 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
               >
                 Clear filters
               </Button>
-            ) : (
+            ) : canAdd ? (
               <Button onClick={openCreate}>Add the first student</Button>
-            )
+            ) : undefined
           }
         >
           {filtering
@@ -729,14 +740,18 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       : <span className="cell-unset">Not set</span>}
                   </td>
                   <td data-label="Name">
-                    <button
-                      type="button"
-                      className="link-button cell-name"
-                      onClick={() => setActivityStudent(student)}
-                      aria-label={`Open ${student.name}'s orders and receipts`}
-                    >
-                      {student.name}
-                    </button>
+                    {canOpenActivity ? (
+                      <button
+                        type="button"
+                        className="link-button cell-name"
+                        onClick={() => setActivityStudent(student)}
+                        aria-label={`Open ${student.name}'s orders and receipts`}
+                      >
+                        {student.name}
+                      </button>
+                    ) : (
+                      <span className="cell-name">{student.name}</span>
+                    )}
                   </td>
                   <td data-label="Class">{classLabel(student) || '—'}</td>
                   <td data-label="Room">
@@ -765,20 +780,24 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                   })()}</td>
                   <td data-label="Actions">
                     <div className="cell-actions">
-                      <Button
-                        variant="success"
-                        className="btn--sm"
-                        onClick={() => openTopUp(student)}
-                      >
-                        Recharge
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="btn--sm"
-                        onClick={() => openEdit(student)}
-                      >
-                        Edit
-                      </Button>
+                      {canRecharge && (
+                        <Button
+                          variant="success"
+                          className="btn--sm"
+                          onClick={() => openTopUp(student)}
+                        >
+                          Recharge
+                        </Button>
+                      )}
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          className="btn--sm"
+                          onClick={() => openEdit(student)}
+                        >
+                          Edit
+                        </Button>
+                      )}
                       {showPurchaseCode && (
                         <Button
                           variant="ghost"
@@ -875,7 +894,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
 
             {/* Only on an existing record, and kept below the fold of the form
                 so it is never the button under a thumb heading for Update. */}
-            {editingId && (
+            {editingId && canArchive && (
               <section className="danger-zone">
                 <div>
                   <h4 className="danger-zone__title">Archive this student</h4>

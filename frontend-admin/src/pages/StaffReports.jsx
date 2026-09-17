@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 
 /* What the rooms are telling the office.
@@ -65,6 +66,7 @@ const formatWhen = (value) =>
   }).format(new Date(value));
 
 export default function StaffReports() {
+  const canRespond = useFeature('reports.respond');
   const [source, setSource] = useState('student');
   const [view, setView] = useState('OUTSTANDING');
   const [reports, setReports] = useState([]);
@@ -241,7 +243,7 @@ export default function StaffReports() {
               </div>
             )}
 
-            {report.status !== 'RESOLVED' && (
+            {canRespond && report.status !== 'RESOLVED' && (
               resolving === report.id ? (
                 <div className="report-card__resolve">
                   <label htmlFor={`answer-${report.id}`}>

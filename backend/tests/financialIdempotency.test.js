@@ -6,6 +6,8 @@ process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
 process.env.NODE_ENV = 'test';
 
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
+const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const Parent = (await import('../models/Parent.js')).default;
 const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
@@ -45,6 +47,7 @@ beforeEach(() => {
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
 });
 
+beforeEach(() => featuresOpen(Admin, FeatureVisibility));
 afterEach(() => mock.restoreAll());
 
 const request = (method, path, token, body, key) =>

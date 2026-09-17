@@ -10,7 +10,7 @@
 //
 // No database: every model call is stubbed, the way the rest of the wallet
 // suite does it.
-import test, { after, afterEach, before, describe, mock } from 'node:test';
+import test, { after, afterEach, before, describe, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -22,6 +22,8 @@ process.env.PHONEPE_CLIENT_SECRET = 'x';
 
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
+const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const Counter = (await import('../models/Counter.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
@@ -70,6 +72,7 @@ before(async () => {
 });
 
 after(() => new Promise((resolve) => server.close(resolve)));
+beforeEach(() => featuresOpen(Admin, FeatureVisibility));
 afterEach(() => mock.restoreAll());
 
 /* The per-student counter, handing out 1, 2, 3… and recording which sequence

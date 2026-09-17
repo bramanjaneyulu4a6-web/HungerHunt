@@ -4,6 +4,7 @@ import api from "../utils/api";
 import { fetchAllStudents } from "../utils/studentRoll";
 import { formatINR } from "../utils/format";
 import { depositTarget, describeEntry, isDeleted } from "../utils/ledgerEntry";
+import { useFeature } from "../utils/currentStaff";
 import { DeleteTransactionButton } from "../components/DeleteTransaction";
 import { ReceiptButton } from "../components/ReceiptButton";
 import {
@@ -34,6 +35,7 @@ const RechargeHistory = () => {
   const [loadError, setLoadError] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const canExport = useFeature("walletLedger.export");
 
   useEffect(() => {
     fetchStudents();
@@ -204,7 +206,7 @@ const RechargeHistory = () => {
         title="Wallet Recharge Registry"
         subtitle="Every top-up on a wallet — the desk’s and a parent’s own UPI payments alike — with the receipt for each."
         actions={
-          students.length > 0 && (
+          canExport && students.length > 0 && (
             <Button onClick={downloadAllStudentsExcel}>
               📊 Export All Students (.csv)
             </Button>
@@ -336,7 +338,7 @@ const RechargeHistory = () => {
                         >
                           Recharge History
                         </h4>
-                        {(ledgers[st._id]?.entries.length || 0) > 0 && (
+                        {canExport && (ledgers[st._id]?.entries.length || 0) > 0 && (
                           <button
                             type="button"
                             className="link-button"

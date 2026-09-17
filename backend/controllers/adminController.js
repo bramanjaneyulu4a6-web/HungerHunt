@@ -7,9 +7,7 @@ import Room from '../models/Room.js';
 import Student from '../models/Student.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
-import FeatureVisibility from '../models/FeatureVisibility.js';
-import { effectiveHidden } from '../utils/featureCatalogue.js';
-import { overridesOf } from './featureController.js';
+import { hiddenFeaturesOf } from '../middleware/featureGate.js';
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -129,12 +127,10 @@ export const currentStaff = async (req, res) => {
     const admin = await Admin.findById(req.staff.id)
       .select('name email phone role isSuperAdmin featureOverrides').lean();
     if (!admin) return res.status(401).json({ message: 'Not authorized', code: 'AUTH_REQUIRED' });
-    const role = admin.role || 'admin';
-    const isSuperAdmin = role === 'admin' && admin.isSuperAdmin === true;
     // What this console hides, settled here so the client never holds the
     // rule: the role's list, then this account's exceptions, and nothing at
     // all for a super admin.
-    const roleRow = isSuperAdmin ? null : await FeatureVisibility.findOne({ role }).lean();
+    const { role, isSuperAdmin, hidden } = await hiddenFeaturesOf(admin);
     res.json({
       id: String(admin._id),
       name: admin.name || '',
@@ -142,12 +138,7 @@ export const currentStaff = async (req, res) => {
       phone: admin.phone || '',
       role,
       isSuperAdmin,
-      hiddenFeatures: effectiveHidden({
-        role,
-        isSuperAdmin,
-        roleHidden: roleRow ? roleRow.hidden : null,
-        overrides: overridesOf(admin),
-      }),
+      hiddenFeatures: hidden,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

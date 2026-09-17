@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireFeature } from '../middleware/featureGate.js';
 import {
   addStudent,
   getStudents,
@@ -60,7 +61,7 @@ router.route('/:id')
 router.post('/bulk', protectAdmin, bulkImportStudents);
 router.post('/:id/restore', protectAdmin, restoreStudent);
 
-router.put('/:id/topup', protectAdmin, topUpWallet);
+router.put('/:id/topup', protectAdmin, requireFeature('students.recharge'), topUpWallet);
 
 /* Named on its own rather than added to the student edit form's writable
    fields: a child's purchase code cannot be set as a side effect of editing

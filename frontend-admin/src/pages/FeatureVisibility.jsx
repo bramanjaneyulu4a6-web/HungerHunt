@@ -146,7 +146,7 @@ export default function FeatureVisibility() {
     <div className="page">
       <PageHeader
         title="Feature visibility"
-        subtitle="Choose what each kind of staff account sees in its app. Super admins always see everything. Hiding a feature removes it from the screen; it is not a permission."
+        subtitle="Choose what each kind of staff account sees in its app. Super admins always see everything. Hiding a feature removes it from the screen. Features marked “also blocked on the server” are refused as well, even if someone sends the request directly."
       />
 
       <div className="feature-role-tabs" role="tablist" aria-label="Which app">

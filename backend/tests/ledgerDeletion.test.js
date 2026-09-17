@@ -10,6 +10,7 @@ process.env.PARENT_JWT_SECRET ||= 'parent-test-secret';
 process.env.NODE_ENV = 'test';
 
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Student = (await import('../models/Student.js')).default;
@@ -237,6 +238,10 @@ describe('POST /v1/accounting-exports/movements/:id/delete', () => {
     server.unref();
   });
 
+  // The role's stored list; null means the built-in default, which shows Delete.
+  const roleHides = (hidden) =>
+    mock.method(FeatureVisibility, 'findOne', () => lean(hidden ? { role: 'admin', hidden } : null));
+
   const send = (body) =>
     fetch(`${base}/api/v1/accounting-exports/movements/${DEPOSIT_ID}/delete`, {
       method: 'POST',
@@ -247,6 +252,7 @@ describe('POST /v1/accounting-exports/movements/:id/delete', () => {
   test('deletes as the signed-in admin and answers with the mark', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
     stubAdmins();
+    roleHides(null);
     mock.method(WalletAdjustment, 'findOne', () => lean(deposit()));
     mock.method(Student, 'findOneAndUpdate', async () => ({ pocketMoney: 0 }));
     mock.method(WalletAdjustment, 'findOneAndUpdate', async () => ({ _id: DEPOSIT_ID }));
@@ -279,8 +285,42 @@ describe('POST /v1/accounting-exports/movements/:id/delete', () => {
     assert.equal(charges.mock.callCount(), 2);
   });
 
+  test('is refused, not just hidden, where a super admin switched it off', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubAdmins();
+    roleHides(['transactions.delete']);
+    const find = mock.method(WalletAdjustment, 'findOne', () => lean(deposit()));
+
+    const response = await send({ kind: 'CASH_DEPOSIT', reason: 'Duplicate entry' });
+
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'FEATURE_HIDDEN');
+    assert.equal(find.mock.callCount(), 0);
+  });
+
+  test('an account shown it by exception may still delete, and a super admin always may', async () => {
+    mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    roleHides(['transactions.delete']);
+    mock.method(WalletAdjustment, 'findOne', () => lean(deposit()));
+    mock.method(Student, 'findOneAndUpdate', async () => ({ pocketMoney: 0 }));
+    mock.method(WalletAdjustment, 'findOneAndUpdate', async () => ({ _id: DEPOSIT_ID }));
+
+    for (const account of [
+      { featureOverrides: [{ key: 'transactions.delete', value: 'shown' }] },
+      { isSuperAdmin: true, role: 'admin' },
+    ]) {
+      mock.method(Admin, 'findById', (id) =>
+        lean(String(id) === ADMIN_ID ? { ...admins[ADMIN_ID], ...account } : admins[String(id)] || null)
+      );
+      const response = await send({ kind: 'CASH_DEPOSIT', reason: 'Duplicate entry' });
+      assert.equal(response.status, 200);
+    }
+  });
+
   test('answers a refusal with its reason', async () => {
     mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
+    stubAdmins();
+    roleHides(null);
     const response = await send({ kind: 'CASH_DEPOSIT', reason: '' });
     assert.equal(response.status, 400);
     assert.match((await response.json()).message, /why/);

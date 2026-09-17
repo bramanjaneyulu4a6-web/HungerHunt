@@ -5,10 +5,13 @@
  */
 import { Button } from './ui';
 import { ReceiptModal } from './Receipt';
+import { useFeature } from '../utils/currentStaff';
 import { useReceipt } from '../utils/walletActivity';
 
 export const ReceiptButton = ({ studentId, entry }) => {
   const { receipt, loading, open, close } = useReceipt();
+  // A super admin can switch Receipt off everywhere on /features.
+  if (!useFeature('ledger.receipt')) return null;
 
   return (
     <>

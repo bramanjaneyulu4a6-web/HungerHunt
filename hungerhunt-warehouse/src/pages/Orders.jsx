@@ -36,7 +36,7 @@ const ItemList = ({ items }) => (
 
 /* A unit is the rooms one caretaker holds, and they travel as one delivery, so
    the board gives them one tile and one button rather than a row each. */
-const UnitTile = ({ unit, status, busy, onAdvance, onReport, canReport = true }) => (
+const UnitTile = ({ unit, status, busy, onAdvance, onReport, canReport = true, canAdvance = true }) => (
   <article className="wh-unit-tile">
     <div className="wh-unit-tile-head">
       <div>
@@ -56,15 +56,17 @@ const UnitTile = ({ unit, status, busy, onAdvance, onReport, canReport = true })
     <ItemList items={unit.items} />
 
     <div className="wh-unit-actions">
-      <button type="button" className="wh-cta" disabled={busy} onClick={() => onAdvance(unit)}>
-        {busy
-          ? "Updating…"
-          : status === "PENDING"
-            ? "Mark as packed"
-            : status === "PACKED"
-              ? "Deliver"
-              : "Record handover"}
-      </button>
+      {canAdvance && (
+        <button type="button" className="wh-cta" disabled={busy} onClick={() => onAdvance(unit)}>
+          {busy
+            ? "Updating…"
+            : status === "PENDING"
+              ? "Mark as packed"
+              : status === "PACKED"
+                ? "Deliver"
+                : "Record handover"}
+        </button>
+      )}
       {status === "PENDING" && canReport && (
         <button type="button" className="wh-report-tile" disabled={busy} onClick={() => onReport(unit)}>
           Report
@@ -78,6 +80,11 @@ const Orders = () => {
   // Two actions a super admin may hide from this account.
   const canPrint = useFeature("warehouse.printOrders");
   const canReport = useFeature("warehouse.reportIssue");
+  // Each stage's move, and the whole-block shortcut, can be hidden too.
+  const canPack = useFeature("warehouse.pack");
+  const canDispatch = useFeature("warehouse.dispatch");
+  const canHandover = useFeature("warehouse.handover");
+  const canBlock = useFeature("warehouse.blockActions");
   const [view, setView] = useState("PENDING");
   const [orders, setOrders] = useState([]);
   // Which rooms travel together is the server's answer, not this screen's.
@@ -91,6 +98,9 @@ const Orders = () => {
   const [printing, setPrinting] = useState(false);
   // null while closed; while open, which stages the sheet should carry.
   const [printChoice, setPrintChoice] = useState(null);
+
+  const canAdvance =
+    view === "PENDING" ? canPack : view === "PACKED" ? canDispatch : canHandover;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -312,7 +322,7 @@ const Orders = () => {
           </div>
           <div className="wh-unit-grid">
             {activeBlock.units.map((unit) => (
-              <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport}
+              <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport} canAdvance={canAdvance}
                 busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit}
                 onReport={(selected) => setReporting({ unit: selected, category: "", note: "" })} />
             ))}
@@ -324,16 +334,18 @@ const Orders = () => {
             <section key={block.key} className="wh-block-stack">
               <header className="wh-block-stack-head">
                 <div><span>{block.unitCount} unit{block.unitCount === 1 ? "" : "s"}</span><h2>{block.label}</h2><small>{itemLabel(block.itemCount)}</small></div>
-                <button type="button" className="wh-block-action" disabled={Boolean(busyKey)}
-                  onClick={() => view === "PACKED"
-                    ? transitionUnits(block.units, "OUT_FOR_DELIVERY")
-                    : openDelivery(block.units, { wholeBlock: true, blockLabel: block.label })}>
-                  {view === "PACKED" ? "Send whole block" : "Hand over whole block"}
-                </button>
+                {canBlock && canAdvance && (
+                  <button type="button" className="wh-block-action" disabled={Boolean(busyKey)}
+                    onClick={() => view === "PACKED"
+                      ? transitionUnits(block.units, "OUT_FOR_DELIVERY")
+                      : openDelivery(block.units, { wholeBlock: true, blockLabel: block.label })}>
+                    {view === "PACKED" ? "Send whole block" : "Hand over whole block"}
+                  </button>
+                )}
               </header>
               <div className="wh-unit-scroll">
                 {block.units.map((unit) => (
-                  <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport}
+                  <UnitTile key={unit.key} unit={unit} status={view} canReport={canReport} canAdvance={canAdvance}
                     busy={busyUnits.includes(unit.key)} onAdvance={advanceUnit} />
                 ))}
               </div>

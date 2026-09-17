@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
 import { Badge, Banner, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
+import { useFeature } from '../../utils/currentStaff';
 
 const PAGE_SIZE = 50;
 
@@ -13,6 +14,8 @@ const matches = (values, search) => {
 };
 
 export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onChanged }) {
+  // Restoring can be switched off on /features; the list still shows.
+  const canRestore = useFeature('archived.restore');
   const [searchParams] = useSearchParams();
   const focusedParentId = searchParams.get('focus') || '';
   const [workingId, setWorkingId] = useState(null);
@@ -179,7 +182,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                   <td data-label="Type">Student</td>
                   <td data-label="Details">Class {[student.className || student.grade, student.section].filter(Boolean).join('-') || '—'} · Room {student.roomNumber || '—'}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
-                  <td data-label="Action"><Button className="btn--sm" disabled={workingId === student._id} onClick={() => restoreStudent(student)}>{workingId === student._id ? 'Restoring…' : 'Restore'}</Button></td>
+                  <td data-label="Action">{canRestore ? <Button className="btn--sm" disabled={workingId === student._id} onClick={() => restoreStudent(student)}>{workingId === student._id ? 'Restoring…' : 'Restore'}</Button> : '—'}</td>
                 </tr>
               ))}
               {showParents && archivedParents.map((parent) => (
@@ -192,7 +195,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                   <td data-label="Type">Parent</td>
                   <td data-label="Details">{parent.phone} · {(parent.students || []).map((student) => student.name).join(', ') || 'No linked students'}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
-                  <td data-label="Action"><Button className="btn--sm" disabled={workingId === parent.id} onClick={() => restoreParent(parent)}>{workingId === parent.id ? 'Restoring…' : 'Restore'}</Button></td>
+                  <td data-label="Action">{canRestore ? <Button className="btn--sm" disabled={workingId === parent.id} onClick={() => restoreParent(parent)}>{workingId === parent.id ? 'Restoring…' : 'Restore'}</Button> : '—'}</td>
                 </tr>
               ))}
               {showStaff && archivedStaff.map((account) => (
@@ -201,7 +204,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                   <td data-label="Type">Staff</td>
                   <td data-label="Details">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}{(account.rooms || []).length ? ` · ${(account.rooms || []).map((room) => room.code).join(' · ')}` : ''}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
-                  <td data-label="Action"><Button className="btn--sm" disabled={workingId === account.id} onClick={() => restoreStaff(account)}>{workingId === account.id ? 'Restoring…' : 'Restore'}</Button></td>
+                  <td data-label="Action">{canRestore ? <Button className="btn--sm" disabled={workingId === account.id} onClick={() => restoreStaff(account)}>{workingId === account.id ? 'Restoring…' : 'Restore'}</Button> : '—'}</td>
                 </tr>
               ))}
             </tbody>

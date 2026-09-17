@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../utils/api";
+import { useFeature } from "../utils/currentStaff";
 import { digitsOnly, numericFieldProps } from "../utils/numericInput";
 import {
   Badge,
@@ -14,6 +15,10 @@ import {
 const EMPTY_FORM = { name: "", phone: "", contactPerson: "", notes: "", leadTimeDays: "7" };
 
 const Suppliers = () => {
+  // Each supplier action can be switched off on /features.
+  const canAdd = useFeature("suppliers.add");
+  const canEdit = useFeature("suppliers.edit");
+  const canDeactivate = useFeature("suppliers.deactivate");
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -122,7 +127,7 @@ const Suppliers = () => {
       <PageHeader
         title="Supplier Directory"
         subtitle="Manage procurement contacts and delivery lead times used by inventory recommendations."
-        actions={<Button onClick={openAdd}>+ Add Supplier</Button>}
+        actions={canAdd ? <Button onClick={openAdd}>+ Add Supplier</Button> : undefined}
       />
 
       {loading ? (
@@ -143,7 +148,7 @@ const Suppliers = () => {
         <EmptyState
           icon="🚚"
           title="No suppliers yet"
-          action={<Button onClick={openAdd}>+ Add Supplier</Button>}
+          action={canAdd ? <Button onClick={openAdd}>+ Add Supplier</Button> : undefined}
         >
           Add the people you order from so purchase orders can name them.
         </EmptyState>
@@ -177,16 +182,20 @@ const Suppliers = () => {
                   <td data-label="Notes">{s.notes || ""}</td>
                   <td data-label="Actions">
                     <div style={{ display: "flex", gap: 8 }}>
-                      <Button className="btn--sm" onClick={() => openEdit(s)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant={s.active === false ? "success" : "danger"}
-                        className="btn--sm"
-                        onClick={() => setActive(s, s.active === false)}
-                      >
-                        {s.active === false ? "Reactivate" : "Deactivate"}
-                      </Button>
+                      {canEdit && (
+                        <Button className="btn--sm" onClick={() => openEdit(s)}>
+                          Edit
+                        </Button>
+                      )}
+                      {canDeactivate && (
+                        <Button
+                          variant={s.active === false ? "success" : "danger"}
+                          className="btn--sm"
+                          onClick={() => setActive(s, s.active === false)}
+                        >
+                          {s.active === false ? "Reactivate" : "Deactivate"}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

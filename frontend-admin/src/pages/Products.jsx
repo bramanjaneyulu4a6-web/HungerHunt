@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import {
   Badge,
   Banner,
@@ -70,6 +71,12 @@ const limitLabel = (product) => {
 };
 
 const Products = () => {
+  // Each catalogue action can be switched off on /features.
+  const canAdd = useFeature('products.add');
+  const canEdit = useFeature('products.edit');
+  const canToggleKiosk = useFeature('products.kioskToggle');
+  const canArchive = useFeature('products.archive');
+  const canEditCategories = useFeature('products.categories');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null);
@@ -609,7 +616,7 @@ const Products = () => {
       <PageHeader
         title="Product Catalog"
         subtitle="Manage products and the sub-categories they sit under."
-        actions={<Button onClick={openProductModal}>+ Add Product</Button>}
+        actions={canAdd ? <Button onClick={openProductModal}>+ Add Product</Button> : undefined}
       />
 
       <div className="catalogue-controls">
@@ -678,6 +685,7 @@ const Products = () => {
                 : 'No products yet'
           }
           action={
+            canAdd &&
             catalogueView !== 'archived' &&
             !searchQuery.trim() && (
               <Button onClick={openProductModal}>+ Add Product</Button>
@@ -726,16 +734,20 @@ const Products = () => {
                   </p>
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <Button
-                      variant="success"
-                      className="btn--sm"
-                      onClick={() => setArchived(product, false)}
-                    >
-                      Restore
-                    </Button>
-                    <Button className="btn--sm" onClick={() => handleEditInit(product)}>
-                      Edit
-                    </Button>
+                    {canArchive && (
+                      <Button
+                        variant="success"
+                        className="btn--sm"
+                        onClick={() => setArchived(product, false)}
+                      >
+                        Restore
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button className="btn--sm" onClick={() => handleEditInit(product)}>
+                        Edit
+                      </Button>
+                    )}
                   </div>
                 </div>
               </article>
@@ -823,13 +835,15 @@ const Products = () => {
                     <td data-label="Per-student limit">{limitLabel(p)}</td>
                     <td data-label="Actions">
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <Button
-                          className="btn--sm"
-                          onClick={() => handleEditInit(p)}
-                        >
-                          Edit
-                        </Button>
-                        {p.active !== false && (
+                        {canEdit && (
+                          <Button
+                            className="btn--sm"
+                            onClick={() => handleEditInit(p)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        {canToggleKiosk && p.active !== false && (
                           <Button
                             variant={p.kioskVisible === false ? 'success' : 'ghost'}
                             className="btn--sm"
@@ -838,13 +852,15 @@ const Products = () => {
                             {p.kioskVisible === false ? 'Enable' : 'Disable'}
                           </Button>
                         )}
-                        <Button
-                          variant={p.active === false ? 'success' : 'danger'}
-                          className="btn--sm"
-                          onClick={() => setArchived(p, p.active !== false)}
-                        >
-                          {p.active === false ? 'Restore' : 'Archive'}
-                        </Button>
+                        {canArchive && (
+                          <Button
+                            variant={p.active === false ? 'success' : 'danger'}
+                            className="btn--sm"
+                            onClick={() => setArchived(p, p.active !== false)}
+                          >
+                            {p.active === false ? 'Restore' : 'Archive'}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -876,13 +892,15 @@ const Products = () => {
               ))}
             </div>
 
-            <Button
-              variant="ghost"
-              className="catalogue-edit-list"
-              onClick={openCategoryEditor}
-            >
-              Edit
-            </Button>
+            {canEditCategories && (
+              <Button
+                variant="ghost"
+                className="catalogue-edit-list"
+                onClick={openCategoryEditor}
+              >
+                Edit
+              </Button>
+            )}
           </div>
 
           {kioskProducts.length === 0 ? (
@@ -940,13 +958,15 @@ const Products = () => {
                                   )}
 
                                   <div className="catalogue-product-hover-actions">
-                                    <Button
-                                      className="btn--sm"
-                                      onClick={() => handleEditInit(product)}
-                                    >
-                                      Edit
-                                    </Button>
-                                    {product.active !== false && (
+                                    {canEdit && (
+                                      <Button
+                                        className="btn--sm"
+                                        onClick={() => handleEditInit(product)}
+                                      >
+                                        Edit
+                                      </Button>
+                                    )}
+                                    {canToggleKiosk && product.active !== false && (
                                       <Button
                                         variant={product.kioskVisible === false ? 'success' : 'ghost'}
                                         className="btn--sm"
@@ -957,13 +977,15 @@ const Products = () => {
                                         {product.kioskVisible === false ? 'Enable' : 'Disable'}
                                       </Button>
                                     )}
-                                    <Button
-                                      variant={product.active === false ? 'success' : 'danger'}
-                                      className="btn--sm"
-                                      onClick={() => setArchived(product, product.active !== false)}
-                                    >
-                                      {product.active === false ? 'Restore' : 'Archive'}
-                                    </Button>
+                                    {canArchive && (
+                                      <Button
+                                        variant={product.active === false ? 'success' : 'danger'}
+                                        className="btn--sm"
+                                        onClick={() => setArchived(product, product.active !== false)}
+                                      >
+                                        {product.active === false ? 'Restore' : 'Archive'}
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
 

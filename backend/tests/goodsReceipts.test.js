@@ -2,7 +2,7 @@
 // order with whatever arrived, destroying the evidence of every shortfall.
 // Receipts are the fix: the order is never edited, each delivery is its own
 // row with who/when/invoice, and the discrepancy is always derivable.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -12,6 +12,8 @@ process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
+const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
+const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const Purchase = (await import('../models/Purchase.js')).default;
 const GoodsReceipt = (await import('../models/GoodsReceipt.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
@@ -38,6 +40,7 @@ before(async () => {
   server.unref();
 });
 
+beforeEach(() => featuresOpen(Admin, FeatureVisibility));
 afterEach(() => mock.restoreAll());
 
 // Models the one account row the gate looks up. Shared with the other role

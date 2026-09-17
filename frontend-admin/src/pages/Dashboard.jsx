@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import Icon from "../components/Icon";
 import api from "../utils/api";
 import { DATA_CHANGED_EVENT } from "../utils/dataAutoRefresh";
+import { useFeature } from "../utils/currentStaff";
 import { formatINR } from "../utils/format";
 import {
   Badge,
@@ -104,6 +105,8 @@ const Dashboard = () => {
       window.removeEventListener(DATA_CHANGED_EVENT, fetchHistory);
     };
   }, [fetchHistory]);
+
+  const canExport = useFeature("dashboard.export");
 
   const filteredHistory = history.filter((entry) => {
     const studentName = entry.student?.name || "Deleted Account";
@@ -282,9 +285,11 @@ const Dashboard = () => {
               onChange={(e) => setSelectedDate(e.target.value || businessDateToday())}
             />
 
-            <Button variant="success" onClick={downloadExcel}>
-              📊 Export Sheet
-            </Button>
+            {canExport && (
+              <Button variant="success" onClick={downloadExcel}>
+                📊 Export Sheet
+              </Button>
+            )}
           </div>
         </div>
 

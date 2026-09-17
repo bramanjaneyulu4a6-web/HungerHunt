@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../utils/api";
+import { useFeature } from "../utils/currentStaff";
 import { formatINR } from "../utils/format";
 import { resolveAvailability } from "../utils/availability";
 import { chargedPrice } from "../constants/productWizard";
@@ -23,6 +24,10 @@ const FILTER_MATCHES = {
 };
 
 const Inventory = () => {
+  // Each row action can be switched off on /features.
+  const canEditPrices = useFeature("inventory.editPrices");
+  const canAdjust = useFeature("inventory.adjustStock");
+  const canArchive = useFeature("inventory.archive");
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null);
@@ -529,24 +534,28 @@ const Inventory = () => {
                     </td>
                     <td data-label="Actions">
                       <div style={{ display: "flex", gap: 8 }}>
-                        <Button
-                          className="btn--sm"
-                          onClick={() => startEdit(item.productId)}
-                          disabled={!item.productId}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          className="btn--sm"
-                          onClick={() => {
-                            setAdjusting(item);
-                            setAdjustDelta("");
-                            setAdjustReason("");
-                          }}
-                          disabled={!item.productId}
-                        >
-                          Adjust
-                        </Button>
+                        {canEditPrices && (
+                          <Button
+                            className="btn--sm"
+                            onClick={() => startEdit(item.productId)}
+                            disabled={!item.productId}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        {canAdjust && (
+                          <Button
+                            className="btn--sm"
+                            onClick={() => {
+                              setAdjusting(item);
+                              setAdjustDelta("");
+                              setAdjustReason("");
+                            }}
+                            disabled={!item.productId}
+                          >
+                            Adjust
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           className="btn--sm"
@@ -555,14 +564,16 @@ const Inventory = () => {
                         >
                           History
                         </Button>
-                        <Button
-                          variant={archived ? "success" : "danger"}
-                          className="btn--sm"
-                          onClick={() => setArchived(item.productId, !archived)}
-                          disabled={!item.productId?._id}
-                        >
-                          {archived ? "Restore" : "Archive"}
-                        </Button>
+                        {canArchive && (
+                          <Button
+                            variant={archived ? "success" : "danger"}
+                            className="btn--sm"
+                            onClick={() => setArchived(item.productId, !archived)}
+                            disabled={!item.productId?._id}
+                          >
+                            {archived ? "Restore" : "Archive"}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

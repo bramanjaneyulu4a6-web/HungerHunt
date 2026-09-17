@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import api from '../../utils/api';
-import { useCurrentStaff } from '../../utils/currentStaff';
+import { useCurrentStaff, useFeature } from '../../utils/currentStaff';
 import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 import { ParentActivityModal } from '../../components/WalletActivity';
 
@@ -22,6 +22,10 @@ export default function ParentsTab({ parents, loading, onChanged }) {
   // now a super admin's choice per role or account (Feature visibility).
   const { me } = useCurrentStaff();
   const showResetAccess = me.isSuperAdmin || !me.hiddenFeatures.includes('parents.resetAccess');
+  const canAdd = useFeature('parents.add');
+  const canEdit = useFeature('parents.edit');
+  const canArchive = useFeature('parents.archive');
+  const canOpenActivity = useFeature('parents.activity');
   const [editing, setEditing] = useState(undefined);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -173,11 +177,11 @@ export default function ParentsTab({ parents, loading, onChanged }) {
     <section>
       <div className="users-tab-head">
         <div><h2>Parent accounts</h2><p>The office creates access and links each parent to the correct students.</p></div>
-        <Button onClick={openCreate}>Add parent</Button>
+        {canAdd && <Button onClick={openCreate}>Add parent</Button>}
       </div>
 
       {!parents.length ? (
-        <EmptyState icon="♙" title="No parent accounts" action={<Button onClick={openCreate}>Create the first parent</Button>}>
+        <EmptyState icon="♙" title="No parent accounts" action={canAdd ? <Button onClick={openCreate}>Create the first parent</Button> : undefined}>
           Parents cannot register themselves. Create their account here; their first sign-in verifies the registered phone by SMS.
         </EmptyState>
       ) : (
@@ -193,15 +197,19 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   className={String(parent.id) === focusedParentId ? 'user-row--focused' : undefined}
                 >
                   <td data-label="Parent">
-                    <button
-                      type="button"
-                      className="link-button"
-                      style={{ fontWeight: 700 }}
-                      onClick={() => setActivityParent(parent)}
-                      aria-label={`Open ${parent.fatherName}'s wallet activity`}
-                    >
-                      {parent.fatherName}
-                    </button>
+                    {canOpenActivity ? (
+                      <button
+                        type="button"
+                        className="link-button"
+                        style={{ fontWeight: 700 }}
+                        onClick={() => setActivityParent(parent)}
+                        aria-label={`Open ${parent.fatherName}'s wallet activity`}
+                      >
+                        {parent.fatherName}
+                      </button>
+                    ) : (
+                      <strong>{parent.fatherName}</strong>
+                    )}
                   </td>
                   <td data-label="Contact"><div>{parent.phone}</div><small>{parent.email || 'No email'}</small></td>
                   <td data-label="Students">
@@ -219,7 +227,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                   </td>
                   <td data-label="Status"><Badge variant={variant}>{status}</Badge></td>
                   <td data-label="Actions"><div className="cell-actions">
-                    <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>
+                    {canEdit && <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>}
                     {/* Reactivate is never gated: an archived parent has no
                         other way back. Reset access answers to the switch. */}
                     {(showResetAccess || !parent.active) && (
@@ -227,7 +235,7 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                         {parent.active ? 'Reset access' : 'Reactivate'}
                       </Button>
                     )}
-                    {parent.active && <Button className="btn--sm" variant="danger" disabled={workingId === parent.id} onClick={() => archive(parent)}>Archive</Button>}
+                    {parent.active && canArchive && <Button className="btn--sm" variant="danger" disabled={workingId === parent.id} onClick={() => archive(parent)}>Archive</Button>}
                   </div></td>
                 </tr>
               );

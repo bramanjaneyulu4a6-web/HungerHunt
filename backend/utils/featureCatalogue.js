@@ -16,7 +16,7 @@
 export const FEATURES = [
   // Admin console
   { key: '/billing', label: 'Point of Sale', group: 'Operations', roles: ['admin'] },
-  { key: '/reports', label: 'Reports', group: 'Operations', roles: ['admin'] },
+  { key: '/reports', label: 'Issues', group: 'Operations', roles: ['admin'] },
   { key: '/recharge-history', label: 'Wallet Ledger', group: 'Operations', roles: ['admin'] },
   { key: '/transactions', label: 'Transactions', group: 'Operations', roles: ['admin'] },
   // Keys labelled "also blocked on the server" are refused there as well as hidden —
@@ -27,7 +27,7 @@ export const FEATURES = [
   { key: 'orders.cancelRefund', label: 'Cancel order and refund (status badge menu) (also blocked on the server)', group: 'Operations', roles: ['admin'] },
   { key: 'dashboard.export', label: 'Export sheet (Dashboard)', group: 'Operations', roles: ['admin'] },
   { key: 'walletLedger.export', label: 'CSV exports (Wallet Ledger)', group: 'Operations', roles: ['admin'] },
-  { key: 'reports.respond', label: 'Acknowledge and answer reports (Reports)', group: 'Operations', roles: ['admin'] },
+  { key: 'reports.respond', label: 'Acknowledge and answer issues (Issues)', group: 'Operations', roles: ['admin'] },
   { key: '/accounting-export', label: 'TallyPrime Export', group: 'Operations', roles: ['admin'] },
   { key: '/users/students', label: 'Students', group: 'Users', roles: ['admin'] },
   { key: '/users/parents', label: 'Parents', group: 'Users', roles: ['admin'] },

@@ -32,10 +32,10 @@ const SOURCES = [
 ];
 
 const SOURCE_COPY = {
-  student: 'Reports raised by students while collecting a package.',
+  student: 'Issues raised by students while collecting a package.',
   caretaker: 'Package issues and complaints raised by room caretakers.',
-  warehouse: 'Reports raised by warehouse staff.',
-  parent: 'Reports raised by parents.',
+  warehouse: 'Issues raised by warehouse staff.',
+  parent: 'Issues raised by parents.',
 };
 
 const STATUS_VARIANT = {
@@ -124,15 +124,15 @@ export default function StaffReports() {
   return (
     <div className="page">
       <PageHeader
-        title="Reports"
+        title="Issues"
         subtitle={
           outstanding > 0
-            ? `${outstanding} ${source}-initiated report${outstanding === 1 ? '' : 's'} waiting on the office.`
+            ? `${outstanding} ${source}-initiated issue${outstanding === 1 ? '' : 's'} waiting on the office.`
             : SOURCE_COPY[source]
         }
       />
 
-      <div className="tabs users-tabs" role="tablist" aria-label="Report sources">
+      <div className="tabs users-tabs" role="tablist" aria-label="Issue sources">
         {SOURCES.map(([id, label]) => (
           <button
             key={id}
@@ -147,7 +147,7 @@ export default function StaffReports() {
         ))}
       </div>
 
-      <div className="warehouse-filterbar" role="tablist" aria-label="Report status and type">
+      <div className="warehouse-filterbar" role="tablist" aria-label="Issue status and type">
         {VIEWS.map(([id, label]) => (
           <button
             key={id}
@@ -163,7 +163,7 @@ export default function StaffReports() {
         ))}
       </div>
 
-      {error && <Banner variant="alert">Could not load reports. Check the connection and try again.</Banner>}
+      {error && <Banner variant="alert">Could not load issues. Check the connection and try again.</Banner>}
 
       {loading ? (
         <Skeleton height={220} radius={16} />
@@ -171,11 +171,11 @@ export default function StaffReports() {
         <EmptyState
           icon="✓"
           variant={view === 'OUTSTANDING' ? 'success' : 'default'}
-          title={view === 'OUTSTANDING' ? 'Nothing is waiting on the office' : 'No reports here yet'}
+          title={view === 'OUTSTANDING' ? 'Nothing is waiting on the office' : 'No issues here yet'}
         >
           {view === 'OUTSTANDING'
-            ? `No ${source}-initiated reports are waiting for the office.`
-            : `No ${source}-initiated reports match this view.`}
+            ? `No ${source}-initiated issues are waiting for the office.`
+            : `No ${source}-initiated issues match this view.`}
         </EmptyState>
       ) : (
         reports.map((report) => (
@@ -184,7 +184,7 @@ export default function StaffReports() {
               <div>
                 <h2 className="report-card__title">{report.categoryLabel}</h2>
                 <p className="report-card__meta">
-                  {report.reportNumber ? `Report #${report.reportNumber} · ` : ''}
+                  {report.reportNumber ? `Issue #${report.reportNumber} · ` : ''}
                   {report.raisedBy?.name || 'Unknown reporter'}
                   {report.raisedBy?.role === 'student' ? ' (student, from the handover screen)' : ''}
                   {report.raisedBy?.roomNumbers

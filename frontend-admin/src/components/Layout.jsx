@@ -8,7 +8,7 @@ import { clearCurrentStaff, useCurrentStaff } from "../utils/currentStaff";
 const PRIMARY_NAV = [
   { path: "/dashboard", label: "Dashboard", icon: "▦" },
   { path: "/billing", label: "Point of Sale", icon: "◫" },
-  { path: "/reports", label: "Reports", icon: "✎" },
+  { path: "/reports", label: "Issues", icon: "✎" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },
   { path: "/transactions", label: "Transactions", icon: "≡" },
   { path: "/accounting-export", label: "TallyPrime Export", icon: "⇩" },

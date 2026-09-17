@@ -67,8 +67,8 @@ export default function ReportAlertBanner() {
       <Banner variant="warn" icon="✎">
         <strong>
           {queue.outstanding === 1
-            ? "1 report is waiting for an answer"
-            : `${queue.outstanding} reports are waiting for an answer`}
+            ? "1 issue is waiting for an answer"
+            : `${queue.outstanding} issues are waiting for an answer`}
         </strong>
         {queue.oldest ? ` — ${waitingFor(queue.oldest.raisedAt)}` : ""} —{" "}
         <Link to="/reports">read and reply</Link>

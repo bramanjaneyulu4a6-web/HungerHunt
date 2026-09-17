@@ -6,6 +6,7 @@ import Icon from "./components/Icon";
 import { clearSession } from "./utils/session";
 import api from "./utils/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
+import { startDeployWatch } from "./utils/deployWatch";
 import { clearCurrentStaff, useCurrentStaff, useFeature } from "./utils/currentStaff";
 import { visibleTabs } from "./utils/features";
 
@@ -252,6 +253,10 @@ const App = () => {
   useEffect(() => startDataAutoRefresh(api, {
     enabled: () => Boolean(localStorage.getItem("warehouseToken")),
   }), []);
+
+  // A separate signal from the one above: that one is about data and never
+  // reloads; this one reloads onto a newer deploy of the app itself.
+  useEffect(() => startDeployWatch({ bakedStamp: import.meta.env.VITE_BUILD_STAMP }), []);
 
   return (
     <BrowserRouter>

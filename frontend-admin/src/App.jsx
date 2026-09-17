@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import api from './utils/api';
 import { startDataAutoRefresh } from './utils/dataAutoRefresh';
+import { startDeployWatch } from './utils/deployWatch';
 
 const Login = lazy(() => import('./pages/Login'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -38,6 +39,10 @@ function App() {
   useEffect(() => startDataAutoRefresh(api, {
     enabled: () => Boolean(localStorage.getItem('adminToken')),
   }), []);
+
+  // A separate signal from the one above: that one is about data and never
+  // reloads; this one reloads onto a newer deploy of the app itself.
+  useEffect(() => startDeployWatch({ bakedStamp: import.meta.env.VITE_BUILD_STAMP }), []);
 
   return (
     <Router>

@@ -36,6 +36,7 @@ import { startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
 import API from "./services/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
+import { startDeployWatch } from "./utils/deployWatch";
 
 /* Every screen behind the session, and the purchase-code gate in front of all
    of them. A child with no purchase code cannot buy anything at the counter,
@@ -120,6 +121,10 @@ function AppContent() {
   useEffect(() => startDataAutoRefresh(API, {
     enabled: () => Boolean(localStorage.getItem('parentToken')),
   }), []);
+
+  // A separate signal from the one above: that one is about data and never
+  // reloads; this one reloads onto a newer deploy of the app itself.
+  useEffect(() => startDeployWatch({ bakedStamp: import.meta.env.VITE_BUILD_STAMP }), []);
 
   useEffect(() => {
     // Starting push before login would ask for notification permission on a

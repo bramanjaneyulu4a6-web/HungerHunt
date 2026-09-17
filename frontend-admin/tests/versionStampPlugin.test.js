@@ -56,4 +56,10 @@ describe('versionStampPlugin', () => {
     const { config } = build({ app: 'x', env: {}, gitSha: 'abc1234567', now: AT });
     assert.equal(JSON.parse(config.define[STAMP_DEFINE_KEY]), 'abc1234@2026-09-17T10:00:00.000Z');
   });
+
+  test('the watcher reads the emitted file back to the baked stamp', async () => {
+    const { stampOf } = await import('../src/utils/deployWatch.js');
+    const { config, emitted } = build({ app: 'frontend-admin', env: ENV, gitSha: null, now: AT });
+    assert.equal(stampOf(JSON.parse(emitted[0].source)), JSON.parse(config.define[STAMP_DEFINE_KEY]));
+  });
 });

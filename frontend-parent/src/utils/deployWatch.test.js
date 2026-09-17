@@ -217,7 +217,7 @@ test('looks for every kind of overlay the four apps use', async (t) => {
   const mod = await freshModule();
   const stop = mod.startDeployWatch({ bakedStamp: BAKED, intervalMs: NEVER, retryMs: NEVER });
   await focus();
-  assert.deepEqual(selectors, ['[role="dialog"], .modal, .modal-backdrop, .wh-dialog-backdrop, .wh-sheet']);
+  assert.deepEqual(selectors, ['[role="dialog"], [role="alertdialog"], .modal, .modal-backdrop, .parent-modal-backdrop, .wh-dialog-backdrop, .wh-sheet']);
   stop();
 });
 

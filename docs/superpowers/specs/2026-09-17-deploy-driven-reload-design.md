@@ -93,8 +93,8 @@ dialog does not mean waiting up to five minutes.
 - `document.visibilityState === 'visible'`
 - the person is not editing — the guard from `ca564e9`, unchanged: active
   element is an `INPUT`, `TEXTAREA` or `SELECT` or is contentEditable, or the
-  document has any of `[role="dialog"], .modal, .modal-backdrop,
-  .wh-dialog-backdrop, .wh-sheet`
+  document has any of `[role="dialog"], [role="alertdialog"], .modal,
+  .modal-backdrop, .parent-modal-backdrop, .wh-dialog-backdrop, .wh-sheet`
 - `canReload()` returns true
 - the loop guard allows it
 

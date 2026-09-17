@@ -21,7 +21,7 @@
 export const DEPLOY_RELOAD_KEY = "hungerhunt:deploy-reload";
 
 const OVERLAY_SELECTOR =
-  '[role="dialog"], .modal, .modal-backdrop, .wh-dialog-backdrop, .wh-sheet';
+  '[role="dialog"], [role="alertdialog"], .modal, .modal-backdrop, .parent-modal-backdrop, .wh-dialog-backdrop, .wh-sheet';
 
 let pendingStamp = null;
 

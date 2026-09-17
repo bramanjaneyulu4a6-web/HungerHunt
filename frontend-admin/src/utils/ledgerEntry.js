@@ -26,12 +26,26 @@ const ENTRY_KINDS = {
   TOPUP_FAILED: { direction: 'none', label: 'Failed Transaction', variant: 'alert' },
 };
 
+/* A row the office deleted (backend utils/ledgerDeletion.js). It stays on
+   every list, but its money was moved back: it is labelled as deleted, its
+   amount is struck through, and no total counts it. */
+export const isDeleted = (entry) => Boolean(entry?.deleted);
+
+const asDeleted = (kind) => ({ ...kind, label: `${kind.label} · Deleted`, variant: 'alert' });
+
 export const describeEntry = (entry) => {
-  const kind = ENTRY_KINDS[entry.kind] ?? { direction: 'out', label: entry.kind, variant: 'neutral' };
-  if (entry.kind !== 'TOP_UP') return kind;
+  const known = ENTRY_KINDS[entry.kind] ?? { direction: 'out', label: entry.kind, variant: 'neutral' };
   // Where the money came in from is the first thing anyone asks about a deposit.
-  return { ...kind, label: entry.mode === 'UPI' ? 'UPI Deposit' : 'Cash Deposit' };
+  const kind = entry.kind === 'TOP_UP'
+    ? { ...known, label: entry.mode === 'UPI' ? 'UPI Deposit' : 'Cash Deposit' }
+    : known;
+  return isDeleted(entry) ? asDeleted(kind) : kind;
 };
+
+/* What a row adds to a day's totals: nothing once it was deleted, since its
+   money went back. `direction` is 'in', 'out' or 'none'. */
+export const countedDirection = (entry) =>
+  isDeleted(entry) ? 'none' : describeEntry(entry).direction;
 
 /* The two lists a wallet reads as. An order row is money leaving for a
    package; everything else — top-ups, the attempts that failed, and the
@@ -76,6 +90,8 @@ const ORDER_STATUS_VARIANTS = { CANCELLED: 'alert', COLLECTED: 'success' };
 const asOrder = (state) => `Order – ${state}`;
 
 const describeOrder = (entry) => {
+  // The package may still be moving, but the money is what the row is about.
+  if (isDeleted(entry)) return { label: asOrder('Payment deleted'), variant: 'alert' };
   if (entry.refunded) return { label: asOrder('Refunded'), variant: 'success' };
   const status = entry.order?.status;
   if (!status) {
@@ -128,7 +144,7 @@ export const entryActor = (entry) => {
 
 export const entryAmount = (entry) => {
   const { direction } = describeEntry(entry);
-  if (direction === 'none') return formatINR(entry.amount);
+  if (direction === 'none' || isDeleted(entry)) return formatINR(entry.amount);
   return `${direction === 'in' ? '+' : '−'} ${formatINR(entry.amount)}`;
 };
 
@@ -143,8 +159,21 @@ export const hasDetails = (entry) =>
       entry.utr ||
       entry.transactionId ||
       entry.reversedTransactionId ||
-      entry.reason
+      entry.reason ||
+      entry.deletion
   );
+
+/* Who made a deleted row, who deleted it, when and why — the facts a deleted
+   row opens into, first, because they are why anyone opens it. */
+export const deletionFacts = (entry, when) =>
+  entry?.deletion
+    ? [
+        ['Deleted by', entry.deletion.byName],
+        ['Deleted on', when(entry.deletion.at)],
+        ['Reason for deletion', entry.deletion.reason],
+        ['Made by', entry.deletion.madeBy],
+      ].filter(([, value]) => value)
+    : [];
 
 /* The ledger row a just-finished recharge opens its receipt by.
  *

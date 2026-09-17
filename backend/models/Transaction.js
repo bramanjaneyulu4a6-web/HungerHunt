@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+import { deletionSchema } from './ledgerDeletion.js';
+
 const transactionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   items: [{
@@ -23,6 +25,8 @@ const transactionSchema = new mongoose.Schema({
   // books directly, like a top-up. Wallet-funded charges spend money that was
   // receipted when it entered the wallet, and stay unnumbered.
   receiptNumber: { type: String, default: null, maxlength: 40 },
+  // Set when the office deleted this charge — see ledgerDeletion.js.
+  deletion: { type: deletionSchema, default: null },
 }, { timestamps: true });
 
 transactionSchema.index({ studentId: 1, createdAt: -1 });

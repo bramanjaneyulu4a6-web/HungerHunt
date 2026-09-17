@@ -70,6 +70,11 @@ const findAdjustment = async (adjustmentId, res) => {
      back. The two collections never share an id, so trying both in order is
      not ambiguous. */
   const adjustment = await WalletAdjustment.findById(adjustmentId).lean();
+  // A deleted deposit's money was taken back; its paper is withdrawn with it.
+  if (adjustment?.deletion) {
+    res.status(410).json({ message: 'This deposit was deleted, so its receipt is no longer available.' });
+    return null;
+  }
   if (adjustment) return { row: adjustment, Model: WalletAdjustment, kind: 'RECHARGE' };
 
   const reversal = await WalletReversal.findById(adjustmentId).lean();

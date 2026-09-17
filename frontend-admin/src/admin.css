@@ -2678,3 +2678,87 @@
 .tx-detail .ledger-detail__facts {
   margin-top: 12px;
 }
+
+/* A deleted row: still listed, visibly out of the count. */
+.tx-row--deleted td {
+  color: var(--muted);
+}
+
+.tx-deleted-badge {
+  margin-left: 6px;
+}
+
+.tx-deleted {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--alert);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.tx-deleted strong {
+  color: var(--alert);
+}
+
+.tx-deleted span {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tx-deleted p {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tx-deleted small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.tx-delete-button {
+  margin-left: auto;
+  color: var(--danger);
+}
+
+.tx-delete-modal { max-width: 520px; }
+.tx-delete-modal textarea { width: 100%; resize: vertical; }
+.tx-delete__copy { margin: -5px 0 16px; line-height: 1.6; }
+
+.tx-delete__facts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.tx-delete__facts div {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 12px;
+}
+
+.tx-delete__facts dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tx-delete__facts dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .tx-deleted { grid-template-columns: 1fr; }
+  .tx-delete__facts div { grid-template-columns: 1fr; gap: 2px; }
+}

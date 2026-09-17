@@ -1,10 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 
 import Icon from '../components/Icon';
 import { ReceiptButton } from '../components/ReceiptButton';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { useCurrentStaff } from '../utils/currentStaff';
 import { formatINR } from '../utils/format';
+import { useDismissableOverlay } from '../utils/overlay';
 import { receiptIdOf } from '../utils/walletActivity';
 import {
   KIND_LABELS,
@@ -85,11 +88,120 @@ const UPI_APPS = { phonepe: 'PhonePe', gpay: 'Google Pay', paytm: 'Paytm' };
    a wallet charge spent money already receipted on its way in. */
 const isPrintable = (row) => Boolean(receiptIdOf(row) && row.student.id);
 
+const REASON_MAX = 200;
+
+/* Who a row's money was moved by, as the delete popup names it before the
+   server has taken its own copy. A kiosk sale and a parent's approval have no
+   person behind them, and say so rather than leaving the line blank. */
+const madeByOf = (row) =>
+  row.processedBy ||
+  (row.kind === 'WALLET_DEDUCTION' ? 'Student at kiosk or parent approval' : null);
+
+/* The popup that deletes a row. It asks for the reason and names both people:
+   whoever made the row, and the signed-in admin who is deleting it. The server
+   records both, with the reason, and moves the money back — so the popup says
+   exactly which way the wallet will move before anything is sent. */
+const DeleteTransactionDialog = ({ row, onClose, onDeleted }) => {
+  const { me } = useCurrentStaff();
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useDismissableOverlay(() => !saving && onClose());
+
+  const deposit = row.kind === 'CASH_DEPOSIT';
+  const studentName = row.student.name || 'this student';
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!reason.trim() || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/v1/accounting-exports/movements/${row.id}/delete`, {
+        kind: row.kind,
+        reason: reason.trim(),
+      });
+      toast.success('Transaction deleted');
+      onDeleted();
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Couldn't delete this transaction. Try again."
+      );
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={() => !saving && onClose()}>
+      <form
+        className="modal tx-delete-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tx-delete-title"
+        onSubmit={submit}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="modal-title" id="tx-delete-title">Delete this transaction?</h2>
+        <p className="tx-delete__copy">
+          {deposit
+            ? `${formatINR(row.amount)} will be taken back out of ${studentName}'s wallet.`
+            : `${formatINR(row.amount)} will be returned to ${studentName}'s wallet. The package and the stock are not changed.`}
+          {' '}The entry stays on this page, marked deleted, and its receipt is withdrawn.
+        </p>
+
+        <dl className="tx-delete__facts">
+          <div>
+            <dt>Transaction</dt>
+            <dd>
+              {KIND_LABELS[row.kind]} · {formatINR(row.amount)}
+              {row.receiptNumber ? ` · ${row.receiptNumber}` : ''}
+              {row.reference ? ` · ${row.reference}` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt>Made by</dt>
+            <dd>{madeByOf(row) || '—'}</dd>
+          </div>
+          <div>
+            <dt>Deleted by</dt>
+            <dd>{me.name || 'You'}</dd>
+          </div>
+        </dl>
+
+        {error && <Banner variant="alert" icon="⚠️">{error}</Banner>}
+
+        <label className="fulfillment-cancel-label" htmlFor="tx-delete-reason">Reason for deletion</label>
+        <textarea
+          id="tx-delete-reason"
+          className="input"
+          rows="3"
+          maxLength={REASON_MAX}
+          autoFocus
+          required
+          value={reason}
+          placeholder="e.g. Entered twice by mistake"
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <div className="fulfillment-cancel-count">{reason.length}/{REASON_MAX}</div>
+
+        <div className="modal-actions fulfillment-cancel-actions">
+          <Button variant="ghost" disabled={saving} onClick={onClose}>Keep it</Button>
+          <Button type="submit" variant="danger" disabled={saving || !reason.trim()}>
+            <Icon name="trash" size={16} />
+            {saving ? 'Deleting…' : 'Delete transaction'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 /* What opens under a row: the basket where money bought something, and the
    facts a person asks about when they ring the office — in the same layout
    the wallet ledger uses, so a row reads the same here as it does on a
    student's page. */
-const RowDetails = ({ row }) => {
+const RowDetails = ({ row, onDelete }) => {
+  const deletion = row.deletion;
   const facts = [
     ['When', whenOf(row.at)],
     ['Type', `${KIND_LABELS[row.kind] || row.kind} · ${row.mode}`],
@@ -114,12 +226,40 @@ const RowDetails = ({ row }) => {
 
   return (
     <div className="ledger-detail tx-detail">
+      {/* Why a deleted row is struck through, first — it is what anyone
+          opening one wants to know. */}
+      {deletion && (
+        <div className="tx-deleted" role="note">
+          <strong>Deleted by {deletion.byName}</strong>
+          <span>{whenOf(deletion.at)}</span>
+          <p>{deletion.reason}</p>
+          {deletion.madeBy && <small>Originally made by {deletion.madeBy}</small>}
+        </div>
+      )}
+
       {/* The printable ones carry their Receipt button on the row itself. */}
-      {!isPrintable(row) && (
+      {(!isPrintable(row) || row.deletable) && (
         <div className="tx-detail__actions">
-          <span className="cell-unset">
-            {row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
-          </span>
+          {!isPrintable(row) && (
+            <span className="cell-unset">
+              {deletion
+                ? 'The receipt was withdrawn when this entry was deleted.'
+                : row.receiptNumber ? 'No printable receipt for this entry.' : 'No receipt for this entry.'}
+            </span>
+          )}
+          {row.deletable && (
+            <Button
+              variant="ghost"
+              className="btn--sm tx-delete-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(row);
+              }}
+            >
+              <Icon name="trash" size={14} />
+              Delete transaction
+            </Button>
+          )}
         </div>
       )}
 
@@ -167,6 +307,9 @@ const Transactions = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Bumped after a deletion, to read the period again with the row marked.
+  const [reloads, setReloads] = useState(0);
+  const [deleting, setDeleting] = useState(null);
 
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
@@ -239,7 +382,7 @@ const Transactions = () => {
     return () => {
       ignore = true;
     };
-  }, [applied]);
+  }, [applied, reloads]);
 
   const showPeriod = useCallback((range) => {
     setLoading(true);
@@ -275,11 +418,13 @@ const Transactions = () => {
   const staff = useMemo(() => staffIn(rows), [rows]);
   const activeFilters = activeFilterCount(filters);
 
-  // Tiles describe what is on screen, so a filter narrows them too.
+  // Tiles describe what is on screen, so a filter narrows them too. A deleted
+  // row's money went back, so it counts toward neither side.
   const totals = useMemo(
     () =>
       visible.reduce(
         (sum, row) => {
+          if (row.deleted) return sum;
           if (row.signedAmount >= 0) sum.in += row.signedAmount;
           else sum.out += -row.signedAmount;
           return sum;
@@ -574,7 +719,7 @@ const Transactions = () => {
                 : visible.map((row) => (
                   <Fragment key={row.id}>
                     <tr
-                      className="ledger-row--expandable"
+                      className={`ledger-row--expandable${row.deleted ? ' tx-row--deleted' : ''}`}
                       aria-expanded={openRows.has(row.id)}
                       onClick={() => toggleRow(row.id)}
                     >
@@ -584,6 +729,7 @@ const Transactions = () => {
                       </td>
                       <td data-label="Type">
                         <Badge variant={KIND_BADGE[row.kind] || 'neutral'}>{KIND_LABELS[row.kind] || row.kind}</Badge>
+                        {row.deleted && <Badge variant="alert" className="tx-deleted-badge">Deleted</Badge>}
                       </td>
                       <td data-label="Student" className="cell-name">
                         {row.student.name || <span className="cell-unset">Deleted student</span>}
@@ -591,7 +737,10 @@ const Transactions = () => {
                       <td data-label="Adm. No." className="cell-mono">{row.student.admissionNumber || '—'}</td>
                       <td data-label="Class">{classOf(row.student)}</td>
                       <td data-label="Mode">{row.mode}</td>
-                      <td data-label="Amount" className={`tx-amount ${row.signedAmount < 0 ? 'tx-out' : 'tx-in'}`}>
+                      <td
+                        data-label="Amount"
+                        className={`tx-amount ${row.deleted ? 'amount-void' : row.signedAmount < 0 ? 'tx-out' : 'tx-in'}`}
+                      >
                         {row.signedAmount < 0 ? '−' : '+'} {formatINR(row.amount)}
                       </td>
                       <td data-label="Wallet after" className="tx-amount">
@@ -602,7 +751,10 @@ const Transactions = () => {
                         {row.reference || '—'}
                         {row.note && <small className="tx-note">{row.note}</small>}
                       </td>
-                      <td data-label="Processed by">{row.processedBy || <span className="cell-unset">—</span>}</td>
+                      <td data-label="Processed by">
+                        {row.processedBy || <span className="cell-unset">—</span>}
+                        {row.deleted && <small className="tx-note">Deleted by {row.deletion.byName}</small>}
+                      </td>
                       <td className="ledger-actions">
                         {isPrintable(row) && (
                           <ReceiptButton studentId={row.student.id} entry={row} />
@@ -618,7 +770,7 @@ const Transactions = () => {
                     {openRows.has(row.id) && (
                       <tr className="ledger-detail-row">
                         <td colSpan={COLUMNS.length + 1}>
-                          <RowDetails row={row} />
+                          <RowDetails row={row} onDelete={setDeleting} />
                         </td>
                       </tr>
                     )}
@@ -627,6 +779,17 @@ const Transactions = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {deleting && (
+        <DeleteTransactionDialog
+          row={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null);
+            setReloads((count) => count + 1);
+          }}
+        />
       )}
     </div>
   );

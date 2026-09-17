@@ -15,6 +15,7 @@ import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
 import WalletReversal from '../models/WalletReversal.js';
+import { deletionView } from '../models/ledgerDeletion.js';
 import { paiseToRupees } from '../src/domain/payments/money.js';
 import { ensureReceiptNumbers } from './walletReceipts.js';
 
@@ -52,6 +53,19 @@ export const fulfillmentDetail = (order) => {
 export const ORDER_DETAIL_FIELDS =
   'transactionId items totalAmount status studentSnapshot orderedAt deliverBy ' +
   'packedAt dispatchedAt deliveredAt collectedAt cancelledAt deliveryNote proofOfDelivery';
+
+/* A deleted deposit or charge (utils/ledgerDeletion.js) stays on the list,
+ * marked, with its receipt withdrawn — no receipt id, so no screen offers the
+ * button. The office sees who deleted it and why; a parent is told only that
+ * the school deleted it, since the reason is the office's own note. */
+export const deletionFields = (entry, { staffView }) =>
+  entry.deletion
+    ? {
+        deleted: true,
+        adjustmentId: null,
+        ...(staffView ? { deletion: deletionView(entry.deletion) } : {}),
+      }
+    : { deleted: false };
 
 export const buildStudentLedger = async (studentId, { staffView = false } = {}) => {
   const [refunds, topups, charges, failedTopups, student] = await Promise.all([
@@ -206,6 +220,7 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
             upiApp: intentById.get(String(entry.paymentIntentId))?.upiApp || null,
           }
         : {}),
+      ...deletionFields(entry, { staffView }),
     })),
     // No balances on a failed attempt: the money never moved, so there is
     // no before and after to show — only what was tried, when, and the
@@ -295,6 +310,7 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
               };
             })()
           : {}),
+        ...deletionFields(entry, { staffView }),
       };
     }),
   ].sort((left, right) => new Date(right.date) - new Date(left.date));

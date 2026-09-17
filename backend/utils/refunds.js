@@ -60,6 +60,12 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
         error.status = 409;
         throw error;
       }
+      // Deleting the charge already put its money back (utils/ledgerDeletion.js).
+      if (transaction.deletion) {
+        const error = new Error('This payment was deleted and its money already returned to the wallet.');
+        error.status = 409;
+        throw error;
+      }
 
       const reversalDocument = {
         studentId: order.studentId,

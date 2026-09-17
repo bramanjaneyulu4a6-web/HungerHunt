@@ -190,6 +190,8 @@ export const chargeCart = async ({
           // parent's own thumb on the pay button. They neither need the
           // child-spending limit's consent nor consume its allowance.
           sourceType: { $ne: 'UPI_ORDER_PAYMENT' },
+          // A deleted charge's money went back to the wallet; it spent nothing.
+          deletion: null,
         }
       },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } }

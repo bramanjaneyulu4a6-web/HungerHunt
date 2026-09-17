@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 const { entryReference, businessDateToday, receiptEntryFromTopUp, entryLabel, entryActor, entryChannel } =
   await import('../src/utils/ledgerEntry.js');
+const { countedDirection, deletionFacts, describeEntry, entryAmount, hasDetails } =
+  await import('../src/utils/ledgerEntry.js');
 
 /* The Reference column is what an admin reads back to a parent on the phone,
    and for money coming in that is the receipt number — the one figure printed
@@ -187,5 +189,37 @@ describe('who processed a row', () => {
     assert.equal(entryChannel({ via: 'KIOSK' }), 'Kiosk');
     assert.equal(entryChannel({ kind: 'TOP_UP', mode: 'CASH' }), 'Admin desk');
     assert.equal(entryChannel({ kind: 'ORDER_PAYMENT' }), null);
+  });
+});
+
+/* A row the office deleted stays listed, but its money went back: it says so,
+   strikes its amount, and counts toward no total. */
+describe('a deleted ledger row', () => {
+  const deletion = { byName: 'Stephen B', madeBy: 'Bharat', reason: 'Typed twice', at: '2026-09-17T07:00:00Z' };
+  const deposit = { kind: 'TOP_UP', mode: 'CASH', amount: 500, deleted: true, deletion };
+
+  test('is labelled deleted', () => {
+    assert.deepEqual(
+      { label: describeEntry(deposit).label, variant: describeEntry(deposit).variant },
+      { label: 'Cash Deposit · Deleted', variant: 'alert' }
+    );
+    assert.equal(entryLabel({ kind: 'ORDER_PAYMENT', deleted: true, order: { status: 'PENDING' } }).label, 'Order – Payment deleted');
+  });
+
+  test('carries no sign and counts toward nothing', () => {
+    assert.equal(entryAmount(deposit), '₹500');
+    assert.equal(countedDirection(deposit), 'none');
+    assert.equal(countedDirection({ ...deposit, deleted: false }), 'in');
+  });
+
+  test('opens into who made it, who deleted it and why', () => {
+    assert.equal(hasDetails({ kind: 'TOP_UP', mode: 'CASH', deletion }), true);
+    assert.deepEqual(deletionFacts(deposit, () => '17 Sept'), [
+      ['Deleted by', 'Stephen B'],
+      ['Deleted on', '17 Sept'],
+      ['Reason for deletion', 'Typed twice'],
+      ['Made by', 'Bharat'],
+    ]);
+    assert.deepEqual(deletionFacts({ kind: 'TOP_UP' }, () => ''), []);
   });
 });

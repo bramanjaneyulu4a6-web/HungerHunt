@@ -4,6 +4,8 @@ import PaymentIntent from '../../../../models/PaymentIntent.js';
 import Transaction from '../../../../models/Transaction.js';
 import WalletAdjustment from '../../../../models/WalletAdjustment.js';
 import WalletReversal from '../../../../models/WalletReversal.js';
+import { deletionView } from '../../../../models/ledgerDeletion.js';
+import { deleteLedgerEntry } from '../../../../utils/ledgerDeletion.js';
 import { collectionFilters, parseIncluded } from '../../../application/accounting/movementTypes.js';
 import { buildMovementRows, movementTotals } from '../../../application/accounting/movementRows.js';
 import { buildTallyCsv } from '../../../application/accounting/tallyCsv.js';
@@ -49,10 +51,16 @@ const ledgers = () => ({
  *
  * The selection is parsed before anything is read, so a request naming a type
  * that does not exist costs a validation error rather than three queries. */
-const readMovements = async (req, { select, withStudents = false }) => {
+/* A deleted row stays in its collection but its money was moved back, so the
+ * exports read only the rows still standing (`includeDeleted` false). The
+ * Transactions page reads them all and marks the deleted ones. Reversals are
+ * never deleted and need no filter. */
+const readMovements = async (req, { select, withStudents = false, includeDeleted = false }) => {
   const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
   const filters = collectionFilters(parseIncluded(req.query.include));
   const range = { createdAt: { $gte: from, $lt: to } };
+
+  const standing = includeDeleted ? {} : { deletion: null };
 
   const read = (Model, filter, fields) => {
     if (!filter) return [];
@@ -64,8 +72,8 @@ const readMovements = async (req, { select, withStudents = false }) => {
   };
 
   const [transactions, adjustments, reversals] = await Promise.all([
-    read(Transaction, filters.transactions, select.transactions),
-    read(WalletAdjustment, filters.adjustments, select.adjustments),
+    read(Transaction, filters.transactions && { ...filters.transactions, ...standing }, select.transactions),
+    read(WalletAdjustment, filters.adjustments && { ...filters.adjustments, ...standing }, select.adjustments),
     read(WalletReversal, filters.reversals, select.reversals),
   ]);
 
@@ -164,11 +172,12 @@ export const movements = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone, from, to } =
     await readMovements(req, {
       withStudents: true,
+      includeDeleted: true,
       select: {
         transactions:
-          '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance createdAt',
+          '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance deletion createdAt',
         adjustments:
-          '_id studentId source amount receiptNumber performedBy paymentIntentId previousBalance newBalance createdAt',
+          '_id studentId source amount receiptNumber performedBy paymentIntentId previousBalance newBalance deletion createdAt',
         reversals:
           '_id studentId amount receiptNumber fulfillmentOrderId transactionId performedBy previousBalance newBalance reason createdAt',
       },
@@ -189,8 +198,11 @@ export const movements = async (req, res) => {
     .filter((entry) => entry.sourceType === 'UPI_ORDER_PAYMENT' && entry.idempotencyKey)
     .map((entry) => entry.idempotencyKey);
   const reversedIds = reversals.map((entry) => entry.transactionId).filter(Boolean);
+  const walletChargeIds = transactions
+    .filter((entry) => entry.sourceType !== 'UPI_ORDER_PAYMENT' && !entry.deletion)
+    .map((entry) => entry._id);
 
-  const [orders, staff, intents, reversed] = await Promise.all([
+  const [orders, staff, intents, reversed, refundedCharges] = await Promise.all([
     transactions.length
       ? FulfillmentOrder.find({ transactionId: { $in: transactions.map((entry) => entry._id) } })
           .select('_id transactionId')
@@ -210,6 +222,12 @@ export const movements = async (req, res) => {
     // A refund restores a whole charge, so its basket is that charge's basket.
     reversedIds.length
       ? Transaction.find({ _id: { $in: reversedIds } }).select('items').lean()
+      : [],
+    /* Which of this period's wallet charges were refunded, whenever that
+       happened — a refund from a later day is outside this period's reversals
+       but still means the charge cannot be deleted. */
+    walletChargeIds.length
+      ? WalletReversal.find({ transactionId: { $in: walletChargeIds } }).select('transactionId').lean()
       : [],
   ]);
   const orderByTransaction = new Map(
@@ -243,6 +261,7 @@ export const movements = async (req, res) => {
       items: itemsByTransaction.get(String(entry.transactionId)) || [],
     })),
     staffNames,
+    refundedIds: new Set(refundedCharges.map((entry) => String(entry.transactionId))),
   });
 
   res.json({
@@ -253,5 +272,26 @@ export const movements = async (req, res) => {
       totals: movementTotals(rows),
       range: { from, to, timeZone },
     },
+  });
+};
+
+/* Deleting one row off the Transactions page. The row stays, marked; the
+ * money moves back — see utils/ledgerDeletion.js for the rules. Any admin may
+ * do it, and the deletion records which one did. */
+export const deleteMovement = async (req, res) => {
+  const result = await deleteLedgerEntry({
+    kind: String(req.body?.kind || ''),
+    id: req.params.id,
+    actorId: req.staff.id,
+    reason: req.body?.reason,
+  });
+  res.json({
+    data: {
+      kind: result.kind,
+      id: result.id,
+      balance: result.balance,
+      deletion: deletionView(result.deletion),
+    },
+    meta: { requestId: req.context.requestId },
   });
 };

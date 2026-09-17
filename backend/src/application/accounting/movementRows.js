@@ -47,6 +47,22 @@ const studentOf = (studentId) => {
   };
 };
 
+/* What a deleted row says about its deletion: when, by whom, why, and who
+   made the row in the first place — the copies taken at the moment of
+   deleting (utils/ledgerDeletion.js), so a renamed admin reads as they did. */
+const deletionOf = (deletion) =>
+  deletion
+    ? {
+        at: new Date(deletion.at).toISOString(),
+        byName: deletion.byName || 'Admin',
+        madeBy: deletion.madeBy || null,
+        reason: deletion.reason || '',
+      }
+    : null;
+
+// The kinds the office may delete; see utils/ledgerDeletion.js for why only these.
+export const DELETABLE_KINDS = Object.freeze(['CASH_DEPOSIT', 'WALLET_DEDUCTION']);
+
 const named = (names, id) => (id && names?.get(String(id))) || null;
 
 const money = (value) => (Number.isFinite(value) ? value : null);
@@ -69,6 +85,7 @@ const itemsOf = (items) =>
 const row = ({
   id, kind, at, amount, receiptNumber, reference, studentId, processedBy,
   balanceBefore, balanceAfter, note, items, gateway, adjustmentId, reversalId, transactionId,
+  deletion, refunded = false,
 }) => {
   const meta = MOVEMENT_KINDS[kind];
   const rupees = Number(amount) || 0;
@@ -96,6 +113,10 @@ const row = ({
     reversalId: reversalId ? String(reversalId) : null,
     transactionId: transactionId ? String(transactionId) : null,
     chargeId: kind === 'UPI_ORDER_PAYMENT' && transactionId ? String(transactionId) : null,
+    deleted: Boolean(deletion),
+    deletion: deletionOf(deletion),
+    // A refunded charge's money is already back, so deleting it would pay twice.
+    deletable: !deletion && !refunded && DELETABLE_KINDS.includes(kind),
   };
 };
 
@@ -104,12 +125,15 @@ const row = ({
    have no staff behind them and read as nobody. `orderReference` on a
    transaction or reversal is the package's short handle, attached by the
    controller the same way the CSV's is; `gateway` and a reversal's `items`
-   (the basket of the charge it undid) are attached there too. */
+   (the basket of the charge it undid) are attached there too. `refundedIds`
+   holds the charges a refund has already given back, which cannot also be
+   deleted. */
 export const buildMovementRows = ({
   transactions = [],
   adjustments = [],
   reversals = [],
   staffNames = new Map(),
+  refundedIds = new Set(),
 }) =>
   [
     ...adjustments.map((entry) =>
@@ -126,6 +150,7 @@ export const buildMovementRows = ({
         balanceAfter: entry.newBalance,
         gateway: entry.gateway,
         adjustmentId: entry._id,
+        deletion: entry.deletion,
       })
     ),
     ...transactions.map((entry) =>
@@ -143,6 +168,8 @@ export const buildMovementRows = ({
         items: entry.items,
         gateway: entry.gateway,
         transactionId: entry._id,
+        deletion: entry.deletion,
+        refunded: refundedIds.has(String(entry._id)),
       })
     ),
     ...reversals.map((entry) =>
@@ -165,10 +192,12 @@ export const buildMovementRows = ({
     ),
   ].sort((left, right) => left.at.localeCompare(right.at) || left.id.localeCompare(right.id));
 
-// What the page's tiles show: money in, money out, and what that nets to.
+/* What the page's tiles show: money in, money out, and what that nets to.
+   A deleted row's money was moved back, so it counts toward none of them. */
 export const movementTotals = (rows) =>
   rows.reduce(
     (totals, entry) => {
+      if (entry.deleted) return totals;
       if (entry.signedAmount >= 0) totals.in += entry.signedAmount;
       else totals.out += -entry.signedAmount;
       totals.net = totals.in - totals.out;

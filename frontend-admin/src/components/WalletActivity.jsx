@@ -17,12 +17,14 @@ import Icon from './Icon';
 import { formatINR } from '../utils/format';
 import { fulfillmentStatusLabel } from '../utils/fulfillmentStatus';
 import {
+  deletionFacts,
   describeEntry,
   entryAmount,
   entryChannel,
   entryLabel,
   entryReference,
   hasDetails,
+  isDeleted,
   isOrder,
   isTransaction,
   pickerOrderOf,
@@ -88,7 +90,7 @@ export const EntryDetails = ({ entry }) => {
       ].filter(([, value]) => value)
     : [];
 
-  const allFacts = [...transactionFacts, ...facts];
+  const allFacts = [...deletionFacts(entry, when), ...transactionFacts, ...facts];
 
   if (items.length === 0 && allFacts.length === 0) return null;
 
@@ -169,11 +171,11 @@ const EntryRow = ({ entry, studentId, showStudent, onOrderChanged }) => {
       </td>
       <td
         data-label="Amount"
-        className={direction === 'none' ? 'amount-void' : undefined}
+        className={direction === 'none' || isDeleted(entry) ? 'amount-void' : undefined}
         style={{
           textAlign: 'right',
           fontWeight: 700,
-          color: direction === 'in' ? 'var(--success)' : undefined,
+          color: direction === 'in' && !isDeleted(entry) ? 'var(--success)' : undefined,
         }}
       >
         {entryAmount(entry)}

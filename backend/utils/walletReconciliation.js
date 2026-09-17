@@ -1,5 +1,10 @@
 const DEFAULT_TOLERANCE = 0.005;
 
+/* What puts money into a wallet. Everything else takes it out — a purchase,
+   and a deleted top-up being taken back (utils/ledgerDeletion.js). A deleted
+   purchase is the money going back in. */
+const MONEY_IN = new Set(['TOP_UP', 'REFUND', 'PURCHASE_DELETED']);
+
 const closeEnough = (left, right, tolerance) =>
   Number.isFinite(left) &&
   Number.isFinite(right) &&
@@ -31,7 +36,7 @@ export const reconcileWallet = (student, events, tolerance = DEFAULT_TOLERANCE) 
       continue;
     }
 
-    const calculatedBalance = ['TOP_UP', 'REFUND'].includes(event.kind)
+    const calculatedBalance = MONEY_IN.has(event.kind)
       ? previousBalance + amount
       : previousBalance - amount;
 

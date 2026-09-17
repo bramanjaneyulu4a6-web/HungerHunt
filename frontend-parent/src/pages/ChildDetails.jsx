@@ -1136,7 +1136,10 @@ export default function ChildDetails() {
             children: recharges.items.map((r, i) => {
               const key = String(r._id || `${r.date}-${i}`);
               const failed = r.kind === 'TOPUP_FAILED';
-              const label =
+              // Deleted by the school: its money was moved back, so like a
+              // failed attempt it is struck through and signs nothing.
+              const deleted = Boolean(r.deleted);
+              const kindLabel =
                 r.kind === 'ORDER_PAYMENT'
                   ? 'Student Wallet Payment'
                   : r.kind === 'UPI_ORDER_PAYMENT'
@@ -1148,12 +1151,13 @@ export default function ChildDetails() {
                         : r.mode === 'UPI'
                           ? 'UPI Deposit'
                           : 'Cash Deposit';
+              const label = deleted ? `${kindLabel} (Deleted)` : kindLabel;
               const moneyOut =
                 r.kind === 'ORDER_PAYMENT' || r.kind === 'UPI_ORDER_PAYMENT';
               /* Refunds sometimes carry no note and no references — such a
                  card has nothing folded away, so it does not invite a tap. */
               const hasDetails = Boolean(
-                failed || r.reason || r.orderId || r.receiptNumber || r.transactionId
+                failed || deleted || r.reason || r.orderId || r.receiptNumber || r.transactionId
               );
               const expanded = hasDetails && expandedTx === key;
               return (
@@ -1184,7 +1188,7 @@ export default function ChildDetails() {
                     }
                   >
                     <div className="tx-head">
-                      <span className={`tx-kind${failed ? ' tx-kind--failed' : ''}`}>
+                      <span className={`tx-kind${failed || deleted ? ' tx-kind--failed' : ''}`}>
                         {label}
                       </span>
                       <span className="tx-date">{formatDate(r.date)}</span>
@@ -1196,7 +1200,7 @@ export default function ChildDetails() {
                         failed attempts and UPI-funded order payments moved
                         nothing through the wallet, so they have none. */}
                     <div className="tx-figures">
-                      {failed ? (
+                      {failed || deleted ? (
                         <span className="tx-amount amount-void">{formatINR(r.amount)}</span>
                       ) : (
                         <span
@@ -1218,6 +1222,14 @@ export default function ChildDetails() {
                             {failed && (
                               <p className="ledger-note ledger-flag--failed">
                                 Payment failed. This money was not added to the wallet.
+                              </p>
+                            )}
+
+                            {deleted && (
+                              <p className="ledger-note ledger-flag--failed">
+                                {moneyOut
+                                  ? 'Deleted by the school. This amount was returned to the wallet.'
+                                  : 'Deleted by the school. This amount was taken back out of the wallet.'}
                               </p>
                             )}
 

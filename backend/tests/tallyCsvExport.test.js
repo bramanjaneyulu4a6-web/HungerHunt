@@ -360,6 +360,8 @@ describe('exporting only some movement types', () => {
     assert.deepEqual(WalletAdjustment.find.mock.calls[0].arguments[0], {
       createdAt: { $gte: new Date('2026-07-31T18:30:00.000Z'), $lt: new Date('2026-08-31T18:30:00.000Z') },
       source: { $ne: 'PARENT_UPI' },
+      // A deleted deposit's money was taken back; the books never see it.
+      deletion: null,
     });
   });
 

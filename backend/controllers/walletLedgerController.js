@@ -20,6 +20,7 @@ import { businessDateStart } from '../utils/businessTime.js';
 import {
   ORDER_DETAIL_FIELDS,
   buildStudentLedger,
+  deletionFields,
   fulfillmentDetail,
 } from '../utils/studentLedger.js';
 
@@ -230,6 +231,7 @@ export const getLedgerFeed = async (req, res) => {
         utr: intentById.get(String(entry.paymentIntentId))?.utr || null,
         upiApp: intentById.get(String(entry.paymentIntentId))?.upiApp || null,
         student: studentOf(entry),
+        ...deletionFields(entry, { staffView: true }),
       })),
       ...charges.map((entry) => {
         const order = fulfillmentDetail(orderByTransaction.get(String(entry._id)));
@@ -255,6 +257,7 @@ export const getLedgerFeed = async (req, res) => {
         orderId: order?.reference || null,
         refunded: refundedTransactionIds.has(String(entry._id)),
         student: studentOf(entry),
+        ...deletionFields(entry, { staffView: true }),
         };
       }),
       ...refunds.map((entry) => ({

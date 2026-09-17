@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+import { deletionSchema } from './ledgerDeletion.js';
+
 // Append-only audit record for money added outside a purchase. The student
 // document remains the fast balance projection; this collection is the
 // durable, queryable ledger and must reconcile to it.
@@ -47,6 +49,8 @@ const walletAdjustmentSchema = new mongoose.Schema(
     // minted lazily the first time any receipt for the student is opened —
     // utils/walletReceipts.js numbers a student's rows oldest first.
     receiptNumber: { type: String, default: null, maxlength: 40 },
+    // Set when the office deleted this deposit — see ledgerDeletion.js.
+    deletion: { type: deletionSchema, default: null },
   },
   { timestamps: true }
 );

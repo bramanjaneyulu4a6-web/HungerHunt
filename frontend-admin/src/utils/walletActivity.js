@@ -19,9 +19,10 @@ import api from './api';
  * closes. The filename comes from the response — a row written before
  * numbering moved to creation time may still be waiting for its number. */
 /* The id a ledger row's receipt is fetched by, or null for a row with no
-   paper — a wallet-funded charge spent money receipted on its way in. */
+   paper — a wallet-funded charge spent money receipted on its way in, and a
+   deleted row's receipt was withdrawn with its money. */
 export const receiptIdOf = (entry) =>
-  entry?.adjustmentId || entry?.reversalId || entry?.chargeId || null;
+  entry?.deleted ? null : entry?.adjustmentId || entry?.reversalId || entry?.chargeId || null;
 
 export const fetchReceipt = async (studentId, entry) => {
   try {

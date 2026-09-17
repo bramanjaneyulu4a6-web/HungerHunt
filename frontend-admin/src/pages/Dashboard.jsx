@@ -17,12 +17,14 @@ import { EntryDetails } from "../components/WalletActivity";
 import FulfillmentStatusPicker from "../components/FulfillmentStatusPicker";
 import {
   businessDateToday,
+  countedDirection,
   describeEntry,
   entryAmount,
   entryActor,
   entryLabel,
   entryReference,
   hasDetails,
+  isDeleted,
   pickerOrderOf,
 } from "../utils/ledgerEntry";
 import { ReceiptButton } from "../components/ReceiptButton";
@@ -118,7 +120,7 @@ const Dashboard = () => {
   // Spent and added are counted apart on purpose: one total covering both
   // directions would net a day's sales against its recharges and mean nothing.
   const sumWhere = (direction) => filteredHistory.reduce(
-    (sum, entry) => (describeEntry(entry).direction === direction ? sum + (entry.amount || 0) : sum),
+    (sum, entry) => (countedDirection(entry) === direction ? sum + (entry.amount || 0) : sum),
     0
   );
   const totalSales = sumWhere("out");
@@ -150,7 +152,8 @@ const Dashboard = () => {
       headers.join(","),
       ...filteredHistory.map((entry, index) => {
         const { label } = entryLabel(entry);
-        const { direction } = describeEntry(entry);
+        // A deleted row is listed, labelled, and left out of both money columns.
+        const direction = countedDirection(entry);
         const studentName = `"${(entry.student?.name || "Deleted Account").replace(/"/g, '""')}"`;
         const timestamp = `"${new Date(entry.date).toLocaleString().replace(/"/g, '""')}"`;
         const itemSummary = entry.items?.length
@@ -392,12 +395,12 @@ const Dashboard = () => {
                         </td>
                         <td
                           data-label="Amount"
-                          className={direction === "none" ? "amount-void" : undefined}
+                          className={direction === "none" || isDeleted(entry) ? "amount-void" : undefined}
                           style={{
                             textAlign: "right",
                             fontWeight: 700,
                             color:
-                              direction === "in" ? "var(--success)" : "var(--ink)",
+                              direction === "in" && !isDeleted(entry) ? "var(--success)" : "var(--ink)",
                           }}
                         >
                           {entryAmount(entry)}
@@ -416,6 +419,7 @@ const Dashboard = () => {
                         </td>
                         <td className="ledger-actions">
                           {(entry.adjustmentId || entry.reversalId) &&
+                            !isDeleted(entry) &&
                             entry.student?.id && (
                             <ReceiptButton studentId={entry.student.id} entry={entry} />
                           )}

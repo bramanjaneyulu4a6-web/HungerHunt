@@ -69,6 +69,30 @@ try {
         }],
       },
     },
+    /* A deletion moved the wallet again, later than the row it deleted, so it
+       is an event of its own at the moment it happened — the row itself
+       stays in the replay above, exactly as it was written. */
+    ...[
+      [Transaction, 'PURCHASE_DELETED', '$totalAmount'],
+      [WalletAdjustment, 'TOP_UP_DELETED', '$amount'],
+    ].map(([Model, kind, amount]) => ({
+      $unionWith: {
+        coll: Model.collection.name,
+        pipeline: [
+          { $match: { 'deletion.at': { $type: 'date' } } },
+          {
+            $project: {
+              studentId: 1,
+              kind: { $literal: kind },
+              amount,
+              previousBalance: '$deletion.previousBalance',
+              resultingBalance: '$deletion.newBalance',
+              createdAt: '$deletion.at',
+            },
+          },
+        ],
+      },
+    })),
     { $sort: { studentId: 1, createdAt: 1, _id: 1 } },
   ]).allowDiskUse(true).cursor({ batchSize: 1_000 });
 

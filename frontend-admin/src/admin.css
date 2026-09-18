@@ -2610,10 +2610,118 @@
   cursor: pointer;
 }
 
-.tx-filter__option input {
+/* Filter and export ticks draw as sliding switches rather than bare
+   checkboxes. Still real <input type="checkbox">s underneath, so keyboard,
+   labels and screen readers behave exactly as before. The row around a switch
+   is the hit area: it tints on hover and holds a soft blue wash while on. */
+.tx-filter__option,
+.export-types__row {
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.tx-filter__option:hover,
+.export-types__row:hover {
+  background: var(--bg-subtle);
+}
+
+.tx-filter__option:has(input:checked),
+.export-types__row:has(input:checked) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--primary-bg) 55%, transparent);
+}
+
+.export-types__row--off,
+.export-types__row--off:hover {
+  background: none;
+}
+
+.tx-filter__option input[type='checkbox'],
+.export-types__row input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.12);
+  cursor: pointer;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+/* The knob. It stretches while pressed and springs across on release. */
+.tx-filter__option input[type='checkbox']::before,
+.export-types__row input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
   width: 16px;
   height: 16px;
-  accent-color: var(--primary);
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+  transition:
+    transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 160ms ease;
+}
+
+.tx-filter__option input[type='checkbox']:checked,
+.export-types__row input[type='checkbox']:checked {
+  background: var(--primary);
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.2);
+}
+
+.tx-filter__option input[type='checkbox']:checked::before,
+.export-types__row input[type='checkbox']:checked::before {
+  transform: translateX(14px);
+}
+
+.tx-filter__option:hover input[type='checkbox']:not(:checked),
+.export-types__row:hover input[type='checkbox']:not(:checked):not(:disabled) {
+  background: var(--muted);
+}
+
+.tx-filter__option:hover input[type='checkbox']:checked,
+.export-types__row:hover input[type='checkbox']:checked:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.tx-filter__option:active input[type='checkbox']::before,
+.export-types__row:active input[type='checkbox']:not(:disabled)::before {
+  width: 20px;
+}
+
+.tx-filter__option:active input[type='checkbox']:checked::before,
+.export-types__row:active input[type='checkbox']:checked:not(:disabled)::before {
+  transform: translateX(10px);
+}
+
+.tx-filter__option input[type='checkbox']:focus-visible,
+.export-types__row input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.export-types__row input[type='checkbox']:disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-filter__option,
+  .export-types__row,
+  .tx-filter__option input[type='checkbox'],
+  .export-types__row input[type='checkbox'],
+  .tx-filter__option input[type='checkbox']::before,
+  .export-types__row input[type='checkbox']::before {
+    transition: none;
+  }
 }
 
 .tx-filter__field {

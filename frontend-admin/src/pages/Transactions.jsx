@@ -420,10 +420,13 @@ const Transactions = () => {
             role="tab"
             aria-selected={tab === option.key}
             className={`tab${tab === option.key ? ' tab--active' : ''}`}
+            aria-label={option.label}
+            title={option.hint ? `${option.label}: ${option.hint}` : option.label}
             onClick={() => { setTab(option.key); setPanelOpen(false); }}
           >
-            <span>{option.label}</span>
-            {option.hint && <small>{option.hint}</small>}
+            <Icon name={option.icon} size={16} className="tx-tab__icon" />
+            <span className="tx-tab__label">{option.label}</span>
+            {option.hint && <small className="tx-tab__hint">{option.hint}</small>}
             {!loading && <b className="tx-tab-count">{tabCount(option.key)}</b>}
           </button>
         ))}

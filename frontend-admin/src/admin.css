@@ -2470,18 +2470,59 @@
   margin-bottom: 16px;
 }
 
-.tx-tabs .tab {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: 4px 8px;
+/* The tabs stay one line tall at every width. As the bar narrows the hint
+   ellipsises, then drops, then the labels drop and each tab is its symbol
+   and count. The full name stays in the tooltip and aria-label. Sized off
+   the bar itself, not the viewport, since the sidebar eats into the page. */
+.tx-tabs {
+  container-type: inline-size;
 }
 
-.tx-tabs .tab small {
+.tx-tabs .tab {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tx-tab__icon {
+  flex-shrink: 0;
+}
+
+.tx-tab__label {
+  flex-shrink: 0;
+}
+
+.tx-tab__hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
+}
+
+.tx-tabs .tx-tab-count {
+  flex-shrink: 0;
+}
+
+@container (max-width: 760px) {
+  .tx-tab__hint {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .tx-tab__label {
+    display: none;
+  }
+
+  .tx-tabs .tab {
+    gap: 6px;
+  }
 }
 
 .tx-tab-count {

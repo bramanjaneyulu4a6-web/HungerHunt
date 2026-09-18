@@ -11,9 +11,9 @@
  * the CSV leaves out. */
 
 export const TABS = [
-  { key: 'all', label: 'All Transactions' },
-  { key: 'deposits', label: 'Deposits', hint: 'Cash and UPI' },
-  { key: 'deductions', label: 'Deductions', hint: 'Wallet payments, UPI order payments, refunds' },
+  { key: 'all', label: 'All Transactions', icon: 'receipt' },
+  { key: 'deposits', label: 'Deposits', icon: 'plus', hint: 'Cash and UPI' },
+  { key: 'deductions', label: 'Deductions', icon: 'minus', hint: 'Wallet payments, UPI order payments, refunds' },
 ];
 
 const TAB_GROUP = { deposits: 'DEPOSIT', deductions: 'DEDUCTION' };

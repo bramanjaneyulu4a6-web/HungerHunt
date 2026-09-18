@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
+import ProcessedByPicker from '../components/ProcessedByPicker';
 import { Banner, Button, Card, PageHeader } from '../components/ui';
 import {
   EXPORT_FORMATS,
@@ -13,6 +14,9 @@ import {
   quickRangeLabel,
 } from '../utils/accountingExport';
 import api from '../utils/api';
+import { tickedKeys, useExportStaff } from '../utils/exportStaff';
+import { saveFile } from '../utils/download';
+import { effectiveKinds, listParam, unavailableKinds } from '../utils/transactionsExport';
 
 const ALL_TYPES = MOVEMENT_TYPES.map((type) => type.key);
 
@@ -29,11 +33,20 @@ const AccountingExport = () => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [included, setIncluded] = useState(ALL_TYPES);
+  // Everyone until someone is unticked — see ProcessedByPicker.
+  const [unticked, setUnticked] = useState([]);
+  const people = useExportStaff();
+  const processedBy = tickedKeys(people.keys, unticked);
+  const nobodySelected = !people.loading && !people.failed && processedBy.length === 0;
   /* Which button is working, so only the one that was pressed says so and the
      rest simply go quiet rather than all claiming to be downloading. */
   const [busy, setBusy] = useState(null);
 
-  const nothingSelected = included.length === 0;
+  // Kinds only the family makes drop out while "No staff" is unticked; the
+  // ticks are kept, so ticking it again brings them back.
+  const blocked = unavailableKinds(processedBy);
+  const chosen = effectiveKinds(included, processedBy);
+  const nothingSelected = chosen.length === 0;
 
   const toggle = (key) =>
     setIncluded((current) =>
@@ -43,7 +56,7 @@ const AccountingExport = () => {
     );
 
   const download = async (formatKey, range, button) => {
-    if (nothingSelected) return;
+    if (nothingSelected || nobodySelected) return;
     if (formatKey === 'xml' && !XML_ENABLED) return;
     if (!range.from || !range.to) {
       toast.error('Select both dates');
@@ -54,21 +67,19 @@ const AccountingExport = () => {
     setBusy(button);
     try {
       const response = await api.get(format.path, {
-        params: { ...range, include: includeParam(included) },
+        params: {
+          ...range,
+          include: includeParam(chosen),
+          // Omitted when everyone is ticked, or when the list never loaded.
+          processedBy: people.failed ? undefined : listParam(processedBy, people.keys),
+        },
         responseType: 'blob',
       });
-      const url = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = exportFilename(response.headers['content-disposition'], format);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      saveFile(response.data, exportFilename(response.headers['content-disposition'], format));
       toast.success(exportedCount(format, response.headers));
     } catch (error) {
       console.error(error);
-      toast.error('Could not create the TallyPrime export. Check the date range and ledger data.');
+      toast.error('Could not create the export. Check the date range and ledger data.');
     } finally {
       setBusy(null);
     }
@@ -80,32 +91,59 @@ const AccountingExport = () => {
     download(formatKey, quickRange(rangeKey), `${rangeKey}-${formatKey}`);
 
   const label = (button, idle) => (busy === button ? 'Preparing…' : idle);
-  const disabled = Boolean(busy) || nothingSelected;
+  const disabled = Boolean(busy) || nothingSelected || nobodySelected || people.loading;
 
   return (
     <div className="page">
-      <PageHeader title="TallyPrime Export" />
+      <PageHeader
+        title="Exports"
+        subtitle="Money that really moved, as the TallyPrime CSV or XML — narrowed by type, by who processed it, and by period."
+      />
 
       <Card style={{ maxWidth: 640, marginTop: 20 }}>
         <h2 className="section-title">Include</h2>
         <fieldset className="export-types">
           <legend className="sr-only">Movement types to export</legend>
           {MOVEMENT_TYPES.map((type) => (
-            <label key={type.key} className="export-types__row">
+            <label
+              key={type.key}
+              className={`export-types__row${blocked.includes(type.key) ? ' export-types__row--off' : ''}`}
+            >
               <input
                 type="checkbox"
-                checked={included.includes(type.key)}
+                checked={chosen.includes(type.key)}
+                disabled={blocked.includes(type.key)}
                 onChange={() => toggle(type.key)}
               />
               <span>{type.label}</span>
             </label>
           ))}
         </fieldset>
+        {blocked.length > 0 && (
+          <p className="export-picker__note">
+            Greyed out: no staff member makes these. Tick &ldquo;No staff&rdquo; under Processed by to include them.
+          </p>
+        )}
         {nothingSelected && (
           <Banner variant="alert" icon="⛔">
             Select at least one movement type to export.
           </Banner>
         )}
+      </Card>
+
+      <Card style={{ maxWidth: 640, marginTop: 20 }}>
+        <h2 className="section-title">Processed by</h2>
+        <ProcessedByPicker {...people} unticked={unticked} onChange={setUnticked} />
+        {nobodySelected && (
+          <Banner variant="alert" icon="⛔">
+            Select at least one person to export.
+          </Banner>
+        )}
+        <p className="export-picker__note">
+          Only cash deposits have a person behind them in these files. Wallet
+          deductions, UPI deposits and UPI order payments were made by the
+          family and belong to &ldquo;No staff&rdquo;.
+        </p>
       </Card>
 
       <Card style={{ maxWidth: 640, marginTop: 20 }}>

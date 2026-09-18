@@ -1,7 +1,7 @@
 # TallyPrime accounting export
 
-The Admin console's **TallyPrime Export** page offers the same movements in two
-shapes, for two audiences:
+The Admin console's **Exports** page (formerly "TallyPrime Export") offers the
+same movements in two shapes, for two audiences:
 
 - **`GET /accounting-exports/tally.xml`** — native Tally XML for a selected
   period, using Tally's `Vouchers` import envelope and accounting-voucher view.
@@ -119,3 +119,14 @@ Official references:
 - https://help.tallysolutions.com/import-data-in-tally/
 - https://help.tallysolutions.com/sample-xml/
 - https://help.tallysolutions.com/xml-integration/
+
+## Narrowing by who processed it
+
+Both files, and the Transactions feed (`GET /accounting-exports/movements`),
+take an optional `processedBy` parameter: a comma-separated list of admin ids,
+plus `none` for rows no member of staff made (kiosk charges, parents' UPI
+top-ups and UPI order payments). Absent means everyone. Only cash deposits and
+refunds carry a person, so naming staff without `none` leaves every charge
+out. `GET /accounting-exports/staff` lists everyone who ever took a deposit or
+gave a refund, which is what both the Exports page and the Transactions
+page's Export popup offer.

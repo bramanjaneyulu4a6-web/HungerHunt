@@ -11,7 +11,7 @@ const PRIMARY_NAV = [
   { path: "/reports", label: "Issues", icon: "✎" },
   { path: "/recharge-history", label: "Wallet Ledger", icon: "₹" },
   { path: "/transactions", label: "Transactions", icon: "≡" },
-  { path: "/accounting-export", label: "TallyPrime Export", icon: "⇩" },
+  { path: "/accounting-export", label: "Exports", icon: "⇩" },
 ];
 
 const USERS_NAV = [

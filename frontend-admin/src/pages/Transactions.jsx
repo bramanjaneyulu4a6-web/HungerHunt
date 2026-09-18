@@ -3,8 +3,10 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Icon from '../components/Icon';
 import { DeleteTransactionButton } from '../components/DeleteTransaction';
 import { ReceiptButton } from '../components/ReceiptButton';
+import TransactionsExportDialog from '../components/TransactionsExportDialog';
 import { Badge, Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import api from '../utils/api';
+import { useFeature } from '../utils/currentStaff';
 import { formatINR } from '../utils/format';
 import { receiptIdOf } from '../utils/walletActivity';
 import {
@@ -232,6 +234,8 @@ const Transactions = () => {
     });
   // Latest first: whoever opens the page is usually looking for what just happened.
   const [sort, setSort] = useState({ key: 'at', direction: 'desc' });
+  const [exporting, setExporting] = useState(false);
+  const canExport = useFeature('transactions.export');
 
   // The panel closes on a click outside it or on Escape, like a menu.
   useEffect(() => {
@@ -348,7 +352,25 @@ const Transactions = () => {
       <PageHeader
         title="Transactions"
         subtitle={`Every deposit, payment and refund for ${rangeLabel(applied)}.`}
+        actions={
+          canExport && (
+            <Button variant="success" onClick={() => setExporting(true)}>
+              <Icon name="download" size={16} />
+              Export
+            </Button>
+          )
+        }
       />
+
+      {/* Opens on what the page shows: its period and the kinds the open tab holds. */}
+      {exporting && (
+        <TransactionsExportDialog
+          initialPeriod={period}
+          initialRange={applied}
+          initialKinds={availableFilters(tab).kinds}
+          onClose={() => setExporting(false)}
+        />
+      )}
 
       <Card className="card--tight tx-period">
         <div className="tx-period__quick" role="group" aria-label="Period">

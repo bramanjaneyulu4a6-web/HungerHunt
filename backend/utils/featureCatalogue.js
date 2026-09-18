@@ -22,13 +22,14 @@ export const FEATURES = [
   // Keys labelled "also blocked on the server" are refused there as well as hidden —
   // they move money or stock (see middleware/featureGate.js).
   { key: 'transactions.delete', label: 'Delete transaction button (Transactions, Wallet Ledger, Dashboard, activity) (also blocked on the server)', group: 'Operations', roles: ['admin'] },
+  { key: 'transactions.export', label: 'Export button (Transactions)', group: 'Operations', roles: ['admin'] },
   { key: 'ledger.receipt', label: 'Receipt button (every ledger)', group: 'Operations', roles: ['admin'] },
   { key: 'orders.changeStatus', label: 'Change order status (status badge menu)', group: 'Operations', roles: ['admin'] },
   { key: 'orders.cancelRefund', label: 'Cancel order and refund (status badge menu) (also blocked on the server)', group: 'Operations', roles: ['admin'] },
   { key: 'dashboard.export', label: 'Export sheet (Dashboard)', group: 'Operations', roles: ['admin'] },
   { key: 'walletLedger.export', label: 'CSV exports (Wallet Ledger)', group: 'Operations', roles: ['admin'] },
   { key: 'reports.respond', label: 'Acknowledge and answer issues (Issues)', group: 'Operations', roles: ['admin'] },
-  { key: '/accounting-export', label: 'TallyPrime Export', group: 'Operations', roles: ['admin'] },
+  { key: '/accounting-export', label: 'Exports', group: 'Operations', roles: ['admin'] },
   { key: '/users/students', label: 'Students', group: 'Users', roles: ['admin'] },
   { key: '/users/parents', label: 'Parents', group: 'Users', roles: ['admin'] },
   { key: '/users/archived', label: 'Archived users', group: 'Users', roles: ['admin'] },

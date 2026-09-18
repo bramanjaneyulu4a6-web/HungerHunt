@@ -9,6 +9,7 @@ import { deleteLedgerEntry } from '../../../../utils/ledgerDeletion.js';
 import { collectionFilters, parseIncluded } from '../../../application/accounting/movementTypes.js';
 import { buildMovementRows, movementTotals } from '../../../application/accounting/movementRows.js';
 import { exportChargeFilter, realMovements } from '../../../application/accounting/realMovements.js';
+import { narrowByProcessedBy, parseProcessedBy } from '../../../application/accounting/processedBy.js';
 import { buildTallyCsv } from '../../../application/accounting/tallyCsv.js';
 import { buildTallyVoucherXml } from '../../../application/accounting/tallyXml.js';
 import { ApplicationError } from '../../../shared/errors/applicationError.js';
@@ -52,6 +53,8 @@ const ledgers = () => ({
  *
  * The selection is parsed before anything is read, so a request naming a type
  * that does not exist costs a validation error rather than three queries.
+ * `processedBy` narrows it further to the people who handled the rows — see
+ * processedBy.js — and is applied last, so it only ever takes rows away.
  *
  * The Transactions page reads every row (`realOnly` false) and marks the
  * deleted and refunded ones. The two exports read only money that really
@@ -61,14 +64,16 @@ const ledgers = () => ({
 const readMovements = async (req, { select, withStudents = false, realOnly = false }) => {
   const { from, to, timeZone } = parseBusinessDateRange(req.query, { maxDays: MAX_RANGE_DAYS });
   const included = parseIncluded(req.query.include);
-  const filters = collectionFilters(included);
+  const processedBy = parseProcessedBy(req.query.processedBy);
+  const selected = collectionFilters(included);
   const range = { createdAt: { $gte: from, $lt: to } };
 
   const standing = realOnly ? { deletion: null } : {};
   if (realOnly) {
-    filters.transactions = exportChargeFilter(included);
-    filters.reversals = null;
+    selected.transactions = exportChargeFilter(included);
+    selected.reversals = null;
   }
+  const filters = narrowByProcessedBy(selected, processedBy);
 
   const read = (Model, filter, fields) => {
     if (!filter) return [];
@@ -298,6 +303,28 @@ export const movements = async (req, res) => {
       totals: movementTotals(rows),
       range: { from, to, timeZone },
     },
+  });
+};
+
+/* Everyone an export can be narrowed to: each admin who ever took a deposit
+ * or gave a refund, by the name they carry now. Read from the ledger rather
+ * than the staff roster, so a person who has never handled money is not
+ * offered, and one who has since left is still there to be asked about —
+ * as "Former staff", the same name the Transactions page gives their rows. */
+export const staff = async (req, res) => {
+  const [deposits, refunds] = await Promise.all([
+    WalletAdjustment.distinct('performedBy'),
+    WalletReversal.distinct('performedBy'),
+  ]);
+  const ids = [...new Set([...deposits, ...refunds].filter(Boolean).map(String))];
+  const admins = ids.length ? await Admin.find({ _id: { $in: ids } }).select('name').lean() : [];
+  const names = new Map(admins.map((admin) => [String(admin._id), admin.name]));
+
+  res.json({
+    data: ids
+      .map((id) => ({ id, name: names.get(id) || 'Former staff' }))
+      .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)),
+    meta: { requestId: req.context.requestId },
   });
 };
 

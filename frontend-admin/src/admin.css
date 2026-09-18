@@ -2382,6 +2382,25 @@
   flex-shrink: 0;
 }
 
+.export-types__row--off {
+  color: var(--muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.export-picker__note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.export-picker__bulk {
+  display: flex;
+  gap: 16px;
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 520px) {
   .quick-export__row {
     align-items: flex-start;
@@ -2862,6 +2881,36 @@
 .row-actions .row-actions__delete:hover:not(:disabled) {
   background: var(--danger-strong);
   border-color: var(--danger-strong);
+}
+
+/* The Export popup (components/TransactionsExportDialog.jsx). */
+.tx-export-modal {
+  max-width: 560px;
+}
+
+.tx-export__section {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--bg-subtle);
+}
+
+.tx-export__heading {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tx-export__dates {
+  margin-top: 12px;
+}
+
+.tx-export__deleted {
+  margin-bottom: 16px;
+}
+
+.tx-export__actions {
+  justify-content: flex-end;
 }
 
 /* Raised from inside a row's actions cell, which keeps its text on one

@@ -105,12 +105,12 @@ describe('types that need "No staff"', () => {
   });
 
   test('without it, only what staff make can be asked for', () => {
-    assert.deepEqual(unavailableKinds([BHARAT]), ['UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT']);
-    assert.deepEqual(effectiveKinds(EXPORT_KINDS, [BHARAT]), ['CASH_DEPOSIT', 'REFUND']);
+    assert.deepEqual(unavailableKinds([BHARAT]), ['UPI_DEPOSIT', 'UPI_ORDER_PAYMENT']);
+    assert.deepEqual(effectiveKinds(EXPORT_KINDS, [BHARAT]), ['CASH_DEPOSIT', 'WALLET_DEDUCTION', 'REFUND']);
   });
 
   test('ticks survive, so ticking "No staff" again restores them', () => {
-    const ticks = ['WALLET_DEDUCTION', 'REFUND'];
+    const ticks = ['UPI_DEPOSIT', 'REFUND'];
     assert.deepEqual(effectiveKinds(ticks, [BHARAT]), ['REFUND']);
     assert.deepEqual(effectiveKinds(ticks, [BHARAT, NO_STAFF]), ticks);
   });

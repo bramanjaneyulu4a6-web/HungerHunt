@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import KioskResultScreen from './KioskResultScreen';
 
 afterEach(() => {
@@ -61,5 +61,34 @@ describe('leaving the screen', () => {
     expect(onDone).not.toHaveBeenCalled();
     vi.advanceTimersByTime(5000);
     expect(onDone).toHaveBeenCalled();
+  });
+});
+
+describe('the WhatsApp button on the approval ending', () => {
+  test('sends the message without also skipping the screen', () => {
+    const onDone = vi.fn();
+    const onClick = vi.fn();
+    render(
+      <KioskResultScreen
+        variant="pending"
+        mark="⏳"
+        kicker="Request sent"
+        title="Sent to your parent"
+        body="Nothing has been charged yet."
+        onDone={onDone}
+        action={{ label: 'Message your parent on WhatsApp', onClick }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Message your parent on WhatsApp' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  test('is not drawn when there is nothing to send', () => {
+    render(
+      <KioskResultScreen variant="paid" mark="✓" kicker="All done" title="Order confirmed" body="" onDone={noop} />
+    );
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

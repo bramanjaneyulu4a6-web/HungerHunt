@@ -18,6 +18,7 @@ process.env.PHONEPE_REDIRECT_BASE_URL = 'https://parent.example';
 const mongoose = (await import('mongoose')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
+const Student = (await import('../models/Student.js')).default;
 const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
 // Stubbed through their default export objects, not the module namespace:
 // mock.method() on an ES module namespace throws "Cannot redefine property"
@@ -62,7 +63,11 @@ afterEach(async () => {
   await paymentCreateLimiter.resetKey(`parent:${PARENT_ID}`);
 });
 
-const asParent = () => mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+const asParent = () => {
+  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+  // No order here is with a room caretaker (utils/caretakerApproval.js).
+  mock.method(Student, 'exists', async () => null);
+};
 
 const send = (method, path, body, headers = {}) =>
   fetch(base + path, {

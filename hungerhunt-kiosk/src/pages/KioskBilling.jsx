@@ -16,6 +16,7 @@ import SessionClock from "../components/SessionClock";
 import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
+import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
@@ -189,6 +190,10 @@ const KioskBilling = ({ student, onLogout }) => {
      stop, and the only thing left running is the few seconds this screen is
      held for. */
   const [result, setResult] = useState(null);
+  // The typed-out WhatsApp to the parent for an order awaiting their yes.
+  const [parentWhatsApp, setParentWhatsApp] = useState("");
+  // The parent let the room caretaker answer this one instead of themselves.
+  const [caretakerReviews, setCaretakerReviews] = useState(false);
 
   // Starts true: the catalogue is fetched on mount, and seeding the flag here
   // keeps that effect free of a synchronous setState.
@@ -535,9 +540,22 @@ const KioskBilling = ({ student, onLogout }) => {
      that follows has to be unambiguous that nothing has been paid for yet. */
   const requestApproval = async (items, purchaseToken) => {
     try {
-      await api.post("/pending-orders", { items, purchaseToken });
+      const { data } = await api.post("/pending-orders", { items, purchaseToken });
 
+      /* The push is sent by the server; this is the second way the parent
+         hears. WhatsApp opens on their chat with the basket and total written
+         out, priced from the server's copy of the order. A missing or odd
+         number just means no message — the request itself has gone. */
+      const link = approvalWhatsAppLink({
+        parentPhone: data?.parentPhone,
+        studentName: student.name,
+        order: data?.pendingOrder,
+        caretakerReviews: data?.caretakerReviews === true,
+      });
+      setParentWhatsApp(link);
+      setCaretakerReviews(data?.caretakerReviews === true);
       setResult("pending");
+      openWhatsApp(link);
       return true;
     } catch (err) {
       console.error("Approval request error:", err);
@@ -766,7 +784,7 @@ const KioskBilling = ({ student, onLogout }) => {
         variant={result}
         mark={result === "paid" ? "✓" : "⏳"}
         kicker={result === "paid" ? "All done" : "Request sent"}
-        title={result === "paid" ? "Order confirmed" : "Sent to your parent"}
+        title={result === "paid" ? "Order confirmed" : caretakerReviews ? "Sent to your caretaker" : "Sent to your parent"}
         /* A confirmed order carries no supporting line: the heading and the
            tick already say it, and the packages are delivered to the room
            rather than collected anywhere, so there was nothing true left to
@@ -774,9 +792,18 @@ const KioskBilling = ({ student, onLogout }) => {
            on its own does not tell a student their money is untouched. */
         body={result === "paid"
           ? ""
-          : "Nothing has been charged yet — your parent has been asked to approve it."}
+          : caretakerReviews
+            ? "Nothing has been charged yet — your room caretaker will review it, and your parent has been told."
+            : "Nothing has been charged yet — your parent has been asked to approve it."}
         onDone={onLogout}
         tapLabel="Tap anywhere for next order"
+        /* Kept on screen for the browser that refused to open WhatsApp on its
+           own, and for a student who closed it before sending. Longer, so
+           there is time to find the button. */
+        action={result === "pending" && parentWhatsApp
+          ? { label: "Message your parent on WhatsApp", onClick: () => openWhatsApp(parentWhatsApp) }
+          : null}
+        seconds={result === "pending" && parentWhatsApp ? 12 : undefined}
       />
     );
   }

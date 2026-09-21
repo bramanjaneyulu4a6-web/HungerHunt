@@ -80,6 +80,18 @@ export default function Dashboard() {
     };
   }, [attempt]);
 
+  /* The section speaks to whoever is answering. Orders the parent handed to the
+     room caretaker are theirs only to view, so when every order is one of
+     those, nothing here needs the parent's action. */
+  const withCaretaker = pendingOrders.filter((order) => order.studentId?.caretakerMayApprove).length;
+  const allWithCaretaker = pendingOrders.length > 0 && withCaretaker === pendingOrders.length;
+  const pendingEyebrow = allWithCaretaker ? 'With the caretaker' : 'Action needed';
+  const pendingCopy = allWithCaretaker
+    ? `The room caretaker is reviewing ${pendingOrders.length === 1 ? 'this order' : 'these orders'}. You can view ${pendingOrders.length === 1 ? 'it' : 'them'} here.`
+    : withCaretaker > 0
+      ? 'Review these purchases before they expire. Orders marked “With the caretaker” are being reviewed by the room caretaker.'
+      : 'Review these purchases before they expire.';
+
   return (
     <div className="page dashboard-page">
       <PageHeader
@@ -116,9 +128,9 @@ export default function Dashboard() {
         <section className="dashboard-section" aria-labelledby="pending-approvals-title">
           <div className="section-heading-row">
             <div>
-              <p className="section-eyebrow">Action needed</p>
+              <p className="section-eyebrow">{pendingEyebrow}</p>
               <h2 className="section-title" id="pending-approvals-title">Pending approvals</h2>
-              <p className="section-copy">Review these purchases before they expire.</p>
+              <p className="section-copy">{pendingCopy}</p>
             </div>
           </div>
 

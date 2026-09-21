@@ -131,7 +131,7 @@ export const entryLabel = (entry) =>
    (`via`); the student ledger, built by the older shared builder, does not,
    and there a deposit's mode and a refund's kind are enough to place it while
    a purchase is left as an order rather than guessed at. */
-const CHANNELS = { ADMIN_DESK: 'Admin desk', PARENT_APP: 'Parent app', KIOSK: 'Kiosk' };
+const CHANNELS = { ADMIN_DESK: 'Admin desk', PARENT_APP: 'Parent app', KIOSK: 'Kiosk', CARETAKER: 'Caretaker app' };
 
 const channelOf = (entry) => {
   if (entry.via) return entry.via;
@@ -148,7 +148,12 @@ export const entryChannel = (entry) => CHANNELS[channelOf(entry)] ?? null;
    there is no person on the office's side of a parent's UPI deposit or a
    student's kiosk sale, and the row should say so rather than leave a dash. */
 export const entryActor = (entry) => {
-  if (entry.processedBy?.name) return { name: entry.processedBy.name, muted: false };
+  // A caretaker approving for a parent is said outright, so the row is not
+  // read as the office's own doing.
+  if (entry.processedBy?.name) {
+    const caretaker = entry.processedBy.role === 'caretaker';
+    return { name: caretaker ? `${entry.processedBy.name} (caretaker)` : entry.processedBy.name, muted: false };
+  }
 
   const channel = channelOf(entry);
   const upi = entry.kind === 'TOP_UP' || entry.kind === 'TOPUP_FAILED' ? 'Parent via PhonePe' : 'Parent via UPI';

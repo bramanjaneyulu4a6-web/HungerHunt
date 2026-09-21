@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 
+import { businessDateAt, businessDateStart } from "../utils/businessTime.js";
+
 // A purchase the till has rung up but not charged, waiting on the parent.
 //
 // The lines are copied rather than referenced. A parent approving tomorrow is
@@ -35,13 +37,16 @@ const pendingOrderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Three days, so a request raised on a Friday is still answerable on Monday.
-// A student may only have one request open, so this is also what stops an
-// ignored request from locking them out of the counter for good.
-export const PENDING_ORDER_TTL_DAYS = 3;
-
-export const pendingOrderExpiry = () =>
-  new Date(Date.now() + PENDING_ORDER_TTL_DAYS * 24 * 60 * 60 * 1000);
+// Open until the end of the next day in the school's time zone (23:59:59 IST
+// by default): an order placed at 4 pm Monday can be answered until Tuesday
+// night, whatever time it was raised. A student may only have one request
+// open, so this is also what stops an ignored request from locking them out of
+// the counter for good.
+export const pendingOrderExpiry = (now = new Date()) => {
+  const [year, month, day] = businessDateAt(now).split("-").map(Number);
+  const dayAfterNext = new Date(Date.UTC(year, month - 1, day + 2)).toISOString().slice(0, 10);
+  return new Date(businessDateStart(dayAfterNext).getTime() - 1000);
+};
 
 const pendingOrderSchema = new mongoose.Schema(
   {
@@ -97,6 +102,14 @@ const pendingOrderSchema = new mongoose.Schema(
     approvedAt: Date,
 
     rejectedAt: Date,
+
+    // The caretaker who approved or declined it, when the parent had handed
+    // them that; null when the parent answered (or nobody has yet).
+    answeredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
 
     // A client reuses this key when an approval response is lost. Together
     // with the atomic PENDING -> PROCESSING claim it makes one approval one

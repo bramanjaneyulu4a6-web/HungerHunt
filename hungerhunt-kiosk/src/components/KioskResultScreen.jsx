@@ -47,6 +47,7 @@ const KioskResultScreen = ({
   tapLabel = "Tap anywhere for next student",
   orderStatus,
   estimatedDeliveryDate,
+  action,
 }) => {
   const statusLabel = ORDER_STATUS_LABELS[orderStatus] || orderStatus;
   const activeStep = progressIndex(orderStatus);
@@ -109,6 +110,19 @@ const KioskResultScreen = ({
               </li>
             ))}
           </ol>
+        )}
+        {action && (
+          <button
+            type="button"
+            className="kiosk-result-action"
+            /* The whole screen is the skip target; this one button is not. */
+            onClick={(event) => {
+              event.stopPropagation();
+              action.onClick();
+            }}
+          >
+            {action.label}
+          </button>
         )}
         <span className="kiosk-result-skip">{tapLabel}</span>
       </div>

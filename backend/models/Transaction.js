@@ -19,6 +19,10 @@ const transactionSchema = new mongoose.Schema({
     default: 'DIRECT_CHECKOUT',
   },
   sourceId: { type: mongoose.Schema.Types.ObjectId },
+  // The caretaker who approved a PARENT_APPROVAL charge on the parent's
+  // behalf. Null for everything else: the kiosk sale is the student's, and a
+  // parent's approval is the parent's.
+  performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   idempotencyKey: { type: String },
   // The school's numbered receipt, minted lazily by ensureReceiptNumbers.
   // Only UPI_ORDER_PAYMENT charges get one — that money entered the school's

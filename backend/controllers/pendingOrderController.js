@@ -1,6 +1,7 @@
 import PendingOrder, { pendingOrderExpiry } from "../models/PendingOrder.js";
 import Student from "../models/Student.js";
 import Parent from "../models/Parent.js";
+import Admin from "../models/Admin.js";
 import Inventory from "../models/Inventory.js";
 import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
@@ -13,6 +14,10 @@ import {
   resetDemoRequest,
   seedDemoBasketAfterApproval,
 } from "../utils/demoParentReset.js";
+import {
+  CARETAKER_HOLDS_MESSAGE,
+  caretakerHoldsApproval,
+} from "../utils/caretakerApproval.js";
 import {
   AUTHORIZATION_MESSAGES,
   consumeAuthorization,
@@ -274,11 +279,19 @@ export const createPendingOrder = async (req, res) => {
       throw err;
     }
 
+    // The caretaker answers this one if the parent has handed it to them; the
+    // parent is still told, but told it is being looked after.
+    const caretakerReviews = Boolean(
+      student.requiresParentApproval && student.caretakerMayApprove
+    );
+
     // Not awaited: the counter gets its answer now. sendToParent never rejects.
     sendToParent(
       parent,
-      "Approval needed",
-      `${student.name} wants to spend ₹${priced.totalAmount}. Tap to review.`,
+      caretakerReviews ? "Order for the caretaker to review" : "Approval needed",
+      caretakerReviews
+        ? `${student.name} wants to spend ₹${priced.totalAmount}. The room caretaker will review it. Tap to view.`
+        : `${student.name} wants to spend ₹${priced.totalAmount}. Tap to review.`,
       {
         type: "PENDING_ORDER",
         orderId: pendingOrder._id.toString(),
@@ -286,9 +299,15 @@ export const createPendingOrder = async (req, res) => {
       }
     );
 
+    /* The kiosk also opens WhatsApp addressed to this parent, with the basket
+       typed out, so the request arrives somewhere they are already looking —
+       a push can be switched off or never registered. The number goes only to
+       whoever raised this request: the student's own session or the console. */
     res.status(201).json({
       message: "Approval request sent to the parent.",
       pendingOrder,
+      parentPhone: parent.phone || null,
+      caretakerReviews,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -312,7 +331,7 @@ export const getParentPendingOrders = async (req, res) => {
       status: "PENDING",
       expiresAt: { $gt: new Date() },
     })
-      .populate("studentId", "name className section grade roomNumber pocketMoney")
+      .populate("studentId", "name className section grade roomNumber pocketMoney caretakerMayApprove")
       .sort({ createdAt: -1 });
 
     res.json({ count: orders.length, orders });
@@ -321,12 +340,14 @@ export const getParentPendingOrders = async (req, res) => {
   }
 };
 
-// The parent's own copy of the order, or an explanation of why it cannot be
-// acted on. Every route below needs the same three checks.
-const loadAnswerable = async (req, res) => {
+// The answerer's copy of the order, or an explanation of why it cannot be
+// acted on. Every route below needs the same three checks. `owner` narrows the
+// lookup to what this answerer may see — the parent's own orders, or one
+// student's for a caretaker (see caretakerOwner).
+const loadAnswerable = async (req, res, owner = { parentId: req.parent.id }) => {
   const order = await PendingOrder.findOne({
     _id: req.params.id,
-    parentId: req.parent.id,
+    ...owner,
   });
 
   if (!order) {
@@ -357,7 +378,7 @@ const loadAnswerable = async (req, res) => {
    halve the quantity — so that answering is not all-or-nothing. Prices are
    re-read rather than carried over from the till's version, so an edit cannot
    be used to hold an old price. */
-export const updatePendingOrder = async (req, res) => {
+const updateAs = async (req, res, { owner }) => {
   try {
     if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
       return res.status(400).json({ message: "An order needs at least one item." });
@@ -376,7 +397,7 @@ export const updatePendingOrder = async (req, res) => {
       return res.status(400).json({ message: "Quantities must be whole numbers." });
     }
 
-    const order = await loadAnswerable(req, res);
+    const order = await loadAnswerable(req, res, owner);
     if (!order) return;
 
     // Only lines the till rang up may be adjusted. Without this a parent could
@@ -399,7 +420,7 @@ export const updatePendingOrder = async (req, res) => {
     const updated = await PendingOrder.findOneAndUpdate(
       {
         _id: order._id,
-        parentId: req.parent.id,
+        ...owner,
         status: "PENDING",
         expiresAt: { $gt: new Date() },
       },
@@ -419,9 +440,15 @@ export const updatePendingOrder = async (req, res) => {
   }
 };
 
-export const approvePendingOrder = async (req, res) => {
+const approveAs = async (req, res, { owner, caretaker = null }) => {
   let claimedOrderId = null;
   let committed = false;
+
+  /* A caretaker is told it went through and nothing more. The charge carries
+     the wallet's balance before and after and is the family's receipt; the
+     caretaker answered for the parent, they are not owed the paperwork. */
+  const reply = (body) =>
+    res.json(caretaker ? { message: body.message, ...(body.replayed ? { replayed: true } : {}) } : body);
 
   try {
     const approvalKey = approvalKeyFrom(req);
@@ -434,7 +461,7 @@ export const approvePendingOrder = async (req, res) => {
 
     const existing = await PendingOrder.findOne({
       _id: req.params.id,
-      parentId: req.parent.id,
+      ...owner,
     });
 
     if (!existing) {
@@ -446,7 +473,7 @@ export const approvePendingOrder = async (req, res) => {
         ? await Transaction.findById(existing.transactionId)
         : await Transaction.findOne({ sourceType: "PARENT_APPROVAL", sourceId: existing._id });
 
-      return res.json({ message: "Order already approved.", transaction, replayed: true });
+      return reply({ message: "Order already approved.", transaction, replayed: true });
     }
 
     await expireIfLapsed(existing);
@@ -469,7 +496,7 @@ export const approvePendingOrder = async (req, res) => {
       const order = await PendingOrder.findOneAndUpdate(
         {
           _id: existing._id,
-          parentId: req.parent.id,
+          ...owner,
           status: "PENDING",
           expiresAt: { $gt: now },
         },
@@ -505,6 +532,7 @@ export const approvePendingOrder = async (req, res) => {
         sourceType: "PARENT_APPROVAL",
         sourceId: order._id,
         idempotencyKey: approvalKey,
+        performedBy: caretaker?.id ?? null,
       });
 
       if (!charge.ok) {
@@ -518,6 +546,7 @@ export const approvePendingOrder = async (req, res) => {
             status: "APPROVED",
             approvedAt: new Date(),
             transactionId: charge.transaction._id,
+            answeredBy: caretaker?.id ?? null,
           },
           $unset: { processingAt: 1 },
         },
@@ -538,7 +567,7 @@ export const approvePendingOrder = async (req, res) => {
     if (parent) {
       sendToParent(
         parent,
-        "Order approved",
+        caretaker ? `Order approved by ${caretaker.name}` : "Order approved",
         `₹${transaction.totalAmount} spent. Balance ₹${student.pocketMoney}.`,
         {
           type: "ORDER_APPROVED",
@@ -553,7 +582,7 @@ export const approvePendingOrder = async (req, res) => {
        settled before anything new is created. No-op for every real family. */
     await seedDemoBasketAfterApproval(order);
 
-    res.json({
+    reply({
       message: "Order approved.",
       transaction,
       fulfillmentOrder,
@@ -573,23 +602,38 @@ export const approvePendingOrder = async (req, res) => {
       ).catch(() => {});
     }
 
-    res.status(err.status || 500).json({ message: err.message });
+    res.status(err.status || 500).json({
+      message: caretaker ? caretakerSafeMessage(err.message) : err.message,
+    });
   }
 };
 
-export const rejectPendingOrder = async (req, res) => {
+/* A wallet refusal names what is left — the balance, the remaining weekly
+   limit — which is the family's to know, not the caretaker's. */
+const caretakerSafeMessage = (message = "") =>
+  /limit exceeded|pocket money|balance/i.test(message)
+    ? "The student's wallet or spending limit does not cover this order. Ask the parent to top up or change the limit."
+    : message;
+
+const rejectAs = async (req, res, { owner, caretaker = null }) => {
   try {
-    const order = await loadAnswerable(req, res);
+    const order = await loadAnswerable(req, res, owner);
     if (!order) return;
 
     const rejected = await PendingOrder.findOneAndUpdate(
       {
         _id: order._id,
-        parentId: req.parent.id,
+        ...owner,
         status: "PENDING",
         expiresAt: { $gt: new Date() },
       },
-      { $set: { status: "REJECTED", rejectedAt: new Date() } },
+      {
+        $set: {
+          status: "REJECTED",
+          rejectedAt: new Date(),
+          answeredBy: caretaker?.id ?? null,
+        },
+      },
       { new: true, runValidators: true }
     );
 
@@ -602,7 +646,142 @@ export const rejectPendingOrder = async (req, res) => {
     // A demo basket said no to is cleared and the next one put in its place.
     await resetDemoRequest(rejected);
 
+    // The parent declining their own request needs no telling; a caretaker
+    // declining it on their behalf does.
+    if (caretaker) {
+      const parent = await Parent.findById(rejected.parentId);
+      if (parent) {
+        sendToParent(
+          parent,
+          `Order declined by ${caretaker.name}`,
+          `₹${rejected.totalAmount} request declined. Nothing was charged.`,
+          {
+            type: "ORDER_REJECTED",
+            orderId: rejected._id.toString(),
+            studentId: String(rejected.studentId),
+          }
+        );
+      }
+    }
+
     res.json({ message: "Order rejected." });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const parentOwner = (req) => ({ owner: { parentId: req.parent.id } });
+
+/* The parent's three answers, each refused while the caretaker holds the
+   approval — see utils/caretakerApproval.js. A missing order falls through to
+   the handler, which says so in its own words. */
+const asParent = (answer) => async (req, res) => {
+  try {
+    const order = await PendingOrder.findOne(
+      { _id: req.params.id, parentId: req.parent.id },
+      "studentId"
+    );
+    if (order && (await caretakerHoldsApproval(order.studentId))) {
+      return res.status(409).json({ message: CARETAKER_HOLDS_MESSAGE, code: "CARETAKER_REVIEWS" });
+    }
+    await answer(req, res, parentOwner(req));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const updatePendingOrder = asParent(updateAs);
+
+export const approvePendingOrder = asParent(approveAs);
+
+export const rejectPendingOrder = asParent(rejectAs);
+
+/* =========================================================
+   ANSWERED BY THE CARETAKER, WHEN THE PARENT ALLOWS IT
+========================================================= */
+/* The students whose requests this caretaker may answer: in one of their rooms,
+   and with the parent's permission standing right now. Asked afresh on every
+   request rather than remembered, so a parent withdrawing it — or approval
+   being turned off, which withdraws it too — lands on the caretaker's next
+   tap, not the next sign-in. */
+const caretakerStudentFilter = (req) => ({
+  roomId: { $in: req.staff.roomIds },
+  active: { $ne: false },
+  requiresParentApproval: true,
+  caretakerMayApprove: true,
+});
+
+// One order's scope for a caretaker, or a 404 that does not say whether the
+// order exists — an order they may not answer is not theirs to know about.
+const caretakerOwner = async (req, res) => {
+  const order = await PendingOrder.findById(req.params.id).select("studentId").lean();
+  const allowed =
+    order &&
+    (await Student.exists({ _id: order.studentId, ...caretakerStudentFilter(req) }));
+
+  if (!allowed) {
+    res.status(404).json({ message: "This order could not be found." });
+    return null;
+  }
+
+  const account = await Admin.findById(req.staff.id).select("name").lean();
+
+  return {
+    owner: { studentId: order.studentId },
+    caretaker: { id: req.staff.id, name: account?.name || "the caretaker" },
+  };
+};
+
+export const getCaretakerPendingOrders = async (req, res) => {
+  try {
+    const students = await Student.find(caretakerStudentFilter(req)).select("_id").lean();
+
+    if (students.length === 0) return res.json({ count: 0, orders: [] });
+
+    const orders = await PendingOrder.find({
+      studentId: { $in: students.map((student) => student._id) },
+      status: "PENDING",
+      expiresAt: { $gt: new Date() },
+    })
+      // pocketMoney: the caretaker sees the wallet balance beside the cart, as
+      // the parent does, to know whether accepting it can go through.
+      .populate("studentId", "name admissionNumber className section grade roomNumber pocketMoney")
+      .sort({ createdAt: -1 });
+
+    res.json({ count: orders.length, orders });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const caretakerApprovePendingOrder = async (req, res) => {
+  try {
+    const scope = await caretakerOwner(req, res);
+    if (!scope) return;
+    await approveAs(req, res, scope);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* A caretaker may cut the basket down before accepting it, as the parent
+   could — the parent now sends changes through them. Same rule: reduce only,
+   never add. */
+export const caretakerUpdatePendingOrder = async (req, res) => {
+  try {
+    const scope = await caretakerOwner(req, res);
+    if (!scope) return;
+    await updateAs(req, res, scope);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const caretakerRejectPendingOrder = async (req, res) => {
+  try {
+    const scope = await caretakerOwner(req, res);
+    if (!scope) return;
+    await rejectAs(req, res, scope);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

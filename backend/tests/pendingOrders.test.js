@@ -53,7 +53,9 @@ before(async () => {
 // here is about something else, so the answer is always yes. What happens when
 // it is no is in parentSessions.test.js.
 beforeEach(() => {
-  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));  // No order here is with a room caretaker (utils/caretakerApproval.js);
+  // tests that need a student session stub this again for themselves.
+  mock.method(Student, 'exists', async () => null);
 });
 
 afterEach(() => mock.restoreAll());
@@ -95,7 +97,7 @@ const studentNeedingApproval = (overrides = {}) => {
 };
 
 const parentIsLinked = () => {
-  mock.method(Parent, 'findOne', async () => ({ _id: PARENT_ID }));
+  mock.method(Parent, 'findOne', async () => ({ _id: PARENT_ID, phone: '9000000021' }));
 };
 
 const noOpenOrder = () => {
@@ -260,6 +262,9 @@ describe('a student raising a request still costs a verified code', () => {
 
     // Priced from inventory, never from what the till said it cost.
     assert.equal(created.mock.calls[0].arguments[0].totalAmount, 40);
+
+    // The kiosk opens WhatsApp to this number with the basket typed out.
+    assert.equal((await res.json()).parentPhone, '9000000021');
   });
 });
 
@@ -463,6 +468,7 @@ describe('a parent may cut an order down but not build it up', () => {
   });
 
   test('an order emptied to nothing is refused rather than approved for zero', async () => {
+    mock.method(PendingOrder, 'findOne', async () => null);
     const res = await send('PUT', `/api/pending-orders/${ORDER_ID}`, parentToken, {
       items: [{ productId: PRODUCT_ID, quantity: 0 }],
     });

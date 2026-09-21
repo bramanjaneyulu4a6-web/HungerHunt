@@ -474,6 +474,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Who processed a payment, when it was a person: a caretaker approving on the
+   parent's behalf. */
+.tx-actor {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 /* The fold. A grid row sliding 0fr→1fr animates to the content's own
    height without measuring it; the clip layer does the hiding, and the
    body layer carries the rule and breathing room so neither leaks a pixel

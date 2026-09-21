@@ -220,7 +220,7 @@ export const getLedgerFeed = async (req, res) => {
     const orderByTransaction = new Map(
       orders.map((order) => [String(order.transactionId), order])
     );
-    const staffNames = await staffNamesFor([...topups, ...refunds]);
+    const staffNames = await staffNamesFor([...topups, ...charges, ...refunds]);
 
     const all = [
       ...topups.map((entry) => ({
@@ -246,8 +246,10 @@ export const getLedgerFeed = async (req, res) => {
         return {
         _id: entry._id,
         kind: entry.sourceType === 'UPI_ORDER_PAYMENT' ? 'UPI_ORDER_PAYMENT' : 'ORDER_PAYMENT',
-        via: CHANNEL_OF_CHARGE[entry.sourceType] || 'KIOSK',
-        processedBy: null,
+        /* A caretaker answering on the parent's behalf is a person on the
+           school's side, so the row names them as it names an admin. */
+        via: entry.performedBy ? 'CARETAKER' : CHANNEL_OF_CHARGE[entry.sourceType] || 'KIOSK',
+        processedBy: processedBy(entry, staffNames),
         amount: entry.totalAmount,
         ...(entry.sourceType === 'UPI_ORDER_PAYMENT'
           ? {

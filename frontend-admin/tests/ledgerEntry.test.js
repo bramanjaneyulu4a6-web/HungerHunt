@@ -165,6 +165,13 @@ describe('who processed a row', () => {
     );
   });
 
+  test('an order a caretaker approved for the parent names them as the caretaker', () => {
+    assert.deepEqual(
+      entryActor({ kind: 'ORDER_PAYMENT', via: 'CARETAKER', processedBy: { name: 'Lakshmi', role: 'caretaker' } }),
+      { name: 'Lakshmi (caretaker)', muted: false }
+    );
+  });
+
   test('rows with nobody on the office side name the channel, muted', () => {
     assert.deepEqual(entryActor({ kind: 'TOP_UP', mode: 'UPI', via: 'PARENT_APP', processedBy: null }), { name: 'Parent via PhonePe', muted: true });
     assert.deepEqual(entryActor({ kind: 'TOPUP_FAILED', via: 'PARENT_APP' }), { name: 'Parent via PhonePe', muted: true });

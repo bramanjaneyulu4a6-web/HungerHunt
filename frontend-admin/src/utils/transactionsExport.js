@@ -21,13 +21,14 @@ export const NO_STAFF_LABEL = 'No staff (kiosk and parent app)';
 
 export const EXPORT_KINDS = Object.keys(KIND_LABELS);
 
-/* The kinds no member of staff ever makes — a parent's UPI top-up, a kiosk or
-   parent-approved wallet payment, a UPI order payment. With "No staff"
-   unticked none of them can match, so the popup and the Exports page grey
-   them out rather than offer a tick that exports nothing. Cash deposits and
-   refunds always carry the admin who made them (performedBy is required on a
-   refund, and set on every desk deposit). */
-export const STAFFLESS_KINDS = ['UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT'];
+/* The kinds no member of staff ever makes — a parent's UPI top-up and a UPI
+   order payment. With "No staff" unticked neither can match, so the popup and
+   the Exports page grey them out rather than offer a tick that exports
+   nothing. Cash deposits and refunds always carry the admin who made them
+   (performedBy is required on a refund, and set on every desk deposit). A
+   wallet payment is either: nobody's at the kiosk or on a parent's own yes,
+   the caretaker's when they approved it for the parent, so it stays offered. */
+export const STAFFLESS_KINDS = ['UPI_DEPOSIT', 'UPI_ORDER_PAYMENT'];
 
 // The kinds that can't be chosen while "No staff" is unticked.
 export const unavailableKinds = (processedBy) =>

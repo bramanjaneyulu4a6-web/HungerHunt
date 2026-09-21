@@ -199,14 +199,21 @@ export const tallyCsv = async (req, res) => {
  *
  * Staff names ride along for the deposits and refunds a person performed,
  * so the column answers "who took this money" the way the dashboard feed
- * does. A charge at the kiosk or a parent's own payment names nobody. */
+ * does, and for an order a caretaker approved on the parent's behalf. A
+ * charge at the kiosk or a parent's own payment names nobody. */
+/* A caretaker's name carries their role, so an order they approved for a
+   parent never reads as the office's own doing — in the Transactions page,
+   its filters, the CSVs and the Processed by picker alike. */
+const staffLabel = (admin) =>
+  admin.role === 'caretaker' ? `${admin.name} (caretaker)` : admin.name;
+
 export const movements = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone, from, to } =
     await readMovements(req, {
       withStudents: true,
       select: {
         transactions:
-          '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance deletion createdAt',
+          '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance performedBy deletion createdAt',
         adjustments:
           '_id studentId source amount receiptNumber performedBy paymentIntentId previousBalance newBalance deletion createdAt',
         reversals:
@@ -216,7 +223,7 @@ export const movements = async (req, res) => {
 
   const staffIds = [
     ...new Set(
-      [...adjustments, ...reversals].map((entry) => entry.performedBy).filter(Boolean).map(String)
+      [...adjustments, ...reversals, ...transactions].map((entry) => entry.performedBy).filter(Boolean).map(String)
     ),
   ];
   /* The handles PhonePe knows a UPI row by. A parent's top-up points at its
@@ -239,7 +246,7 @@ export const movements = async (req, res) => {
           .select('_id transactionId')
           .lean()
       : [],
-    staffIds.length ? Admin.find({ _id: { $in: staffIds } }).select('name').lean() : [],
+    staffIds.length ? Admin.find({ _id: { $in: staffIds } }).select('name role').lean() : [],
     intentIds.length || merchantOrderIds.length
       ? PaymentIntent.find({
           $or: [
@@ -266,7 +273,7 @@ export const movements = async (req, res) => {
   );
   // Former staff still took the money; their row keeps a name rather than a blank.
   const staffNames = new Map(staffIds.map((id) => [id, 'Former staff']));
-  for (const admin of staff) staffNames.set(String(admin._id), admin.name);
+  for (const admin of staff) staffNames.set(String(admin._id), staffLabel(admin));
   const gatewayOf = (intent) =>
     intent ? { reference: intent.merchantOrderId, utr: intent.utr, upiApp: intent.upiApp } : null;
   const intentById = new Map(intents.map((intent) => [String(intent._id), intent]));
@@ -306,19 +313,21 @@ export const movements = async (req, res) => {
   });
 };
 
-/* Everyone an export can be narrowed to: each admin who ever took a deposit
- * or gave a refund, by the name they carry now. Read from the ledger rather
+/* Everyone an export can be narrowed to: each member of staff who ever took a
+ * deposit, gave a refund or approved an order for a parent, by the name they
+ * carry now. Read from the ledger rather
  * than the staff roster, so a person who has never handled money is not
  * offered, and one who has since left is still there to be asked about —
  * as "Former staff", the same name the Transactions page gives their rows. */
 export const staff = async (req, res) => {
-  const [deposits, refunds] = await Promise.all([
+  const [deposits, refunds, approvals] = await Promise.all([
     WalletAdjustment.distinct('performedBy'),
     WalletReversal.distinct('performedBy'),
+    Transaction.distinct('performedBy'),
   ]);
-  const ids = [...new Set([...deposits, ...refunds].filter(Boolean).map(String))];
-  const admins = ids.length ? await Admin.find({ _id: { $in: ids } }).select('name').lean() : [];
-  const names = new Map(admins.map((admin) => [String(admin._id), admin.name]));
+  const ids = [...new Set([...deposits, ...refunds, ...approvals].filter(Boolean).map(String))];
+  const admins = ids.length ? await Admin.find({ _id: { $in: ids } }).select('name role').lean() : [];
+  const names = new Map(admins.map((admin) => [String(admin._id), staffLabel(admin)]));
 
   res.json({
     data: ids

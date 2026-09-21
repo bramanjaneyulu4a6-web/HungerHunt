@@ -2,14 +2,18 @@ import express from "express";
 
 import {
   approvePendingOrder,
+  caretakerApprovePendingOrder,
+  caretakerRejectPendingOrder,
+  caretakerUpdatePendingOrder,
   createPendingOrder,
+  getCaretakerPendingOrders,
   getParentPendingOrders,
   getPendingOrderStatus,
   rejectPendingOrder,
   updatePendingOrder,
 } from "../controllers/pendingOrderController.js";
 
-import { orStudent, protectParent, protectStaff } from "../middleware/authMiddleware.js";
+import { orStudent, protectCaretaker, protectParent, protectStaff } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -29,5 +33,12 @@ router.get("/parent", protectParent, getParentPendingOrders);
 router.put("/:id", protectParent, updatePendingOrder);
 router.post("/:id/approve", protectParent, approvePendingOrder);
 router.post("/:id/reject", protectParent, rejectPendingOrder);
+
+// The caretaker's door, for students whose parent has handed them the answer.
+// Scoped per request to the caretaker's rooms and that standing permission.
+router.get("/caretaker", protectCaretaker, getCaretakerPendingOrders);
+router.post("/:id/caretaker-approve", protectCaretaker, caretakerApprovePendingOrder);
+router.post("/:id/caretaker-reject", protectCaretaker, caretakerRejectPendingOrder);
+router.put("/:id/caretaker", protectCaretaker, caretakerUpdatePendingOrder);
 
 export default router;

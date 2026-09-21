@@ -57,6 +57,7 @@ export const chargeCart = async ({
   sourceId,
   idempotencyKey,
   funding = 'WALLET',
+  performedBy = null,
 }) => {
   const studentQuery = Student.findById(studentId);
   const student = session ? await studentQuery.session(session) : await studentQuery;
@@ -344,6 +345,7 @@ export const chargeCart = async ({
       ...(sourceId ? { sourceId } : {}),
       ...(idempotencyKey ? { idempotencyKey } : {}),
       ...(receiptNumber ? { receiptNumber } : {}),
+      ...(performedBy ? { performedBy } : {}),
     };
 
     if (session) {

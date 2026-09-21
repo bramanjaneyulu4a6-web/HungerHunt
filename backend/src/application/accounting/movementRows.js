@@ -162,7 +162,8 @@ export const buildMovementRows = ({
         receiptNumber: entry.receiptNumber,
         reference: entry.orderReference,
         studentId: entry.studentId,
-        processedBy: null,
+        // A caretaker approving for the parent; nobody for the family's own.
+        processedBy: named(staffNames, entry.performedBy),
         balanceBefore: entry.previousBalance,
         balanceAfter: entry.remainingBalance,
         items: entry.items,

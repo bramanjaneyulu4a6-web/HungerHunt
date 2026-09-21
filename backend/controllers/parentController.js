@@ -845,6 +845,9 @@ export const updatePurchaseApproval = async (req, res) => {
     }
 
     student.requiresParentApproval = required;
+    // The caretaker's permission is a share of the approval, so it goes with
+    // it — see caretakerMayApprove on the Student model.
+    if (!required) student.caretakerMayApprove = false;
 
     await student.save();
 
@@ -853,8 +856,55 @@ export const updatePurchaseApproval = async (req, res) => {
         ? "Purchases will now wait for your approval"
         : "Purchases no longer need your approval",
       requiresParentApproval: student.requiresParentApproval,
+      caretakerMayApprove: student.caretakerMayApprove,
     });
 
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================================================
+   ✅ CARETAKER MAY APPROVE
+========================================================= */
+// Lets the caretaker of the student's room accept or decline purchase requests
+// alongside the parent. Only while approval is on: with it off there is
+// nothing to answer, and a switch that was on but meant nothing would read as
+// a promise to the parent that nobody was keeping.
+export const updateCaretakerApproval = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!(await assertOwnsStudent(req, res, studentId))) return;
+
+    const { allowed } = req.body;
+
+    if (typeof allowed !== "boolean") {
+      return res.status(400).json({ message: "allowed must be true or false" });
+    }
+
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (allowed && !student.requiresParentApproval) {
+      return res.status(400).json({
+        message: "Turn on approval for each purchase first.",
+      });
+    }
+
+    student.caretakerMayApprove = allowed;
+
+    await student.save();
+
+    res.json({
+      message: allowed
+        ? "The caretaker can now accept or decline orders too"
+        : "Only you can accept or decline orders now",
+      caretakerMayApprove: student.caretakerMayApprove,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

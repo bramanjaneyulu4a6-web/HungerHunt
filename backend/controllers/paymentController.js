@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import PaymentIntent from '../models/PaymentIntent.js';
 import PendingOrder from '../models/PendingOrder.js';
+import { CARETAKER_HOLDS_MESSAGE, caretakerHoldsApproval } from '../utils/caretakerApproval.js';
 import Parent from '../models/Parent.js';
 import phonepe from '../src/domain/payments/providers/phonepe.js';
 import settle from '../src/domain/payments/settlePaymentIntent.js';
@@ -197,6 +198,10 @@ export const createPaymentIntent = async (req, res) => {
       if (!order) return res.status(404).json({ message: 'This order could not be found.' });
       if (order.status !== 'PENDING' || order.expiresAt <= new Date()) {
         return res.status(409).json({ message: 'This order is no longer awaiting payment.' });
+      }
+      // Paying for it is answering it, and the caretaker holds that answer.
+      if (await caretakerHoldsApproval(order.studentId)) {
+        return res.status(409).json({ message: CARETAKER_HOLDS_MESSAGE, code: 'CARETAKER_REVIEWS' });
       }
 
       studentId = order.studentId;

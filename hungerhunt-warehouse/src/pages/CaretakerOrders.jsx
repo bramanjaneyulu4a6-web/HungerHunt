@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import CaretakerApprovals from '../components/CaretakerApprovals';
 import Icon from '../components/Icon';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
@@ -227,6 +228,10 @@ const CaretakerOrders = () => {
           </p>
         </div>
       </div>
+
+      {/* Above the tabs: a purchase waiting on an answer is the one thing
+          here that a student is actively held up by. */}
+      <CaretakerApprovals />
 
       <div className="wh-view-tabs" aria-label="Package view">
         <button type="button" className={view === 'arriving' ? 'active' : ''} onClick={() => showView('arriving')}>

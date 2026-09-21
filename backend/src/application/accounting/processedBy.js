@@ -1,9 +1,11 @@
 /* Narrowing a period's movements to the people who handled them.
  *
- * Only two kinds of row have a person behind them: a cash deposit taken at
- * the desk and a refund an admin gave. A kiosk charge, a parent's UPI top-up
- * and a UPI order payment were made by the family themselves, so they belong
- * to nobody — and the office can still ask for them, by name, as `none`.
+ * Three kinds of row have a person behind them: a cash deposit taken at the
+ * desk, a refund an admin gave, and an order a caretaker approved on the
+ * parent's behalf. A kiosk charge, a parent's UPI top-up, a parent's own
+ * approval and a UPI order payment were made by the family themselves, so
+ * they belong to nobody — and the office can still ask for them, by name, as
+ * `none`.
  *
  * Shared by the two exports and the Transactions feed, so "Bharat's rows"
  * means the same rows in every one of them.
@@ -46,11 +48,11 @@ export const parseProcessedBy = (value) => {
 
 /* The collection filters, narrowed to those people.
  *
- * A deposit or a refund carries performedBy; `none` also claims the ones that
- * carry nothing (a parent's UPI top-up) — $in with null matches a missing
- * field as well as an explicit null. A charge never has a person, so it is
- * read only when `none` was asked for. A collection already unselected stays
- * null: this narrows, it never widens. */
+ * A deposit, a refund or a caretaker-approved charge carries performedBy;
+ * `none` also claims the ones that carry nothing (a parent's UPI top-up, a
+ * kiosk sale) — $in with null matches a missing field as well as an explicit
+ * null. A collection already unselected stays null: this narrows, it never
+ * widens. */
 export const narrowByProcessedBy = (filters, processedBy) => {
   if (!processedBy) return filters;
   const performers = processedBy.none ? [...processedBy.staffIds, null] : processedBy.staffIds;
@@ -58,6 +60,6 @@ export const narrowByProcessedBy = (filters, processedBy) => {
   return {
     adjustments: performed(filters.adjustments),
     reversals: performed(filters.reversals),
-    transactions: processedBy.none ? filters.transactions : null,
+    transactions: performed(filters.transactions),
   };
 };

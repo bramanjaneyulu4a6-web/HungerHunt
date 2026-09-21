@@ -44,7 +44,9 @@ before(async () => {
 
 beforeEach(() => {
   mock.method(Admin, 'exists', async () => ({ _id: ADMIN_ID }));
-  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
+  mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));  // No order here is with a room caretaker (utils/caretakerApproval.js);
+  // tests that need a student session stub this again for themselves.
+  mock.method(Student, 'exists', async () => null);
 });
 
 beforeEach(() => featuresOpen(Admin, FeatureVisibility));

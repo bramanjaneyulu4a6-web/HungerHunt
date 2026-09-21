@@ -291,6 +291,10 @@ export default function ChildDetails() {
   const [approvalRequired, setApprovalRequired] = useState(false);
   const [approvalSaving, setApprovalSaving] = useState(false);
   const [approvalBanner, setApprovalBanner] = useState({ type: '', message: '' });
+  // Whether the room's caretaker may answer requests too. Only meaningful
+  // while approvalRequired is on, and the server clears it when that goes off.
+  const [caretakerApproval, setCaretakerApproval] = useState(false);
+  const [caretakerSaving, setCaretakerSaving] = useState(false);
 
   const [topupAmount, setTopupAmount] = useState('');
   const [demoCheckoutOpen, setDemoCheckoutOpen] = useState(false);
@@ -351,6 +355,7 @@ export default function ChildDetails() {
         };
 
         setApprovalRequired(Boolean(student.requiresParentApproval));
+        setCaretakerApproval(Boolean(student.caretakerMayApprove));
 
         const control = student.walletControl;
 
@@ -443,7 +448,10 @@ export default function ChildDetails() {
     setApprovalSaving(true);
 
     try {
-      await API.put(`/parent/purchase-approval/${id}`, { required });
+      const { data } = await API.put(`/parent/purchase-approval/${id}`, { required });
+      // Turning approval off takes the caretaker's share of it away too.
+      setCaretakerApproval(Boolean(data?.caretakerMayApprove));
+      markPendingReviewer(Boolean(data?.caretakerMayApprove));
 
       setApprovalBanner({
         type: 'success',
@@ -460,6 +468,43 @@ export default function ChildDetails() {
       });
     } finally {
       setApprovalSaving(false);
+    }
+  };
+
+  /* Orders already on screen switch between answerable and view-only the
+     moment the switch is saved, rather than on the next refresh. */
+  const markPendingReviewer = (caretakerMayApprove) =>
+    setPendingOrders((orders) =>
+      orders.map((order) => ({
+        ...order,
+        studentId: { ...order.studentId, caretakerMayApprove },
+      }))
+    );
+
+  // Saved on the flip, for the same reasons as toggleApproval.
+  const toggleCaretakerApproval = async (allowed) => {
+    setCaretakerApproval(allowed);
+    setApprovalBanner({ type: '', message: '' });
+    setCaretakerSaving(true);
+
+    try {
+      await API.put(`/parent/caretaker-approval/${id}`, { allowed });
+      markPendingReviewer(allowed);
+
+      setApprovalBanner({
+        type: 'success',
+        message: allowed
+          ? `${student.name}'s caretaker can now accept or decline orders too.`
+          : 'Only you can accept or decline orders now.',
+      });
+    } catch (err) {
+      setCaretakerApproval(!allowed);
+      setApprovalBanner({
+        type: 'error',
+        message: err.response?.data?.message || 'Could not change that setting.',
+      });
+    } finally {
+      setCaretakerSaving(false);
     }
   };
 
@@ -629,6 +674,26 @@ export default function ChildDetails() {
         inactiveIcon={<Icon name="cart" size={24} />}
         activeDescription="Every purchase waits for your approval. Nothing leaves the wallet until you say yes."
         inactiveDescription={`${student.name} buys with their code and the wallet is charged right away.`}
+      />
+
+      {/* A share of the approval above, so it cannot be switched on without
+          it: greyed out while approval is off, and cleared by the server when
+          approval is turned off. */}
+      <StatusToggleTile
+        label="Let the caretaker accept orders"
+        value={approvalRequired && caretakerApproval}
+        disabled={!approvalRequired || approvalSaving || caretakerSaving}
+        onTap={() => toggleCaretakerApproval(!caretakerApproval)}
+        activeLabel="On"
+        inactiveLabel="Off"
+        activeIcon={<Icon name="user" size={24} />}
+        inactiveIcon={<Icon name="shield" size={24} />}
+        activeDescription={`${student.name}'s room caretaker can review and accept or decline orders as well as you. Whoever answers first decides.`}
+        inactiveDescription={
+          approvalRequired
+            ? 'Only you can accept or decline orders. Turn on to let the room caretaker answer them too.'
+            : 'Turn on “Ask me before each purchase” first.'
+        }
       />
 
       <StatusToggleTile
@@ -1214,6 +1279,15 @@ export default function ChildDetails() {
                         <span className="tx-balance">{formatINR(r.newBalance)}</span>
                       )}
                     </div>
+
+                    {/* Only on an order the room caretaker approved for the
+                        parent: who spent it belongs on the face of the card,
+                        not behind a tap. */}
+                    {r.processedBy?.name && (
+                      <p className="tx-actor">
+                        Processed by caretaker {r.processedBy.name}
+                      </p>
+                    )}
 
                     {hasDetails && (
                       <div className="tx-details">

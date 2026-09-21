@@ -128,6 +128,15 @@ requiresParentApproval: {
   default: false
 },
 
+// The parent's second yes: while approval is on, the caretaker of this
+// student's room may answer those requests too, from the caretaker app. It
+// means nothing with approval off, so turning approval off clears it and a
+// parent turning approval back on has to hand it over again deliberately.
+caretakerMayApprove: {
+  type: Boolean,
+  default: false
+},
+
 walletControl: {
   enabled: {
     type: Boolean,

@@ -72,6 +72,17 @@ const PAY_UPI_POLL_FAILED_COPY = {
 // on this card before onResolved's pending-list refresh can remove it.
 const DEGRADED_NOTICE_DELAY_MS = 6000;
 
+/* Shown instead of the answers while the parent has let the room caretaker
+   accept orders. The server refuses the parent's answers in that state too
+   (backend utils/caretakerApproval.js); this is the same rule, said first. */
+const CaretakerReviewNote = ({ style }) => (
+  <Banner variant="warn" icon="ℹ️" className="caretaker-review-note" style={style}>
+    The room caretaker is reviewing this order. Contact the caretaker for any
+    changes, or turn off <b>Let the caretaker accept orders</b> in wallet
+    controls to review and edit it yourself.
+  </Banner>
+);
+
 const initialQuantities = (order) =>
   Object.fromEntries(
     order.items.map((item) => [String(item.productId), item.quantity])
@@ -109,6 +120,8 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
   // otherwise remove this card before the note is readable).
   const [degradedResolving, setDegradedResolving] = useState(false);
   const student = order.studentId || {};
+  // The parent handed this one to the caretaker: view it, do not answer it.
+  const caretakerReviews = Boolean(student.caretakerMayApprove);
 
   const payAbortRef = useRef(null);
   const mountedRef = useRef(true);
@@ -563,10 +576,12 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         >
           <header className="review-modal__head">
             <div>
-              <p className="section-eyebrow">Review required</p>
+              <p className="section-eyebrow">{caretakerReviews ? 'With the caretaker' : 'Review required'}</p>
               <h2 id={`review-title-${order._id}`}>{student.name || 'Student'}&apos;s cart</h2>
               <p id={`review-copy-${order._id}`}>
-                Check every item before placing this order.
+                {caretakerReviews
+                  ? 'The room caretaker is reviewing this order. You can view it here.'
+                  : 'Check every item before placing this order.'}
               </p>
             </div>
             <button
@@ -598,6 +613,9 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                       <strong>{item.name}</strong>
                       <span>{formatINR(item.price)} each</span>
                     </div>
+                    {caretakerReviews ? (
+                      <output className="quantity-static" aria-label={`${item.name} quantity`}>×{quantity}</output>
+                    ) : (
                     <div className="quantity-control">
                       <Button
                         variant="ghost"
@@ -618,6 +636,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                         <Icon name="plus" size={16} />
                       </Button>
                     </div>
+                    )}
                     <strong className="review-cart__line-total">
                       {formatINR(item.price * quantity)}
                     </strong>
@@ -626,6 +645,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
               })}
             </ul>
 
+            {caretakerReviews && <CaretakerReviewNote style={{ marginTop: 16 }} />}
             {error && <ErrorFeedback issue={error} action={error.presentation === 'staleData' ? { label: 'Review latest order', onClick: () => onResolved?.() } : undefined} />}
             {demoOrderResult && (
               <Banner variant="success" icon="✓" style={{ marginTop: 16 }}>
@@ -634,7 +654,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
             )}
             {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
             {constraint?.type === 'final' && <ErrorFeedback issue={{ presentation: 'blocked', title: 'Keep one item in the order', message: 'Want to decline the entire request instead?' }} action={{ label: 'Decline Order', onClick: () => { setReviewing(false); setConfirming('decline'); } }} />}
-            {insufficient && !empty && (
+            {insufficient && !empty && !caretakerReviews && (
               <ErrorFeedback issue={{ presentation: 'insufficientFunds', title: 'Not quite enough', message: 'The order is over the wallet balance — pay by UPI below to cover it.' }} available={Number(student.pocketMoney || 0)} required={total} />
             )}
             {payCopy && (
@@ -655,7 +675,17 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
           </div>
 
           <footer className="review-modal__actions">
-            {degradedResolving ? null : (
+            {caretakerReviews ? (
+              <>
+                <div>
+                  <span>Subtotal</span>
+                  <strong>{formatINR(total)}</strong>
+                </div>
+                <Button variant="dark" onClick={() => setReviewing(false)}>
+                  Close
+                </Button>
+              </>
+            ) : degradedResolving ? null : (
               <>
                 <div>
                   <span>Subtotal</span>
@@ -692,7 +722,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         <Card className={`pending-card pending-card--compact${busy ? ' pending-card--busy' : ''}`} aria-busy={busy}>
           <div className="pending-compact__head">
             <div>
-              <span className="pending-compact__eyebrow">Review required</span>
+              <span className="pending-compact__eyebrow">{caretakerReviews ? 'With the caretaker' : 'Review required'}</span>
               <h3>{student.name || 'Your child'}&apos;s order</h3>
             </div>
           </div>
@@ -708,7 +738,23 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
               Payment completed with {demoOrderResult.provider}.
             </Banner>
           )}
-          {confirming === 'decline' ? (
+          {caretakerReviews ? (
+            <>
+              <CaretakerReviewNote style={{ marginTop: 12 }} />
+              <div className="pending-actions pending-compact__actions">
+                <Button
+                  variant="dark"
+                  block
+                  onClick={(event) => {
+                    reviewTriggerRef.current = event.currentTarget;
+                    setReviewing(true);
+                  }}
+                >
+                  View order
+                </Button>
+              </div>
+            </>
+          ) : confirming === 'decline' ? (
             <div className="pending-confirm-copy">
               <p>Cancel this order request?</p>
               <div className="pending-actions">
@@ -792,6 +838,9 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                 {item.name}
                 <small>{formatINR(item.price)} each</small>
               </span>
+              {caretakerReviews ? (
+                <output className="quantity-static" aria-label={`${item.name} quantity`}>×{quantity}</output>
+              ) : (
               <span className="quantity-control">
                 <Button
                   variant="ghost"
@@ -812,6 +861,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
                   <Icon name="plus" size={16} />
                 </Button>
               </span>
+              )}
             </li>
           );
         })}
@@ -825,7 +875,7 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
       {error && <ErrorFeedback issue={error} className="pending-error" action={error.presentation === 'staleData' ? { label: 'View latest order', onClick: () => onResolved?.() } : undefined} />}
       {constraint?.type === 'maximum' && <InlineFieldError>You can reduce this order, but you can&apos;t add more than the student requested.</InlineFieldError>}
       {constraint?.type === 'final' && <ErrorFeedback issue={{ presentation: 'blocked', title: 'Keep one item in the order', message: 'Want to decline the entire request instead?' }} action={{ label: 'Decline Order', onClick: () => setConfirming('decline') }} />}
-      {insufficient && !empty && (
+      {insufficient && !empty && !caretakerReviews && (
         <ErrorFeedback issue={{ presentation: 'insufficientFunds', title: 'Not quite enough', message: 'The school wallet cannot cover this order, but you can choose UPI after accepting it.' }} available={Number(student.pocketMoney || 0)} required={total} className="insufficient-note" />
       )}
 
@@ -835,14 +885,16 @@ export default function PendingApprovalCard({ order, onResolved, onStudentClick,
         </Banner>
       )}
 
-      {edited && !empty && (
+      {edited && !empty && !caretakerReviews && (
         <div className="pending-actions">
           <Button block disabled={busy} onClick={saveEdits}>{busy ? 'Saving…' : 'Save changes'}</Button>
           <Button variant="ghost" block disabled={busy} onClick={() => setQuantities(initialQuantities(order))}>Undo</Button>
         </div>
       )}
 
-      {confirming === 'decline' ? (
+      {caretakerReviews ? (
+        <CaretakerReviewNote style={{ marginTop: 12 }} />
+      ) : confirming === 'decline' ? (
         <div className="pending-confirm-copy">
           <p>Decline this request? The kiosk order will be cancelled.</p>
           <div className="pending-actions">

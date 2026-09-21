@@ -557,7 +557,7 @@ describe('an admin raises orders without a code', () => {
   });
 
   // An order nobody can approve is not an order. Better said here than left
-  // sitting pending until it expires three days later.
+  // sitting pending until it expires at the end of the next day.
   test('a student whose parent has not registered cannot be billed', async () => {
     adminSignedIn();
     orderableStudent({ requiresParentApproval: true });

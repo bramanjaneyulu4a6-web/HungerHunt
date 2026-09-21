@@ -3867,3 +3867,11 @@ body {
     transition: none;
   }
 }
+
+/* The quantity on an order the room caretaker is reviewing: read, not set. */
+.quantity-static {
+  min-width: 40px;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

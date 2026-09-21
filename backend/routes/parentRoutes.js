@@ -14,6 +14,7 @@ import {
   resetPurchasePassword,
   updateWalletControl,
   updatePurchaseApproval,
+  updateCaretakerApproval,
   forgotPassword,
   resetPassword,
   savePushToken,
@@ -73,6 +74,7 @@ router.post('/reset-purchase-password', protectParent, resetPurchasePassword);
 
 router.put('/wallet-control/:studentId', protectParent, updateWalletControl);
 router.put('/purchase-approval/:studentId', protectParent, updatePurchaseApproval);
+router.put('/caretaker-approval/:studentId', protectParent, updateCaretakerApproval);
 
 /* Rate-limited as well as gated: this route checks a password, so it is
    guessable in the way the login route is, and a session alone must not make

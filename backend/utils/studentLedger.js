@@ -127,9 +127,17 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
   /* Who took each desk deposit, for the office's copy: a deposit opens into
    * that name, and the delete popup says who made the row it is about to
    * undo. An admin removed since reads as former staff, as the feed does. */
-  const depositorIds = staffView
-    ? [...new Set(topups.map((entry) => entry.performedBy).filter(Boolean).map(String))]
-    : [];
+  /* The caretaker who approved an order on the parent's behalf is named on
+   * both copies — the parent asked to know who spent their child's money, and
+   * the office needs it for the same reason it names a desk deposit. */
+  const depositorIds = [
+    ...new Set(
+      [...(staffView ? topups : []), ...charges]
+        .map((entry) => entry.performedBy)
+        .filter(Boolean)
+        .map(String)
+    ),
+  ];
   const depositors = depositorIds.length
     ? await Admin.find({ _id: { $in: depositorIds } }).select('name role').lean()
     : [];
@@ -319,6 +327,9 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
         // reference rather than a "reason" — what a charge is for is not a
         // note anyone wrote, unlike a refund's.
         orderId: orderId ? `#${orderId.slice(-6).toUpperCase()}` : null,
+        // Set only on an order a caretaker approved; the kiosk sale and the
+        // parent's own approval have nobody on the school's side.
+        ...(entry.performedBy ? { processedBy: depositorOf(entry), via: 'CARETAKER' } : {}),
         ...(staffView
           ? (() => {
               const order = fulfillmentDetail(orderByTransaction.get(String(entry._id)));

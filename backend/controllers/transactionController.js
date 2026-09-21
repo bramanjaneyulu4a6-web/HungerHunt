@@ -42,8 +42,23 @@ const settleDemoBill = async ({ studentId, items, purchaseToken }) => {
   let totalAmount = 0;
   const lines = [];
 
+  /* One query for the cart, for the same reason chargeCart reads it that way:
+     a line used to cost two round trips to Atlas, and those trips cross a
+     region boundary. The per-line checks below are unchanged. */
+  const inventoryRows = await Inventory.find({
+    productId: { $in: items.map((orderItem) => orderItem.productId) },
+  }).populate('productId');
+
+  const inventoryByProduct = new Map(
+    inventoryRows.map((row) => {
+      const product = row.productId;
+      const key = product && typeof product === 'object' && product._id ? product._id : product;
+      return [String(key), row];
+    })
+  );
+
   for (const orderItem of items) {
-    const inventory = await Inventory.findOne({ productId: orderItem.productId }).populate('productId');
+    const inventory = inventoryByProduct.get(String(orderItem.productId));
 
     if (!inventory?.productId) {
       return { status: 404, body: { message: 'Inventory record not found.' } };

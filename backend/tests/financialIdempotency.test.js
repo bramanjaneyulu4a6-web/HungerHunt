@@ -138,11 +138,11 @@ describe('financial idempotency', () => {
       pocketMoney: 100,
       walletControl: { enabled: false },
     }));
-    mock.method(Inventory, 'findOne', () => ({
-      populate: async () => ({
+    mock.method(Inventory, 'find', () => ({
+      populate: async () => ([{
         stock: 10,
         productId: { _id: PRODUCT_ID, name: 'Samosa', price: 99, active: true },
-      }),
+      }]),
     }));
     const decrement = mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: 8 }));
     const debit = mock.method(Student, 'findOneAndUpdate', async () => ({

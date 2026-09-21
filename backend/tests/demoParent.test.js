@@ -106,10 +106,10 @@ describe('the shelves', () => {
   const cart = [{ productId: 'p1', quantity: 2 }];
 
   const stubInventory = (stock) => {
-    mock.method(Inventory, 'findOne', () => ({
+    mock.method(Inventory, 'find', () => ({
       populate: () => ({
-        session: async () => ({ stock, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
-        then: (resolve) => resolve({ stock, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
+        session: async () => ([{ stock, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }]),
+        then: (resolve) => resolve([{ stock, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }]),
       }),
     }));
     return mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: stock - 2 }));
@@ -216,10 +216,10 @@ describe('the showroom wallet', () => {
     spy.mock.calls.filter(({ arguments: [, update] }) => update?.$set?.pocketMoney !== undefined);
 
   const stubCatalogue = () => {
-    mock.method(Inventory, 'findOne', () => ({
+    mock.method(Inventory, 'find', () => ({
       populate: () => ({
-        session: async () => ({ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
-        then: (resolve) => resolve({ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }),
+        session: async () => ([{ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }]),
+        then: (resolve) => resolve([{ stock: 99, productId: { _id: 'p1', name: 'Frooti', price: 20, active: true } }]),
       }),
     }));
     mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: 98 }));

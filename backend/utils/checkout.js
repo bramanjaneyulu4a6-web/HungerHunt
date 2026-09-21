@@ -111,11 +111,49 @@ export const chargeCart = async ({
   const transactionItems = [];
   const limitedEntries = [];
 
-  for (const orderItem of items) {
-    const inventoryQuery = Inventory.findOne({
-      productId: orderItem.productId
+  /* The whole cart is read in one query rather than one per line.
+   *
+   * Each line used to cost two round trips — the findOne, then a second query
+   * behind populate to fetch the product — and the service talks to Atlas
+   * across a region boundary, so those trips are ~245ms each no matter how
+   * fast the query itself is. A five-line basket spent over two seconds
+   * waiting on a database that answered every one of those queries in under a
+   * millisecond.
+   *
+   * Only the fetch is batched. Every check below still runs per line, in cart
+   * order, against the same row findOne would have returned — so the first
+   * line to fail is still the one the customer is told about, and the refusal
+   * is still the same refusal. */
+  const readCart = async () => {
+    if (!items.length) return [];
+
+    const query = Inventory.find({
+      productId: { $in: items.map((orderItem) => orderItem.productId) }
     }).populate("productId");
-    const inventory = session ? await inventoryQuery.session(session) : await inventoryQuery;
+
+    return session ? query.session(session) : query;
+  };
+
+  const inventoryRows = await readCart();
+
+  /* Keyed by the product the cart line names, so a miss below means exactly
+     what findOne returning null used to mean. A row whose product has been
+     deleted populates to null and therefore keys to nothing, which lands on
+     the same "Inventory record not found." the null check below already gave
+     it — the check stays anyway, because it costs nothing and this map is not
+     the only way a row can arrive without a product. */
+  const inventoryByProduct = new Map(
+    inventoryRows.map((row) => {
+      const product = row.productId;
+      const key = product && typeof product === "object" && product._id
+        ? product._id
+        : product;
+      return [String(key), row];
+    })
+  );
+
+  for (const orderItem of items) {
+    const inventory = inventoryByProduct.get(String(orderItem.productId));
 
     if (!inventory || !inventory.productId) {
       return { ok: false, status: 404, message: "Inventory record not found." };

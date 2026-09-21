@@ -109,6 +109,14 @@ const stockedAt = (price, stock) => {
       productId: { _id: PRODUCT_ID, name: 'Samosa', price },
     }),
   }));
+  // chargeCart reads the whole cart in one query; the request-raising path
+  // above it still looks a single product up.
+  mock.method(Inventory, 'find', () => ({
+    populate: async () => ([{
+      stock,
+      productId: { _id: PRODUCT_ID, name: 'Samosa', price },
+    }]),
+  }));
 };
 
 const archivedAt = (price, stock) => {
@@ -117,6 +125,12 @@ const archivedAt = (price, stock) => {
       stock,
       productId: { _id: PRODUCT_ID, name: 'Samosa', price, active: false },
     }),
+  }));
+  mock.method(Inventory, 'find', () => ({
+    populate: async () => ([{
+      stock,
+      productId: { _id: PRODUCT_ID, name: 'Samosa', price, active: false },
+    }]),
   }));
 };
 

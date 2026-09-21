@@ -22,7 +22,7 @@ const PRODUCT_ID = '507f191e810c19729de860ec';
 
 afterEach(() => mock.restoreAll());
 
-// Inventory.findOne(...).populate(...) — a thenable chain fixed up front.
+// Inventory.find(...).populate(...) — a thenable chain fixed up front.
 const findOneChain = (result) => {
   const chain = {
     populate: () => chain,
@@ -34,11 +34,11 @@ const findOneChain = (result) => {
 describe('charging a cart with an archived product', () => {
   test('is refused by name before any stock or money moves', async () => {
     mock.method(Student, 'findById', async () => ({ _id: STUDENT_ID, pocketMoney: 500 }));
-    mock.method(Inventory, 'findOne', () =>
-      findOneChain({
+    mock.method(Inventory, 'find', () =>
+      findOneChain([{
         stock: 10,
         productId: { _id: PRODUCT_ID, name: 'Samosa', price: 12, active: false },
-      })
+      }])
     );
     let stockMoved = false;
     mock.method(Inventory, 'findOneAndUpdate', async () => { stockMoved = true; return null; });
@@ -56,11 +56,11 @@ describe('charging a cart with an archived product', () => {
 
   test('a live product still charges normally past the check', async () => {
     mock.method(Student, 'findById', async () => ({ _id: STUDENT_ID, pocketMoney: 500 }));
-    mock.method(Inventory, 'findOne', () =>
-      findOneChain({
+    mock.method(Inventory, 'find', () =>
+      findOneChain([{
         stock: 10,
         productId: { _id: PRODUCT_ID, name: 'Samosa', price: 12, active: true },
-      })
+      }])
     );
     // Refuse at the stock decrement so the test ends before wallets and
     // transactions come into it — reaching this call is the assertion.

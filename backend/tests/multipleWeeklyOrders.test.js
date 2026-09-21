@@ -41,7 +41,7 @@ describe('multiple orders per student per week', () => {
       weeklyLookups += 1;
       return { session: async () => ({ _id: 'an-order-from-monday' }) };
     });
-    mock.method(Inventory, 'findOne', () => findOneChain(null));
+    mock.method(Inventory, 'find', () => findOneChain([]));
 
     const result = await chargeCart({
       studentId: STUDENT_ID,

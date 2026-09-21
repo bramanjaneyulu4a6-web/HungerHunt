@@ -24,11 +24,11 @@ const stubStudent = (overrides = {}) => {
 };
 
 const stubInventory = () => {
-  mock.method(Inventory, 'findOne', () => ({
-    populate: () => Promise.resolve({
+  mock.method(Inventory, 'find', () => ({
+    populate: () => Promise.resolve([{
       stock: 10,
       productId: { _id: PRODUCT_ID, name: 'Samosa', price: 15, active: true },
-    }),
+    }]),
   }));
   mock.method(Inventory, 'findOneAndUpdate', () => Promise.resolve({ stock: 8 }));
 };

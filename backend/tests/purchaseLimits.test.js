@@ -78,7 +78,7 @@ const arrange = ({ product, alreadyBought = 0, awaitingApproval = 0 }) => {
   const pipelines = [];
 
   mock.method(Student, 'findById', async () => ({ _id: STUDENT_ID, pocketMoney: 5000 }));
-  mock.method(Inventory, 'findOne', () => findOneChain({ stock: 100, productId: product }));
+  mock.method(Inventory, 'find', () => findOneChain([{ stock: 100, productId: product }]));
   mock.method(Transaction, 'aggregate', (pipeline) => {
     pipelines.push(pipeline);
     return alreadyBought > 0 ? [{ _id: PRODUCT_ID, quantity: alreadyBought }] : [];

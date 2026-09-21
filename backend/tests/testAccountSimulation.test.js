@@ -121,7 +121,7 @@ describe('checkout for a test student', () => {
       parentPhoneNumber,
       walletControl: { enabled: true, limitAmount: 1, limitType: 'WEEKLY' },
     }));
-    mock.method(Inventory, 'findOne', () => queryFor({ stock: 100, productId: limitedProduct }));
+    mock.method(Inventory, 'find', () => queryFor([{ stock: 100, productId: limitedProduct }]));
     mock.method(Transaction, 'aggregate', (pipeline) => {
       aggregates.push(pipeline);
       return [];

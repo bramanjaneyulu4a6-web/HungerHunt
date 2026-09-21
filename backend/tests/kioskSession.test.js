@@ -467,8 +467,8 @@ describe('a student session cannot spend for another student', () => {
       debited.push(String(filter._id));
       return { pocketMoney: 480 };
     });
-    mock.method(Inventory, 'findOne', () =>
-      queryFor({ stock: 50, productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 } }));
+    mock.method(Inventory, 'find', () =>
+      queryFor([{ stock: 50, productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 } }]));
     mock.method(Inventory, 'findOneAndUpdate', async () => ({ stock: 48 }));
     mock.method(Transaction, 'create', async () => ({ _id: '507f191e810c19729de860ee' }));
     mock.method(Parent, 'findOne', async () => null);

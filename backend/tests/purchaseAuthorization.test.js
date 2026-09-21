@@ -129,11 +129,11 @@ const stubBillPath = () => {
     })
   );
 
-  mock.method(Inventory, 'findOne', () =>
-    queryFor({
+  mock.method(Inventory, 'find', () =>
+    queryFor([{
       stock: 50,
       productId: { _id: PRODUCT_ID, name: 'Bun', price: 10 },
-    })
+    }])
   );
 
   mock.method(Inventory, 'findOneAndUpdate', async () => {

@@ -69,11 +69,11 @@ const items = [{ productId: PRODUCT_ID, quantity: 2 }];
 
 // The catalogue row both the real and the demo checkout price against.
 const stubInventory = () =>
-  mock.method(Inventory, 'findOne', () =>
-    queryFor({
+  mock.method(Inventory, 'find', () =>
+    queryFor([{
       stock: 50,
       productId: { _id: PRODUCT_ID, name: 'Samosa', price: 20, active: true },
-    })
+    }])
   );
 
 // A live authorization for `items`, as verifyPayment would have left behind.
@@ -199,7 +199,7 @@ describe('chargeCart', () => {
     mock.method(Student, 'findById', () => queryFor({ _id: REAL_ID, demoAccount: false }));
     // Nothing on the shelf, so the charge stops at the next check — which is
     // the point: it got past the demo guard to reach one.
-    mock.method(Inventory, 'findOne', () => queryFor(null));
+    mock.method(Inventory, 'find', () => queryFor([]));
 
     const result = await chargeCart({ studentId: REAL_ID, items });
 

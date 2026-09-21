@@ -287,11 +287,11 @@ function stubCatalogue() {
   mock.method(Student, 'findById', async () => ({
     _id: STUDENT_ID, admissionNumber: ADMISSION, pocketMoney: 500, active: true,
   }));
-  mock.method(Inventory, 'findOne', () => ({
-    populate: async () => ({
+  mock.method(Inventory, 'find', () => ({
+    populate: async () => ([{
       productId: { _id: PRODUCT_ID, name: 'Milk', price: 20, active: true },
       stock: 10,
-    }),
+    }]),
   }));
   mock.method(Inventory, 'updateOne', async () => ({ modifiedCount: 1 }));
   mock.method(Inventory, 'findOneAndUpdate', async () => ({ productId: PRODUCT_ID, stock: 9 }));

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { approvalWhatsAppLink, composeApprovalMessage, whatsAppNumber } from './parentWhatsApp';
+import { PARENT_APP_URL, approvalWhatsAppLink, composeApprovalMessage, whatsAppNumber } from './parentWhatsApp';
 
 const ORDER = {
   items: [
@@ -56,6 +56,19 @@ describe('when the room caretaker reviews it', () => {
     expect(message).toContain('The room caretaker will review this order');
     expect(message).toContain('Contact the caretaker for any changes');
     expect(message).not.toMatch(/\*accept\* or \*decline\*/);
+  });
+});
+
+describe('the parent app link', () => {
+  test('ends both messages, on a line of its own so WhatsApp can open it', () => {
+    for (const caretakerReviews of [false, true]) {
+      const message = composeApprovalMessage({ studentName: 'Ravi', order: ORDER, caretakerReviews });
+      expect(message.endsWith(`Open the Hunger Hunt parent app:\n${PARENT_APP_URL}`)).toBe(true);
+    }
+  });
+
+  test('defaults to the live parent web app', () => {
+    expect(PARENT_APP_URL).toBe('https://hunger-hunt-parent.vercel.app');
   });
 });
 

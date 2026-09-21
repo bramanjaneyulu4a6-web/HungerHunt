@@ -18,6 +18,16 @@ export const whatsAppNumber = (phone) => {
   return "";
 };
 
+// Where the parent answers (or, while the caretaker reviews, views) the order.
+// Baked in at build time like the API URL; the default is the live parent web
+// app, so an unset variable still sends a link that works.
+export const PARENT_APP_URL =
+  String(import.meta.env.VITE_PARENT_APP_URL || "").trim() ||
+  "https://hunger-hunt-parent.vercel.app";
+
+// On a line of its own so WhatsApp turns it into a tappable link.
+const appLink = `Open the Hunger Hunt parent app:\n${PARENT_APP_URL}`;
+
 const answerBy = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -59,6 +69,7 @@ export const composeApprovalMessage = ({ studentName, order, caretakerReviews = 
         (deadline ? ` before ${deadline}` : "") +
         ". You can view it in the Hunger Hunt app. Contact the caretaker for any changes, " +
         "or turn off *Let the caretaker accept orders* in the app to review and edit it yourself.",
+      appLink,
     ].join("\n\n");
   }
 
@@ -69,6 +80,7 @@ export const composeApprovalMessage = ({ studentName, order, caretakerReviews = 
     `*Total: ${formatINR(order?.totalAmount)}*`,
     "Nothing has been charged yet. Please open the Hunger Hunt app to review this order and *accept* or *decline* it" +
       (deadline ? ` before ${deadline}.` : "."),
+    appLink,
   ].join("\n\n");
 };
 

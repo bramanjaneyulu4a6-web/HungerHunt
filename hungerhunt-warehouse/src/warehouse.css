@@ -2364,3 +2364,50 @@
     min-width: 0;
   }
 }
+
+/* The caretaker's WhatsApp to the parent about a waiting order. WhatsApp's
+   own green, so it reads as "opens WhatsApp" before the label is read. */
+.caretaker-notify-parent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: #1f8a4c;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.caretaker-notify-parent:hover {
+  background: #197340;
+}
+
+.caretaker-notify-parent:focus-visible {
+  outline: 3px solid #1f8a4c;
+  outline-offset: 3px;
+}
+
+.caretaker-notify-parent__missing {
+  margin: 12px 0 0;
+  color: var(--review-muted);
+  font-size: 13px;
+}
+
+/* An order the parent still answers: the caretaker only watches and nudges. */
+.pending-card--parent .pending-compact__eyebrow {
+  color: var(--review-muted);
+}
+
+.caretaker-parent-note {
+  margin: 14px 0 0;
+  color: var(--review-muted);
+  font-size: 14px;
+}

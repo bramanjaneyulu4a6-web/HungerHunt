@@ -31,6 +31,8 @@ const PARENT_ID = '507f191e810c19729de860ea';
 const STUDENT_ID = '507f191e810c19729de860eb';
 const ORDER_ID = '507f191e810c19729de860ed';
 const ROOM_ID = '507f191e810c19729de860e1';
+const OTHER_STUDENT_ID = '507f191e810c19729de860f1';
+const OTHER_ORDER_ID = '507f191e810c19729de860f2';
 const PRODUCT_ID = '507f191e810c19729de860ec';
 
 const caretakerToken = signStaffToken(CARETAKER_ID, 'caretaker');
@@ -162,21 +164,69 @@ describe("the caretaker's routes", () => {
     assert.equal(asCaretaker.status, 401);
   });
 
-  test('list only students in their rooms whose parent handed approval over', async () => {
+  test('list every waiting order from their rooms, marking which are theirs to answer', async () => {
     signedInCaretaker();
     let asked;
     mock.method(Student, 'find', (filter) => {
       asked = filter;
-      return { select: () => ({ lean: async () => [] }) };
+      return {
+        select: () => ({
+          lean: async () => [
+            { _id: STUDENT_ID, caretakerMayApprove: true },
+            { _id: OTHER_STUDENT_ID, caretakerMayApprove: false },
+          ],
+        }),
+      };
     });
+    const query = {
+      populate() { return query; },
+      sort: async () => [
+        { _id: ORDER_ID, studentId: { _id: STUDENT_ID, name: 'Asha' }, items: [] },
+        { _id: OTHER_ORDER_ID, studentId: { _id: OTHER_STUDENT_ID, name: 'Kiran' }, items: [] },
+      ],
+    };
+    mock.method(PendingOrder, 'find', () => query);
+
+    const res = await send('GET', '/api/pending-orders/caretaker', caretakerToken);
+    const { orders } = await res.json();
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(asked.roomId, { $in: [ROOM_ID] });
+    assert.equal(asked.requiresParentApproval, true);
+    assert.equal(asked.caretakerMayApprove, undefined);
+    assert.deepEqual(orders.map((order) => order.caretakerMayAnswer), [true, false]);
+  });
+
+  test('still cannot answer an order that is waiting on the parent', async () => {
+    signedInCaretaker();
+    orderFor(OTHER_STUDENT_ID);
+    // The answer routes ask the permission afresh; the parent never gave it.
+    mock.method(Student, 'exists', async (filter) =>
+      filter.caretakerMayApprove === true && String(filter._id) === OTHER_STUDENT_ID ? null : { _id: STUDENT_ID });
+    const claim = mock.method(PendingOrder, 'findOneAndUpdate', async () => null);
+
+    const res = await send('POST', `/api/pending-orders/${ORDER_ID}/caretaker-reject`, caretakerToken);
+
+    assert.equal(res.status, 404);
+    assert.equal(claim.mock.callCount(), 0);
+  });
+
+
+  // The parent's phone rides along for the WhatsApp button — and only the phone.
+  test('carry the parent\'s phone and nothing else of theirs', async () => {
+    signedInCaretaker();
+    mock.method(Student, 'find', () => ({ select: () => ({ lean: async () => [{ _id: STUDENT_ID }] }) }));
+    const populated = [];
+    const query = {
+      populate(path, fields) { populated.push([path, fields]); return query; },
+      sort: async () => [],
+    };
+    mock.method(PendingOrder, 'find', () => query);
 
     const res = await send('GET', '/api/pending-orders/caretaker', caretakerToken);
 
     assert.equal(res.status, 200);
-    assert.deepEqual((await res.json()).orders, []);
-    assert.deepEqual(asked.roomId, { $in: [ROOM_ID] });
-    assert.equal(asked.requiresParentApproval, true);
-    assert.equal(asked.caretakerMayApprove, true);
+    assert.deepEqual(populated.find(([path]) => path === 'parentId'), ['parentId', 'phone']);
   });
 
   test('cannot approve an order the parent has not handed over, and nothing is claimed', async () => {

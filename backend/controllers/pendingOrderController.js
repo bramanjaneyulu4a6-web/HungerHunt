@@ -732,11 +732,26 @@ const caretakerOwner = async (req, res) => {
   };
 };
 
+/* Every unanswered request from the caretaker's rooms, in two kinds. The ones
+   the parent handed over carry `caretakerMayAnswer: true` and are the
+   caretaker's to accept or decline. The rest are still the parent's: the
+   caretaker sees them only to nudge the parent on WhatsApp, and the answer
+   routes below refuse them as before (caretakerStudentFilter). */
 export const getCaretakerPendingOrders = async (req, res) => {
   try {
-    const students = await Student.find(caretakerStudentFilter(req)).select("_id").lean();
+    const students = await Student.find({
+      roomId: { $in: req.staff.roomIds },
+      active: { $ne: false },
+      requiresParentApproval: true,
+    })
+      .select("_id caretakerMayApprove")
+      .lean();
 
     if (students.length === 0) return res.json({ count: 0, orders: [] });
+
+    const handedOver = new Set(
+      students.filter((student) => student.caretakerMayApprove).map((student) => String(student._id))
+    );
 
     const orders = await PendingOrder.find({
       studentId: { $in: students.map((student) => student._id) },
@@ -746,9 +761,18 @@ export const getCaretakerPendingOrders = async (req, res) => {
       // pocketMoney: the caretaker sees the wallet balance beside the cart, as
       // the parent does, to know whether accepting it can go through.
       .populate("studentId", "name admissionNumber className section grade roomNumber pocketMoney")
+      // The parent's number and nothing else of theirs, for the caretaker's
+      // "Notify Parent via WhatsApp" button.
+      .populate("parentId", "phone")
       .sort({ createdAt: -1 });
 
-    res.json({ count: orders.length, orders });
+    const shaped = orders.map((order) => {
+      const plain = typeof order.toObject === "function" ? order.toObject() : order;
+      const studentId = String(plain.studentId?._id ?? plain.studentId);
+      return { ...plain, caretakerMayAnswer: handedOver.has(studentId) };
+    });
+
+    res.json({ count: shaped.length, orders: shaped });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -779,6 +779,7 @@ const KioskBilling = ({ student, onLogout }) => {
      wait out somebody else's receipt. The timers do not run here; the session
      is already over, and this is only the telling. */
   if (result) {
+    const notifyParentButton = result === "pending" && !caretakerReviews && Boolean(parentWhatsApp);
     return (
       <KioskResultScreen
         variant={result}
@@ -797,13 +798,15 @@ const KioskBilling = ({ student, onLogout }) => {
             : "Nothing has been charged yet — your parent has been asked to approve it."}
         onDone={onLogout}
         tapLabel="Tap anywhere for next order"
-        /* Kept on screen for the browser that refused to open WhatsApp on its
-           own, and for a student who closed it before sending. Longer, so
-           there is time to find the button. */
-        action={result === "pending" && parentWhatsApp
-          ? { label: "Message your parent on WhatsApp", onClick: () => openWhatsApp(parentWhatsApp) }
+        /* Only on "Sent to your parent": kept on screen for the browser that
+           refused to open WhatsApp on its own, and for a student who closed it
+           before sending. Longer, so there is time to find the button. An
+           order the caretaker reviews gets no button here — the caretaker
+           app carries that one. */
+        action={notifyParentButton
+          ? { label: "Notify Parent via WhatsApp", onClick: () => openWhatsApp(parentWhatsApp) }
           : null}
-        seconds={result === "pending" && parentWhatsApp ? 12 : undefined}
+        seconds={notifyParentButton ? 12 : undefined}
       />
     );
   }

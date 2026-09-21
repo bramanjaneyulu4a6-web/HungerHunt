@@ -16,6 +16,7 @@ import SessionClock from "../components/SessionClock";
 import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
+import { allowanceCeiling, allowancePeriod, limitLine, limitMessage } from "../utils/purchaseCaps";
 import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
@@ -123,28 +124,6 @@ const toProduct = (item) => ({
   description: item.productId?.description?.trim() || "",
   purchaseAllowance: item.purchaseAllowance || null,
 });
-
-const allowanceCeiling = (product) => {
-  const allowance = product?.purchaseAllowance;
-  if (!allowance?.enabled) return Number.POSITIVE_INFINITY;
-  return Math.max(0, Number(allowance.remaining) || 0);
-};
-
-const allowancePeriod = (period) => ({
-  DAILY: "daily",
-  WEEKLY: "weekly",
-  MONTHLY: "monthly",
-  TOTAL: "total",
-}[period] || "purchase");
-
-const limitMessage = (product) => {
-  const allowance = product.purchaseAllowance;
-  if (!allowance?.enabled) return "This item cannot be added.";
-  if (allowance.pending > 0) {
-    return `${product.name}'s ${allowancePeriod(allowance.period)} limit includes ${allowance.pending} awaiting parent approval.`;
-  }
-  return `${product.name}'s ${allowancePeriod(allowance.period)} limit has been reached.`;
-};
 
 const KioskBilling = ({ student, onLogout }) => {
   // While this till is on screen a student is mid-order, and no deploy may
@@ -335,32 +314,34 @@ const KioskBilling = ({ student, onLogout }) => {
     if (refreshed.error) return;
 
     // Reconcile the ticket against fresh stock rather than dropping it.
+    // Line by line, so a shared category cap is handed out in cart order:
+    // lines already kept count against it, lines not yet reached do not.
     setCart((prevCart) =>
-      prevCart
-        .map((cartItem) => {
-          const latest = refreshed.products.find((p) => p._id === cartItem._id);
-          if (!latest) return null;
+      prevCart.reduce((kept, cartItem) => {
+        const latest = refreshed.products.find((p) => p._id === cartItem._id);
+        if (!latest) return kept;
 
-          return {
-            ...cartItem,
-            price: latest.price,
-            stock: latest.stock,
-            quantity: Math.min(
-              parseInt(cartItem.quantity, 10) || 1,
-              latest.stock,
-              allowanceCeiling(latest)
-            ),
-            purchaseAllowance: latest.purchaseAllowance,
-          };
-        })
-        .filter((item) => item && item.stock > 0 && item.quantity > 0)
+        const line = {
+          ...cartItem,
+          price: latest.price,
+          stock: latest.stock,
+          quantity: Math.min(
+            parseInt(cartItem.quantity, 10) || 1,
+            latest.stock,
+            allowanceCeiling(latest, kept)
+          ),
+          purchaseAllowance: latest.purchaseAllowance,
+        };
+
+        return line.stock > 0 && line.quantity > 0 ? [...kept, line] : kept;
+      }, [])
     );
   }, [applyInventory, loadInventory]);
 
   const addToCart = (product) => {
     if (product.stock < 1) return;
-    if (allowanceCeiling(product) < 1) {
-      showFeedback({ message: limitMessage(product), code: 'PRODUCT_LIMIT' }, {
+    if (allowanceCeiling(product, cart) < 1) {
+      showFeedback({ message: limitMessage(product, cart), code: 'PRODUCT_LIMIT' }, {
         product,
       });
       return;
@@ -403,12 +384,12 @@ const KioskBilling = ({ student, onLogout }) => {
 
           const latest = products.find((p) => p._id === productId) || item;
           const maxStock = latest.stock ?? item.stock;
-          const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
+          const maxAllowed = Math.min(maxStock, allowanceCeiling(latest, prevCart));
           const next = (parseInt(item.quantity, 10) || 0) + amount;
 
           if (next > maxAllowed) {
             if (maxAllowed < maxStock) {
-              showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+              showFeedback({ message: limitMessage(latest, prevCart), code: 'PRODUCT_LIMIT' }, { product: latest });
               return item;
             }
             showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: next });
@@ -439,12 +420,12 @@ const KioskBilling = ({ student, onLogout }) => {
 
         const latest = products.find((p) => p._id === productId) || item;
         const maxStock = latest.stock ?? item.stock;
-        const maxAllowed = Math.min(maxStock, allowanceCeiling(latest));
+        const maxAllowed = Math.min(maxStock, allowanceCeiling(latest, prevCart));
 
         if (parsed < 1) return { ...item, quantity: 1 };
         if (parsed > maxAllowed) {
           if (maxAllowed < maxStock) {
-            showFeedback({ message: limitMessage(latest), code: 'PRODUCT_LIMIT' }, { product: latest });
+            showFeedback({ message: limitMessage(latest, prevCart), code: 'PRODUCT_LIMIT' }, { product: latest });
             return { ...item, quantity: maxAllowed };
           }
           showFeedback({ message: `Only ${maxStock} in stock.` }, { available: maxStock, requested: parsed });
@@ -1013,7 +994,7 @@ const KioskBilling = ({ student, onLogout }) => {
                     products.find((p) => p._id === item._id) || item;
                   const maxAllowed = Math.min(
                     latest.stock ?? item.stock,
-                    allowanceCeiling(latest)
+                    allowanceCeiling(latest, cart)
                   );
                   const quantity = parseInt(item.quantity, 10) || 1;
                   const atCeiling = quantity >= maxAllowed;
@@ -1323,7 +1304,7 @@ const KioskBilling = ({ student, onLogout }) => {
                     <div className="wall-grid wall-grid--rail" role="list">
                 {subCategory.products.map((p, i) => {
                   const line = cart.find((item) => item._id === p._id);
-                  const maxAllowed = Math.min(p.stock, allowanceCeiling(p));
+                  const maxAllowed = Math.min(p.stock, allowanceCeiling(p, cart));
                   const limitReached = maxAllowed < 1;
                   const atCeiling =
                     (parseInt(line?.quantity, 10) || 0) >= maxAllowed;
@@ -1377,11 +1358,7 @@ const KioskBilling = ({ student, onLogout }) => {
                           className={`tile-limit${limitReached ? " tile-limit--reached" : ""}${p.purchaseAllowance?.enabled ? "" : " tile-slot--empty"}`}
                           aria-hidden={p.purchaseAllowance?.enabled ? undefined : true}
                         >
-                          {p.purchaseAllowance?.enabled
-                            ? limitReached
-                              ? `${allowancePeriod(p.purchaseAllowance.period)} limit reached`
-                              : `${p.purchaseAllowance.remaining} left in your ${allowancePeriod(p.purchaseAllowance.period)} limit`
-                            : BLANK}
+                          {p.purchaseAllowance?.enabled ? limitLine(p, cart) : BLANK}
                         </p>
 
                         {line ? (

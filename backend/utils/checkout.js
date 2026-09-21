@@ -4,7 +4,7 @@ import Inventory from '../models/Inventory.js';
 import { businessPeriodStart } from './businessTime.js';
 import { createFulfillmentOrder } from './fulfillment.js';
 import WalletReversal from '../models/WalletReversal.js';
-import { checkPurchaseLimits } from './purchaseLimits.js';
+import { checkPurchaseLimits, CLOSED_CATEGORY_MESSAGE, productInClosedCategory } from './purchaseLimits.js';
 import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
@@ -197,6 +197,14 @@ export const chargeCart = async ({
     });
 
     limitedEntries.push({ product: inventory.productId, quantity: orderItem.quantity });
+  }
+
+  // A category the office has switched off sells nothing, however the order
+  // arrived — a till menu loaded before the switch, or a request raised
+  // before it and approved after.
+  const closed = await productInClosedCategory(limitedEntries.map((entry) => entry.product), session);
+  if (closed) {
+    return { ok: false, status: 400, code: 'CATEGORY_DISABLED', message: CLOSED_CATEGORY_MESSAGE(closed) };
   }
 
   // Per-product limits are judged against the same populated rows the price

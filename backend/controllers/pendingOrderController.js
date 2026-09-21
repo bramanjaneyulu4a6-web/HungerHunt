@@ -7,7 +7,11 @@ import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
 import { isDemoStudent } from "../utils/demoAccount.js";
-import { checkPurchaseLimits } from "../utils/purchaseLimits.js";
+import {
+  checkPurchaseLimits,
+  CLOSED_CATEGORY_MESSAGE,
+  productInClosedCategory,
+} from "../utils/purchaseLimits.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import {
   healDemoAccount,
@@ -139,6 +143,9 @@ const priceCart = async (items, studentId) => {
   // standing there, instead of surfacing days later as a parent's approval
   // failing for reasons they cannot act on. chargeCart checks again at the
   // moment money moves, which is the answer that actually binds.
+  const closed = await productInClosedCategory(limitedEntries.map((entry) => entry.product));
+  if (closed) return { ok: false, status: 400, message: CLOSED_CATEGORY_MESSAGE(closed) };
+
   const withinLimits = await checkPurchaseLimits({ studentId, entries: limitedEntries });
 
   if (!withinLimits.ok) {

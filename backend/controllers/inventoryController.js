@@ -35,10 +35,14 @@ export const getInventory = async (req, res) => {
     //
     // Archived is the full withdrawal, restored only from the admin's archived
     // screen. Disabled is the lighter switch: off the kiosk, still sellable by
-    // staff at the till. Both spell out `!== false`, because rows written
-    // before either field carry no flag and are on sale.
+    // staff at the till. A switched-off category takes all its products off
+    // with it. Each spells out `!== false`, because rows written before the
+    // field carry no flag and are on sale.
     const visible = inventory.filter(
-      (row) => row.productId?.active !== false && row.productId?.kioskVisible !== false
+      (row) =>
+        row.productId?.active !== false &&
+        row.productId?.kioskVisible !== false &&
+        row.productId?.stockGroup?.active !== false
     );
 
     const products = visible.map((row) => row.productId).filter(Boolean);

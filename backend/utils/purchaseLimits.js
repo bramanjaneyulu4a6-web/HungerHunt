@@ -2,12 +2,20 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import WalletReversal from '../models/WalletReversal.js';
 import PendingOrder from '../models/PendingOrder.js';
+import Product from '../models/Product.js';
+import StockGroup from '../models/StockGroup.js';
+import { normalizeSubCategory } from './productSubcategory.js';
 import { businessPeriodStart } from './businessTime.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
 
-/* Per-product purchase limits: how many units of one product a single student
- * may buy in a period.
+/* Purchase limits: how many units a single student may buy in a period — of
+ * one product, of a whole category, or of one sub-category of a category.
+ *
+ * Every cap that covers a product applies, and the strictest binds: Blue Lays
+ * at 3 a week inside Salty Snacks at 2 a week can be bought twice. A category
+ * or sub-category cap counts the student's total across all its products, in
+ * any mix, so the two Salty Snacks may be one Blue Lays and one Kurkure.
  *
  * This is a different question from walletControl, which caps rupees across
  * the whole basket, and both are asked on every sale. A student inside their
@@ -53,6 +61,62 @@ export const limitOf = (product) => {
 
 const asObjectId = (value) =>
   mongoose.Types.ObjectId.isValid(value) ? new mongoose.Types.ObjectId(value) : value;
+
+const withSession = (query, session) => (session ? query.session(session) : query);
+
+// A product's category id, whether stockGroup arrived populated or as an id.
+const groupIdOf = (product) => {
+  const group = product?.stockGroup;
+  if (!group) return null;
+  return String(group._id ?? group);
+};
+
+const subCategoryOf = (product) => normalizeSubCategory(product?.subCategory);
+
+/* The category and sub-category caps over these products' categories, as
+ * { key, type, name, groupId, subCategory, quantity, period }. subCategory is
+ * null for a whole-category cap. */
+const loadGroupCaps = async (products, session) => {
+  const groupIds = [...new Set(products.map(groupIdOf).filter(Boolean))];
+  if (groupIds.length === 0) return [];
+
+  const groups = await withSession(
+    StockGroup.find({ _id: { $in: groupIds.map(asObjectId) } })
+      .select('name purchaseLimit subCategoryLimits')
+      .lean(),
+    session
+  );
+  const caps = [];
+
+  for (const group of groups) {
+    const groupId = String(group._id);
+    const own = limitOf(group);
+
+    if (own) {
+      caps.push({ key: `category:${groupId}`, type: 'CATEGORY', name: group.name, groupId, subCategory: null, ...own });
+    }
+
+    for (const entry of group.subCategoryLimits || []) {
+      const limit = limitOf({ purchaseLimit: entry });
+      if (!limit) continue;
+      const subCategory = normalizeSubCategory(entry.name);
+      caps.push({
+        key: `subcategory:${groupId}:${subCategory}`,
+        type: 'SUBCATEGORY',
+        name: subCategory,
+        groupId,
+        subCategory,
+        ...limit,
+      });
+    }
+  }
+
+  return caps;
+};
+
+const capCovers = (cap, product) =>
+  groupIdOf(product) === cap.groupId &&
+  (cap.subCategory === null || subCategoryOf(product) === cap.subCategory);
 
 /* Units of each product the student has already bought in one period.
  *
@@ -128,6 +192,27 @@ const pendingQuantities = async ({
   return new Map(rows.map((row) => [String(row._id), Number(row.quantity) || 0]));
 };
 
+/* What a category or sub-category cap has used: every unit bought in its
+ * period, and every unit waiting in an open request, across all the products
+ * it covers — archived ones included, since what was bought was bought. A
+ * product's current category decides, so moving a product moves its history
+ * with it. */
+const capUsage = async ({ cap, studentId, session, now, excludePendingOrderId }) => {
+  const filter = { stockGroup: asObjectId(cap.groupId) };
+  if (cap.subCategory !== null) filter.subCategory = cap.subCategory;
+
+  const productIds = await withSession(Product.find(filter).distinct('_id'), session);
+  if (productIds.length === 0) return { purchased: 0, pending: 0 };
+
+  const [bought, waiting] = await Promise.all([
+    purchasedInPeriod({ studentId, productIds, since: periodStart(cap.period, now), session }),
+    pendingQuantities({ studentId, productIds, session, now, excludePendingOrderId }),
+  ]);
+  const sum = (map) => [...map.values()].reduce((total, value) => total + value, 0);
+
+  return { purchased: sum(bought), pending: sum(waiting) };
+};
+
 /* The catalogue needs the same answer as checkout so it can stop the invalid
  * action at the Add/+ button instead of allowing a basket that can only fail.
  * Values are the number of additional units the current basket may contain;
@@ -140,12 +225,16 @@ export const getPurchaseAllowances = async ({
   excludePendingOrderId = null,
   student = null,
 }) => {
+  const result = new Map();
+  if (!products?.length) return result;
+
   const limited = products
     .map((product) => ({ product, limit: limitOf(product) }))
     .filter((entry) => entry.limit);
-  const result = new Map();
+  const caps = (await loadGroupCaps(products, session))
+    .filter((cap) => products.some((product) => capCovers(cap, product)));
 
-  if (limited.length === 0) return result;
+  if (limited.length === 0 && caps.length === 0) return result;
 
   // The PhonePe reviewer's children shop without limits, so that a review can
   // place order after order without waiting for a business week to turn over.
@@ -159,45 +248,98 @@ export const getPurchaseAllowances = async ({
   if (await isTestAccountStudent(student ?? studentId, { session })) return result;
   if (await isDemoStudent(student ?? studentId, { session })) return result;
 
-  const productIds = limited.map(({ product }) => product._id);
-  const pending = await pendingQuantities({
-    studentId,
-    productIds,
-    session,
-    now,
-    excludePendingOrderId,
-  });
-  const byPeriod = new Map();
+  // Each product's own cap, counted per product.
+  const productCaps = new Map();
 
-  for (const entry of limited) {
-    const group = byPeriod.get(entry.limit.period);
-    if (group) group.push(entry);
-    else byPeriod.set(entry.limit.period, [entry]);
+  if (limited.length) {
+    const pending = await pendingQuantities({
+      studentId,
+      productIds: limited.map(({ product }) => product._id),
+      session,
+      now,
+      excludePendingOrderId,
+    });
+    const byPeriod = new Map();
+
+    for (const entry of limited) {
+      const group = byPeriod.get(entry.limit.period);
+      if (group) group.push(entry);
+      else byPeriod.set(entry.limit.period, [entry]);
+    }
+
+    for (const [period, group] of byPeriod) {
+      const purchased = await purchasedInPeriod({
+        studentId,
+        productIds: group.map(({ product }) => product._id),
+        since: periodStart(period, now),
+        session,
+      });
+
+      for (const { product, limit } of group) {
+        const key = String(product._id);
+        const bought = purchased.get(key) || 0;
+        const awaitingApproval = pending.get(key) || 0;
+
+        productCaps.set(key, {
+          type: 'PRODUCT',
+          name: product.name,
+          quantity: limit.quantity,
+          period,
+          purchased: bought,
+          pending: awaitingApproval,
+          remaining: Math.max(0, limit.quantity - bought - awaitingApproval),
+        });
+      }
+    }
   }
 
-  for (const [period, group] of byPeriod) {
-    const purchased = await purchasedInPeriod({
-      studentId,
-      productIds: group.map(({ product }) => product._id),
-      since: periodStart(period, now),
-      session,
+  // Each category and sub-category cap, counted once across its products.
+  const groupCaps = await Promise.all(
+    caps.map(async (cap) => {
+      const used = await capUsage({ cap, studentId, session, now, excludePendingOrderId });
+      return {
+        key: cap.key,
+        type: cap.type,
+        name: cap.name,
+        quantity: cap.quantity,
+        period: cap.period,
+        purchased: used.purchased,
+        pending: used.pending,
+        remaining: Math.max(0, cap.quantity - used.purchased - used.pending),
+        covers: (product) => capCovers(cap, product),
+      };
+    })
+  );
+
+  for (const product of products) {
+    const key = String(product._id);
+    const own = productCaps.get(key) || null;
+    const shared = groupCaps.filter((cap) => cap.covers(product)).map(({ covers: _covers, ...cap }) => cap);
+
+    if (!own && shared.length === 0) continue;
+
+    // The strictest cap is the one the student meets first; it is also the
+    // one the kiosk names. On a tie the product's own cap is named.
+    const binding = [own, ...shared]
+      .filter(Boolean)
+      .reduce((best, cap) => (cap.remaining < best.remaining ? cap : best));
+
+    result.set(key, {
+      enabled: true,
+      quantity: binding.quantity,
+      period: binding.period,
+      purchased: binding.purchased,
+      pending: binding.pending,
+      remaining: binding.remaining,
+      // Which cap the figures above belong to: PRODUCT, CATEGORY or
+      // SUBCATEGORY, and its name.
+      scope: { type: binding.type, name: binding.name },
+      // Every cap in play. A category or sub-category cap is shared by the
+      // whole cart, so the kiosk needs each one's key and remaining to stop
+      // two products together going over it.
+      product: own,
+      caps: shared,
     });
-
-    for (const { product, limit } of group) {
-      const key = String(product._id);
-      const bought = purchased.get(key) || 0;
-      const awaitingApproval = pending.get(key) || 0;
-      const used = bought + awaitingApproval;
-
-      result.set(key, {
-        enabled: true,
-        quantity: limit.quantity,
-        period,
-        purchased: bought,
-        pending: awaitingApproval,
-        remaining: Math.max(0, limit.quantity - used),
-      });
-    }
   }
 
   return result;
@@ -212,6 +354,26 @@ export const getPurchaseAllowances = async ({
  * Returns { ok: true } or { ok: false, status, message }, matching chargeCart
  * so a caller decides what an HTTP response looks like.
  */
+const usedText = (cap) =>
+  cap.pending > 0
+    ? `${cap.purchased} bought and ${cap.pending} awaiting parent approval`
+    : `${cap.purchased} already bought`;
+
+const refusal = (subject, cap) => {
+  const label = purchaseLimitPeriodLabel(cap.period);
+  return {
+    ok: false,
+    status: 400,
+    code: 'PRODUCT_LIMIT',
+    scope: { type: cap.type, name: cap.name },
+    message:
+      cap.remaining === 0
+        ? `${subject} limited to ${cap.quantity} per ${label}; ${usedText(cap)}. None can be added.`
+        : `${subject} limited to ${cap.quantity} per ${label}; ${usedText(cap)}, ` +
+          `so only ${cap.remaining} more can be added.`,
+  };
+};
+
 export const checkPurchaseLimits = async ({
   studentId,
   entries,
@@ -225,17 +387,13 @@ export const checkPurchaseLimits = async ({
   const wanted = new Map();
 
   for (const { product, quantity } of entries) {
-    const limit = limitOf(product);
-
-    if (!limit) continue;
-
     const key = String(product._id);
     const seen = wanted.get(key);
 
     if (seen) {
       seen.quantity += Number(quantity);
     } else {
-      wanted.set(key, { product, limit, quantity: Number(quantity) });
+      wanted.set(key, { product, quantity: Number(quantity) });
     }
   }
 
@@ -250,27 +408,46 @@ export const checkPurchaseLimits = async ({
     student,
   });
 
+  // A product's own cap, line by line.
   for (const entry of wanted.values()) {
-    const allowance = allowances.get(String(entry.product._id));
-    if (!allowance || entry.quantity <= allowance.remaining) continue;
+    const own = allowances.get(String(entry.product._id))?.product;
+    if (own && entry.quantity > own.remaining) return refusal(`${entry.product.name} is`, own);
+  }
 
-    const label = purchaseLimitPeriodLabel(entry.limit.period);
-    const usedText = allowance.pending > 0
-      ? `${allowance.purchased} bought and ${allowance.pending} awaiting parent approval`
-      : `${allowance.purchased} already bought`;
+  // A category or sub-category cap, against everything in the cart it covers.
+  const shared = new Map();
 
-    return {
-      ok: false,
-      status: 400,
-      code: 'PRODUCT_LIMIT',
-      message:
-        allowance.remaining === 0
-          ? `${entry.product.name} is limited to ${entry.limit.quantity} per ${label}; ` +
-            `${usedText}. None can be added.`
-          : `${entry.product.name} is limited to ${entry.limit.quantity} per ${label}; ` +
-            `${usedText}, so only ${allowance.remaining} more can be added.`,
-    };
+  for (const entry of wanted.values()) {
+    for (const cap of allowances.get(String(entry.product._id))?.caps || []) {
+      const total = shared.get(cap.key);
+      if (total) total.quantity += entry.quantity;
+      else shared.set(cap.key, { cap, quantity: entry.quantity });
+    }
+  }
+
+  for (const { cap, quantity } of shared.values()) {
+    if (quantity > cap.remaining) return refusal(`Items from ${cap.name} are`, cap);
   }
 
   return { ok: true };
 };
+
+/* Products whose category the office has switched off. Asked by every way of
+ * buying — the till, raising a request and approving one — before any cap:
+ * a switched-off category is not for sale at all, to anyone, test accounts
+ * included. Returns the first such product, or null. */
+export const productInClosedCategory = async (products, session = null) => {
+  const groupIds = [...new Set(products.map(groupIdOf).filter(Boolean))];
+  if (groupIds.length === 0) return null;
+
+  const closed = await withSession(
+    StockGroup.find({ _id: { $in: groupIds.map(asObjectId) }, active: false }).select('_id').lean(),
+    session
+  );
+  if (closed.length === 0) return null;
+
+  const closedIds = new Set(closed.map((group) => String(group._id)));
+  return products.find((product) => closedIds.has(groupIdOf(product))) || null;
+};
+
+export const CLOSED_CATEGORY_MESSAGE = (product) => `${product.name} is not available right now.`;

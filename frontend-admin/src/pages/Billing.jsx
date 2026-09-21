@@ -45,6 +45,9 @@ const Billing = () => {
 
       const inventoryProducts = (Array.isArray(res.data) ? res.data : [])
         .filter((item) => {
+          // A category switched off on the Products page sells nothing; the
+          // server would refuse the bill, so it is not offered here either.
+          if (item.productId?.stockGroup?.active === false) return false;
           const availability = resolveAvailability(item);
           return availability === "AVAILABLE" || availability === "LOW";
         })

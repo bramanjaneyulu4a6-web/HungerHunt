@@ -15,6 +15,8 @@ import { formatINR, formatPackSize } from '../utils/format';
 import { cloudinaryThumb } from '../utils/cloudinaryThumb';
 import { resolveAvailability } from '../utils/availability';
 import { unitsForCategory } from '../constants/units';
+import CategoryLimitEditor from '../components/CategoryLimitEditor';
+import { capLabel } from '../utils/categoryLimits';
 import {
   WIZARD_STEPS,
   canReachStep,
@@ -347,6 +349,65 @@ const Products = () => {
       console.error(error);
       await fetchStockGroups();
       toast.error('Failed to reorder categories');
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  /* A category's own settings: on sale or not, and its per-student cap.
+     Saved straight away, each on its own control. */
+  const saveCategory = async (category, updates, message) => {
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}`, updates);
+      await fetchStockGroups();
+      toast.success(message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update the category');
+      throw error;
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+
+  // Switching a category off takes every product in it off sale at once, so
+  // it asks first; switching back on does not.
+  const setCategoryForSale = (category, forSale) => {
+    const apply = () =>
+      saveCategory(category, { active: forSale }, forSale ? `${category.name} is on sale again` : `${category.name} switched off`)
+        .catch(() => {});
+    if (forSale) {
+      apply();
+      return;
+    }
+    const count = products.filter((product) => product.stockGroup?._id === category._id).length;
+    setConfirming({
+      title: `Switch off ${category.name}?`,
+      message: `Students can't buy any of its ${count} ${count === 1 ? 'product' : 'products'} — at the kiosk, at the till or through a waiting approval — until you switch it back on. Stock and history stay as they are.`,
+      icon: 'eyeOff',
+      variant: 'danger',
+      action: apply,
+    });
+  };
+
+  const saveCategoryLimit = (category, purchaseLimit) =>
+    saveCategory(
+      category,
+      { purchaseLimit },
+      purchaseLimit.enabled ? `${category.name} limit saved` : `${category.name} limit switched off`
+    ).catch(() => {});
+
+  const subCategoryLimitOf = (category, name) =>
+    (category?.subCategoryLimits || []).find((entry) => entry.name === name) || null;
+
+  const saveSubCategoryLimit = async (category, name, limit) => {
+    setSavingGroups(true);
+    try {
+      await api.put(`/stock-groups/${category._id}/subcategory-limits`, { subCategory: name, ...limit });
+      await fetchStockGroups();
+      toast.success(limit.enabled ? `${name} limit saved` : `${name} limit switched off`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save the limit');
     } finally {
       setSavingGroups(false);
     }
@@ -1072,6 +1133,7 @@ const Products = () => {
                     <span aria-hidden="true">⠿</span>
                     <button type="button" role="tab" aria-selected={editorCategoryId === category._id} onClick={() => setEditorCategoryId(category._id)}>
                       {category.name}
+                      {category.active === false && <span className="category-editor-tab__off">Off</span>}
                     </button>
                   </div>
                 ))}
@@ -1085,6 +1147,36 @@ const Products = () => {
                       <h4 id="subcategory-editor-title">{selectedCategory.name}</h4>
                     </div>
                   </header>
+
+                  {/* What students may buy from this category: whether it is
+                      on sale at all, and a per-student cap over all of it. */}
+                  <div className={`category-sale${selectedCategory.active === false ? ' category-sale--off' : ''}`}>
+                    <div>
+                      <strong>{selectedCategory.active === false ? 'Switched off' : 'On sale'}</strong>
+                      <small>
+                        {selectedCategory.active === false
+                          ? 'Hidden from the kiosk and the till. No order with these products can be placed or approved.'
+                          : 'Students can buy this category at the kiosk and the till.'}
+                      </small>
+                    </div>
+                    <Button
+                      variant={selectedCategory.active === false ? 'primary' : 'danger'}
+                      disabled={savingGroups}
+                      onClick={() => setCategoryForSale(selectedCategory, selectedCategory.active === false)}
+                    >
+                      {selectedCategory.active === false ? 'Switch back on' : 'Switch off category'}
+                    </Button>
+                  </div>
+
+                  <CategoryLimitEditor
+                    key={`category-${selectedCategory._id}-${capLabel(selectedCategory.purchaseLimit)}-${selectedCategory.purchaseLimit?.enabled}`}
+                    id={`category-limit-${selectedCategory._id}`}
+                    label={`Limit per student across all of ${selectedCategory.name}`}
+                    hint="Counts every product in the category together. The strictest limit — product, sub-category or category — is the one that applies."
+                    limit={selectedCategory.purchaseLimit}
+                    disabled={savingGroups}
+                    onSave={(limit) => saveCategoryLimit(selectedCategory, limit)}
+                  />
 
                   <div className="subcategory-tile-grid">
                     {subCategories.map((name) => {
@@ -1120,7 +1212,12 @@ const Products = () => {
                           <button type="button" className="subcategory-editor-tile__name" onClick={() => renameSubCategory(selectedCategory, name)}>
                             {name} <span aria-hidden="true">✎</span>
                           </button>
-                          <small>{count} {count === 1 ? 'product' : 'products'}</small>
+                          <small>
+                            {count} {count === 1 ? 'product' : 'products'}
+                            {capLabel(subCategoryLimitOf(selectedCategory, name)) && (
+                              <span className="subcategory-editor-tile__cap"> · limit {capLabel(subCategoryLimitOf(selectedCategory, name))}</span>
+                            )}
+                          </small>
                           {name !== 'Others' && (
                             <button type="button" className="subcategory-editor-tile__remove" disabled={savingGroups || count > 0} onClick={() => removeSubCategory(selectedCategory, name)} aria-label={`Remove ${name}`}>×</button>
                           )}
@@ -1136,6 +1233,26 @@ const Products = () => {
                       <Button type="submit" disabled={savingGroups}>Add</Button>
                     </div>
                   </form>
+
+                  <section className="subcategory-limits" aria-labelledby="subcategory-limits-title">
+                    <h5 id="subcategory-limits-title">Limits per sub-category</h5>
+                    <p>
+                      Each counts a student&apos;s total across that sub-category&apos;s products, in any mix.
+                    </p>
+                    {subCategories.map((name) => {
+                      const limit = subCategoryLimitOf(selectedCategory, name);
+                      return (
+                        <CategoryLimitEditor
+                          key={`sub-${selectedCategory._id}-${name}-${capLabel(limit)}-${limit?.enabled}`}
+                          id={`subcategory-limit-${selectedCategory._id}-${name.replace(/\W+/g, '-')}`}
+                          label={name}
+                          limit={limit}
+                          disabled={savingGroups}
+                          onSave={(next) => saveSubCategoryLimit(selectedCategory, name, next)}
+                        />
+                      );
+                    })}
+                  </section>
                 </section>
               )}
 

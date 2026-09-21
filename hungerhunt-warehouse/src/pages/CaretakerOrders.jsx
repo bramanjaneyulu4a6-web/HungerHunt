@@ -3,18 +3,28 @@ import { useNavigate } from 'react-router-dom';
 
 import CaretakerApprovals from '../components/CaretakerApprovals';
 import Icon from '../components/Icon';
+import NotifyParentButton from '../components/NotifyParentButton';
 import ReportForm from '../components/ReportForm';
 import { Banner, EmptyState, Skeleton } from '../components/ui';
 import api from '../utils/api';
 import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
+import { awaitingParentTile, splitPendingOrders } from '../utils/awaitingParent';
 import { caretakerProductTotals, filterCaretakerOrders } from '../utils/caretakerOrders';
 import { ORDER_ISSUE_CATEGORIES } from '../utils/reports';
 import { useFeature } from '../utils/currentStaff';
 
 const HISTORY_PAGE_SIZE = 25;
 const REFRESH_INTERVAL_MS = 15_000;
-const STATUS_STEPS = ['PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
+// AWAITING_PARENT is not a package status: it is an approval order the
+// parent has not answered yet, drawn as a tile at the first step. Every
+// package from the warehouse is past it.
+const STATUS_STEPS = ['AWAITING_PARENT', 'PENDING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED'];
 const STATUS_DETAILS = {
+  AWAITING_PARENT: {
+    label: 'Awaiting parent approval',
+    detail: 'Sent to the parent to accept or decline in their app. Nothing is charged until they do.',
+    badge: 'new',
+  },
   PENDING: {
     label: 'Order received',
     detail: 'The warehouse has received this order.',
@@ -109,6 +119,14 @@ const UnitOrderItems = ({ items }) => (
   </div>
 );
 
+const answerBy = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'Asia/Kolkata',
+});
+
 const StudentDetails = ({ order }) => (
   <div>
     <span className="wh-who">{order.student.name}</span>
@@ -133,6 +151,11 @@ const CaretakerOrders = () => {
   const [historyError, setHistoryError] = useState(false);
   const [awaitingCollection, setAwaitingCollection] = useState(0);
   const [orderSearch, setOrderSearch] = useState('');
+  // Every unanswered approval order from these rooms (GET /pending-orders/caretaker):
+  // the caretaker's to answer go to Pending approvals, the parent's become
+  // tiles in Student orders.
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingError, setPendingError] = useState(false);
   const loadMoreRef = useRef(null);
   const arrivalRequestRef = useRef(0);
 
@@ -150,6 +173,17 @@ const CaretakerOrders = () => {
       if (requestNumber === arrivalRequestRef.current) setLoadError(true);
     } finally {
       if (requestNumber === arrivalRequestRef.current) setLoading(false);
+    }
+  }, []);
+
+  const loadPending = useCallback(async () => {
+    try {
+      const response = await api.get('/pending-orders/caretaker');
+      setPendingOrders(response.data.orders || []);
+      setPendingError(false);
+    } catch (error) {
+      console.error(error);
+      setPendingError(true);
     }
   }, []);
 
@@ -173,20 +207,26 @@ const CaretakerOrders = () => {
     }
   }, []);
 
-  useEffect(() => { (async () => { await loadArrivals(); })(); }, [loadArrivals]);
+  useEffect(() => { (async () => { await Promise.all([loadArrivals(), loadPending()]); })(); }, [loadArrivals, loadPending]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => loadArrivals({ silent: true }), REFRESH_INTERVAL_MS);
+    const interval = window.setInterval(() => {
+      loadArrivals({ silent: true });
+      loadPending();
+    }, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [loadArrivals]);
+  }, [loadArrivals, loadPending]);
 
   // The backend announces every change within seconds; the interval above is
   // the safety net for when that announcement is missed.
   useEffect(() => {
-    const refresh = () => loadArrivals({ silent: true });
+    const refresh = () => {
+      loadArrivals({ silent: true });
+      loadPending();
+    };
     window.addEventListener(DATA_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(DATA_CHANGED_EVENT, refresh);
-  }, [loadArrivals]);
+  }, [loadArrivals, loadPending]);
 
   useEffect(() => {
     if (view !== 'history' || !historyHasMore || historyLoading || !historyLoaded) return undefined;
@@ -210,10 +250,18 @@ const CaretakerOrders = () => {
     STATUS_STEPS.indexOf(b.status) - STATUS_STEPS.indexOf(a.status) ||
     new Date(a.deliverBy).getTime() - new Date(b.deliverBy).getTime()
   ), [orders]);
+  const { forCaretaker, awaitingParent } = useMemo(() => splitPendingOrders(pendingOrders), [pendingOrders]);
+  // Orders waiting on the parent first — the one thing on this list the
+  // caretaker can still move along, by nudging the parent on WhatsApp.
+  const studentTiles = useMemo(
+    () => [...awaitingParent.map(awaitingParentTile), ...currentOrders],
+    [awaitingParent, currentOrders]
+  );
+  // Only what is actually on its way: an unanswered order is not paid for.
   const unitProducts = useMemo(() => caretakerProductTotals(orders), [orders]);
   const visibleOrders = useMemo(
-    () => filterCaretakerOrders(currentOrders, orderSearch),
-    [currentOrders, orderSearch]
+    () => filterCaretakerOrders(studentTiles, orderSearch),
+    [studentTiles, orderSearch]
   );
 
   return (
@@ -231,11 +279,11 @@ const CaretakerOrders = () => {
 
       {/* Above the tabs: a purchase waiting on an answer is the one thing
           here that a student is actively held up by. */}
-      <CaretakerApprovals />
+      <CaretakerApprovals orders={forCaretaker} loadError={pendingError} onResolved={loadPending} />
 
       <div className="wh-view-tabs" aria-label="Package view">
         <button type="button" className={view === 'arriving' ? 'active' : ''} onClick={() => showView('arriving')}>
-          Current ({orders.length})
+          Current ({studentTiles.length})
         </button>
         {canHistory && (
           <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => showView('history')}>
@@ -275,7 +323,7 @@ const CaretakerOrders = () => {
                     <span>Individual packages</span>
                     <h2 id="caretaker-student-orders-title">Student orders</h2>
                   </div>
-                  <strong>{visibleOrders.length} of {orders.length}</strong>
+                  <strong>{visibleOrders.length} of {studentTiles.length}</strong>
                 </div>
 
                 <label className="wh-search caretaker-order-search" htmlFor="caretaker-order-search">
@@ -293,11 +341,11 @@ const CaretakerOrders = () => {
 
                 {visibleOrders.length === 0 ? (
                   <EmptyState
-                    icon={orders.length === 0 ? '✓' : '⌕'}
-                    title={orders.length === 0 ? "You're all caught up" : 'No matching student orders'}
-                    variant={orders.length === 0 ? 'success' : 'default'}
+                    icon={studentTiles.length === 0 ? '✓' : '⌕'}
+                    title={studentTiles.length === 0 ? "You're all caught up" : 'No matching student orders'}
+                    variant={studentTiles.length === 0 ? 'success' : 'default'}
                   >
-                    {orders.length === 0
+                    {studentTiles.length === 0
                       ? 'Nothing is on its way to your rooms, and no package is waiting to be collected.'
                       : 'Try another student name or admission number.'}
                   </EmptyState>
@@ -326,7 +374,13 @@ const CaretakerOrders = () => {
                       </div>
 
                       <p className="wh-status-detail">{status.detail}</p>
+                      {order.pendingOrder && order.expiresAt && (
+                        <p className="wh-status-detail">
+                          Parent can answer until {answerBy.format(new Date(order.expiresAt))}
+                        </p>
+                      )}
                       <PackageLines items={order.items} />
+                      {order.pendingOrder && <NotifyParentButton order={order.pendingOrder} />}
                       {order.status === 'DELIVERED' && <DeliveredActions order={order} />}
                     </article>
                   );

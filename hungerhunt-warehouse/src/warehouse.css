@@ -954,7 +954,7 @@
 
 .wh-order-progress {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 5px;
   margin: 16px 0 8px;
 }
@@ -2395,19 +2395,22 @@
   outline-offset: 3px;
 }
 
+/* Notified once, by the kiosk or a caretaker: the button stays, locked. */
+.caretaker-notify-parent:disabled {
+  cursor: default;
+  background: #a9cdb8;
+}
+
+.caretaker-notify-parent-done p {
+  margin: 6px 0 0;
+  color: var(--review-muted, var(--wh-muted));
+  font-size: 13px;
+  text-align: center;
+}
+
 .caretaker-notify-parent__missing {
   margin: 12px 0 0;
   color: var(--review-muted);
   font-size: 13px;
 }
 
-/* An order the parent still answers: the caretaker only watches and nudges. */
-.pending-card--parent .pending-compact__eyebrow {
-  color: var(--review-muted);
-}
-
-.caretaker-parent-note {
-  margin: 14px 0 0;
-  color: var(--review-muted);
-  font-size: 14px;
-}

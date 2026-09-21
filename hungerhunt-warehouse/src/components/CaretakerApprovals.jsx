@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 
 import Icon from './Icon';
+import NotifyParentButton from './NotifyParentButton';
 import { Banner, Button, Card, ConfirmDialog } from './ui';
 import api from '../utils/api';
-import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { formatINR } from '../utils/format';
-import { openWhatsApp } from '../utils/openWhatsApp';
-import { notifyParentWhatsAppLink } from '../utils/parentWhatsApp';
-
-const REFRESH_INTERVAL_MS = 15_000;
 
 const formatExpiry = (value) =>
   new Intl.DateTimeFormat('en-IN', {
@@ -24,70 +20,6 @@ const initialQuantities = (order) =>
 
 const failureMessage = (error) =>
   error.response?.data?.message || 'That did not go through. Please try again.';
-
-/* Tells the parent about an order still waiting for an answer, from the
- * caretaker's own WhatsApp — the kiosk's message, word for word: accept or
- * decline when the parent answers, "the caretaker is reviewing it" when they
- * handed it over. Opens a typed-out message; the caretaker taps send. */
-const NotifyParentButton = ({ order }) => {
-  const link = notifyParentWhatsAppLink(order);
-
-  if (!link) {
-    return (
-      <p className="caretaker-notify-parent__missing">
-        No WhatsApp number on file for this student&apos;s parent.
-      </p>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      className="caretaker-notify-parent"
-      onClick={() => {
-        if (!openWhatsApp(link)) {
-          toast.error('Could not open WhatsApp. Allow pop-ups for this site and try again.');
-        }
-      }}
-    >
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-        <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.2.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.2.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z" />
-      </svg>
-      Notify Parent via WhatsApp
-    </button>
-  );
-};
-
-/* An order still waiting on the parent: theirs to answer, so the caretaker
- * gets no cart to change and no Accept — only the order at a glance and the
- * nudge. The answer routes refuse it server-side as well. */
-const WaitingOnParentCard = ({ order }) => {
-  const student = order.studentId || {};
-  return (
-    <Card className="pending-card pending-card--compact pending-card--parent">
-      <div className="pending-compact__head">
-        <div>
-          <span className="pending-compact__eyebrow">Waiting for parent</span>
-          <h3>{student.name || 'Student'}&apos;s order</h3>
-        </div>
-        <span className="pending-compact__expiry">
-          {student.admissionNumber || 'No admission number'}
-        </span>
-      </div>
-
-      <div className="pending-compact__totals">
-        <div><span>Subtotal</span><strong>{formatINR(order.totalAmount)}</strong></div>
-        <div><span>Expires</span><strong>{formatExpiry(order.expiresAt)}</strong></div>
-      </div>
-
-      <p className="caretaker-parent-note">
-        Sent to the parent to accept or decline in their app.
-      </p>
-
-      <NotifyParentButton order={order} />
-    </Card>
-  );
-};
 
 /* One request, drawn as the parent's app draws it on their dashboard: the
  * compact card, and the same "Review" sheet with the same cart, quantity
@@ -429,49 +361,23 @@ const ApprovalCard = ({ order, onResolved }) => {
   );
 };
 
-/* Purchase requests the caretaker may answer for the parent.
- *
- * Every unanswered order from the caretaker's rooms. Those whose parent
- * switched on "Let the caretaker accept orders" are the caretaker's to answer,
- * and the server checks that permission again on every tap — a parent who
- * withdraws it mid-shift turns the next Accept into "not found" rather than a
- * charge. The rest are still the parent's; the caretaker can only nudge them.
+/* Purchase requests the caretaker may answer for the parent: only those whose
+ * parent switched on "Let the caretaker accept orders". The server checks that
+ * permission again on every tap — a parent who withdraws it mid-shift turns
+ * the next Accept into "not found" rather than a charge. Orders the parent
+ * still answers are drawn with the room's packages in Student orders instead
+ * (pages/CaretakerOrders.jsx), which also loads this list.
  *
  * Draws nothing at all when there is nothing to answer, which is most rooms
  * most of the time. */
-const CaretakerApprovals = () => {
-  const [orders, setOrders] = useState([]);
-  const [loadError, setLoadError] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const response = await api.get('/pending-orders/caretaker');
-      setOrders(response.data.orders || []);
-      setLoadError(false);
-    } catch (error) {
-      console.error(error);
-      setLoadError(true);
-    }
-  }, []);
-
-  useEffect(() => { (async () => { await load(); })(); }, [load]);
-
-  useEffect(() => {
-    const interval = window.setInterval(load, REFRESH_INTERVAL_MS);
-    window.addEventListener(DATA_CHANGED_EVENT, load);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener(DATA_CHANGED_EVENT, load);
-    };
-  }, [load]);
-
+const CaretakerApprovals = ({ orders, loadError, onResolved }) => {
   if (orders.length === 0) return null;
 
   return (
     <section className="caretaker-approvals" aria-labelledby="caretaker-approvals-title">
       <div className="caretaker-student-orders__heading">
         <div>
-          <span>Waiting for an answer</span>
+          <span>Parents have asked you to review</span>
           <h2 id="caretaker-approvals-title">Pending approvals</h2>
         </div>
         <strong>{orders.length}</strong>
@@ -479,17 +385,15 @@ const CaretakerApprovals = () => {
 
       {loadError && <Banner variant="alert" icon="⚠️">Could not refresh orders waiting for approval.</Banner>}
 
-      {orders.map((order) => (order.caretakerMayAnswer ? (
+      {orders.map((order) => (
         // Keyed on the saved basket too, so a reduction saved elsewhere
         // resets the steppers to what is actually on the order now.
         <ApprovalCard
           key={`${order._id}-${order.totalAmount}`}
           order={order}
-          onResolved={load}
+          onResolved={onResolved}
         />
-      ) : (
-        <WaitingOnParentCard key={order._id} order={order} />
-      )))}
+      ))}
     </section>
   );
 };

@@ -9,6 +9,7 @@ import {
   getCaretakerPendingOrders,
   getParentPendingOrders,
   getPendingOrderStatus,
+  markParentNotified,
   rejectPendingOrder,
   updatePendingOrder,
 } from "../controllers/pendingOrderController.js";
@@ -40,5 +41,9 @@ router.get("/caretaker", protectCaretaker, getCaretakerPendingOrders);
 router.post("/:id/caretaker-approve", protectCaretaker, caretakerApprovePendingOrder);
 router.post("/:id/caretaker-reject", protectCaretaker, caretakerRejectPendingOrder);
 router.put("/:id/caretaker", protectCaretaker, caretakerUpdatePendingOrder);
+
+// "Notify Parent via WhatsApp" was tapped: once per order, from the kiosk (the
+// student's own order) or the caretaker app (an order from their rooms).
+router.post("/:id/parent-notified", orStudent(protectCaretaker), markParentNotified);
 
 export default router;

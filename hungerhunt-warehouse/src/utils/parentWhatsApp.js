@@ -60,7 +60,7 @@ export const composeParentApprovalMessage = ({ studentName, order }) => {
   return [
     '*Hunger Hunt — order waiting for your approval*',
     `Hello! Your child${child ? ` *${child}*` : ''} has just placed an order at the school store.`,
-    ['🛒 *Order*', ...items.map(itemLine)].join('\n'),
+    ['*Order*', ...items.map(itemLine)].join('\n'),
     `*Total: ${formatINR(order?.totalAmount)}*`,
     'Nothing has been charged yet. Please open the Hunger Hunt app to review this order and *accept* or *decline* it' +
       (deadline ? ` before ${deadline}.` : '.'),
@@ -77,7 +77,7 @@ export const composeCaretakerReviewMessage = ({ studentName, order }) => {
   return [
     '*Hunger Hunt — order sent to the room caretaker*',
     `Hello! Your child${child ? ` *${child}*` : ''} has just placed an order at the school store.`,
-    ['🛒 *Order*', ...items.map(itemLine)].join('\n'),
+    ['*Order*', ...items.map(itemLine)].join('\n'),
     `*Total: ${formatINR(order?.totalAmount)}*`,
     'Nothing has been charged yet. The room caretaker will review this order' +
       (deadline ? ` before ${deadline}` : '') +

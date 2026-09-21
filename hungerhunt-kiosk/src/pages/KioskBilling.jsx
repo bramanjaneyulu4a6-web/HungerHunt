@@ -18,6 +18,7 @@ import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../componen
 import { presentError } from "../utils/errorPresentation";
 import { allowanceCeiling, allowancePeriod, limitLine, limitMessage } from "../utils/purchaseCaps";
 import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
+import { notifyParent } from "../utils/notifyParent";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
@@ -173,6 +174,11 @@ const KioskBilling = ({ student, onLogout }) => {
   const [parentWhatsApp, setParentWhatsApp] = useState("");
   // The parent let the room caretaker answer this one instead of themselves.
   const [caretakerReviews, setCaretakerReviews] = useState(false);
+  // The approval order the WhatsApp button reports on, and whether it has:
+  // 'idle' until tapped, then 'done' — once per order, shared with the
+  // caretaker app, so the button does not come back after a tap.
+  const [pendingOrderId, setPendingOrderId] = useState("");
+  const [notifyState, setNotifyState] = useState("idle");
 
   // Starts true: the catalogue is fetched on mount, and seeding the flag here
   // keeps that effect free of a synchronous setState.
@@ -523,10 +529,11 @@ const KioskBilling = ({ student, onLogout }) => {
     try {
       const { data } = await api.post("/pending-orders", { items, purchaseToken });
 
-      /* The push is sent by the server; this is the second way the parent
-         hears. WhatsApp opens on their chat with the basket and total written
-         out, priced from the server's copy of the order. A missing or odd
-         number just means no message — the request itself has gone. */
+      /* The push is sent by the server; WhatsApp is the second way the parent
+         hears, with the basket and total written out, priced from the
+         server's copy of the order. It opens only when "Notify Parent via
+         WhatsApp" is tapped on the next screen — never on its own. A missing
+         or odd number just means no button; the request itself has gone. */
       const link = approvalWhatsAppLink({
         parentPhone: data?.parentPhone,
         studentName: student.name,
@@ -534,9 +541,10 @@ const KioskBilling = ({ student, onLogout }) => {
         caretakerReviews: data?.caretakerReviews === true,
       });
       setParentWhatsApp(link);
+      setPendingOrderId(data?.pendingOrder?._id || "");
+      setNotifyState("idle");
       setCaretakerReviews(data?.caretakerReviews === true);
       setResult("pending");
-      openWhatsApp(link);
       return true;
     } catch (err) {
       console.error("Approval request error:", err);
@@ -760,7 +768,18 @@ const KioskBilling = ({ student, onLogout }) => {
      wait out somebody else's receipt. The timers do not run here; the session
      is already over, and this is only the telling. */
   if (result) {
-    const notifyParentButton = result === "pending" && !caretakerReviews && Boolean(parentWhatsApp);
+    const notifyParentButton =
+      result === "pending" && !caretakerReviews && Boolean(parentWhatsApp) && Boolean(pendingOrderId);
+    const tapNotifyParent = async () => {
+      setNotifyState("done");
+      const outcome = await notifyParent({
+        orderId: pendingOrderId,
+        link: parentWhatsApp,
+        post: (url) => api.post(url),
+        open: openWhatsApp,
+      });
+      if (outcome === "failed") setNotifyState("idle");
+    };
     return (
       <KioskResultScreen
         variant={result}
@@ -779,13 +798,16 @@ const KioskBilling = ({ student, onLogout }) => {
             : "Nothing has been charged yet — your parent has been asked to approve it."}
         onDone={onLogout}
         tapLabel="Tap anywhere for next order"
-        /* Only on "Sent to your parent": kept on screen for the browser that
-           refused to open WhatsApp on its own, and for a student who closed it
-           before sending. Longer, so there is time to find the button. An
-           order the caretaker reviews gets no button here — the caretaker
-           app carries that one. */
+        /* Only on "Sent to your parent", and the only way WhatsApp opens.
+           One tap per order: it locks here and in the caretaker app. Held
+           longer, so there is time to find the button. An order the caretaker
+           reviews gets no button here — the caretaker app carries that one. */
         action={notifyParentButton
-          ? { label: "Notify Parent via WhatsApp", onClick: () => openWhatsApp(parentWhatsApp) }
+          ? {
+              label: notifyState === "done" ? "Parent notified ✓" : "Notify Parent via WhatsApp",
+              disabled: notifyState === "done",
+              onClick: tapNotifyParent,
+            }
           : null}
         seconds={notifyParentButton ? 12 : undefined}
       />

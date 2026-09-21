@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import PendingOrder, { pendingOrderExpiry } from "../models/PendingOrder.js";
 import Student from "../models/Student.js";
 import Parent from "../models/Parent.js";
@@ -744,6 +745,93 @@ const caretakerOwner = async (req, res) => {
    caretaker's to accept or decline. The rest are still the parent's: the
    caretaker sees them only to nudge the parent on WhatsApp, and the answer
    routes below refuse them as before (caretakerStudentFilter). */
+/* =========================================================
+   "NOTIFY PARENT VIA WHATSAPP", ONCE PER ORDER
+========================================================= */
+// Who opened WhatsApp to the parent about this order, or null if nobody has.
+const parentNotifiedView = (order) =>
+  order?.parentNotifiedAt
+    ? {
+        at: order.parentNotifiedAt,
+        via: order.parentNotifiedVia,
+        by: order.parentNotifiedBy?.name ?? null,
+      }
+    : null;
+
+/* The first tap wins, from either side: a student's session for their own
+   order at the kiosk, or a caretaker for an order from one of their rooms
+   (whether the parent or the caretaker answers it). The claim is one atomic
+   update on "still waiting and nobody has notified", so two taps racing from
+   the kiosk and the caretaker app record exactly one. */
+export const markParentNotified = async (req, res) => {
+  const notFound = () => res.status(404).json({ message: "This order could not be found." });
+
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return notFound();
+
+    let scope;
+    if (req.student) {
+      scope = { studentId: req.student.id };
+    } else {
+      const order = await PendingOrder.findById(req.params.id).select("studentId").lean();
+      const inRooms =
+        order &&
+        (await Student.exists({
+          _id: order.studentId,
+          roomId: { $in: req.staff.roomIds },
+          active: { $ne: false },
+          requiresParentApproval: true,
+        }));
+      if (!inRooms) return notFound();
+      scope = {};
+    }
+
+    const now = new Date();
+    const claimed = await PendingOrder.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        ...scope,
+        status: "PENDING",
+        expiresAt: { $gt: now },
+        parentNotifiedAt: null,
+      },
+      {
+        $set: {
+          parentNotifiedAt: now,
+          parentNotifiedVia: req.student ? "KIOSK" : "CARETAKER",
+          parentNotifiedBy: req.student ? null : req.staff.id,
+        },
+      },
+      { new: true }
+    )
+      .populate("parentNotifiedBy", "name")
+      .lean();
+
+    if (claimed) return res.json({ parentNotified: parentNotifiedView(claimed) });
+
+    const current = await PendingOrder.findOne({ _id: req.params.id, ...scope })
+      .populate("parentNotifiedBy", "name")
+      .lean();
+
+    if (!current) return notFound();
+
+    if (current.parentNotifiedAt) {
+      return res.status(409).json({
+        code: "PARENT_ALREADY_NOTIFIED",
+        message: "The parent has already been notified about this order.",
+        parentNotified: parentNotifiedView(current),
+      });
+    }
+
+    return res.status(409).json({
+      code: "ORDER_NOT_WAITING",
+      message: "This order is no longer waiting for the parent.",
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getCaretakerPendingOrders = async (req, res) => {
   try {
     const students = await Student.find({
@@ -771,12 +859,17 @@ export const getCaretakerPendingOrders = async (req, res) => {
       // The parent's number and nothing else of theirs, for the caretaker's
       // "Notify Parent via WhatsApp" button.
       .populate("parentId", "phone")
+      .populate("parentNotifiedBy", "name")
       .sort({ createdAt: -1 });
 
     const shaped = orders.map((order) => {
       const plain = typeof order.toObject === "function" ? order.toObject() : order;
       const studentId = String(plain.studentId?._id ?? plain.studentId);
-      return { ...plain, caretakerMayAnswer: handedOver.has(studentId) };
+      return {
+        ...plain,
+        caretakerMayAnswer: handedOver.has(studentId),
+        parentNotified: parentNotifiedView(plain),
+      };
     });
 
     res.json({ count: shaped.length, orders: shaped });

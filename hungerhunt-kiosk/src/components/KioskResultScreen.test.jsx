@@ -85,6 +85,26 @@ describe('the WhatsApp button on the approval ending', () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
+  test('a disabled action cannot be tapped again', () => {
+    const onClick = vi.fn();
+    render(
+      <KioskResultScreen
+        variant="pending"
+        mark="⏳"
+        kicker="Request sent"
+        title="Sent to your parent"
+        body="Nothing has been charged yet."
+        onDone={noop}
+        action={{ label: 'Parent notified ✓', onClick, disabled: true }}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Parent notified ✓' });
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   test('is not drawn when there is nothing to send', () => {
     render(
       <KioskResultScreen variant="paid" mark="✓" kicker="All done" title="Order confirmed" body="" onDone={noop} />

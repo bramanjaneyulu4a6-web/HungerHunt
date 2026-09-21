@@ -115,10 +115,12 @@ const KioskResultScreen = ({
           <button
             type="button"
             className="kiosk-result-action"
-            /* The whole screen is the skip target; this one button is not. */
+            disabled={Boolean(action.disabled)}
+            /* The whole screen is the skip target; this one button is not —
+               even disabled, a tap on it must not end the screen. */
             onClick={(event) => {
               event.stopPropagation();
-              action.onClick();
+              if (!action.disabled) action.onClick();
             }}
           >
             {action.label}

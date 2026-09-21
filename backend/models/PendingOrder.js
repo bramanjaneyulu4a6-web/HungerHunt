@@ -111,6 +111,18 @@ const pendingOrderSchema = new mongoose.Schema(
       default: null,
     },
 
+    // "Notify Parent via WhatsApp" counts once per order: the first tap, from
+    // the kiosk's result screen or the caretaker app, is recorded here and
+    // locks the button everywhere. Only that WhatsApp was opened is known —
+    // never whether the message was sent.
+    parentNotifiedAt: { type: Date, default: null },
+    parentNotifiedVia: { type: String, enum: ["KIOSK", "CARETAKER", null], default: null },
+    parentNotifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin",
+      default: null,
+    },
+
     // A client reuses this key when an approval response is lost. Together
     // with the atomic PENDING -> PROCESSING claim it makes one approval one
     // charge across double taps, retries and multiple devices.

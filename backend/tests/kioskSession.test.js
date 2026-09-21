@@ -1,6 +1,6 @@
 // The kiosk's open front door: a session from an admission number, and the
 // model fields that carry it. No database — model calls are stubbed.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, beforeEach, afterEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -10,6 +10,8 @@ process.env.NODE_ENV = 'test';
 
 const mongoose = (await import('mongoose')).default;
 const Student = (await import('../models/Student.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { parentGateOpen } = await import('./helpers/parentGateOpen.js');
 const app = (await import('../app.js')).default;
 
 mongoose.set('bufferTimeoutMS', 1000);
@@ -137,6 +139,8 @@ const postSession = (body) =>
   });
 
 describe('opening a kiosk session', () => {
+  beforeEach(() => parentGateOpen(OrderingSettings));
+
   const onRoll = {
     _id: STUDENT_ID,
     name: 'Asha Rao',

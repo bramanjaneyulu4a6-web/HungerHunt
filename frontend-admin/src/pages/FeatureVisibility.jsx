@@ -34,6 +34,78 @@ const groupBy = (features) => {
   return [...groups.entries()];
 };
 
+/* School-wide rules on who may order. Not a visibility setting — the server
+   enforces it at the kiosk door — but it is the super admin's alone, so it
+   lives on the super admin's page. */
+function OrderingRulesCard() {
+  const [settings, setSettings] = useState(null);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/admin/settings/ordering')
+      .then((response) => { if (!cancelled) setSettings(response.data); })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.response?.data?.message || 'Could not load the ordering rules.');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggle = async () => {
+    const next = !settings.requireActivatedParent;
+    setSaving(true);
+    try {
+      const response = await api.put('/admin/settings/ordering', { requireActivatedParent: next });
+      setSettings(response.data);
+      toast.success(next
+        ? 'Students now need an activated parent to order'
+        : 'Students can order without an activated parent');
+    } catch (saveError) {
+      toast.error(saveError.response?.data?.message || 'Could not save the rule');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="feature-card">
+      <div className="users-tab-head">
+        <div>
+          <h2>Ordering rules</h2>
+          <p>
+            Only allow a student to order at the kiosk once a parent has activated their account
+            (signed in to the parent app and set a password). Students whose parent has not are
+            turned away at the kiosk with a message asking the parent to activate.
+          </p>
+          {settings?.updatedBy && (
+            <p>
+              Last changed by {settings.updatedBy.name} on{' '}
+              {new Date(settings.updatedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+            </p>
+          )}
+        </div>
+        {settings && (
+          <label className="student-picker__row">
+            <input
+              type="checkbox"
+              checked={settings.requireActivatedParent}
+              disabled={saving}
+              onChange={toggle}
+            />
+            <span>Require an activated parent</span>
+            <Badge variant={settings.requireActivatedParent ? 'success' : 'neutral'}>
+              {settings.requireActivatedParent ? 'On' : 'Off'}
+            </Badge>
+          </label>
+        )}
+      </div>
+      {error && <Banner variant="alert">{error}</Banner>}
+      {!settings && !error && <Skeleton height={40} radius={10} />}
+    </Card>
+  );
+}
+
 export default function FeatureVisibility() {
   const { me, loaded } = useCurrentStaff();
   const [data, setData] = useState(null);
@@ -148,6 +220,8 @@ export default function FeatureVisibility() {
         title="Feature visibility"
         subtitle="Choose what each kind of staff account sees in its app. Super admins always see everything. Hiding a feature removes it from the screen. Features marked “also blocked on the server” are refused as well, even if someone sends the request directly."
       />
+
+      <OrderingRulesCard />
 
       <div className="feature-role-tabs" role="tablist" aria-label="Which app">
         {ROLE_TABS.map((candidate) => (

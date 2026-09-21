@@ -37,6 +37,8 @@ const { getPurchaseAllowances } = await import('../utils/purchaseLimits.js');
 const { signAdminToken, signStudentToken, STUDENT_SESSION_SECONDS } = await import('../utils/tokens.js');
 const Admin = (await import('../models/Admin.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { parentGateOpen } = await import('./helpers/parentGateOpen.js');
 const app = (await import('../app.js')).default;
 
 mongoose.set('bufferTimeoutMS', 200);
@@ -240,6 +242,8 @@ describe('per-product limits', () => {
 });
 
 describe('the kiosk session', () => {
+  beforeEach(() => parentGateOpen(OrderingSettings));
+
   const studentRow = (overrides) => ({
     _id: DEMO_ID,
     name: 'Demo Student',

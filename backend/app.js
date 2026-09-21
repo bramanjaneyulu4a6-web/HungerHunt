@@ -12,6 +12,7 @@ import mongoose from 'mongoose';
 import adminRoutes from './routes/adminRoutes.js';
 import adminUserRoutes from './routes/adminUserRoutes.js';
 import featureRoutes from './routes/featureRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
 import parentRoutes from './routes/parentRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import productRoutes from './routes/productRoutes.js';
@@ -282,6 +283,7 @@ app.get('/api/data-revision', (req, res) => {
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/admin/features', featureRoutes);
+app.use('/api/admin/settings', settingsRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/products', productRoutes);

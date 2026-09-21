@@ -12,6 +12,7 @@ import { mintReceiptNumber } from '../utils/walletReceipts.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import { isTestAccountStudent } from '../utils/testAccount.js';
 import { DEMO_SESSION_SECONDS, isDemoStudent } from '../utils/demoAccount.js';
+import { ACTIVATED_PARENT, activatedParentRequired, hasActivatedParent } from '../utils/parentActivation.js';
 import {
   ADMISSION_NUMBER_MESSAGE,
   isValidAdmissionNumber,
@@ -154,10 +155,7 @@ export const getStudents = async (req, res) => {
          and $nin would then report them as activated, which is the opposite of
          the truth. Complementing the activated side puts them where they
          belong without naming them as a special case. */
-      const activated = await Parent.distinct('studentIds', {
-        active: { $ne: false },
-        activationRequired: { $ne: true },
-      });
+      const activated = await Parent.distinct('studentIds', ACTIVATED_PARENT);
 
       filter._id = parentActivated === 'yes' ? { $in: activated } : { $nin: activated };
     }
@@ -577,6 +575,26 @@ export const createKioskSession = async (req, res) => {
        day cannot absorb. */
     const now = new Date();
     const demo = await isDemoStudent(student);
+
+    /* No ordering until a parent has activated their account — the parent is
+       who answers approvals, gets the receipts and tops the wallet up, and an
+       office-created account nobody has signed into reaches none of them. A
+       super admin can switch this off (OrderingSettings); it is on by
+       default. The demo account has no real parent and is never asked. */
+    if (!demo && await activatedParentRequired() && !(await hasActivatedParent(student._id))) {
+      return res.status(403).json({
+        code: 'KIOSK_PARENT_NOT_ACTIVATED',
+        message:
+          "Your parent hasn't activated their Hunger Hunt account yet. Ask them to sign in to the parent app and set a password.",
+        screen: {
+          variant: 'parent-not-activated',
+          mark: '🔒',
+          kicker: 'Parent account needed',
+          title: "Your parent hasn't activated their account",
+          body: 'Ask them to sign in to the Hunger Hunt parent app and set a password. You can order once they have.',
+        },
+      });
+    }
     const [pendingApproval, fulfillmentOrder] = demo ? [null, null] : await Promise.all([
       PendingOrder.findOne({
         studentId: student._id,

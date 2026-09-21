@@ -28,6 +28,8 @@ const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default
 const { chargeCart } = await import('../utils/checkout.js');
 const { isTestAccountPhone } = await import('../config/paymentAccess.js');
 const { signParentToken, signStudentToken } = await import('../utils/tokens.js');
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { parentGateOpen } = await import('./helpers/parentGateOpen.js');
 const app = (await import('../app.js')).default;
 
 mongoose.set('bufferTimeoutMS', 200);
@@ -215,6 +217,8 @@ describe('the kiosk catalogue for a test student', () => {
 });
 
 describe('the kiosk door for a test student', () => {
+  beforeEach(() => parentGateOpen(OrderingSettings));
+
   const student = (parentPhoneNumber) => ({
     _id: STUDENT_ID,
     name: 'Test Student One',

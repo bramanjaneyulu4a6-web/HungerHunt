@@ -8,6 +8,7 @@ import Transaction from "../models/Transaction.js";
 import { sendToParent } from "../utils/sendNotification.js";
 import { chargeCart } from "../utils/checkout.js";
 import { isDemoStudent } from "../utils/demoAccount.js";
+import { checkWeeklyOrderLimit } from "../utils/weeklyOrderLimit.js";
 import {
   checkPurchaseLimits,
   CLOSED_CATEGORY_MESSAGE,
@@ -257,6 +258,14 @@ export const createPendingOrder = async (req, res) => {
           ` No new order can be placed until ${live.expiresAt.toLocaleString("en-IN")}.`,
         expiresAt: live.expiresAt,
       });
+    }
+
+    // Asked again when the order is paid for; here so the student hears it at
+    // the kiosk rather than the parent hearing it at approval.
+    const weekly = await checkWeeklyOrderLimit({ student });
+
+    if (!weekly.ok) {
+      return res.status(weekly.status).json({ code: weekly.code, message: weekly.message });
     }
 
     const priced = await priceCart(items, student._id);

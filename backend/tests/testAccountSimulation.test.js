@@ -29,6 +29,7 @@ const { chargeCart } = await import('../utils/checkout.js');
 const { isTestAccountPhone } = await import('../config/paymentAccess.js');
 const { signParentToken, signStudentToken } = await import('../utils/tokens.js');
 const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { parentGateOpen } = await import('./helpers/parentGateOpen.js');
 const app = (await import('../app.js')).default;
 
@@ -59,6 +60,8 @@ beforeEach(() => {
   mock.method(Parent, 'exists', async () => ({ _id: PARENT_ID }));
 });
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => {
   delete process.env.PHONEPE_TEST_PARENT_PHONES;
   mock.restoreAll();

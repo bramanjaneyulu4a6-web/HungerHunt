@@ -1,4 +1,4 @@
-import test, { afterEach, mock } from 'node:test';
+import test, { afterEach, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -7,8 +7,12 @@ process.env.NODE_ENV = 'test';
 const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { chargeCart } = await import('../utils/checkout.js');
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const STUDENT_ID = '507f1f77bcf86cd799439011';

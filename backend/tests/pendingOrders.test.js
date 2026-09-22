@@ -22,6 +22,8 @@ const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { hashCart } = await import('../utils/purchaseAuthorization.js');
 const { signAdminToken, signParentToken, signStudentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -58,6 +60,8 @@ beforeEach(() => {
   mock.method(Student, 'exists', async () => null);
 });
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const send = (method, path, token, body) =>

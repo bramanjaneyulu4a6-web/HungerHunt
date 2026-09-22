@@ -4,7 +4,7 @@
 // the fiddly part — cancelled orders must not count, one cart naming a product
 // twice must count as one, and the period must be the business day, not the
 // server's.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -19,6 +19,8 @@ const Product = (await import('../models/Product.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { chargeCart } = await import('../utils/checkout.js');
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -50,6 +52,8 @@ before(async () => {
   server.unref();
 });
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const accountIs = accountMatcher(Admin, STAFF_ID);

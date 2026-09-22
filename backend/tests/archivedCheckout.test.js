@@ -2,7 +2,7 @@
 // yesterday's menu, so hiding an archived product client-side is not enough —
 // the charge itself has to refuse it. Both sale paths (till bill, parent
 // approval) go through chargeCart, so this is the one place.
-import test, { afterEach, describe } from 'node:test';
+import test, { afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -13,6 +13,8 @@ process.env.NODE_ENV = 'test';
 const mongoose = (await import('mongoose')).default;
 const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { chargeCart } = await import('../utils/checkout.js');
 
 mongoose.set('bufferTimeoutMS', 200);
@@ -20,6 +22,8 @@ mongoose.set('bufferTimeoutMS', 200);
 const STUDENT_ID = '507f1f77bcf86cd799439021';
 const PRODUCT_ID = '507f191e810c19729de860ec';
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 // Inventory.find(...).populate(...) — a thenable chain fixed up front.

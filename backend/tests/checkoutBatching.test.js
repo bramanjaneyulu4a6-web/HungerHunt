@@ -14,7 +14,7 @@
  * would still pass every other suite in this repository — the only symptom is
  * a slower till.
  */
-import test, { afterEach, describe } from 'node:test';
+import test, { afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -31,6 +31,8 @@ process.env.PHONEPE_TEST_PARENT_PHONES = '';
 const mongoose = (await import('mongoose')).default;
 const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { chargeCart } = await import('../utils/checkout.js');
 
 mongoose.set('bufferTimeoutMS', 200);
@@ -40,6 +42,8 @@ const SAMOSA = '507f191e810c19729de860c1';
 const BUN = '507f191e810c19729de860c2';
 const MILK = '507f191e810c19729de860c3';
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const row = (productId, name, price, stock, active = true) => ({

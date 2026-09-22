@@ -10,7 +10,7 @@
 // stubbed, so no database is needed: PurchaseAuthorization is backed by a Map
 // that removes on read, which is the property Mongo's findOneAndDelete provides
 // and the reason a token cannot be spent twice.
-import test, { before, afterEach, describe } from 'node:test';
+import test, { before, afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import bcrypt from 'bcryptjs';
@@ -26,6 +26,8 @@ const Inventory = (await import('../models/Inventory.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const Parent = (await import('../models/Parent.js')).default;
 const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { hashCart } = await import('../utils/purchaseAuthorization.js');
 const { signAdminToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -66,6 +68,8 @@ before(async () => {
   server.unref();
 });
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => {
   mock.restoreAll();
   delete process.env.PURCHASE_AUTH_GRACE_UNTIL;

@@ -25,6 +25,8 @@ before(async () => {
   server.unref();
 });
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 describe('the Student schema carries the kiosk fields', () => {
@@ -288,6 +290,7 @@ describe('opening a kiosk session', () => {
 
 const bcrypt = (await import('bcryptjs')).default;
 const PurchaseAuthorization = (await import('../models/PurchaseAuthorization.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 
 const OTHER_STUDENT = '507f191e810c19729de860eb';
 const PRODUCT_ID = '507f191e810c19729de860ec';

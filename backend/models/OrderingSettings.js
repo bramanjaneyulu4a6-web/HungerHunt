@@ -11,6 +11,11 @@ const orderingSettingsSchema = new mongoose.Schema({
   // activated their account (set a password in the parent app). On by default.
   requireActivatedParent: { type: Boolean, default: true },
 
+  // A student may have one order a business week (Sunday midnight IST): a paid
+  // package that is not cancelled, or an order still waiting on its approver.
+  // On by default. See utils/weeklyOrderLimit.js.
+  oneOrderPerWeek: { type: Boolean, default: true },
+
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, { timestamps: true });
 

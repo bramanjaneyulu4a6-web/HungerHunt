@@ -10,7 +10,7 @@
  *
  * No database: every model call is stubbed.
  */
-import test, { afterEach, describe } from 'node:test';
+import test, { afterEach, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -24,12 +24,16 @@ process.env.DEMO_PARENT_PHONES = '';
 
 const Student = (await import('../models/Student.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { isDemoParentPhone, demoParentPhones } = await import('../config/demoAccess.js');
 const { isDemoParentStudent } = await import('../utils/demoParent.js');
 
 const DEMO_PHONE = '7995601391';
 const REAL_PHONE = '9876543210';
 
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => {
   mock.restoreAll();
   process.env.DEMO_PARENT_PHONES = '';

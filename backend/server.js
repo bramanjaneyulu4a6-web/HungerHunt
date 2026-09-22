@@ -14,7 +14,11 @@ import { mongoConnectOptions } from './config/mongoPool.js';
 // or a listening socket, so the tests can mount it directly. This file is the
 // part that only makes sense when actually running the server.
 
-/* The database half of the disabled weekly-order rule.
+/* The database half of the old weekly-order rule.
+ *
+ * The rule is back since 2026-09-22, but as a super admin's switch checked in
+ * code (utils/weeklyOrderLimit.js), not this index — which would go on refusing
+ * second orders with the switch off. So the index still has to go.
  *
  * The schema stops declaring the unique index, but a database that already
  * carries it goes on enforcing it — the application would stop asking and
@@ -30,8 +34,8 @@ const releaseWeeklyOrderIndex = async () => {
   try {
     await FulfillmentOrder.collection.dropIndex(WEEKLY_ORDER_INDEX);
     console.warn(
-      `Weekly order limit disabled — dropped ${WEEKLY_ORDER_INDEX}.` +
-        ' Students may now place more than one package order per business week.'
+      `Dropped the old ${WEEKLY_ORDER_INDEX} index.` +
+        ' The weekly order limit is enforced in code, behind the ordering-rules switch.'
     );
   } catch (error) {
     // IndexNotFound / NamespaceNotFound: nothing to drop, which is the goal.

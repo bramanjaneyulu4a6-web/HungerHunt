@@ -33,6 +33,8 @@ const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { mintReceiptNumber } = await import('../utils/walletReceipts.js');
 const { chargeCart } = await import('../utils/checkout.js');
 const { cancelAndRefundFulfillment } = await import('../utils/refunds.js');
@@ -73,6 +75,8 @@ before(async () => {
 
 after(() => new Promise((resolve) => server.close(resolve)));
 beforeEach(() => featuresOpen(Admin, FeatureVisibility));
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 /* The per-student counter, handing out 1, 2, 3… and recording which sequence

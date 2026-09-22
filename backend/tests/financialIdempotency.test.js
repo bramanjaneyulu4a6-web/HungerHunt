@@ -14,6 +14,8 @@ const Inventory = (await import('../models/Inventory.js')).default;
 const PendingOrder = (await import('../models/PendingOrder.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
+const OrderingSettings = (await import('../models/OrderingSettings.js')).default;
+const { weeklyOrderLimitOff } = await import('./helpers/weeklyOrderLimitOff.js');
 const { signAdminToken, signParentToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 
@@ -50,6 +52,8 @@ beforeEach(() => {
 });
 
 beforeEach(() => featuresOpen(Admin, FeatureVisibility));
+// Not about the one-order-a-week rule; weeklyOrderLimit.test.js covers it.
+beforeEach(() => weeklyOrderLimitOff(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const request = (method, path, token, body, key) =>

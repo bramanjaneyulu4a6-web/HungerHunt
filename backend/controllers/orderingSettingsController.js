@@ -6,15 +6,24 @@ export const getOrderingSettings = async (req, res) => {
 };
 
 export const setOrderingSettings = async (req, res) => {
-  const { requireActivatedParent } = req.body ?? {};
+  // Each rule is saved on its own, so a request names only the one it changes.
+  const changes = {};
+  for (const field of ['requireActivatedParent', 'oneOrderPerWeek']) {
+    const value = req.body?.[field];
+    if (value === undefined) continue;
+    if (typeof value !== 'boolean') {
+      return res.status(400).json({ message: `${field} must be true or false.` });
+    }
+    changes[field] = value;
+  }
 
-  if (typeof requireActivatedParent !== 'boolean') {
-    return res.status(400).json({ message: 'requireActivatedParent must be true or false.' });
+  if (!Object.keys(changes).length) {
+    return res.status(400).json({ message: 'Name a rule to change: requireActivatedParent or oneOrderPerWeek.' });
   }
 
   const row = await OrderingSettings.findOneAndUpdate(
     { key: 'ordering' },
-    { $set: { requireActivatedParent, updatedBy: req.staff.id } },
+    { $set: { ...changes, updatedBy: req.staff.id } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   )
     .populate('updatedBy', 'name')

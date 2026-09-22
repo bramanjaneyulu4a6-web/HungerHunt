@@ -9,6 +9,7 @@ import { creditWallet, debitWallet } from './walletAccount.js';
 import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
+import { checkWeeklyOrderLimit } from './weeklyOrderLimit.js';
 import {
   DEMO_LOW_BALANCE,
   DEMO_OPENING_BALANCE,
@@ -220,6 +221,16 @@ export const chargeCart = async ({
   });
 
   if (!withinLimits.ok) return withinLimits;
+
+  // One order a week, asked where money moves. The waiting order this charge
+  // pays for is excluded, or approving it would be refused for existing.
+  const weekly = await checkWeeklyOrderLimit({
+    student,
+    session,
+    excludePendingOrderId:
+      sourceType === 'PARENT_APPROVAL' || sourceType === 'UPI_ORDER_PAYMENT' ? sourceId : null,
+  });
+  if (!weekly.ok) return weekly;
 
   // The weekly cap is the parent's rule for their own child. The PhonePe
   // reviewer's children are exempt for the same reason the product limits

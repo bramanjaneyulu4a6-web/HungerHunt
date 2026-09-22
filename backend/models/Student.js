@@ -121,11 +121,13 @@ purchaseCodeLockedUntil: {
 // When on, the till cannot charge this student at the counter. The purchase
 // password still has to be entered — that is what proves the order is theirs —
 // but it only raises a request, and the parent approving it in the app is what
-// spends the money. Off by default: turning it on is the parent's decision, and
-// a school where nobody has chosen keeps the counter working as it did.
+// spends the money. On by default since 2026-09-22, when the school asked for
+// every order to go past a parent: every live student was switched on then,
+// except the demo account, which scripts/createDemoStudent.js sets off
+// explicitly. A parent can still turn it off in the app.
 requiresParentApproval: {
   type: Boolean,
-  default: false
+  default: true
 },
 
 // The parent's second yes: while approval is on, the caretaker of this
@@ -137,15 +139,19 @@ caretakerMayApprove: {
   default: false
 },
 
+// The parent's weekly spending cap. On at ₹150 a week by default since
+// 2026-09-22, when every live student without a limit was given that one
+// (limits parents had already set were left alone). A parent can change or
+// switch it off in the app.
 walletControl: {
   enabled: {
     type: Boolean,
-    default: false
+    default: true
   },
 
   limitAmount: {
     type: Number,
-    default: 0
+    default: 150
   },
 
   limitType: {

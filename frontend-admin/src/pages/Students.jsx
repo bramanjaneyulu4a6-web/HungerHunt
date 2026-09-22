@@ -21,6 +21,7 @@ import {
   Skeleton,
 } from '../components/ui';
 import { StudentActivityModal } from '../components/WalletActivity';
+import WalletControlIcons from '../components/WalletControlIcons';
 import { PurchaseCodeDialog } from '../components/PurchaseCodeDialog';
 import { ReceiptModal } from '../components/Receipt';
 import { useReceipt } from '../utils/walletActivity';
@@ -56,7 +57,7 @@ const SORTABLE_COLUMNS = [
   { key: 'name', label: 'Name' },
   { key: 'className', label: 'Class' },
   { key: 'roomNumber', label: 'Room' },
-  { key: 'pocketMoney', label: 'Wallet', align: 'right' },
+  { key: 'pocketMoney', label: 'Wallet' },
 ];
 const PAGE_SIZE = 50;
 
@@ -759,9 +760,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                       ? <span className="badge badge--neutral">{student.roomNumber}</span>
                       : <span className="cell-unset">Not set</span>}
                   </td>
-                  <td data-label="Wallet" className="cell-right">
-                    <span className={`cell-money${student.pocketMoney > 0 ? '' : ' cell-money--zero'}`}>
-                      {formatINR(student.pocketMoney)}
+                  <td data-label="Wallet">
+                    {/* Two rows, the balance centred over its two marks. */}
+                    <span className="wallet-cell">
+                      <span className={`cell-money${student.pocketMoney > 0 ? '' : ' cell-money--zero'}`}>
+                        {formatINR(student.pocketMoney)}
+                      </span>
+                      <WalletControlIcons student={student} />
                     </span>
                   </td>
                   <td data-label="Linked parent">{(() => {

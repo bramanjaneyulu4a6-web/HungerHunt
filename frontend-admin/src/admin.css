@@ -1768,6 +1768,36 @@
   color: var(--muted);
 }
 
+/* Who approves (parent or caretaker, green when on) and the spending limit
+   (yellow-orange when on), beside the balance; gray when off. See
+   components/WalletControlIcons.jsx. */
+/* The Students Wallet cell: the balance on one row and its marks on the next,
+   centred on each other, the pair starting at the column's left edge. */
+.wallet-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.wallet-controls {
+  display: flex;
+  gap: 3px;
+}
+
+.wallet-controls__mark {
+  display: inline-flex;
+  color: var(--muted-soft);
+}
+
+.wallet-controls__mark--green {
+  color: var(--success);
+}
+
+.wallet-controls__mark--amber {
+  color: var(--warn);
+}
+
 .cell-actions {
   display: flex;
   justify-content: flex-end;

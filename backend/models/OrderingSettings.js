@@ -16,6 +16,11 @@ const orderingSettingsSchema = new mongoose.Schema({
   // On by default. See utils/weeklyOrderLimit.js.
   oneOrderPerWeek: { type: Boolean, default: true },
 
+  // The kiosk as a whole. Off means every terminal shows "offline" and the
+  // server refuses kiosk sessions and student orders; the admin console is
+  // untouched. On by default. See middleware/kioskOpen.js.
+  kioskEnabled: { type: Boolean, default: true },
+
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, { timestamps: true });
 

@@ -21,6 +21,8 @@ import { getStudentReceiptPdf } from '../controllers/walletReceiptController.js'
 
 import { protectAdmin, protectStaff, protectStudent } from '../middleware/authMiddleware.js';
 import { kioskSessionLimiter, searchLimiter } from '../middleware/rateLimit.js';
+import { getKioskStatus, requireKioskOpen } from '../middleware/kioskOpen.js';
+import { asyncHandler } from '../src/interfaces/http/middleware/asyncHandler.js';
 
 const router = express.Router();
 
@@ -29,7 +31,9 @@ const router = express.Router();
    there is nothing yet to present one with. The limiter is the whole of what
    stands in front of it, which is why it is tight — see the accepted risk in
    docs/superpowers/specs/2026-08-11-kiosk-student-self-serve-design.md. */
-router.post('/kiosk-session', kioskSessionLimiter, createKioskSession);
+// Public: the kiosk checks this before showing anything. See middleware/kioskOpen.js.
+router.get('/kiosk-status', asyncHandler(getKioskStatus));
+router.post('/kiosk-session', kioskSessionLimiter, requireKioskOpen, createKioskSession);
 router.get('/me/wallet', protectStudent, getWalletBalance);
 
 /* Search is the till's route: it returns the few fields needed to ring a

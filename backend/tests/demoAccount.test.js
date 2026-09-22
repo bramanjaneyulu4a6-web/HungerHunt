@@ -57,6 +57,8 @@ before(async () => {
   server.unref();
 });
 
+// Every ordering rule reads as off (kiosk open) unless a test says otherwise.
+beforeEach(() => parentGateOpen(OrderingSettings));
 afterEach(() => mock.restoreAll());
 
 const queryFor = (value) => {
@@ -167,6 +169,7 @@ describe('a demo bill', () => {
 
   test('still has to carry a valid purchase code', async () => {
     mock.restoreAll();
+    parentGateOpen(OrderingSettings);
     stubInventory();
     mock.method(Student, 'exists', async () => ({ _id: DEMO_ID }));
     mock.method(Student, 'findById', () => queryFor({ _id: DEMO_ID, demoAccount: true }));

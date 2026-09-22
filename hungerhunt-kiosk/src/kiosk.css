@@ -3432,6 +3432,28 @@
   color: #2763a8 !important;
 }
 
+.kiosk-result--offline .kiosk-result-kicker {
+  color: #64748b !important;
+}
+
+.kiosk-result-mark--offline {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 900;
+}
+
+/* Small on purpose: for the office's test students, not for the queue. */
+.kiosk-offline-test {
+  margin-top: 28px;
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  color: #94a3b8;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .kiosk-result--technical .kiosk-result-kicker {
   color: #b43232 !important;
 }

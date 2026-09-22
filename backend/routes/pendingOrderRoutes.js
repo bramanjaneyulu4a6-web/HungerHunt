@@ -15,6 +15,7 @@ import {
 } from "../controllers/pendingOrderController.js";
 
 import { orStudent, protectCaretaker, protectParent, protectStaff } from "../middleware/authMiddleware.js";
+import { requireKioskOpenForStudents } from "../middleware/kioskOpen.js";
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ const router = express.Router();
    The till is two things now: a student at the kiosk, holding a session of
    their own, and the admin console. */
 
-router.post("/", orStudent(protectStaff), createPendingOrder);
+router.post("/", orStudent(protectStaff), requireKioskOpenForStudents, createPendingOrder);
 router.get("/:id/status", orStudent(protectStaff), getPendingOrderStatus);
 
 router.get("/parent", protectParent, getParentPendingOrders);

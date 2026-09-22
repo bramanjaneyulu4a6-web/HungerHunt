@@ -7,6 +7,7 @@ import {
 
 import { orStudent, protectAdmin, protectStaff } from "../middleware/authMiddleware.js";
 import { getLedgerFeed } from "../controllers/walletLedgerController.js";
+import { requireKioskOpenForStudents } from "../middleware/kioskOpen.js";
 
 const router = express.Router();
 
@@ -19,8 +20,8 @@ const router = express.Router();
    The ledger is a different matter — every purchase every student has ever
    made is a report, not a step in a sale, and it stays with the back office. */
 
-router.post("/verify-payment", orStudent(protectStaff), verifyPayment);
-router.post("/bill", orStudent(protectStaff), generateBill);
+router.post("/verify-payment", orStudent(protectStaff), requireKioskOpenForStudents, verifyPayment);
+router.post("/bill", orStudent(protectStaff), requireKioskOpenForStudents, generateBill);
 router.get("/history", protectAdmin, getAllTransactions);
 // The same feed with the money coming in as well as going out.
 router.get("/ledger", protectAdmin, getLedgerFeed);

@@ -13,6 +13,7 @@ import KioskBilling from "./pages/KioskBilling";
 import Login from "./pages/Login";
 import DemoKiosk from "./pages/DemoKiosk";
 import ProtectedRoute from "./components/ProtectedRoute";
+import KioskOfflineGate from "./components/KioskOfflineGate";
 import { LOGIN_DISABLED } from "./constants/kioskMode";
 import { startDeployWatch } from "./utils/deployWatch";
 import { isOrderSessionActive } from "./utils/kioskSession";
@@ -69,6 +70,9 @@ function App() {
   return (
     <Router>
       <Toaster position="top-center" />
+      {/* The office's switch for the whole kiosk: while it is off, nothing
+          below is mounted — not the gate, not the demo, not a till. */}
+      <KioskOfflineGate>
       {/* Two kiosks, and only ever one of them built: the terminal that asks
           who is standing at it, and the one that does not. The gate is not
           hidden behind a redirect when it is off — Login is not mounted at
@@ -95,6 +99,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}
+      </KioskOfflineGate>
     </Router>
   );
 }

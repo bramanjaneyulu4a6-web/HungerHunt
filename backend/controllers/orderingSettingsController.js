@@ -8,7 +8,7 @@ export const getOrderingSettings = async (req, res) => {
 export const setOrderingSettings = async (req, res) => {
   // Each rule is saved on its own, so a request names only the one it changes.
   const changes = {};
-  for (const field of ['requireActivatedParent', 'oneOrderPerWeek']) {
+  for (const field of ['requireActivatedParent', 'oneOrderPerWeek', 'kioskEnabled']) {
     const value = req.body?.[field];
     if (value === undefined) continue;
     if (typeof value !== 'boolean') {
@@ -18,7 +18,7 @@ export const setOrderingSettings = async (req, res) => {
   }
 
   if (!Object.keys(changes).length) {
-    return res.status(400).json({ message: 'Name a rule to change: requireActivatedParent or oneOrderPerWeek.' });
+    return res.status(400).json({ message: 'Name a rule to change: requireActivatedParent, oneOrderPerWeek or kioskEnabled.' });
   }
 
   const row = await OrderingSettings.findOneAndUpdate(

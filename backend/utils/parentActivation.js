@@ -24,6 +24,7 @@ export const activatedParentRequired = async () => {
 export const orderingSettingsView = (row) => ({
   requireActivatedParent: row?.requireActivatedParent !== false,
   oneOrderPerWeek: row?.oneOrderPerWeek !== false,
+  kioskEnabled: row?.kioskEnabled !== false,
   updatedAt: row?.updatedAt ?? null,
   updatedBy: row?.updatedBy ? { id: String(row.updatedBy._id), name: row.updatedBy.name } : null,
 });

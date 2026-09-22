@@ -19,6 +19,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   observeMutationRevision,
   (error) => {
+    // The office switched the kiosk off between this tablet's status checks.
+    // Tell the offline gate now rather than a minute from now, so the student
+    // sees "offline" instead of a generic failure. See KioskOfflineGate.
+    if (error.response?.data?.code === "KIOSK_OFFLINE") {
+      window.dispatchEvent(new CustomEvent("kiosk-offline", { detail: error.response.data }));
+    }
+
     // A 401 out here is the session's own token reaching its 450 seconds, or a
     // student removed from the roll mid-order. Either way the session is over
     // and the screen belongs to the next person.

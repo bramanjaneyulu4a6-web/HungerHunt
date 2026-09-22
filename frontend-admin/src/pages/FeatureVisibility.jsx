@@ -40,6 +40,7 @@ const groupBy = (features) => {
 const ORDERING_RULES = [
   { field: 'requireActivatedParent', label: 'Require an activated parent' },
   { field: 'oneOrderPerWeek', label: 'One order per week' },
+  { field: 'kioskEnabled', label: 'Kiosk open' },
 ];
 
 const RULE_TOASTS = {
@@ -50,6 +51,10 @@ const RULE_TOASTS = {
   oneOrderPerWeek: {
     on: 'Students can now place one order per week',
     off: 'Students can now order more than once a week',
+  },
+  kioskEnabled: {
+    on: 'The kiosk is open again',
+    off: 'The kiosk is now offline',
   },
 };
 
@@ -98,6 +103,13 @@ function OrderingRulesCard() {
             Sunday midnight. A paid order that is not cancelled, or one still waiting for the parent
             or caretaker, uses up the week; a declined, expired or cancelled order does not. Test and
             demo accounts are exempt.
+          </p>
+          <p>
+            <strong>Kiosk open:</strong> switch this off to take every kiosk offline. Kiosks show
+            &ldquo;Kiosk is currently offline. Please check again later.&rdquo;
+            within a minute, and no student can order there until it is switched back on. It does not
+            switch itself back on the next day. Orders already placed are not affected, and this
+            console keeps working.
           </p>
           {settings?.updatedBy && (
             <p>

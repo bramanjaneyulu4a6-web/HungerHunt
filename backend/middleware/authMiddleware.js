@@ -155,7 +155,13 @@ export const protectStudent = async (req, res, next) => {
     return denied(res, 'Token failed, invalid authorization');
   }
 
-  req.student = { id: payload.id, admissionNumber: payload.admissionNumber };
+  // `sr` is the showroom marker minted at kiosk sign-in; absent means an
+  // ordinary student, so it is read strictly rather than coerced.
+  req.student = {
+    id: payload.id,
+    admissionNumber: payload.admissionNumber,
+    showroom: payload.sr === true,
+  };
   next();
 };
 

@@ -6,6 +6,7 @@ import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import Room, { normalizeRoomCode } from '../models/Room.js';
 import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
+import { showroomStudent } from "../utils/showroomCatalogue.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
 import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
 import { mintReceiptNumber } from '../utils/walletReceipts.js';
@@ -647,8 +648,17 @@ export const createKioskSession = async (req, res) => {
     // kiosk. `demo` rides along so the screen knows to draw no countdown.
     const sessionSeconds = demo ? DEMO_SESSION_SECONDS : STUDENT_SESSION_SECONDS;
 
+    /* Settled here and carried in the token, because the student is already
+       loaded with both fields it reads and the catalogue that acts on it is
+       polled — see utils/showroomCatalogue.js. Wider than `demo` above: the
+       showroom family and the payment reviewer's children get the same shop
+       window, and neither carries the demoAccount flag. */
+    const showroom = showroomStudent(student);
+
     res.json({
-      token: signStudentToken(student._id.toString(), student.admissionNumber, sessionSeconds),
+      token: signStudentToken(student._id.toString(), student.admissionNumber, sessionSeconds, {
+        showroom,
+      }),
       expiresInSeconds: sessionSeconds,
       student: {
         id: student._id.toString(),

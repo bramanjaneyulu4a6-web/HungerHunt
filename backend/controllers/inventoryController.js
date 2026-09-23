@@ -3,6 +3,7 @@ import Inventory from "../models/Inventory.js";
 import StockAdjustment from "../models/StockAdjustment.js";
 import { getPurchaseAllowances } from "../utils/purchaseLimits.js";
 import { availabilityOf } from "../utils/availability.js";
+import { showroomProduct } from "../utils/showroomCatalogue.js";
 
 export const getInventory = async (req, res) => {
   try {
@@ -28,22 +29,41 @@ export const getInventory = async (req, res) => {
       })));
     }
 
-    // Two different ways a product leaves the students' screen, both enforced
-    // here rather than left to the till to filter: the kiosk is a sideloaded
-    // APK, and a build that filters differently — or not at all — should not be
-    // the only thing standing between a withdrawn product and a child.
-    //
-    // Archived is the full withdrawal, restored only from the admin's archived
-    // screen. Disabled is the lighter switch: off the kiosk, still sellable by
-    // staff at the till. A switched-off category takes all its products off
-    // with it. Each spells out `!== false`, because rows written before the
-    // field carry no flag and are on sale.
-    const visible = inventory.filter(
-      (row) =>
-        row.productId?.active !== false &&
-        row.productId?.kioskVisible !== false &&
-        row.productId?.stockGroup?.active !== false
-    );
+    /* A showroom account — a demonstration or a payment review — is shown a
+       shop window instead of the shelf: one category, photographed items only.
+       See utils/showroomCatalogue.js for what that is and who gets it.
+
+       Read off the session rather than looked up. This endpoint is polled by
+       every till, and the answer was already settled when the session was
+       minted — see signStudentToken. */
+    const showroom = req.student.showroom === true;
+
+    /* The ways a product leaves the students' screen, enforced here rather
+       than left to the till to filter: the kiosk is a sideloaded APK, and a
+       build that filters differently — or not at all — should not be the only
+       thing standing between a withdrawn product and a child.
+
+       Archived is the full withdrawal, restored only from the admin's archived
+       screen. A switched-off category takes all its products off with it.
+       Neither bends for a demonstration: both mean the product is not for
+       sale, and a visitor is no reason to put it back on a screen.
+
+       Disabled (kioskVisible) is the lighter switch — off the kiosk, still
+       sellable by staff at the till — and it is the one the shop window
+       replaces rather than adds to. The Essentials the window is built from
+       are switched off for the real kiosk, so honouring both rules at once
+       would leave a visitor looking at an empty screen.
+
+       Each test spells out `false` rather than trusting truthiness, because
+       rows written before these fields existed carry no flag and are on sale. */
+    const visible = inventory.filter((row) => {
+      const product = row.productId;
+
+      if (product?.active === false) return false;
+      if (product?.stockGroup?.active === false) return false;
+
+      return showroom ? showroomProduct(product) : product?.kioskVisible !== false;
+    });
 
     const products = visible.map((row) => row.productId).filter(Boolean);
     const allowances = await getPurchaseAllowances({

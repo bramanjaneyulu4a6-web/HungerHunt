@@ -76,10 +76,25 @@ export const signAdminToken = (id) => signStaffToken(id, 'admin');
 // there without lengthening it here would manufacture 401s mid-demo. The
 // default is the one every real student gets, so a caller that says nothing
 // is capped exactly as before.
-export const signStudentToken = (id, admissionNumber, ttlSeconds = STUDENT_SESSION_SECONDS) =>
-  jwt.sign({ id, admissionNumber, role: 'student' }, studentSecret(), {
-    expiresIn: ttlSeconds,
-  });
+/* `sr` marks a showroom session: a demonstration or review account, which the
+   kiosk catalogue shows a shop window instead of the whole shelf (see
+   utils/showroomCatalogue.js). It is settled here, at sign-in, because
+   createKioskSession has already loaded the student unprojected enough to
+   answer it — and the catalogue is polled, so asking the database again on
+   every read would add an Atlas round trip to the one request the till waits
+   on. Written only when true: absent is the ordinary student, which is what
+   every token minted before this existed already says. */
+export const signStudentToken = (
+  id,
+  admissionNumber,
+  ttlSeconds = STUDENT_SESSION_SECONDS,
+  { showroom = false } = {}
+) =>
+  jwt.sign(
+    { id, admissionNumber, role: 'student', ...(showroom ? { sr: true } : {}) },
+    studentSecret(),
+    { expiresIn: ttlSeconds }
+  );
 
 // v carries the account's tokenVersion, which is what makes a parent session
 // revocable before its seven days are up. See atTokenVersion in the auth

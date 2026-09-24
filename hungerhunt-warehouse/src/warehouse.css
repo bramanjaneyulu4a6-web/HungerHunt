@@ -151,7 +151,7 @@
 
 .caretaker-identity__rooms {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   max-width: 260px;
   padding: 10px 12px;
@@ -162,6 +162,21 @@
 
 .caretaker-identity__rooms small { color: var(--muted); font-size: 11px; }
 .caretaker-identity__rooms strong { margin-top: 2px; font-size: 13px; }
+
+.caretaker-identity__room-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.caretaker-identity__room-list li {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 .wh-sessionbar {
   display: flex;

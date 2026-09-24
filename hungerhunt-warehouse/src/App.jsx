@@ -117,7 +117,12 @@ const CaretakerShell = ({ children, identity = true }) => {
      old login and will keep it until the caretaker signs in again, so the one
      room is read as a list of one rather than shown as missing. */
   const profileRooms = profile.rooms ?? (profile.hostel ? [profile.hostel] : []);
-  const roomLabel = profileRooms.map((room) => room.code).filter(Boolean).join(" · ");
+  // One room per row, in the order people count them: 101, 102 … 110, not
+  // the order the account happened to be given them in.
+  const roomCodes = profileRooms
+    .map((room) => room.code)
+    .filter(Boolean)
+    .sort(new Intl.Collator("en", { numeric: true, sensitivity: "base" }).compare);
 
   return (
     <div className="wh-app wh-app--single caretaker-app">
@@ -148,7 +153,13 @@ const CaretakerShell = ({ children, identity = true }) => {
           <Icon name="home" size={20} />
           <span>
             <small>{profileRooms.length === 1 ? "Your room" : "Your rooms"}</small>
-            <strong>{roomLabel || "Rooms unavailable"}</strong>
+            {roomCodes.length ? (
+              <ul className="caretaker-identity__room-list">
+                {roomCodes.map((code) => <li key={code}>{code}</li>)}
+              </ul>
+            ) : (
+              <strong>Rooms unavailable</strong>
+            )}
           </span>
         </div>
       </section>

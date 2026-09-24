@@ -457,7 +457,11 @@ const updateAs = async (req, res, { owner }) => {
   }
 };
 
-const approveAs = async (req, res, { owner, caretaker = null }) => {
+/* `caretaker` or `admin` names whoever answered on the parent's behalf; both
+   are recorded on the charge and the order, and the parent is told who it was.
+   Only a caretaker is kept from the paperwork. */
+const approveAs = async (req, res, { owner, caretaker = null, admin = null }) => {
+  const onBehalf = caretaker ?? admin;
   let claimedOrderId = null;
   let committed = false;
 
@@ -549,7 +553,7 @@ const approveAs = async (req, res, { owner, caretaker = null }) => {
         sourceType: "PARENT_APPROVAL",
         sourceId: order._id,
         idempotencyKey: approvalKey,
-        performedBy: caretaker?.id ?? null,
+        performedBy: onBehalf?.id ?? null,
       });
 
       if (!charge.ok) {
@@ -563,7 +567,7 @@ const approveAs = async (req, res, { owner, caretaker = null }) => {
             status: "APPROVED",
             approvedAt: new Date(),
             transactionId: charge.transaction._id,
-            answeredBy: caretaker?.id ?? null,
+            answeredBy: onBehalf?.id ?? null,
           },
           $unset: { processingAt: 1 },
         },
@@ -584,7 +588,7 @@ const approveAs = async (req, res, { owner, caretaker = null }) => {
     if (parent) {
       sendToParent(
         parent,
-        caretaker ? `Order approved by ${caretaker.name}` : "Order approved",
+        onBehalf ? `Order approved by ${onBehalf.name}` : "Order approved",
         `₹${transaction.totalAmount} spent. Balance ₹${student.pocketMoney}.`,
         {
           type: "ORDER_APPROVED",
@@ -632,7 +636,8 @@ const caretakerSafeMessage = (message = "") =>
     ? "The student's wallet or spending limit does not cover this order. Ask the parent to top up or change the limit."
     : message;
 
-const rejectAs = async (req, res, { owner, caretaker = null }) => {
+const rejectAs = async (req, res, { owner, caretaker = null, admin = null }) => {
+  const onBehalf = caretaker ?? admin;
   try {
     const order = await loadAnswerable(req, res, owner);
     if (!order) return;
@@ -648,7 +653,7 @@ const rejectAs = async (req, res, { owner, caretaker = null }) => {
         $set: {
           status: "REJECTED",
           rejectedAt: new Date(),
-          answeredBy: caretaker?.id ?? null,
+          answeredBy: onBehalf?.id ?? null,
         },
       },
       { new: true, runValidators: true }
@@ -663,14 +668,14 @@ const rejectAs = async (req, res, { owner, caretaker = null }) => {
     // A demo basket said no to is cleared and the next one put in its place.
     await resetDemoRequest(rejected);
 
-    // The parent declining their own request needs no telling; a caretaker
-    // declining it on their behalf does.
-    if (caretaker) {
+    // The parent declining their own request needs no telling; a caretaker or
+    // super admin declining it on their behalf does.
+    if (onBehalf) {
       const parent = await Parent.findById(rejected.parentId);
       if (parent) {
         sendToParent(
           parent,
-          `Order declined by ${caretaker.name}`,
+          `Order declined by ${onBehalf.name}`,
           `₹${rejected.totalAmount} request declined. Nothing was charged.`,
           {
             type: "ORDER_REJECTED",
@@ -919,6 +924,54 @@ export const caretakerRejectPendingOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+/* =========================================================
+   SEEN BY EVERY ADMIN, ANSWERED BY A SUPER ADMIN
+========================================================= */
+/* Every order still waiting on a parent, for the Student Orders board: these
+   are placed but not yet paid for, so they sit ahead of the warehouse's
+   packages. Any admin may see them; only a super admin may answer. */
+export const getAdminPendingOrders = async (req, res) => {
+  try {
+    const orders = await PendingOrder.find({
+      status: "PENDING",
+      expiresAt: { $gt: new Date() },
+    })
+      .populate("studentId", "name admissionNumber roomNumber")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ count: orders.length, orders });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* A super admin answers for the parent, whoever holds the approval — the
+   parent or a caretaker they handed it to. It is the same approval and the
+   same charge, recorded against the admin and announced to the parent. */
+const superAdminScope = async (req) => {
+  const account = await Admin.findById(req.staff.id).select("name").lean();
+  return {
+    owner: {},
+    admin: { id: req.staff.id, name: account?.name || "the school office" },
+  };
+};
+
+const asSuperAdmin = (answer) => async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: "This order could not be found." });
+    }
+    await answer(req, res, await superAdminScope(req));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const adminApprovePendingOrder = asSuperAdmin(approveAs);
+
+export const adminRejectPendingOrder = asSuperAdmin(rejectAs);
 
 /* =========================================================
    POLLED BY THE TILL

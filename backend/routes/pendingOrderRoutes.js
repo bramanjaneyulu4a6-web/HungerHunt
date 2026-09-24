@@ -1,11 +1,14 @@
 import express from "express";
 
 import {
+  adminApprovePendingOrder,
+  adminRejectPendingOrder,
   approvePendingOrder,
   caretakerApprovePendingOrder,
   caretakerRejectPendingOrder,
   caretakerUpdatePendingOrder,
   createPendingOrder,
+  getAdminPendingOrders,
   getCaretakerPendingOrders,
   getParentPendingOrders,
   getPendingOrderStatus,
@@ -14,7 +17,14 @@ import {
   updatePendingOrder,
 } from "../controllers/pendingOrderController.js";
 
-import { orStudent, protectCaretaker, protectParent, protectStaff } from "../middleware/authMiddleware.js";
+import {
+  orStudent,
+  protectAdmin,
+  protectCaretaker,
+  protectParent,
+  protectStaff,
+  protectSuperAdmin,
+} from "../middleware/authMiddleware.js";
 import { requireKioskOpenForStudents } from "../middleware/kioskOpen.js";
 
 const router = express.Router();
@@ -42,6 +52,12 @@ router.get("/caretaker", protectCaretaker, getCaretakerPendingOrders);
 router.post("/:id/caretaker-approve", protectCaretaker, caretakerApprovePendingOrder);
 router.post("/:id/caretaker-reject", protectCaretaker, caretakerRejectPendingOrder);
 router.put("/:id/caretaker", protectCaretaker, caretakerUpdatePendingOrder);
+
+// The back office: every admin sees what is waiting on a parent on the Student
+// Orders board; a super admin may answer it for them.
+router.get("/admin", protectAdmin, getAdminPendingOrders);
+router.post("/:id/admin-approve", protectSuperAdmin, adminApprovePendingOrder);
+router.post("/:id/admin-reject", protectSuperAdmin, adminRejectPendingOrder);
 
 // "Notify Parent via WhatsApp" was tapped: once per order, from the kiosk (the
 // student's own order) or the caretaker app (an order from their rooms).

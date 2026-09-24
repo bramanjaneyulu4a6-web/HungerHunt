@@ -3,7 +3,9 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import api from '../utils/api';
 import { Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
 import FulfillmentStatusPicker from '../components/FulfillmentStatusPicker';
+import ParentApprovalPicker from '../components/ParentApprovalPicker';
 import { formatINR } from '../utils/format';
+import { requestNumber } from '../utils/fulfillmentStatus';
 
 const HISTORY_PAGE_SIZE = 50;
 
@@ -11,18 +13,39 @@ const HISTORY_PAGE_SIZE = 50;
 // cancellation moves the order to history, so it leaves this list at once.
 const LEAVES_ACTIVE = new Set(['DELIVERED', 'COLLECTED', 'CANCELLED']);
 
-const orderNumber = (order) => `FO-${order.id.slice(-6).toUpperCase()}`;
+// An order still waiting on its parent has no package yet, so it carries its
+// request number rather than a package number.
+const orderNumber = (order) =>
+  order.awaitingParent ? requestNumber(order) : `FO-${order.id.slice(-6).toUpperCase()}`;
+
+/* Everything placed and not finished: orders the parent has yet to answer
+   first — they are the step before a package exists — then the packages. */
+const asAwaitingRow = (order) => ({
+  id: String(order._id),
+  awaitingParent: true,
+  student: order.studentId
+    ? {
+        name: order.studentId.name,
+        admissionNumber: order.studentId.admissionNumber,
+        roomNumber: order.studentId.roomNumber,
+      }
+    : null,
+  items: order.items || [],
+  orderedAt: order.createdAt,
+  expiresAt: order.expiresAt,
+  totalAmount: order.totalAmount,
+});
 
 const itemCount = (order) =>
   order.items.reduce((total, item) => total + Number(item.quantity || 0), 0);
 
-const OrdersLedger = ({ orders, expanded, onExpand, onChanged, history = false }) => (
+const OrdersLedger = ({ orders, expanded, onExpand, onChanged, onAnswered, history = false }) => (
   <Card className="warehouse-ledger-card fulfillment-ledger">
     <div className="fulfillment-ledger__summary">
       <div><strong>{orders.length}</strong><span>{history ? 'orders on this page' : 'active orders'}</span></div>
       <p>{history
         ? 'Completed and cancelled packages are listed newest first. A status can still be corrected from its badge.'
-        : 'Update paid orders as they move from confirmed through delivery. Every status can be changed from its badge; confirmed and packed orders can be cancelled.'}</p>
+        : 'Every order placed and not yet finished, from those sent to the parent through delivery. Paid orders can be moved from their badge; confirmed and packed orders can be cancelled. A super admin can approve or decline an order sent to the parent from its badge.'}</p>
     </div>
     <div className="table-wrap">
       <table className="table table--stack table--hover">
@@ -49,7 +72,9 @@ const OrdersLedger = ({ orders, expanded, onExpand, onChanged, history = false }
               <td data-label="Placed">{new Date(order.orderedAt).toLocaleString()}</td>
               <td data-label="Total"><strong>{formatINR(order.totalAmount)}</strong></td>
               <td data-label="Status">
-                <FulfillmentStatusPicker order={order} onChanged={(updated, status) => onChanged(order, updated, status)} />
+                {order.awaitingParent
+                  ? <ParentApprovalPicker order={order} onAnswered={(answer) => onAnswered(order, answer)} />
+                  : <FulfillmentStatusPicker order={order} onChanged={(updated, status) => onChanged(order, updated, status)} />}
               </td>
               <td data-label="Actions">
                 <div className="fulfillment-actions">
@@ -77,6 +102,14 @@ const OrdersLedger = ({ orders, expanded, onExpand, onChanged, history = false }
                         </p>
                       ))}
                     </div>
+                    {order.awaitingParent ? (
+                    <div>
+                      <small>Waiting on the parent</small>
+                      <p><strong>Open until {new Date(order.expiresAt).toLocaleString()}</strong></p>
+                      <p><span>Request ID</span><strong>{order.id}</strong></p>
+                      <p><span>Charged</span><strong>Nothing yet</strong></p>
+                    </div>
+                    ) : (
                     <div>
                       <small>{history ? 'Order record' : 'Delivery window'}</small>
                       <p><strong>Due {new Date(order.deliverBy).toLocaleString()}</strong></p>
@@ -88,6 +121,7 @@ const OrdersLedger = ({ orders, expanded, onExpand, onChanged, history = false }
                         </p>
                       )}
                     </div>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -115,8 +149,14 @@ export default function FulfillmentOrders() {
     setLoading(true);
     setLoadError(false);
     try {
-      const response = await api.get('/v1/fulfillment-orders');
-      setOrders(response.data.data || []);
+      const [packages, awaiting] = await Promise.all([
+        api.get('/v1/fulfillment-orders'),
+        api.get('/pending-orders/admin'),
+      ]);
+      setOrders([
+        ...(awaiting.data.orders || []).map(asAwaitingRow),
+        ...(packages.data.data || []),
+      ]);
     } catch (error) {
       console.error(error);
       setLoadError(true);
@@ -162,13 +202,24 @@ export default function FulfillmentOrders() {
     setExpanded((current) => (LEAVES_ACTIVE.has(status) && current === order.id ? null : current));
   };
 
+  /* An approval turns the request into a paid package, which the board reads
+     back from the server; a decline just leaves. */
+  const onAwaitingAnswered = (order, answer) => {
+    setExpanded((current) => (current === order.id ? null : current));
+    if (answer === 'APPROVED') {
+      loadActive();
+      return;
+    }
+    setOrders((current) => current.filter((item) => item.id !== order.id));
+  };
+
   const onHistoryChanged = () => loadHistory(historyPage);
 
   return (
     <div className="page warehouse-page">
       <PageHeader
         title="Student Orders"
-        subtitle="Review active warehouse packages and the complete history of handed-over, delivered, and cancelled orders."
+        subtitle="Review every active order, from those sent to the parent through delivery, and the complete history of delivered and cancelled orders."
       />
 
       <div className="tabs users-tabs" role="tablist" aria-label="Student order views">
@@ -191,7 +242,7 @@ export default function FulfillmentOrders() {
       ) : (view === 'active' ? orders : historyOrders).length === 0 && !loadError ? (
         <EmptyState icon="✓" title={view === 'active' ? 'No active student orders' : 'No order history yet'} variant="success">
           {view === 'active'
-            ? 'Every warehouse package has been handed over, delivered, or cancelled.'
+            ? 'Nothing is waiting on a parent, and every warehouse package has been delivered or cancelled.'
             : 'Handed-over, delivered, and cancelled orders will appear here.'}
         </EmptyState>
       ) : (view === 'active' ? orders : historyOrders).length > 0 ? (
@@ -201,6 +252,7 @@ export default function FulfillmentOrders() {
             expanded={expanded}
             onExpand={setExpanded}
             onChanged={view === 'active' ? onActiveChanged : onHistoryChanged}
+            onAnswered={onAwaitingAnswered}
             history={view === 'history'}
           />
           {view === 'history' && historyPages > 1 && (

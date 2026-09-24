@@ -54,11 +54,17 @@ export const fulfillmentBadgeVariant = (status) => {
    the transaction, so absence of the newer hint must not hide the editor. An
    explicit false still locks a known unpaid/corrupt record. */
 export const availableFulfillmentStatuses = (order) => {
-  if (!order || order.paymentProcessed === false || !FULFILLMENT_STAGES.includes(order.status)) {
+  // An order still waiting on its parent is not a package yet: the only
+  // answers to it are accept and decline (ParentApprovalPicker).
+  if (!order || order.awaitingParent || order.paymentProcessed === false || !FULFILLMENT_STAGES.includes(order.status)) {
     return [];
   }
   return FULFILLMENT_STAGES.filter((status) => status !== order.status);
 };
 
 export const isCancellableFulfillment = (order) =>
-  Boolean(order) && order.paymentProcessed !== false && CANCELLABLE_STATUSES.includes(order.status);
+  Boolean(order) && !order.awaitingParent && order.paymentProcessed !== false && CANCELLABLE_STATUSES.includes(order.status);
+
+// An order still waiting on its parent has no package yet; it is known by its
+// approval request instead.
+export const requestNumber = (order) => `REQ-${String(order.id).slice(-6).toUpperCase()}`;

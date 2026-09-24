@@ -930,12 +930,20 @@ export const caretakerRejectPendingOrder = async (req, res) => {
 ========================================================= */
 /* Every order still waiting on a parent, for the Student Orders board: these
    are placed but not yet paid for, so they sit ahead of the warehouse's
-   packages. Any admin may see them; only a super admin may answer. */
+   packages. Any admin may see them; only a super admin may answer.
+   `?studentId=` narrows it to one student, for their activity popup. */
 export const getAdminPendingOrders = async (req, res) => {
   try {
+    const { studentId } = req.query;
+
+    if (studentId !== undefined && !mongoose.isValidObjectId(studentId)) {
+      return res.status(400).json({ message: "That student could not be found." });
+    }
+
     const orders = await PendingOrder.find({
       status: "PENDING",
       expiresAt: { $gt: new Date() },
+      ...(studentId ? { studentId } : {}),
     })
       .populate("studentId", "name admissionNumber roomNumber")
       .sort({ createdAt: -1 })

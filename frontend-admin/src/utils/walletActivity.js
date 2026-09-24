@@ -79,6 +79,10 @@ const PAGE = 50;
    need it and a parent's modal needs several at once. */
 export const useStudentLedger = (studentId) => {
   const [entries, setEntries] = useState([]);
+  // Orders sent to the parent and not yet answered. Nothing has been charged,
+  // so they are not in the ledger; they are read beside it, and a failure to
+  // read them leaves the ledger standing rather than blanking the popup.
+  const [awaiting, setAwaiting] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -87,6 +91,11 @@ export const useStudentLedger = (studentId) => {
   const load = useCallback(async (wanted) => {
     if (!studentId) return;
     setLoading(true);
+    if (wanted === 1) {
+      api.get('/pending-orders/admin', { params: { studentId } })
+        .then(({ data }) => setAwaiting(data.orders || []))
+        .catch((error) => { console.error(error); setAwaiting([]); });
+    }
     try {
       const { data } = await api.get(`/students/${studentId}/ledger`, {
         params: { page: wanted, limit: PAGE },
@@ -108,5 +117,5 @@ export const useStudentLedger = (studentId) => {
     return () => window.clearTimeout(first);
   }, [load]);
 
-  return { entries, hasMore, loading, failed, loadMore: () => load(page + 1), retry: () => load(1) };
+  return { entries, awaiting, hasMore, loading, failed, loadMore: () => load(page + 1), retry: () => load(1) };
 };

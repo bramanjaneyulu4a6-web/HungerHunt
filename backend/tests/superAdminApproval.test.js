@@ -170,3 +170,32 @@ describe("answering for the parent", () => {
     assert.equal(res.status, 409);
   });
 });
+
+describe("one student's waiting orders", () => {
+  test('narrows the list to that student', async () => {
+    accountIs('admin');
+    let asked;
+    const query = {
+      populate() { return query; },
+      sort() { return query; },
+      lean: async () => [],
+    };
+    mock.method(PendingOrder, 'find', (filter) => { asked = filter; return query; });
+
+    const res = await send('GET', `/api/pending-orders/admin?studentId=${STUDENT_ID}`, adminToken);
+
+    assert.equal(res.status, 200);
+    assert.equal(String(asked.studentId), STUDENT_ID);
+    assert.equal(asked.status, 'PENDING');
+  });
+
+  test('refuses a malformed student id', async () => {
+    accountIs('admin');
+    const find = mock.method(PendingOrder, 'find', () => { throw new Error('should not query'); });
+
+    const res = await send('GET', '/api/pending-orders/admin?studentId=nope', adminToken);
+
+    assert.equal(res.status, 400);
+    assert.equal(find.mock.callCount(), 0);
+  });
+});

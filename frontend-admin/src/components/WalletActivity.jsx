@@ -15,7 +15,7 @@ import { Fragment, useState } from 'react';
 
 import Icon from './Icon';
 import { formatINR } from '../utils/format';
-import { fulfillmentStatusLabel } from '../utils/fulfillmentStatus';
+import { fulfillmentStatusLabel, requestNumber } from '../utils/fulfillmentStatus';
 import {
   deletionFacts,
   depositTarget,
@@ -34,6 +34,7 @@ import { receiptIdOf, useStudentLedger } from '../utils/walletActivity';
 import { DeleteTransactionButton } from './DeleteTransaction';
 import { ReceiptButton } from './ReceiptButton';
 import FulfillmentStatusPicker from './FulfillmentStatusPicker';
+import ParentApprovalPicker from './ParentApprovalPicker';
 import { useDismissableOverlay } from '../utils/overlay';
 import { Badge, Banner, Button, EmptyState, Skeleton } from './ui';
 
@@ -216,8 +217,54 @@ const EntryRow = ({ entry, studentId, studentName, showStudent, onOrderChanged, 
   );
 };
 
+/* An order sent to the parent and not yet answered. It has no charge behind
+   it, so no balance and no receipt; a super admin may answer it from the
+   badge, like on the Student Orders board. */
+const AwaitingRow = ({ order, studentName, onAnswered }) => {
+  const [open, setOpen] = useState(false);
+  const row = { id: String(order._id), totalAmount: order.totalAmount, student: { name: studentName } };
+
+  return (
+    <Fragment>
+    <tr className="ledger-row--expandable" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+      <td data-label="Date/Time" style={{ fontSize: 13, color: 'var(--muted)' }}>
+        {new Date(order.createdAt).toLocaleString()}
+      </td>
+      <td data-label="Status">
+        <ParentApprovalPicker order={row} onAnswered={onAnswered} />
+      </td>
+      <td data-label="Reference" className="ledger-mono">{requestNumber(row)}</td>
+      <td data-label="Amount" style={{ textAlign: 'right', fontWeight: 700, color: 'var(--muted)' }}>
+        {formatINR(order.totalAmount)}
+      </td>
+      <td data-label="Balance" style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 13 }}>—</td>
+      <td className="ledger-actions">
+        <div className="row-actions row-actions--chevron">
+          <div className="row-actions__line">
+            <span className={`ledger-chevron${open ? ' ledger-chevron--open' : ''}`} aria-hidden="true">
+              <Icon name="caret" size={16} />
+            </span>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {open && (
+      <tr className="ledger-detail-row">
+        <td colSpan={6}>
+          <EntryDetails entry={{ items: order.items }} />
+          <dl className="ledger-detail__facts">
+            <div><dt>Status</dt><dd>Sent to parent, nothing charged yet</dd></div>
+            <div><dt>Open until</dt><dd>{when(order.expiresAt)}</dd></div>
+          </dl>
+        </td>
+      </tr>
+    )}
+    </Fragment>
+  );
+};
+
 export const LedgerTable = ({
-  entries, studentId, studentName, showStudent = false, onOrderChanged, onDeleted,
+  entries, awaiting = [], studentId, studentName, showStudent = false, onOrderChanged, onDeleted,
 }) => (
   <div className="table-wrap">
     <table className="table table--stack table--hover">
@@ -233,6 +280,9 @@ export const LedgerTable = ({
         </tr>
       </thead>
       <tbody>
+        {awaiting.map((order) => (
+          <AwaitingRow key={`awaiting-${order._id}`} order={order} studentName={studentName} onAnswered={onOrderChanged} />
+        ))}
         {entries.map((entry) => (
           <EntryRow
             key={`${entry.kind}-${entry._id}`}
@@ -249,16 +299,17 @@ export const LedgerTable = ({
   </div>
 );
 
-const Section = ({ title, entries, studentId, studentName, empty, onOrderChanged, onDeleted }) => (
+const Section = ({ title, entries, awaiting = [], studentId, studentName, empty, onOrderChanged, onDeleted }) => (
   <section style={{ marginTop: 20 }}>
     <h4 className="section-title" style={{ marginBottom: 8 }}>
-      {title} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({entries.length})</span>
+      {title} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({awaiting.length + entries.length})</span>
     </h4>
-    {entries.length === 0
+    {awaiting.length + entries.length === 0
       ? <p className="modal-note">{empty}</p>
       : (
         <LedgerTable
           entries={entries}
+          awaiting={awaiting}
           studentId={studentId}
           studentName={studentName}
           onOrderChanged={onOrderChanged}
@@ -288,7 +339,7 @@ const LedgerBody = ({ ledger, studentId, studentName }) => {
     );
   }
 
-  if (ledger.entries.length === 0) {
+  if (ledger.entries.length === 0 && ledger.awaiting.length === 0) {
     return <EmptyState icon="🧾" title="Nothing on this wallet yet" />;
   }
 
@@ -297,7 +348,9 @@ const LedgerBody = ({ ledger, studentId, studentName }) => {
       <Section
         title="Orders"
         entries={ledger.entries.filter(isOrder)}
+        awaiting={ledger.awaiting}
         studentId={studentId}
+        studentName={studentName}
         empty="Nothing has been bought on this wallet."
         // A status change is re-read rather than patched: the row's label,
         // timeline and any refund line all come from the server's ledger.

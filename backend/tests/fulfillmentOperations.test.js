@@ -670,7 +670,7 @@ describe('delivery history and operational reports', () => {
         { _id: '507f191e810c19729de860e2', code: 'D-5' },
         { _id: '507f191e810c19729de860e7', code: 'E-1' },
       ],
-      [{ _id: '507f1f77bcf86cd799439021', roomIds: ['507f191e810c19729de860e1', '507f191e810c19729de860e2'] }]
+      [{ _id: '507f1f77bcf86cd799439021', name: 'Meena', roomIds: ['507f191e810c19729de860e1', '507f191e810c19729de860e2'] }]
     );
     mock.method(FulfillmentOrder, 'find', () => query([orderFixture()]));
     mock.method(FulfillmentOrder, 'countDocuments', async () => 1);
@@ -678,8 +678,11 @@ describe('delivery history and operational reports', () => {
     // Two rooms held by one caretaker are one run; the room nobody covers
     // stands alone rather than being folded in with them.
     const expected = [
-      { rooms: [{ id: '507f191e810c19729de860e1', code: 'D-4' }, { id: '507f191e810c19729de860e2', code: 'D-5' }] },
-      { rooms: [{ id: '507f191e810c19729de860e7', code: 'E-1' }] },
+      {
+        rooms: [{ id: '507f191e810c19729de860e1', code: 'D-4' }, { id: '507f191e810c19729de860e2', code: 'D-5' }],
+        caretaker: { id: '507f1f77bcf86cd799439021', name: 'Meena' },
+      },
+      { rooms: [{ id: '507f191e810c19729de860e7', code: 'E-1' }], caretaker: null },
     ];
 
     for (const path of [

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 import api from "../utils/api";
-import { groupOrdersByBlock } from "../utils/orderGroups";
+import { groupOrdersByBlock, unitKicker } from "../utils/orderGroups";
 
 const dateOnly = (date) => {
   const year = date.getFullYear();
@@ -114,7 +114,7 @@ const Records = () => {
                       return (
                         <article key={unit.key} className="wh-unit-tile wh-history-tile">
                           <div className="wh-unit-tile-head">
-                            <div><span className="wh-unit-kicker">{unit.roomNumbers.length === 1 ? "Room" : "Rooms"}</span><h3>{unit.label}</h3></div>
+                            <div><span className="wh-unit-kicker">{unitKicker(unit)}</span><h3>{unit.label}</h3></div>
                             <span className="wh-unit-count"><strong>{unit.itemCount}</strong><small>items</small></span>
                           </div>
                           <div className="wh-history-statuses">

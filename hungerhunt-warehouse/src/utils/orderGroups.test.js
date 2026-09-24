@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { blockFromRoom, groupOrdersByBlock } from "./orderGroups.js";
+import { blockFromRoom, groupOrdersByBlock, unitKicker } from "./orderGroups.js";
 
 const orderIn = (id, roomNumber, roomId, items = [{ productId: "pepsi", name: "Pepsi", quantity: 1 }]) => ({
   id,
@@ -121,4 +121,38 @@ test("marks a unit overdue when any of its orders is past its deliver-by time", 
   );
 
   assert.equal(blocks[0].units[0].overdue, true);
+});
+
+test("one caretaker's rooms make one tile named for them, with the wing said once", () => {
+  const orders = [
+    { id: "1", student: { roomId: "r1", roomNumber: "MINDS BOYS - 101" }, items: [], deliverBy: "2999-01-01" },
+    { id: "2", student: { roomId: "r3", roomNumber: "MINDS BOYS - 124" }, items: [], deliverBy: "2999-01-01" },
+    { id: "3", student: { roomId: "r4", roomNumber: "MINDS BOYS - 105" }, items: [], deliverBy: "2999-01-01" },
+  ];
+  const roomUnits = [
+    {
+      caretaker: { id: "a", name: "Sowmya" },
+      rooms: [
+        { id: "r1", code: "MINDS BOYS - 101" },
+        { id: "r2", code: "MINDS BOYS - 102" },
+        { id: "r3", code: "MINDS BOYS - 124" },
+      ],
+    },
+    { caretaker: { id: "b", name: "Prashanthi" }, rooms: [{ id: "r4", code: "MINDS BOYS - 105" }] },
+  ];
+
+  const [block] = groupOrdersByBlock(orders, roomUnits);
+
+  assert.equal(block.label, "Block MINDS");
+  assert.deepEqual(block.units.map((unit) => unit.label), ["BOYS 101 · 102 · 124", "BOYS - 105"]);
+  assert.deepEqual(block.units.map(unitKicker), ["Sowmya · 3 rooms", "Prashanthi · 1 room"]);
+  assert.equal(block.units[0].orderCount, 2);
+});
+
+test("a room nobody covers keeps the plain Room heading", () => {
+  const [block] = groupOrdersByBlock(
+    [{ id: "1", student: { roomId: "h", roomNumber: "H1" }, items: [], deliverBy: "2999-01-01" }],
+    [{ caretaker: null, rooms: [{ id: "h", code: "H1" }] }]
+  );
+  assert.equal(unitKicker(block.units[0]), "Room");
 });

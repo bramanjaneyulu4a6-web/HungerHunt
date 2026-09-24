@@ -16,7 +16,33 @@ export const blockFromRoom = (roomNumber) => {
    MINDS" repeats the block twice for nothing. */
 const stripBlock = (roomNumber, block) => {
   const code = String(roomNumber || "").trim();
-  return code.toUpperCase().startsWith(`${block}-`) ? code.slice(block.length + 1) : code;
+  const upper = code.toUpperCase();
+  if (!upper.startsWith(block)) return code;
+  const rest = code.slice(block.length);
+  // "MINDS-101" and "MINDS BOYS - 101" both carry the block before a separator.
+  return /^[-/\s]/.test(rest) ? rest.replace(/^[-/\s]+/, "") || code : code;
+};
+
+/* One caretaker's rooms usually share a wing: "BOYS - 101 · BOYS - 102 ·
+   BOYS - 103" says BOYS three times. When every room in the unit has the same
+   wing, it is said once: "BOYS 101 · 102 · 103". */
+const unitLabel = (codes) => {
+  const parts = codes.map((code) => code.match(/^(.+?)\s*-\s*(\S+)$/));
+  const wing = parts[0]?.[1];
+  if (codes.length > 1 && wing && parts.every((part) => part && part[1] === wing)) {
+    return `${wing} ${parts.map((part) => part[2]).join(" · ")}`;
+  }
+  return codes.join(" · ");
+};
+
+// The tile's small heading: whose round this is, or just "Room(s)" for a room
+// nobody covers.
+export const unitKicker = (unit) => {
+  const rooms = unit.roomNumbers.length;
+  const noun = rooms === 1 ? "room" : "rooms";
+  return unit.caretakerName
+    ? `${unit.caretakerName} · ${rooms} ${noun}`
+    : rooms === 1 ? "Room" : "Rooms";
 };
 
 const itemCountOf = (order) =>
@@ -51,7 +77,9 @@ export const groupOrdersByBlock = (orders, roomUnits = []) => {
   const unitByRoomId = new Map();
   (roomUnits || []).forEach((unit, index) => {
     const rooms = [...(unit.rooms || [])].sort((a, b) => natural.compare(a.code, b.code));
-    for (const room of rooms) unitByRoomId.set(String(room.id), { index, rooms });
+    for (const room of rooms) {
+      unitByRoomId.set(String(room.id), { index, rooms, caretakerName: unit.caretaker?.name || "" });
+    }
   });
 
   const units = new Map();
@@ -68,6 +96,7 @@ export const groupOrdersByBlock = (orders, roomUnits = []) => {
         roomNumbers: membership
           ? membership.rooms.map((room) => room.code)
           : [roomCode || "Unassigned"],
+        caretakerName: membership?.caretakerName || "",
         orders: [],
       });
     }
@@ -79,8 +108,9 @@ export const groupOrdersByBlock = (orders, roomUnits = []) => {
     if (!blocks.has(unit.block)) blocks.set(unit.block, []);
     blocks.get(unit.block).push({
       key: unit.key,
-      label: unit.roomNumbers.map((code) => stripBlock(code, unit.block)).join(" · "),
+      label: unitLabel(unit.roomNumbers.map((code) => stripBlock(code, unit.block))),
       roomNumbers: unit.roomNumbers,
+      caretakerName: unit.caretakerName,
       orders: unit.orders,
       orderCount: unit.orders.length,
       itemCount: unit.orders.reduce((sum, order) => sum + itemCountOf(order), 0),
@@ -91,7 +121,10 @@ export const groupOrdersByBlock = (orders, roomUnits = []) => {
 
   return [...blocks.entries()]
     .map(([key, blockUnits]) => {
-      const sorted = [...blockUnits].sort((a, b) => natural.compare(a.label, b.label));
+      // By first room, as the server orders units: a label can be shortened,
+      // but the rooms it stands for keep their place.
+      const sorted = [...blockUnits].sort((a, b) =>
+        natural.compare(a.roomNumbers[0], b.roomNumbers[0]) || natural.compare(a.label, b.label));
       return {
         key,
         label: key === "Other" ? "Other rooms" : `Block ${key}`,

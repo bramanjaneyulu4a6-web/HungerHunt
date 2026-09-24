@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import Icon from "../components/Icon";
 import { Banner, EmptyState, Skeleton } from "../components/ui";
 import api from "../utils/api";
-import { groupOrdersByBlock } from "../utils/orderGroups";
+import { groupOrdersByBlock, unitKicker } from "../utils/orderGroups";
 import { isShareCancel, openOrdersPrintSheet } from "../utils/ordersPrintSheet";
 import { useFeature } from "../utils/currentStaff";
 
@@ -40,7 +40,7 @@ const UnitTile = ({ unit, status, busy, onAdvance, onReport, canReport = true, c
   <article className="wh-unit-tile">
     <div className="wh-unit-tile-head">
       <div>
-        <span className="wh-unit-kicker">{unit.roomNumbers.length === 1 ? "Room" : "Rooms"}</span>
+        <span className="wh-unit-kicker">{unitKicker(unit)}</span>
         <h3>{unit.label}</h3>
       </div>
       <span className="wh-unit-count">

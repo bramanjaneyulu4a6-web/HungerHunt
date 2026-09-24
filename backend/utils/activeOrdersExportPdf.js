@@ -91,6 +91,28 @@ export const renderActiveOrdersExport = (report, stream) => {
     y += 22;
   };
 
+  const itemTotalsHeading = (group, continued = false) => {
+    ensure(30, group.caretakerName);
+    doc.rect(margin, y, contentWidth, 28)
+      .lineWidth(1)
+      .strokeColor(INK)
+      .stroke();
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(INK)
+      .text(`ITEMS HANDED TO CARETAKER${continued ? ' - CONTINUED' : ''}`, margin + 10, y + 9, {
+        width: contentWidth - 210,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
+      .text(
+        `${group.itemCount} item${group.itemCount === 1 ? '' : 's'} total`,
+        width - margin - 190,
+        y + 9.5,
+        { width: 180, align: 'right', lineBreak: false, ellipsis: true }
+      );
+    y += 28;
+  };
+
   const roomBand = (room, continuation) => {
     ensure(34, continuation);
     doc.rect(margin, y, contentWidth, 22).fillColor(BAND).fill();
@@ -114,22 +136,31 @@ export const renderActiveOrdersExport = (report, stream) => {
       y = doc.y + 12;
     }
 
-    sectionHeading(
-      'Items handed to caretaker',
-      `${group.itemCount} item${group.itemCount === 1 ? '' : 's'} total`,
-      group.caretakerName
-    );
+    itemTotalsHeading(group);
     for (const item of group.items) {
-      ensure(16, `${group.caretakerName} - item totals`);
+      const continued = y + 22 > bottom;
+      if (continued) {
+        doc.addPage();
+        y = margin;
+        itemTotalsHeading(group, true);
+      }
+      doc.rect(margin, y, contentWidth, 22)
+        .lineWidth(0.7)
+        .strokeColor(RULE)
+        .stroke();
       doc.font('Helvetica').fontSize(10).fillColor(INK)
-        .text(item.name, margin + 10, y, {
+        .text(item.name, margin + 10, y + 5.5, {
           width: contentWidth - 70,
           lineBreak: false,
           ellipsis: true,
         });
       doc.font('Helvetica-Bold').fontSize(10).fillColor(INK)
-        .text(`×${item.quantity}`, width - margin - 50, y, { width: 50, align: 'right' });
-      y += 15;
+        .text(`×${item.quantity}`, width - margin - 60, y + 5.5, {
+          width: 50,
+          align: 'right',
+          lineBreak: false,
+        });
+      y += 22;
     }
     y += 10;
 

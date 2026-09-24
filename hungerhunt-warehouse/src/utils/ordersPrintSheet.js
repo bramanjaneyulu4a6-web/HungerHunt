@@ -6,11 +6,9 @@ import { Share } from "@capacitor/share";
 import api from "./api";
 import { filenameFromDisposition } from "./contentDisposition";
 
-/* The active-orders board as a PDF work sheet, rendered by the server so the
-   paper always agrees with the board (see the backend's printSheet.js). This
-   file only moves the bytes: fetch, then land them wherever this platform
-   can show a PDF. The pattern is the parent app's receipts.js, which is the
-   proven path for exactly this on both surfaces. */
+/* The selected active stages as one consolidated receiving list per
+   caretaker. The server owns grouping and rendering; this file only moves the
+   PDF bytes to the platform's viewer or share sheet. */
 
 const blobToBase64 = (blob) =>
   new Promise((resolve, reject) => {
@@ -30,8 +28,8 @@ export const isShareCancel = (error) => /cancel/i.test(String(error?.message || 
    cache, and a fresh copy is one tap away. On the web it opens in a new tab,
    which is where the print dialog lives.
 
-   `sections` narrows the sheet to the stages named (PENDING, PACKED,
-   OUT_FOR_DELIVERY); the server prints the whole board when it is absent. */
+   `sections` narrows the totals to the stages named (PENDING, PACKED,
+   OUT_FOR_DELIVERY); the server includes every active stage when absent. */
 export const openOrdersPrintSheet = async (sections) => {
   const response = await api.get("/v1/fulfillment-orders/print", {
     responseType: "blob",

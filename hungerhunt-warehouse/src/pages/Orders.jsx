@@ -245,9 +245,8 @@ const Orders = () => {
     return openDelivery([unit]);
   };
 
-  /* The sheet is carried on a round, so the print dialog asks which stages to
-     take along — all three by default. Its checkboxes arrive pre-ticked to
-     match what the board says at this moment. */
+  /* The sheet totals the chosen stages by caretaker. Keeping the stage picker
+     lets the storeroom print only the work that is ready for today's handover. */
   const printOrdersList = async (event) => {
     event.preventDefault();
     const sections = VIEWS.map(([status]) => status).filter((status) => printChoice[status]);
@@ -359,7 +358,7 @@ const Orders = () => {
           <form className="wh-work-dialog" role="dialog" aria-modal="true" onSubmit={printOrdersList}>
             <span className="wh-dialog-kicker">Orders list</span>
             <h2>What should print?</h2>
-            <p className="wh-remaining">Each stage starts on its own page of the PDF.</p>
+            <p className="wh-remaining">Selected stages are combined into one total list per caretaker.</p>
             <div className="wh-print-choices">
               {VIEWS.map(([status, label]) => (
                 <button key={status} type="button" role="checkbox" aria-checked={printChoice[status]}

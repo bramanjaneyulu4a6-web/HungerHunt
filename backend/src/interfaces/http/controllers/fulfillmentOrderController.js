@@ -1,6 +1,9 @@
 import mongoose from 'mongoose';
 
+import Admin from '../../../../models/Admin.js';
 import FulfillmentOrder from '../../../../models/FulfillmentOrder.js';
+import PendingOrder from '../../../../models/PendingOrder.js';
+import { buildActiveOrdersExport } from '../../../domain/fulfillment/activeOrdersExport.js';
 import { buildDeliveryReport } from '../../../domain/fulfillment/deliveryReport.js';
 import {
   OrderStatus,
@@ -25,7 +28,10 @@ import {
   proofOfDeliveryProblem,
   receiverPhoneProblem,
 } from '../../../domain/fulfillment/proofOfDelivery.js';
-import { PRINTABLE_STATUSES, buildPrintSheet } from '../../../domain/fulfillment/printSheet.js';
+import {
+  PRINTABLE_RECEIVING_STATUSES,
+  buildCaretakerReceivingSheet,
+} from '../../../domain/fulfillment/caretakerReceivingSheet.js';
 import { checkPurchaseCode } from '../../../domain/students/purchaseCodeCheck.js';
 import {
   ApplicationError,
@@ -35,7 +41,8 @@ import {
 } from '../../../shared/errors/applicationError.js';
 import { parseBusinessDateRange } from '../../../shared/http/businessDateRange.js';
 import { cancelAndRefundFulfillment } from '../../../../utils/refunds.js';
-import { renderOrdersPrintSheet } from '../../../../utils/ordersPrintSheetPdf.js';
+import { renderCaretakerReceivingSheet } from '../../../../utils/caretakerReceivingSheetPdf.js';
+import { renderActiveOrdersExport } from '../../../../utils/activeOrdersExportPdf.js';
 import { buildRoomUnits } from '../../../../utils/roomUnits.js';
 import { resetDemoOrder } from '../../../../utils/demoParentReset.js';
 
@@ -202,17 +209,19 @@ export const print = async (req, res) => {
     .split(',')
     .map((value) => value.trim().toUpperCase())
     .filter(Boolean);
-  const unknown = sections.find((value) => !PRINTABLE_STATUSES.includes(value));
+  const unknown = sections.find((value) => !PRINTABLE_RECEIVING_STATUSES.includes(value));
   if (unknown) {
     throw new ValidationError(`"${unknown}" is not a printable stage.`);
   }
 
-  const [orders, roomUnits] = await Promise.all([
+  const [orders, caretakers] = await Promise.all([
     FulfillmentOrder.find({ status: { $in: OPEN_STATUSES } })
       .sort({ deliverBy: 1 })
       .limit(MAX_ACTIVE)
       .lean(),
-    buildRoomUnits(),
+    Admin.find({ role: 'caretaker', active: { $ne: false } })
+      .select('name roomIds')
+      .lean(),
   ]);
 
   const generatedAt = new Date();
@@ -230,7 +239,68 @@ export const print = async (req, res) => {
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="orders-list-${day}-${clock}.pdf"`);
-  renderOrdersPrintSheet(buildPrintSheet(orders, roomUnits, { generatedAt, sections }), res);
+  renderCaretakerReceivingSheet(
+    buildCaretakerReceivingSheet(orders, caretakers, { generatedAt, sections }),
+    res
+  );
+};
+
+/* The admin's handout of every current order from Student Orders > Active Orders.
+ * Unlike the warehouse worksheet, this includes requests awaiting parent
+ * approval and is organised around named caretakers. It is a read-only point-
+ * in-time snapshot; exporting never advances or answers an order. */
+export const exportActive = async (req, res) => {
+  const now = new Date();
+  const [packages, pending, caretakers] = await Promise.all([
+    FulfillmentOrder.find({ status: { $in: OPEN_STATUSES } })
+      .sort({ deliverBy: 1 })
+      .limit(MAX_REPORT_ORDERS)
+      .lean(),
+    PendingOrder.find({ status: 'PENDING', expiresAt: { $gt: now } })
+      .populate('studentId', 'name admissionNumber roomNumber roomId')
+      .sort({ createdAt: -1 })
+      .limit(MAX_REPORT_ORDERS)
+      .lean(),
+    Admin.find({ role: 'caretaker', active: { $ne: false } })
+      .select('name roomIds')
+      .lean(),
+  ]);
+
+  const pendingRows = pending.map((order) => ({
+    _id: order._id,
+    studentId: order.studentId?._id,
+    status: 'AWAITING_PARENT',
+    orderedAt: order.createdAt,
+    studentSnapshot: order.studentId
+      ? {
+          name: order.studentId.name,
+          admissionNumber: order.studentId.admissionNumber,
+          roomNumber: order.studentId.roomNumber,
+          roomId: order.studentId.roomId,
+        }
+      : {},
+    items: order.items || [],
+  }));
+
+  const generatedAt = new Date();
+  const timeZone = process.env.BUSINESS_TIME_ZONE || 'Asia/Kolkata';
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone }).format(generatedAt);
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  }).format(generatedAt).replace(':', '');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="active-orders-by-caretaker-${day}-${clock}.pdf"`
+  );
+  renderActiveOrdersExport(
+    buildActiveOrdersExport([...pendingRows, ...packages], caretakers, { generatedAt }),
+    res
+  );
 };
 
 /* The caretaker's history has no date window: it is a receipt log for the rooms

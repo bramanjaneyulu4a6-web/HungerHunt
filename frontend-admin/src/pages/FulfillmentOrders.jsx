@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
 import api from '../utils/api';
 import { Banner, Button, Card, EmptyState, PageHeader, Skeleton } from '../components/ui';
@@ -6,6 +7,7 @@ import FulfillmentStatusPicker from '../components/FulfillmentStatusPicker';
 import ParentApprovalPicker from '../components/ParentApprovalPicker';
 import { formatINR } from '../utils/format';
 import { requestNumber } from '../utils/fulfillmentStatus';
+import { openActiveOrdersExport } from '../utils/activeOrdersExport';
 
 const HISTORY_PAGE_SIZE = 50;
 
@@ -144,6 +146,7 @@ export default function FulfillmentOrders() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [expanded, setExpanded] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const loadActive = useCallback(async () => {
     setLoading(true);
@@ -215,11 +218,28 @@ export default function FulfillmentOrders() {
 
   const onHistoryChanged = () => loadHistory(historyPage);
 
+  const exportOrders = async () => {
+    setExporting(true);
+    try {
+      await openActiveOrdersExport();
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not create the active orders export. Try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="page warehouse-page">
       <PageHeader
         title="Student Orders"
         subtitle="Review every active order, from those sent to the parent through delivery, and the complete history of delivered and cancelled orders."
+        actions={view === 'active' ? (
+          <Button disabled={loading || exporting || !orders.length} onClick={exportOrders}>
+            {exporting ? 'Preparing…' : 'Export orders'}
+          </Button>
+        ) : null}
       />
 
       <div className="tabs users-tabs" role="tablist" aria-label="Student order views">

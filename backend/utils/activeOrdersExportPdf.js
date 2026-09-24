@@ -27,20 +27,29 @@ export const renderActiveOrdersExport = (report, stream) => {
   const height = doc.page.height;
   const margin = 42;
   const contentWidth = width - margin * 2;
-  const bottom = height - margin;
+  // Keep the lower-right signature area clear on every caretaker page.
+  const bottom = height - 88;
   let y = margin;
   let hasPage = false;
+  let currentPageNeedsSignature = false;
+  const pageSignatures = [];
 
   const addPage = () => {
     if (hasPage) doc.addPage();
     hasPage = true;
     y = margin;
+    pageSignatures.push(currentPageNeedsSignature);
+  };
+
+  const addContinuationPage = () => {
+    doc.addPage();
+    y = margin;
+    pageSignatures.push(currentPageNeedsSignature);
   };
 
   const ensure = (needed, continuation) => {
     if (y + needed <= bottom) return;
-    doc.addPage();
-    y = margin;
+    addContinuationPage();
     if (continuation) {
       doc.font('Helvetica-Bold').fontSize(10).fillColor(MUTED)
         .text(`${continuation} - continued`, margin, y);
@@ -128,6 +137,7 @@ export const renderActiveOrdersExport = (report, stream) => {
   // One complete handout per caretaker: totals first, then the student detail.
   // A new caretaker always begins on a fresh page.
   for (const group of report.groups) {
+    currentPageNeedsSignature = !group.unassigned;
     addPage();
     groupHeader(group);
     if (group.unassigned) {
@@ -140,13 +150,12 @@ export const renderActiveOrdersExport = (report, stream) => {
     for (const item of group.items) {
       const continued = y + 22 > bottom;
       if (continued) {
-        doc.addPage();
-        y = margin;
+        addContinuationPage();
         itemTotalsHeading(group, true);
       }
       doc.rect(margin, y, contentWidth, 22)
-        .lineWidth(0.7)
-        .strokeColor(RULE)
+        .lineWidth(1)
+        .strokeColor(INK)
         .stroke();
       doc.font('Helvetica').fontSize(10).fillColor(INK)
         .text(item.name, margin + 10, y + 5.5, {
@@ -218,6 +227,7 @@ export const renderActiveOrdersExport = (report, stream) => {
   }
 
   if (!report.groups.length) {
+    currentPageNeedsSignature = false;
     addPage();
     doc.font('Helvetica-Bold').fontSize(18).fillColor(INK).text('Active orders export', margin, y);
     y = doc.y + 12;
@@ -229,6 +239,19 @@ export const renderActiveOrdersExport = (report, stream) => {
   const pages = doc.bufferedPageRange();
   for (let index = 0; index < pages.count; index += 1) {
     doc.switchToPage(pages.start + index);
+    if (pageSignatures[index]) {
+      const signatureWidth = 190;
+      const signatureX = width - margin - signatureWidth;
+      const signatureY = height - 58;
+      doc.moveTo(signatureX, signatureY).lineTo(width - margin, signatureY)
+        .lineWidth(0.9).strokeColor(INK).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(MUTED)
+        .text('Caretaker signature - items received', signatureX, signatureY + 5, {
+          width: signatureWidth,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
     doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(
       `Generated ${stamp} | Page ${index + 1} of ${pages.count}`,
       margin,

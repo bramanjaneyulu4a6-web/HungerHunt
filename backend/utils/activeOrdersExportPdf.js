@@ -4,12 +4,19 @@ const INK = '#111111';
 const MUTED = '#555555';
 const RULE = '#c7c7c7';
 const BAND = '#eeeeee';
+const AWAITING_BAND = '#fff1a8';
+const AWAITING_INK = '#6b4f00';
 
-const STATUS_LABELS = Object.freeze({
+export const STATUS_LABELS = Object.freeze({
   AWAITING_PARENT: 'Awaiting parent approval',
-  PENDING: 'New order',
+  PENDING: 'Confirmed',
   PACKED: 'Packed',
   OUT_FOR_DELIVERY: 'Out for delivery',
+});
+
+export const activeOrderPresentation = (status) => ({
+  label: STATUS_LABELS[status] || status || 'Active',
+  awaitingParentApproval: status === 'AWAITING_PARENT',
 });
 
 export const renderActiveOrdersExport = (report, stream) => {
@@ -136,6 +143,14 @@ export const renderActiveOrdersExport = (report, stream) => {
       for (const order of room.orders) {
         const itemLines = Math.max(order.items.length, 1);
         ensure(33 + itemLines * 13, `${group.caretakerName} - Room ${room.roomNumber}`);
+        const presentation = activeOrderPresentation(order.status);
+        if (presentation.awaitingParentApproval) {
+          // Keep the student and every item in the approval request inside one
+          // yellow band so it remains obvious on a busy caretaker handout.
+          doc.roundedRect(margin + 4, y - 4, contentWidth - 8, 25 + itemLines * 13, 3)
+            .fillColor(AWAITING_BAND)
+            .fill();
+        }
         const student = order.admissionNumber
           ? `${order.studentName} · ${order.admissionNumber}`
           : order.studentName;
@@ -145,8 +160,10 @@ export const renderActiveOrdersExport = (report, stream) => {
             lineBreak: false,
             ellipsis: true,
           });
-        doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
-          .text(STATUS_LABELS[order.status] || order.status || 'Active', width - margin - 150, y + 1,
+        doc.font(presentation.awaitingParentApproval ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(8.5)
+          .fillColor(presentation.awaitingParentApproval ? AWAITING_INK : MUTED)
+          .text(presentation.label, width - margin - 150, y + 1,
             { width: 150, align: 'right', lineBreak: false, ellipsis: true });
         y = Math.max(doc.y, y + 13) + 4;
         for (const item of order.items) {

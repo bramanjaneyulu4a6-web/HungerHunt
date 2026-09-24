@@ -234,8 +234,8 @@ export const renderActiveOrdersExport = (report, stream) => {
     doc.font('Helvetica').fontSize(10).fillColor(MUTED).text('There are no active orders.', margin, y);
   }
 
-  // Number and timestamp every page after layout, including continuation
-  // pages PDFKit added while a long caretaker section was being drawn.
+  // Stamp every page after layout, including continuation pages PDFKit added
+  // while a long caretaker section was being drawn.
   const pages = doc.bufferedPageRange();
   for (let index = 0; index < pages.count; index += 1) {
     doc.switchToPage(pages.start + index);
@@ -253,7 +253,7 @@ export const renderActiveOrdersExport = (report, stream) => {
         });
     }
     doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(
-      `Generated ${stamp} | Page ${index + 1} of ${pages.count}`,
+      `Generated ${stamp}`,
       margin,
       height - 28,
       { width: contentWidth, align: 'right', lineBreak: false }

@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import DemoKiosk from "./pages/DemoKiosk";
 import ProtectedRoute from "./components/ProtectedRoute";
 import KioskOfflineGate from "./components/KioskOfflineGate";
+import ProductFooter from "./components/ProductFooter";
 import { LOGIN_DISABLED } from "./constants/kioskMode";
 import { startDeployWatch } from "./utils/deployWatch";
 import { isOrderSessionActive } from "./utils/kioskSession";
@@ -100,6 +101,7 @@ function App() {
         </Routes>
       )}
       </KioskOfflineGate>
+      <ProductFooter />
     </Router>
   );
 }

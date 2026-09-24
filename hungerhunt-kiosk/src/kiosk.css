@@ -66,6 +66,170 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- product footer --------------------------------------------------- */
+
+.product-footer {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 16px;
+  border-top: 1px solid #ece4d9;
+  background: #fffdf9;
+  color: #827565;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.product-footer button {
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: #c84f26;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.product-footer button:hover,
+.product-footer button:focus-visible {
+  color: #8f3217;
+}
+
+.product-contact-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 20, 13, 0.48);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.product-contact-dialog {
+  position: relative;
+  width: min(390px, 100%);
+  padding: 28px;
+  border: 1px solid #eadfd2;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 70px -28px rgba(30, 20, 12, 0.65);
+  color: #241c13;
+  text-align: left;
+}
+
+.product-contact-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f7f2eb;
+  color: #6d6152;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  place-items: center;
+}
+
+.product-contact-eyebrow {
+  margin: 0 48px 5px 0;
+  color: #c84f26;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.product-contact-dialog h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.product-contact-role {
+  margin-top: 3px;
+  color: #76695b;
+  font-size: 13px;
+}
+
+.product-contact-dialog address {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+  font-style: normal;
+}
+
+.product-contact-dialog address a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #eee4d8;
+  border-radius: 13px;
+  background: #fffaf4;
+  color: #34291f;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.product-contact-dialog address a:hover,
+.product-contact-dialog address a:focus-visible {
+  border-color: #e8b9a6;
+  background: #fff5ec;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.product-contact-dialog address a > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.product-contact-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ffeadf;
+  color: #c84f26;
+  place-items: center;
+}
+
+.product-contact-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 520px) {
+  .product-footer {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    padding-block: 7px;
+  }
+}
+
 /* ---- left column: the order ticket ------------------------------------ */
 
 .ticket-col {
@@ -4700,5 +4864,34 @@
   .kiosk-student-card__wallet strong {
     margin-top: 4px;
     line-height: 1;
+  }
+}
+
+/* Full-screen kiosk surfaces and this footer share one viewport. These live
+   after the individual surface rules so their original 100dvh sizes do not
+   push the company credit below the fold. */
+.till {
+  height: calc(100svh - 34px);
+  height: calc(100dvh - 34px);
+  min-height: calc(100svh - 34px);
+}
+
+.kiosk-login,
+.kiosk-result {
+  min-height: calc(100svh - 34px);
+  min-height: calc(100dvh - 34px);
+}
+
+@media (max-width: 520px) {
+  .till {
+    height: calc(100svh - 46px);
+    height: calc(100dvh - 46px);
+    min-height: calc(100svh - 46px);
+  }
+
+  .kiosk-login,
+  .kiosk-result {
+    min-height: calc(100svh - 46px);
+    min-height: calc(100dvh - 46px);
   }
 }

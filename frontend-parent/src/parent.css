@@ -19,6 +19,169 @@ body {
   overflow-x: hidden;
 }
 
+/* Small company credit shared by every public and signed-in screen. */
+.product-footer {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--parent-line);
+  background: #fffdf9;
+  color: var(--parent-muted);
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.product-footer button {
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--parent-brand-deep);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.product-footer button:hover,
+.product-footer button:focus-visible {
+  color: #9e3718;
+}
+
+.product-contact-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(32, 24, 17, 0.48);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.product-contact-dialog {
+  position: relative;
+  width: min(390px, 100%);
+  padding: 28px;
+  border: 1px solid var(--parent-line);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 70px -28px rgba(30, 20, 12, 0.65);
+  color: var(--parent-ink);
+  text-align: left;
+}
+
+.product-contact-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--parent-soft);
+  color: var(--parent-muted);
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+  place-items: center;
+}
+
+.product-contact-eyebrow {
+  margin: 0 48px 5px 0;
+  color: var(--parent-brand-deep);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.product-contact-dialog h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.product-contact-role {
+  margin-top: 3px;
+  color: var(--parent-muted);
+  font-size: 13px;
+}
+
+.product-contact-dialog address {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+  font-style: normal;
+}
+
+.product-contact-dialog address a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--parent-line);
+  border-radius: 13px;
+  background: #fffaf4;
+  color: var(--parent-ink);
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.product-contact-dialog address a:hover,
+.product-contact-dialog address a:focus-visible {
+  border-color: #e8b9a6;
+  background: #fff5ec;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.product-contact-dialog address a > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.product-contact-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ffeadf;
+  color: var(--parent-brand-deep);
+  place-items: center;
+}
+
+.product-contact-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 520px) {
+  .product-footer {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    padding-block: 7px;
+  }
+}
+
 /* Demo UPI checkout --------------------------------------------------- */
 
 .upi-demo-overlay {
@@ -3874,4 +4037,22 @@ body {
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* Keep the credit visible at the bottom of otherwise full-height public
+   screens; signed-in pages already use .parent-main's flexible height. */
+.auth-page,
+.policy-page {
+  min-height: calc(
+    100svh - 34px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+}
+
+@media (max-width: 520px) {
+  .auth-page,
+  .policy-page {
+    min-height: calc(
+      100svh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+  }
 }

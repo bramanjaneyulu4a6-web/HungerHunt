@@ -31,6 +31,7 @@ const ShippingPolicy = lazy(() => import("./pages/ShippingPolicy"));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 
 import Navbar from "./components/Navbar";
+import ProductFooter from "./components/ProductFooter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
@@ -249,6 +250,7 @@ function AppContent() {
         </Routes>
         </Suspense>
       </main>
+      <ProductFooter />
     </>
   );
 }

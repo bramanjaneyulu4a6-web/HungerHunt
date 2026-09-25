@@ -1,0 +1,53 @@
+.notifications-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+  border-color: var(--primary-light);
+  background: var(--primary-bg);
+}
+
+.notifications-card__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.notifications-card__icon {
+  flex: none;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.notifications-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.notifications-card__copy {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.notifications-card__error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--alert);
+}
+
+.notifications-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .notifications-card__actions .btn {
+    flex: 1 1 auto;
+  }
+}

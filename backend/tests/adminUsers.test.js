@@ -300,3 +300,27 @@ test('any invalid spreadsheet cell prevents the entire bulk insert', async () =>
   assert.deepEqual(body.invalidCells.map((item) => item.cell), ['F7']);
   assert.equal(insert.mock.callCount(), 0);
 });
+
+test('the parent list says which platforms have notifications on, never the tokens', async () => {
+  authenticate();
+  mock.method(Parent, 'find', () => ({
+    sort() { return this; },
+    populate() { return this; },
+    async lean() {
+      return [
+        { _id: PARENT_ID, fatherName: 'Ravi', phone: '9000000001', active: true, studentIds: [],
+          pushTokens: [{ token: 'secret-android', platform: 'android' }, { token: 'secret-web', platform: 'web' }] },
+        { _id: '507f1f77bcf86cd799439013', fatherName: 'Old', phone: '9000000002', active: true, studentIds: [],
+          pushTokens: [], fcmToken: 'secret-legacy' },
+        { _id: '507f1f77bcf86cd799439014', fatherName: 'None', phone: '9000000003', active: true, studentIds: [] },
+      ];
+    },
+  }));
+
+  const response = await request('/api/admin/users/parents');
+  assert.equal(response.status, 200);
+  const body = await response.json();
+
+  assert.deepEqual(body.map((parent) => parent.pushPlatforms), [['android', 'web'], ['web'], []]);
+  assert.equal(JSON.stringify(body).includes('secret'), false);
+});

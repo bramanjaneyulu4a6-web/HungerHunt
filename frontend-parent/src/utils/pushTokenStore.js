@@ -39,6 +39,15 @@ export const alreadySent = (token) => {
   return Boolean(sent && session && sent.token === token && sent.session === session);
 };
 
+// The settings card does not know the device token, but it still needs to
+// distinguish OS/browser permission from a token this signed-in parent has
+// actually registered with the backend.
+export const hasSentToken = () => {
+  const sent = read();
+  const session = currentSession();
+  return Boolean(sent && session && sent.session === session);
+};
+
 export const markSent = (token) => {
   try {
     localStorage.setItem(KEY, JSON.stringify({ token, session: currentSession() }));

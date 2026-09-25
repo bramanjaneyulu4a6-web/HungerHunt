@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { alreadySent, markSent, takeSent } from './pushTokenStore.js';
+import { alreadySent, hasSentToken, markSent, takeSent } from './pushTokenStore.js';
 
 /* Node has no localStorage. This stands in the smallest one that behaves like
    a browser's for the store's purposes: string values, and the option of
@@ -35,6 +35,16 @@ test('a token is not "sent" until it has been marked so', (t) => {
   assert.equal(alreadySent('device-abc'), false);
   markSent('device-abc');
   assert.equal(alreadySent('device-abc'), true);
+  assert.equal(hasSentToken(), true);
+});
+
+test('registration belongs to the current signed-in parent', (t) => {
+  installFakeStorage(t);
+  localStorage.setItem('parentToken', 'jwt-one');
+  markSent('device-abc');
+
+  localStorage.setItem('parentToken', 'jwt-two');
+  assert.equal(hasSentToken(), false);
 });
 
 test('the mark survives a fresh module load, which is what a page reload is', async (t) => {

@@ -8,13 +8,19 @@
    Firebase plugins read their credentials from GoogleService-Info.plist /
    google-services.json instead. */
 
+/* Trimmed because the production appId was once deployed with a leading space
+   pasted into the hosting dashboard. Firebase Installations rejects that as
+   INVALID_ARGUMENT, so no browser could get a push token, while phone sign-in,
+   which never sends the appId there, went on working and hid the fault. */
+const env = (value) => (typeof value === 'string' ? value.trim() : value);
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: env(import.meta.env.VITE_FIREBASE_API_KEY),
+  authDomain: env(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+  projectId: env(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  storageBucket: env(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: env(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+  appId: env(import.meta.env.VITE_FIREBASE_APP_ID),
 };
 
 export const firebaseConfigured = Boolean(

@@ -15,6 +15,14 @@ const statusOf = (parent) => {
   return ['Active', 'success'];
 };
 
+const PLATFORM_NAMES = { android: 'Android app', ios: 'iPhone app', web: 'browser' };
+
+const notificationsLabel = (platforms = []) => {
+  if (!platforms.length) return 'Notifications off';
+  const names = [...new Set(platforms.map((platform) => PLATFORM_NAMES[platform] || platform))];
+  return `Notifications on · ${names.join(', ')}`;
+};
+
 export default function ParentsTab({ parents, loading, onChanged }) {
   const [searchParams] = useSearchParams();
   const focusedParentId = searchParams.get('focus') || '';
@@ -173,10 +181,20 @@ export default function ParentsTab({ parents, loading, onChanged }) {
 
   if (loading) return <Skeleton height={220} radius={14} />;
 
+  const activeParents = parents.filter((parent) => parent.active);
+  const withNotifications = activeParents.filter((parent) => (parent.pushPlatforms || []).length > 0).length;
+
   return (
     <section>
       <div className="users-tab-head">
-        <div><h2>Parent accounts</h2><p>The office creates access and links each parent to the correct students.</p></div>
+        <div>
+          <h2>Parent accounts</h2>
+          <p>The office creates access and links each parent to the correct students.</p>
+          <p>
+            <strong>Notifications on for {withNotifications} of {activeParents.length} active parents.</strong>{' '}
+            A parent turns them on from the card on their dashboard; the others only hear about approvals by WhatsApp.
+          </p>
+        </div>
         {canAdd && <Button onClick={openCreate}>Add parent</Button>}
       </div>
 
@@ -225,7 +243,12 @@ export default function ParentsTab({ parents, loading, onChanged }) {
                       </Fragment>
                     )) : 'None'}
                   </td>
-                  <td data-label="Status"><Badge variant={variant}>{status}</Badge></td>
+                  <td data-label="Status">
+                    <Badge variant={variant}>{status}</Badge>
+                    {parent.active && (
+                      <div><small>{notificationsLabel(parent.pushPlatforms)}</small></div>
+                    )}
+                  </td>
                   <td data-label="Actions"><div className="cell-actions">
                     {canEdit && <Button className="btn--sm" variant="ghost" onClick={() => openEdit(parent)}>Edit</Button>}
                     {/* Reactivate is never gated: an archived parent has no

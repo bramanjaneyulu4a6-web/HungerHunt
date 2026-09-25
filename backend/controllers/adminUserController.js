@@ -22,6 +22,11 @@ const parentView = (parent) => ({
   activatedAt: parent.activatedAt || null,
   archivedAt: parent.archivedAt || null,
   archivedReason: parent.archivedReason || null,
+  // Platforms only, never the tokens themselves.
+  pushPlatforms: [
+    ...(parent.pushTokens || []).map((entry) => entry.platform || 'web'),
+    ...(parent.fcmToken && !(parent.pushTokens || []).some((entry) => entry.token === parent.fcmToken) ? ['web'] : []),
+  ],
   students: (parent.studentIds || []).filter(Boolean).map((student) => ({
     id: String(student._id || student),
     name: student.name || '',

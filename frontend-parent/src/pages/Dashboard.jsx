@@ -5,6 +5,7 @@ import { DATA_CHANGED_EVENT } from '../utils/dataAutoRefresh';
 import { claimBackgroundRefresh, onBackgroundRefreshResumed } from '../utils/paymentHold';
 import { AnimateIn, Banner, EmptyState, PageHeader, Skeleton, Card } from '../components/ui';
 import PendingApprovalCard from '../components/PendingApprovalCard';
+import NotificationsCard from '../components/NotificationsCard';
 import OrderCard from '../components/OrderCard';
 import { ErrorFeedback } from '../components/error/ErrorFeedback';
 import { presentError } from '../utils/errorPresentation';
@@ -98,6 +99,8 @@ export default function Dashboard() {
         title="Dashboard"
         subtitle="Track ongoing orders and review purchases waiting for your approval."
       />
+
+      <NotificationsCard />
 
       {notice && <Banner variant="success" icon="✅" style={{ marginBottom: 20 }}>{notice}</Banner>}
       {error && (

@@ -19,7 +19,7 @@
 import { Capacitor } from '@capacitor/core';
 import API from '../services/api';
 import { firebaseConfig, firebaseConfigured, getFirebaseApp } from '../firebase';
-import { alreadySent, markSent, takeSent } from './pushTokenStore';
+import { alreadySent, hasSentToken, markSent, takeSent } from './pushTokenStore';
 
 const platform = () => Capacitor.getPlatform();
 const isNative = () => Capacitor.isNativePlatform();
@@ -54,30 +54,36 @@ let nativeListenersAttached = false;
 let webListenerAttached = false;
 
 const sendToken = async (token) => {
-  if (!token || alreadySent(token)) return;
+  if (!token) return false;
+  if (alreadySent(token)) return true;
 
   try {
     await API.post('/parent/save-fcm-token', { token, platform: platform() });
     markSent(token);
+    return true;
   } catch (err) {
     // A failed save means this device silently gets no notifications, which is
     // worth a console line — but never worth blocking sign-in over.
     console.error('Could not register this device for notifications:', err);
+    return false;
   }
 };
 
 /* ------------------------------------------------------------------ native */
 
-const initNative = async () => {
+/* `prompt` decides whether the OS permission dialog may be shown. Android and
+   iOS apps conventionally ask at first launch, so sign-in passes true; the
+   Enable button always does. */
+const initNative = async ({ prompt }) => {
   const { PushNotifications } = await import('@capacitor/push-notifications');
 
   let status = await PushNotifications.checkPermissions();
 
-  if (status.receive !== 'granted') {
+  if (status.receive !== 'granted' && prompt) {
     status = await PushNotifications.requestPermissions();
   }
 
-  if (status.receive !== 'granted') return;
+  if (status.receive !== 'granted') return false;
 
   if (platform() === 'android') {
     await PushNotifications.createChannel(CHANNEL);
@@ -122,30 +128,41 @@ const initNative = async () => {
   // Re-registering on a later sign-in is the point: it re-fires 'registration',
   // which attaches this device to whichever parent is signed in now.
   await PushNotifications.register();
+  return true;
 };
 
 /* --------------------------------------------------------------------- web */
 
-const initWeb = async () => {
+/* Never prompts unless asked to. A permission request nobody tapped for is
+   refused outright by iPhone Safari and quietly muted by Chrome, which is how
+   every signed-in parent ended up with no registered browser. Sign-in only
+   re-registers a browser that already said yes; asking is the Enable
+   button's job. */
+const initWeb = async ({ prompt }) => {
   if (!firebaseConfigured) {
     console.warn(
       'Firebase web config missing — browser notifications are disabled. ' +
         'Set the VITE_FIREBASE_* variables to enable them.'
     );
-    return;
+    return false;
   }
 
-  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return false;
 
   const { isSupported, getMessaging, getToken, onMessage } = await import(
     'firebase/messaging'
   );
 
   // Safari below 16.4, most in-app browsers, and any non-secure origin.
-  if (!(await isSupported())) return;
+  if (!(await isSupported())) return false;
 
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return;
+  let permission = Notification.permission;
+
+  if (permission === 'default' && prompt) {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission !== 'granted') return false;
 
   /* The worker is a static file and cannot read Vite's env, so the config
      rides along in its query string — one source of truth instead of a second
@@ -157,13 +174,13 @@ const initWeb = async () => {
   const messaging = getMessaging(await getFirebaseApp());
 
   const token = await getToken(messaging, {
-    vapidKey: import.meta.env.VITE_VAPID_KEY,
+    vapidKey: import.meta.env.VITE_VAPID_KEY?.trim(),
     serviceWorkerRegistration: registration,
   });
 
-  await sendToken(token);
+  const saved = await sendToken(token);
 
-  if (webListenerAttached) return;
+  if (webListenerAttached) return saved;
   webListenerAttached = true;
 
   onMessage(messaging, (payload) => {
@@ -187,6 +204,8 @@ const initWeb = async () => {
 
     pushHandler({ data, tapped: false });
   });
+
+  return saved;
 };
 
 /* ------------------------------------------------------------------ public */
@@ -203,12 +222,79 @@ export const startPush = async (onPush) => {
   started = true;
 
   try {
-    await (isNative() ? initNative() : initWeb());
+    await (isNative() ? initNative({ prompt: true }) : initWeb({ prompt: false }));
   } catch (err) {
     // Notifications are a convenience. Nothing here should be able to stop a
     // parent from using the app.
     console.error('Push setup failed:', err);
   }
+};
+
+/* Called from a tap, which is what lets the browser show its permission
+   dialog. Resolves to true once this device is registered with the backend. */
+export const enablePush = async () => {
+  try {
+    return await (isNative() ? initNative({ prompt: true }) : initWeb({ prompt: true }));
+  } catch (err) {
+    console.error('Push setup failed:', err);
+    return false;
+  }
+};
+
+const userAgent = () => (typeof navigator === 'undefined' ? '' : navigator.userAgent || '');
+
+// WhatsApp, Facebook, Instagram and other apps open links in a built-in
+// browser that has no notification support at all.
+const inAppBrowser = () =>
+  /WhatsApp|FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|; wv\)/i.test(userAgent());
+
+const isIos = () =>
+  /iPhone|iPad|iPod/i.test(userAgent())
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const installedToHomeScreen = () =>
+  window.navigator.standalone === true
+  || window.matchMedia?.('(display-mode: standalone)').matches === true;
+
+/* What the notifications card should say for this device:
+     on          — permission granted (and, on the web, a token saved)
+     off         — never asked; the Enable button can ask
+     blocked     — refused; only the phone or browser settings can undo it
+     unsupported — with a reason: 'in-app', 'ios-install' or 'browser' */
+export const pushStatus = async () => {
+  if (isNative()) {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const { receive } = await PushNotifications.checkPermissions();
+      if (receive === 'granted') return { state: 'on', registered: hasSentToken() };
+      if (receive === 'denied') return { state: 'blocked' };
+      return { state: 'off' };
+    } catch {
+      return { state: 'unsupported', reason: 'browser' };
+    }
+  }
+
+  if (inAppBrowser()) return { state: 'unsupported', reason: 'in-app' };
+
+  // iPhone Safari offers web push only to a site added to the Home Screen.
+  if (isIos() && !installedToHomeScreen()) return { state: 'unsupported', reason: 'ios-install' };
+
+  if (!firebaseConfigured || !('Notification' in window) || !('serviceWorker' in navigator)) {
+    return { state: 'unsupported', reason: 'browser' };
+  }
+
+  try {
+    const { isSupported } = await import('firebase/messaging');
+    if (!(await isSupported())) return { state: 'unsupported', reason: 'browser' };
+  } catch {
+    return { state: 'unsupported', reason: 'browser' };
+  }
+
+  if (Notification.permission === 'denied') return { state: 'blocked' };
+  if (Notification.permission === 'granted') {
+    return { state: 'on', registered: hasSentToken() };
+  }
+  return { state: 'off' };
 };
 
 /* Called on logout. Without this, a device keeps receiving one family's

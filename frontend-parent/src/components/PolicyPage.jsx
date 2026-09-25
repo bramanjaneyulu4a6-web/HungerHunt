@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 /* Public legal pages share one quiet reading surface. They deliberately sit
    outside the signed-in navigation: a payment provider, reviewer, or parent
    must be able to open a policy URL directly without an app session. */
-export default function PolicyPage({ title, summary, children }) {
+export default function PolicyPage({ title, summary, updated = '7 September 2026', children }) {
   return (
     <div className="policy-page">
       <header className="policy-header">
@@ -22,7 +22,7 @@ export default function PolicyPage({ title, summary, children }) {
       <main className="policy-document">
         <p className="policy-eyebrow">Hunger Hunt Parent policy</p>
         <h1>{title}</h1>
-        <p className="policy-updated">Last updated: 7 September 2026</p>
+        <p className="policy-updated">Last updated: {updated}</p>
         <p className="policy-summary">{summary}</p>
         <div className="policy-content">{children}</div>
       </main>

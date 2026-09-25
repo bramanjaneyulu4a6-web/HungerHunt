@@ -2402,8 +2402,23 @@ body {
   line-height: 1.8;
 }
 
-.policy-content p + p {
+.policy-content p + p,
+.policy-content p + ul,
+.policy-content ul + p {
   margin-top: 14px;
+}
+
+.policy-content ul {
+  display: grid;
+  gap: 10px;
+  padding-left: 22px;
+  color: var(--ink-dim);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.policy-content strong {
+  color: var(--ink);
 }
 
 .policy-content a {

@@ -4,6 +4,7 @@ export default function RefundPolicy() {
   return (
     <PolicyPage
       title="Refund and Cancellation Policy"
+      updated="24 September 2026"
       summary="This policy explains when an order placed through Hunger Hunt Parent may be cancelled, returned, exchanged, or refunded."
     >
       <section>
@@ -53,8 +54,22 @@ export default function RefundPolicy() {
       <section>
         <h2>4. Refund processing</h2>
         <p>
-          If HungerHunt approves a refund, allow up to 30 days for it to be processed. The method used to
-          issue the refund may depend on how the original order was funded and the status of that payment.
+          An approved refund is returned through the same method used to pay for the order:
+        </p>
+        <ul>
+          <li>
+            <strong>Orders paid from the student wallet</strong> are refunded to the student wallet. The
+            amount is credited back as wallet balance and is not paid out in cash or transferred elsewhere.
+          </li>
+          <li>
+            <strong>Orders paid by UPI</strong> are refunded by UPI to the originating bank account through
+            the PhonePe payment gateway&apos;s refund process. Once the refund is initiated, the time taken
+            for it to reach your account depends on PhonePe and your bank.
+          </li>
+        </ul>
+        <p>
+          If HungerHunt approves a refund, allow up to 30 days for it to be processed. Refunds are not
+          issued to a different payment method from the one used for the original order.
         </p>
       </section>
 

@@ -35,7 +35,8 @@
     "parent:demo": "node scripts/createDemoParent.js",
     "migrate:class-names": "node scripts/normalizeStudentClasses.js",
     "admin:super": "node scripts/grantSuperAdmin.js",
-    "orders:revert-to-approval": "node scripts/revertConfirmedToParentApproval.js"
+    "orders:revert-to-approval": "node scripts/revertConfirmedToParentApproval.js",
+    "orders:extend-deadline": "node scripts/extendPendingOrderDeadline.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -1785,6 +1785,28 @@
   line-height: 1;
 }
 
+.wall-group-heading__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.wall-group-heading .wall-category-note {
+  display: inline-flex;
+  margin: 1px 0 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(111, 91, 67, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-transform: none;
+}
+
 .wall-group-heading p {
   flex: 0 0 auto;
   padding-bottom: 2px;

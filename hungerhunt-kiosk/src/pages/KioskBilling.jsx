@@ -1289,7 +1289,12 @@ const KioskBilling = ({ student, onLogout }) => {
               <header className="wall-group-heading">
                 <div>
                   <span>Category</span>
-                  <h2>{titleCase(selectedCategory)}</h2>
+                  <div className="wall-group-heading__title">
+                    <h2>{titleCase(selectedCategory)}</h2>
+                    {selectedCategory.toLowerCase() === "drinks" && (
+                      <span className="wall-category-note">Drinks may not be chilled</span>
+                    )}
+                  </div>
                 </div>
                 <p>
                   {productSearchQuery.trim()

@@ -4,6 +4,7 @@ import StockAdjustment from "../models/StockAdjustment.js";
 import { getPurchaseAllowances } from "../utils/purchaseLimits.js";
 import { availabilityOf } from "../utils/availability.js";
 import { showroomProduct } from "../utils/showroomCatalogue.js";
+import { orderDeductionsByDay } from "../utils/orderStockDays.js";
 
 export const getInventory = async (req, res) => {
   try {
@@ -240,12 +241,21 @@ export const getAdjustments = async (req, res) => {
   }
 
   try {
-    const adjustments = await StockAdjustment.find({ productId })
-      .populate("adjustedBy", "email role")
-      .sort({ createdAt: -1 })
-      .limit(100);
+    const [adjustments, orderDays] = await Promise.all([
+      StockAdjustment.find({ productId })
+        .populate("adjustedBy", "email role")
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
+      orderDeductionsByDay(productId),
+    ]);
 
-    res.json(adjustments);
+    // Manual movements and each day's orders, newest first, in one history.
+    res.json(
+      [...adjustments, ...orderDays].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      )
+    );
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

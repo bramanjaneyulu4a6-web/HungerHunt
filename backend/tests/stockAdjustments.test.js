@@ -16,6 +16,8 @@ const FeatureVisibility = (await import('../models/FeatureVisibility.js')).defau
 const { featuresOpen } = await import('./helpers/featuresOpen.js');
 const Inventory = (await import('../models/Inventory.js')).default;
 const StockAdjustment = (await import('../models/StockAdjustment.js')).default;
+const Student = (await import('../models/Student.js')).default;
+const Transaction = (await import('../models/Transaction.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -179,9 +181,11 @@ describe('reading the ledger', () => {
       populate: (path, fields) => { calls.populate = [path, fields]; return chain; },
       sort: (s) => { calls.sort = s; return chain; },
       limit: (n) => { calls.limit = n; return chain; },
+      lean: () => chain,
       then: (resolve, reject) => Promise.resolve([]).then(resolve, reject),
     };
     mock.method(StockAdjustment, 'find', (f) => { calls.filter = f; return chain; });
+    mock.method(Transaction, 'aggregate', async () => []);
 
     const res = await fetch(`${base}/api/inventory/${PRODUCT_ID}/adjustments`, {
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -192,5 +196,55 @@ describe('reading the ledger', () => {
     assert.deepEqual(calls.populate, ['adjustedBy', 'email role']);
     assert.deepEqual(calls.sort, { createdAt: -1 });
     assert.equal(calls.limit, 100);
+  });
+
+  test('adds one row per IST day of orders, merged newest first, demo family left out', async () => {
+    accountIs('admin');
+    process.env.DEMO_PARENT_PHONES = '7995601391';
+    const manual = {
+      _id: 'adj1', delta: 5, reason: 'Stocktake', stockAfter: 40,
+      createdAt: '2026-09-21T06:00:00.000Z', adjustedBy: { email: 'a@b.c' },
+    };
+    const chain = {
+      populate: () => chain, sort: () => chain, limit: () => chain, lean: () => chain,
+      then: (resolve, reject) => Promise.resolve([manual]).then(resolve, reject),
+    };
+    mock.method(StockAdjustment, 'find', () => chain);
+    const demoId = new mongoose.Types.ObjectId();
+    mock.method(Student, 'find', (f) => {
+      assert.deepEqual(f, { parentPhoneNumber: { $in: ['7995601391'] } });
+      return { select: () => ({ lean: async () => [{ _id: demoId }] }) };
+    });
+    let pipeline;
+    mock.method(Transaction, 'aggregate', async (p) => {
+      pipeline = p;
+      return [
+        { _id: '2026-09-22', quantity: 7, orders: ['t1', 't2', 't3'], lastAt: new Date('2026-09-22T10:00:00.000Z') },
+        { _id: '2026-09-20', quantity: 1, orders: ['t4'], lastAt: new Date('2026-09-20T04:00:00.000Z') },
+      ];
+    });
+
+    try {
+      const res = await fetch(`${base}/api/inventory/${PRODUCT_ID}/adjustments`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      assert.equal(res.status, 200);
+      const rows = await res.json();
+
+      assert.deepEqual(rows.map((r) => r._id), ['orders-2026-09-22', 'adj1', 'orders-2026-09-20']);
+      assert.equal(rows[0].kind, 'ORDERS');
+      assert.equal(rows[0].delta, -7);
+      assert.equal(rows[0].orderCount, 3);
+      assert.match(rows[0].reason, /22 Sept? 2026 \(3 orders\)/);
+      assert.match(rows[2].reason, /\(1 order\)/);
+
+      const match = pipeline[0].$match;
+      assert.equal(match.createdAt.$gte.toISOString(), '2026-09-18T18:30:00.000Z');
+      assert.equal(String(match['items.productId']), PRODUCT_ID);
+      assert.deepEqual(match.studentId.$nin.map(String), [String(demoId)]);
+      assert.equal(pipeline[3].$group._id.$dateToString.timezone, 'Asia/Kolkata');
+    } finally {
+      delete process.env.DEMO_PARENT_PHONES;
+    }
   });
 });

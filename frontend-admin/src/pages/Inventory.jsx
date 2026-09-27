@@ -210,7 +210,7 @@ const Inventory = () => {
     } catch (err) {
       console.error(err);
       setHistory([]);
-      toast.error("Failed to load the adjustment history");
+      toast.error("Failed to load the stock history");
     }
   };
 
@@ -406,14 +406,14 @@ const Inventory = () => {
       {historyFor && (
         <div className="modal-backdrop" onClick={() => setHistoryFor(null)}>
           <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">Adjustments — {historyFor.name}</h3>
+            <h3 className="modal-title">Stock history — {historyFor.name}</h3>
 
             {history === null ? (
               <Skeleton height={16} style={{ marginTop: 10 }} />
             ) : history.length === 0 ? (
               <p style={{ color: "var(--muted-soft)" }}>
-                No manual adjustments recorded. Receipts and sales move stock
-                without appearing here.
+                No manual adjustments or orders recorded. Goods receipts move
+                stock without appearing here.
               </p>
             ) : (
               <div className="table-wrap">
@@ -430,13 +430,17 @@ const Inventory = () => {
                   <tbody>
                     {history.map((row) => (
                       <tr key={row._id}>
-                        <td>{new Date(row.createdAt).toLocaleString()}</td>
+                        <td>
+                          {row.kind === "ORDERS"
+                            ? new Date(`${row.day}T00:00:00+05:30`).toLocaleDateString()
+                            : new Date(row.createdAt).toLocaleString()}
+                        </td>
                         <td style={{ fontWeight: 600, color: row.delta < 0 ? "var(--danger)" : "var(--success)" }}>
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
                         </td>
                         <td>{row.reason}</td>
-                        <td>{row.adjustedBy?.email || "—"}</td>
-                        <td>{row.stockAfter}</td>
+                        <td>{row.kind === "ORDERS" ? "Orders" : row.adjustedBy?.email || "—"}</td>
+                        <td>{row.stockAfter ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>

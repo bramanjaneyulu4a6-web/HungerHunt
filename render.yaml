@@ -13,7 +13,10 @@ services:
     name: hungerhunt-dbat
     runtime: node
     rootDir: backend
-    buildCommand: npm ci
+    # The API has no compile step. Install only locked runtime dependencies and
+    # avoid registry audit calls, which add network work without affecting the
+    # deployed artifact.
+    buildCommand: npm ci --omit=dev --no-audit --no-fund
     startCommand: npm start
     healthCheckPath: /health
     branch: main
@@ -21,6 +24,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Pin the runtime instead of inheriting Render's creation-date-dependent
+      # default. This version satisfies every production dependency in the lock.
+      - key: NODE_VERSION
+        value: "22.22.0"
+      # The build command above performs the one deterministic install we want.
+      # Prevent Render's native runtime from attempting another package install.
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
       - key: BUSINESS_TIME_ZONE
         value: Asia/Kolkata
       # 3, not 1: Render fronts this service with a three-hop chain. At 1,
@@ -175,13 +186,17 @@ services:
     runtime: node
     rootDir: backend
     schedule: "*/15 * * * *"
-    buildCommand: npm ci
+    buildCommand: npm ci --omit=dev --no-audit --no-fund
     startCommand: npm run reconcile:payments
     branch: main
     autoDeploy: false
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22.22.0"
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
       - key: MONGO_URI
         sync: false
       # MUST MATCH the web service's PHONEPE_ENV, and be changed in the same

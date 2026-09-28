@@ -21,12 +21,14 @@ const WarehouseOverview = lazy(() => import('./pages/WarehouseOverview'));
 const FulfillmentOrders = lazy(() => import('./pages/FulfillmentOrders'));
 const ProcurementReview = lazy(() => import('./pages/ProcurementReview'));
 const ProcurementOrders = lazy(() => import('./pages/ProcurementOrders'));
+const ProcurementCreate = lazy(() => import('./pages/ProcurementCreate'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Products = lazy(() => import('./pages/Products'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
 const AccountingExport = lazy(() => import('./pages/AccountingExport'));
 const StaffReports = lazy(() => import('./pages/StaffReports'));
 const FeatureVisibility = lazy(() => import('./pages/FeatureVisibility'));
+const ExecutiveReport = lazy(() => import('./pages/ExecutiveReport'));
 
 const RouteFallback = () => (
   <div className="route-fallback" role="status" aria-live="polite">
@@ -67,10 +69,12 @@ function App() {
             <Route path="/accounting-export" element={<AccountingExport />} />
             <Route path="/reports" element={<StaffReports />} />
             <Route path="/features" element={<FeatureVisibility />} />
+            <Route path="/executive-report" element={<ExecutiveReport />} />
             <Route path="/warehouse" element={<WarehouseOverview />} />
             <Route path="/warehouse/student-orders" element={<FulfillmentOrders />} />
             <Route path="/warehouse/review" element={<ProcurementReview />} />
             <Route path="/warehouse/orders" element={<ProcurementOrders />} />
+            <Route path="/warehouse/orders/new" element={<ProcurementCreate />} />
             <Route path="/warehouse/inventory" element={<Inventory />} />
             <Route path="/warehouse/products" element={<Products />} />
             <Route path="/warehouse/suppliers" element={<Suppliers />} />

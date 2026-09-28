@@ -4,10 +4,10 @@ import { Badge, Banner, Button, Card, PageHeader, Skeleton } from '../components
 import { resolveAvailability } from '../utils/availability';
 
 const FLOW = [
-  { number: '01', title: 'Warehouse requests stock', copy: 'The warehouse team raises a replenishment request from its own app.' },
-  { number: '02', title: 'Accounts reviews', copy: 'Admin approves the spend or rejects it with a reason.' },
-  { number: '03', title: 'Warehouse receives', copy: 'Approved orders can be received partially or in full against deliveries.' },
-  { number: '04', title: 'Inventory reconciles', copy: 'Receipts update stock and remain attached to the order ledger.' },
+  { number: '01', title: 'Raise the order', copy: 'An admin or warehouse team member creates the supplier request.' },
+  { number: '02', title: 'Admin reviews', copy: 'An admin verifies supplier, quantities, and rates before approval.' },
+  { number: '03', title: 'Inventory updates', copy: 'Approval adds every ordered unit to stock in one transaction.' },
+  { number: '04', title: 'Audit stays complete', copy: 'The received order and its approval receipt remain in the ledger.' },
 ];
 
 export default function WarehouseOverview() {
@@ -139,6 +139,7 @@ export default function WarehouseOverview() {
         <section className="warehouse-section">
           <div className="warehouse-section__head"><div><p className="warehouse-eyebrow">Quick access</p><h2>Manage warehouse data</h2></div></div>
           <div className="warehouse-quicklinks">
+            <Button to="/warehouse/orders/new" variant="success">Raise inventory order</Button>
             <Button to="/warehouse/student-orders" variant="primary">View active student orders</Button>
             <Button to="/warehouse/review" variant="primary">Review requests {metrics.review > 0 && `(${metrics.review})`}</Button>
             <Button to="/warehouse/inventory" variant="ghost">Check inventory</Button>

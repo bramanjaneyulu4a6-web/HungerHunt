@@ -10,6 +10,8 @@ process.env.FEATURE_V1_PROCUREMENT = 'true';
 
 const Admin = (await import('../models/Admin.js')).default;
 const Purchase = (await import('../models/Purchase.js')).default;
+const Inventory = (await import('../models/Inventory.js')).default;
+const GoodsReceipt = (await import('../models/GoodsReceipt.js')).default;
 const { signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
 const { accountMatcher } = await import('./helpers/accountIs.js');
@@ -60,6 +62,26 @@ describe('v1 Warehouse–Accounts purchase-order contract', () => {
     assert.ok(response.headers.get('x-request-id'));
   });
 
+  test('an admin can raise an order into the same review queue', async () => {
+    accountIs('admin');
+    let stored;
+    mock.method(Purchase, 'create', async ([document]) => {
+      stored = document;
+      return [{ _id: PURCHASE_ID, createdAt: new Date(), ...document }];
+    });
+
+    const response = await request('/api/v1/purchase-orders', adminToken, {
+      supplierId: '507f191e810c19729de860ea',
+      reason: 'Raised by Accounts',
+      items: [{ productId: PRODUCT_ID, quantity: 20, estimatedUnitCost: 35.71 }],
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(stored.status, 'PENDING_REVIEW');
+    assert.equal(String(stored.raisedBy), STAFF_ID);
+    assert.equal(stored.items[0].purchasePrice, 35.71);
+  });
+
   test('invalid DTOs return stable field-level validation errors', async () => {
     accountIs('warehouse');
     const response = await request('/api/v1/purchase-orders', warehouseToken, {
@@ -86,9 +108,9 @@ describe('v1 Warehouse–Accounts purchase-order contract', () => {
 
     mock.restoreAll();
     accountIs('admin');
-    let filter;
+    const filters = [];
     mock.method(Purchase, 'findOneAndUpdate', async (requestedFilter, update) => {
-      filter = requestedFilter;
+      filters.push(requestedFilter);
       return {
         _id: PURCHASE_ID,
         status: update.$set.status,
@@ -96,6 +118,9 @@ describe('v1 Warehouse–Accounts purchase-order contract', () => {
         createdAt: new Date(),
       };
     });
+    mock.method(Purchase, 'updateOne', async () => ({ matchedCount: 1, modifiedCount: 1 }));
+    mock.method(Inventory, 'updateOne', async () => ({ matchedCount: 1, modifiedCount: 1 }));
+    mock.method(GoodsReceipt, 'create', async ([document]) => [{ _id: 'receipt', ...document }]);
 
     const approved = await request(
       `/api/v1/purchase-orders/${PURCHASE_ID}/decision`,
@@ -104,8 +129,8 @@ describe('v1 Warehouse–Accounts purchase-order contract', () => {
     );
 
     assert.equal(approved.status, 200);
-    assert.deepEqual(filter, { _id: PURCHASE_ID, status: 'PENDING_REVIEW' });
-    assert.equal((await approved.json()).data.status, 'APPROVED');
+    assert.deepEqual(filters[0], { _id: PURCHASE_ID, status: 'PENDING_REVIEW' });
+    assert.deepEqual(filters[1], { _id: PURCHASE_ID, status: 'APPROVED' });
+    assert.equal((await approved.json()).data.status, 'RECEIVED');
   });
 });
-

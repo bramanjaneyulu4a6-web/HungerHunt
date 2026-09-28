@@ -243,6 +243,16 @@ const Layout = () => {
             <>
               <p className="sidenav-section-label">Super admin</p>
               <NavLink
+                to="/executive-report"
+                className={({ isActive }) =>
+                  `sidenav-link${isActive ? " sidenav-link--active" : ""}`
+                }
+                title={isExpanded ? undefined : "Executive report"}
+              >
+                <span className="sidenav-icon" aria-hidden="true">◒</span>
+                {isExpanded && <span className="sidenav-label">Executive report</span>}
+              </NavLink>
+              <NavLink
                 to="/features"
                 className={({ isActive }) =>
                   `sidenav-link${isActive ? " sidenav-link--active" : ""}`

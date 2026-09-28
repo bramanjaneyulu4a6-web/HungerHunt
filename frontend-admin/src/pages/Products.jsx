@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { useFeature } from '../utils/currentStaff';
@@ -73,6 +74,8 @@ const limitLabel = (product) => {
 };
 
 const Products = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   // Each catalogue action can be switched off on /features.
   const canAdd = useFeature('products.add');
   const canEdit = useFeature('products.edit');
@@ -108,6 +111,8 @@ const Products = () => {
   const [nudged, setNudged] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const productCreationReturn = location.state?.productCreationReturn;
+  const addRequested = new URLSearchParams(location.search).get('add') === '1';
 
   useEffect(() => {
     fetchProducts();
@@ -157,6 +162,15 @@ const Products = () => {
     if (stockGroups.length === 0) fetchStockGroups();
     if (units.length === 0) fetchUnits();
   };
+
+  useEffect(() => {
+    if (!addRequested || !canAdd || isProductOpen) return undefined;
+    const open = setTimeout(openProductModal, 0);
+    return () => clearTimeout(open);
+  // Opening is driven by the navigation request; the modal closes by leaving
+  // this route, so it should not reopen during ordinary catalogue work.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addRequested, canAdd]);
 
   const openCategoryEditor = () => {
     setEditorCategoryId((current) =>
@@ -219,8 +233,18 @@ const Products = () => {
         await api.put(`/products/${editingId}`, data);
         toast.success('Product updated');
       } else {
-        await api.post('/products', data);
+        const response = await api.post('/products', data);
         toast.success('Product added');
+        if (productCreationReturn) {
+          navigate(productCreationReturn, {
+            replace: true,
+            state: {
+              procurementDraft: location.state?.procurementDraft,
+              newProduct: { id: response.data._id, name: response.data.name },
+            },
+          });
+          return;
+        }
       }
 
       clearForm();
@@ -1267,6 +1291,13 @@ const Products = () => {
         const isLastStep = step === WIZARD_STEPS.length - 1;
         const closeProductModal = () => {
           if (saving) return;
+          if (productCreationReturn) {
+            navigate(productCreationReturn, {
+              replace: true,
+              state: { procurementDraft: location.state?.procurementDraft },
+            });
+            return;
+          }
           setIsProductOpen(false);
           clearForm();
         };

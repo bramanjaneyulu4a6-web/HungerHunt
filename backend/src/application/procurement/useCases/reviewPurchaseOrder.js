@@ -7,7 +7,7 @@ export class ReviewPurchaseOrder {
     this.clock = clock;
   }
 
-  async execute({ id, decision, reason, actor }) {
+  async execute({ id, decision, reason, actor, session = null }) {
     const updated = await this.purchaseOrderRepository.transition({
       id,
       from: PurchaseOrderStatus.PENDING_REVIEW,
@@ -19,7 +19,7 @@ export class ReviewPurchaseOrder {
         ...(decision === PurchaseOrderStatus.APPROVED ? { approvedAt: this.clock() } : {}),
         ...(decision === PurchaseOrderStatus.REJECTED ? { rejectedAt: this.clock() } : {}),
       },
-    });
+    }, { session });
 
     if (updated) return updated;
 
@@ -31,4 +31,3 @@ export class ReviewPurchaseOrder {
     );
   }
 }
-

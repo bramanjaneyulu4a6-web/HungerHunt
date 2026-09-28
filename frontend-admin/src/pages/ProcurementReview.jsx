@@ -45,7 +45,7 @@ export default function ProcurementReview() {
       await api.post(`/v1/purchase-orders/${order.id}/decision`, { decision, reason });
       setOrders((current) => current.filter((item) => item.id !== order.id));
       setRejection(null);
-      toast.success(decision === 'APPROVED' ? 'Purchase order approved' : 'Purchase order rejected');
+      toast.success(decision === 'APPROVED' ? 'Approved and added to inventory' : 'Purchase order rejected');
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Decision could not be saved');
@@ -69,7 +69,7 @@ export default function ProcurementReview() {
 
       <div className="warehouse-review-note">
         <span aria-hidden="true">i</span>
-        <p><strong>Approval releases the order for receiving.</strong> Rejection closes this request and requires Warehouse to raise a new one if stock is still needed.</p>
+        <p><strong>Approval adds every ordered unit to inventory immediately.</strong> Rejection closes this request and requires Warehouse to raise a new one if stock is still needed.</p>
       </div>
 
       {error && <Banner variant="alert" icon="⚠️">Could not load review requests.</Banner>}
@@ -137,7 +137,7 @@ export default function ProcurementReview() {
                   variant="success"
                   disabled={workingId === order.id}
                   onClick={() => decide(order, 'APPROVED')}
-                >Approve and release</Button>
+                >Approve and add to inventory</Button>
                 <Button
                   variant="alert"
                   disabled={workingId === order.id}

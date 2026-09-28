@@ -1,6 +1,7 @@
 // The order half of goods-inwards: what was asked for, from whom, by whom.
-// The received counts live on the order for cheap remaining-math, but they are
-// only ever moved by receipts (Task 4) — nothing here writes them.
+// The received counts live on the order for cheap remaining-math. Legacy
+// orders move them through warehouse receipts; reviewed orders now book their
+// full receipt atomically when Accounts approves them.
 import test, { before, afterEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';

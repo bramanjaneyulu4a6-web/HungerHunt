@@ -27,6 +27,7 @@ import supplierRoutes from './routes/supplierRoutes.js';
 import receiptRoutes from './routes/receiptRoutes.js';
 import purchaseOrderRoutes from './src/interfaces/http/routes/purchaseOrderRoutes.js';
 import analyticsRoutes from './src/interfaces/http/routes/analyticsRoutes.js';
+import executiveReportRoutes from './src/interfaces/http/routes/executiveReportRoutes.js';
 import fulfillmentOrderRoutes from './src/interfaces/http/routes/fulfillmentOrderRoutes.js';
 import caretakerFulfillmentOrderRoutes from './src/interfaces/http/routes/caretakerFulfillmentOrderRoutes.js';
 import caretakerReportRoutes from './src/interfaces/http/routes/caretakerReportRoutes.js';
@@ -318,6 +319,7 @@ v1('/api/v1/caretaker/fulfillment-orders', caretakerFulfillmentOrderRoutes);
 v1('/api/v1/caretaker/reports', caretakerReportRoutes);
 v1('/api/v1/reports', staffReportRoutes);
 v1('/api/v1/accounting-exports', accountingExportRoutes);
+v1('/api/v1/executive-report', executiveReportRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });

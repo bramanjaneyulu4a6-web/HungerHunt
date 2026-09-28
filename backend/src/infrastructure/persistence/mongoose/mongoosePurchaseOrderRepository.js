@@ -45,4 +45,12 @@ export class MongoosePurchaseOrderRepository {
         ])
       : purchase;
   }
+
+  async setLineReceived(id, productId, quantity, { session } = {}) {
+    return Purchase.updateOne(
+      { _id: id, 'items.productId': productId },
+      { $set: { 'items.$.received': quantity } },
+      { session }
+    );
+  }
 }

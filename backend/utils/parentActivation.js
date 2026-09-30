@@ -25,6 +25,7 @@ export const orderingSettingsView = (row) => ({
   requireActivatedParent: row?.requireActivatedParent !== false,
   oneOrderPerWeek: row?.oneOrderPerWeek !== false,
   kioskEnabled: row?.kioskEnabled !== false,
+  weeklyResetAt: row?.weeklyResetAt ?? null,
   updatedAt: row?.updatedAt ?? null,
   updatedBy: row?.updatedBy ? { id: String(row.updatedBy._id), name: row.updatedBy.name } : null,
 });

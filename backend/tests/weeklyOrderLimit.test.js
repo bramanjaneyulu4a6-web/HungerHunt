@@ -134,6 +134,21 @@ describe('what uses up the week', () => {
 
     assert.deepEqual(await checkWeeklyOrderLimit({ student }), { ok: true });
   });
+
+  test('a manual weekly reset ignores earlier packages without changing their timestamps', async () => {
+    const resetAt = new Date('2026-09-23T09:30:00+05:30');
+    settingsRow({ oneOrderPerWeek: true, weeklyResetAt: resetAt });
+    const packages = stubExists(FulfillmentOrder, null);
+    stubExists(PendingOrder, null);
+
+    const result = await checkWeeklyOrderLimit({
+      student,
+      now: new Date('2026-09-23T10:00:00+05:30'),
+    });
+
+    assert.deepEqual(result, { ok: true });
+    assert.equal(packages[0].orderedAt.$gte.getTime(), resetAt.getTime());
+  });
 });
 
 describe('who is not asked', () => {

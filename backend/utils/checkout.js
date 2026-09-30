@@ -1,7 +1,6 @@
 import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import Inventory from '../models/Inventory.js';
-import { businessPeriodStart } from './businessTime.js';
 import { createFulfillmentOrder } from './fulfillment.js';
 import WalletReversal from '../models/WalletReversal.js';
 import { checkPurchaseLimits, CLOSED_CATEGORY_MESSAGE, productInClosedCategory } from './purchaseLimits.js';
@@ -10,6 +9,7 @@ import { mintReceiptNumber } from './walletReceipts.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
 import { checkWeeklyOrderLimit } from './weeklyOrderLimit.js';
+import { effectivePeriodStart } from './effectivePeriodStart.js';
 import {
   DEMO_LOW_BALANCE,
   DEMO_OPENING_BALANCE,
@@ -239,11 +239,12 @@ export const chargeCart = async ({
   const testStudent = await isTestAccountStudent(student, { session });
 
   if (funding === 'WALLET' && student.walletControl?.enabled && !testStudent) {
+    const walletPeriodStart = await effectivePeriodStart(student.walletControl.limitType, { session });
     const spendingQuery = Transaction.aggregate([
       {
         $match: {
           studentId: student._id,
-          createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) },
+          createdAt: { $gte: walletPeriodStart },
           // UPI-paid orders are the parent's own money, spent with the
           // parent's own thumb on the pay button. They neither need the
           // child-spending limit's consent nor consume its allowance.
@@ -256,7 +257,7 @@ export const chargeCart = async ({
     ]);
     const spent = session ? await spendingQuery.session(session) : await spendingQuery;
     const reversalQuery = WalletReversal.aggregate([
-      { $match: { studentId: student._id, createdAt: { $gte: businessPeriodStart(student.walletControl.limitType) } } },
+      { $match: { studentId: student._id, createdAt: { $gte: walletPeriodStart } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const reversals = session ? await reversalQuery.session(session) : await reversalQuery;

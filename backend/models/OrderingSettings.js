@@ -16,6 +16,11 @@ const orderingSettingsSchema = new mongoose.Schema({
   // On by default. See utils/weeklyOrderLimit.js.
   oneOrderPerWeek: { type: Boolean, default: true },
 
+  // A manual restart of the current business week. Weekly order, wallet and
+  // catalogue limits count activity after the later of Sunday midnight and
+  // this instant. Past orders keep their real timestamps and remain auditable.
+  weeklyResetAt: { type: Date, default: null },
+
   // The kiosk as a whole. Off means every terminal shows "offline" and the
   // server refuses kiosk sessions and student orders; the admin console is
   // untouched. On by default. See middleware/kioskOpen.js.

@@ -3,7 +3,7 @@ import OrderingSettings from '../models/OrderingSettings.js';
 import PendingOrder from '../models/PendingOrder.js';
 import { OrderStatus } from '../src/domain/fulfillment/orderState.js';
 import { isDemoParentPhone } from '../config/demoAccess.js';
-import { businessPeriodStart } from './businessTime.js';
+import { effectivePeriodStart } from './effectivePeriodStart.js';
 import { isTestAccountStudent } from './testAccount.js';
 
 /* One order per student per business week.
@@ -58,7 +58,7 @@ export const checkWeeklyOrderLimit = async ({
 
   const packageQuery = FulfillmentOrder.exists({
     studentId: student._id,
-    orderedAt: { $gte: businessPeriodStart('WEEKLY', now) },
+    orderedAt: { $gte: await effectivePeriodStart('WEEKLY', { now, session }) },
     status: { $ne: OrderStatus.CANCELLED },
   });
   if (await (session ? packageQuery.session(session) : packageQuery)) {

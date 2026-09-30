@@ -5,7 +5,7 @@ import PendingOrder from '../models/PendingOrder.js';
 import Product from '../models/Product.js';
 import StockGroup from '../models/StockGroup.js';
 import { normalizeSubCategory } from './productSubcategory.js';
-import { businessPeriodStart } from './businessTime.js';
+import { effectivePeriodStart } from './effectivePeriodStart.js';
 import { isTestAccountStudent } from './testAccount.js';
 import { isDemoStudent } from './demoAccount.js';
 
@@ -41,7 +41,8 @@ export const purchaseLimitPeriodLabel = (period) => PERIOD_LABELS[period] || 'da
 // go through businessPeriodStart, which turns days over at midnight in the
 // configured business zone — the same boundary walletControl already uses, so
 // a student is not told two different stories about when "today" began.
-const periodStart = (period, now) => (period === 'TOTAL' ? null : businessPeriodStart(period, now));
+const periodStart = async (period, now, session) =>
+  (period === 'TOTAL' ? null : effectivePeriodStart(period, { now, session }));
 
 // Absent purchaseLimit reads as no limit: rows written before the field
 // carry nothing, and a disabled switch must behave identically to never
@@ -205,7 +206,7 @@ const capUsage = async ({ cap, studentId, session, now, excludePendingOrderId })
   if (productIds.length === 0) return { purchased: 0, pending: 0 };
 
   const [bought, waiting] = await Promise.all([
-    purchasedInPeriod({ studentId, productIds, since: periodStart(cap.period, now), session }),
+    purchasedInPeriod({ studentId, productIds, since: await periodStart(cap.period, now, session), session }),
     pendingQuantities({ studentId, productIds, session, now, excludePendingOrderId }),
   ]);
   const sum = (map) => [...map.values()].reduce((total, value) => total + value, 0);
@@ -271,7 +272,7 @@ export const getPurchaseAllowances = async ({
       const purchased = await purchasedInPeriod({
         studentId,
         productIds: group.map(({ product }) => product._id),
-        since: periodStart(period, now),
+        since: await periodStart(period, now, session),
         session,
       });
 

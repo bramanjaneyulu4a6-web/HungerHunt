@@ -31,18 +31,20 @@ export const exportedCount = (format, headers) =>
 export const exportFilename = (disposition, format) =>
   /filename="([^"]+)"/.exec(disposition || '')?.[1] || format.fallbackName;
 
-/* The four movements an export can be narrowed to, in the order the checkboxes
+/* The movements an export can be narrowed to, in the order the checkboxes
  * show them and the order the server returns them in. The keys are the
  * server's vocabulary (backend/src/application/accounting/movementTypes.js);
  * the labels are the office's, matching what the ledger screens already call
  * these rows so a filter and a feed read the same way. The server also knows
- * REFUND, but an export never files a refund (see realMovements.js), so it is
- * not offered here. */
+ * REFUND, but that is an order cancellation which cancels its charge and is
+ * never filed. BALANCE_REFUND is different: cash really left the school, so
+ * it is offered and exported as a Payment. */
 export const MOVEMENT_TYPES = [
   { key: 'CASH_DEPOSIT', label: 'Cash Deposits' },
   { key: 'UPI_DEPOSIT', label: 'UPI Deposits' },
   { key: 'WALLET_DEDUCTION', label: 'Student Wallet Deductions' },
   { key: 'UPI_ORDER_PAYMENT', label: 'UPI Order Payments' },
+  { key: 'BALANCE_REFUND', label: 'Wallet Balance Refunds' },
 ];
 
 export const includeParam = (selected) => selected.join(',');

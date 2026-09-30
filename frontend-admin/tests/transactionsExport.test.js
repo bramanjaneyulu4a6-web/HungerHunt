@@ -34,7 +34,8 @@ describe('what the Export popup asks the server for', () => {
 
   test('offers refunds too, unlike the TallyPrime export', () => {
     assert.ok(EXPORT_KINDS.includes('REFUND'));
-    assert.equal(EXPORT_KINDS.length, 5);
+    assert.ok(EXPORT_KINDS.includes('BALANCE_REFUND'));
+    assert.equal(EXPORT_KINDS.length, 6);
   });
 });
 
@@ -106,7 +107,9 @@ describe('types that need "No staff"', () => {
 
   test('without it, only what staff make can be asked for', () => {
     assert.deepEqual(unavailableKinds([BHARAT]), ['UPI_DEPOSIT', 'UPI_ORDER_PAYMENT']);
-    assert.deepEqual(effectiveKinds(EXPORT_KINDS, [BHARAT]), ['CASH_DEPOSIT', 'WALLET_DEDUCTION', 'REFUND']);
+    assert.deepEqual(effectiveKinds(EXPORT_KINDS, [BHARAT]), [
+      'CASH_DEPOSIT', 'WALLET_DEDUCTION', 'REFUND', 'BALANCE_REFUND',
+    ]);
   });
 
   test('ticks survive, so ticking "No staff" again restores them', () => {

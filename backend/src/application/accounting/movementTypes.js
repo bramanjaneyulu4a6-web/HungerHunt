@@ -15,6 +15,7 @@ export const MOVEMENT_TYPES = [
   'WALLET_DEDUCTION',
   'UPI_ORDER_PAYMENT',
   'REFUND',
+  'BALANCE_REFUND',
 ];
 
 /* What the request asked for, in canonical order.
@@ -73,17 +74,33 @@ export const collectionFilters = (included) => {
   const upiDeposit = has('UPI_DEPOSIT');
   const wallet = has('WALLET_DEDUCTION');
   const upiOrder = has('UPI_ORDER_PAYMENT');
+  const balanceRefund = has('BALANCE_REFUND');
+
+  const depositSelected = cash || upiDeposit;
+  const depositHalf = depositSelected
+    ? halves({
+        both: cash && upiDeposit,
+        gateway: upiDeposit,
+        field: 'source',
+        gatewayValue: 'PARENT_UPI',
+      })
+    : null;
+
+  let adjustments = null;
+  if (balanceRefund && cash && upiDeposit) adjustments = {};
+  else if (balanceRefund && depositHalf) {
+    adjustments = {
+      $or: [
+        { type: 'BALANCE_REFUND' },
+        { ...depositHalf, type: { $ne: 'BALANCE_REFUND' } },
+      ],
+    };
+  } else if (balanceRefund) adjustments = { type: 'BALANCE_REFUND' };
+  else if (depositHalf) adjustments = { ...depositHalf, type: { $ne: 'BALANCE_REFUND' } };
 
   return {
     // null, not {}: a collection nothing was selected from is never read.
-    adjustments: cash || upiDeposit
-      ? halves({
-          both: cash && upiDeposit,
-          gateway: upiDeposit,
-          field: 'source',
-          gatewayValue: 'PARENT_UPI',
-        })
-      : null,
+    adjustments,
     transactions: wallet || upiOrder
       ? halves({
           both: wallet && upiOrder,

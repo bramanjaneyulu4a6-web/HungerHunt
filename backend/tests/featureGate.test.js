@@ -52,6 +52,14 @@ describe('switched-off money and stock actions', () => {
     await refused(await call('PUT', `/api/students/${ID}/topup`, { amount: 100 }));
   });
 
+  test('a wallet balance refund is refused', async () => {
+    settings({ hidden: ['students.refund'] });
+    await refused(await call('PUT', `/api/students/${ID}/refund`, {
+      amount: 100,
+      reason: 'Student leaving school',
+    }));
+  });
+
   test('a stock adjustment is refused', async () => {
     settings({ featureOverrides: [{ key: 'inventory.adjustStock', value: 'hidden' }] });
     await refused(await call('POST', `/api/inventory/${ID}/adjust`, { quantity: 1, reason: 'x' }));

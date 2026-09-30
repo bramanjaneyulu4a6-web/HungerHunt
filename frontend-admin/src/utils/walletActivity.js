@@ -22,7 +22,9 @@ import api from './api';
    paper — a wallet-funded charge spent money receipted on its way in, and a
    deleted row's receipt was withdrawn with its money. */
 export const receiptIdOf = (entry) =>
-  entry?.deleted ? null : entry?.adjustmentId || entry?.reversalId || entry?.chargeId || null;
+  entry?.deleted
+    ? null
+    : entry?.adjustmentId || entry?.reversalId || entry?.balanceRefundId || entry?.chargeId || null;
 
 export const fetchReceipt = async (studentId, entry) => {
   try {

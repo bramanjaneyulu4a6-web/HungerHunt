@@ -127,7 +127,7 @@ export const getLedgerFeed = async (req, res) => {
 
     const filter = range ? { createdAt: range } : {};
 
-    const [topups, charges, refunds, failedTopups] = await Promise.all([
+    const [walletRows, charges, refunds, failedTopups] = await Promise.all([
       WalletAdjustment.find(filter)
         .populate('studentId', 'name admissionNumber roomNumber')
         .sort({ createdAt: -1 })
@@ -149,6 +149,8 @@ export const getLedgerFeed = async (req, res) => {
         .limit(FEED_DEPTH)
         .lean(),
     ]);
+    const balanceRefunds = walletRows.filter((entry) => entry.type === 'BALANCE_REFUND');
+    const topups = walletRows.filter((entry) => entry.type !== 'BALANCE_REFUND');
 
     /* The packages behind this page of charges and refunds. One extra read for
        the whole page rather than one per row opened, because a feed is scanned
@@ -220,7 +222,7 @@ export const getLedgerFeed = async (req, res) => {
     const orderByTransaction = new Map(
       orders.map((order) => [String(order.transactionId), order])
     );
-    const staffNames = await staffNamesFor([...topups, ...charges, ...refunds]);
+    const staffNames = await staffNamesFor([...topups, ...charges, ...refunds, ...balanceRefunds]);
 
     const all = [
       ...topups.map((entry) => ({
@@ -292,6 +294,20 @@ export const getLedgerFeed = async (req, res) => {
             reversedTransactionId: entry.transactionId ? String(entry.transactionId) : null,
           };
         })(),
+        student: studentOf(entry),
+      })),
+      ...balanceRefunds.map((entry) => ({
+        _id: entry._id,
+        kind: 'BALANCE_REFUND',
+        via: 'ADMIN_DESK',
+        processedBy: processedBy(entry, staffNames),
+        amount: entry.amount,
+        previousBalance: entry.previousBalance,
+        newBalance: entry.newBalance,
+        date: entry.createdAt,
+        reason: entry.reason,
+        receiptNumber: entry.receiptNumber || null,
+        balanceRefundId: String(entry._id),
         student: studentOf(entry),
       })),
       ...failedTopups.map((entry) => ({

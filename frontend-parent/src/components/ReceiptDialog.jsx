@@ -24,11 +24,13 @@ const formatReceiptDate = (value) =>
 const TITLES = {
   ORDER_PAYMENT: 'Order Payment Receipt',
   REFUND: 'Wallet Refund Receipt',
+  BALANCE_REFUND: 'Wallet Balance Refund Receipt',
 };
 
 const FOOTNOTES = {
   ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
   REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+  BALANCE_REFUND: 'Paid out from the student wallet balance and recorded by the school',
 };
 
 const Row = ({ label, children }) => (
@@ -84,6 +86,7 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
 
   const company = receipt?.company;
   const isOrder = receipt?.kind === 'ORDER_PAYMENT';
+  const isBalanceRefund = receipt?.kind === 'BALANCE_REFUND';
 
   return (
     <WalletDialog
@@ -186,12 +189,20 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
             )}
 
             <div className="receipt-amount">
-              <span>{isOrder ? 'Amount paid' : 'Amount received'}</span>
+              <span>{isBalanceRefund ? 'Amount refunded' : isOrder ? 'Amount paid' : 'Amount received'}</span>
               <strong>{formatINR(receipt.amount)}</strong>
               <em>{receipt.amountInWords}</em>
             </div>
 
-            {receipt.mode === 'CASH' ? (
+            {isBalanceRefund ? (
+              <>
+                <Row label="Refund Method">Cash — paid by school office</Row>
+                {receipt.receivedBy?.name && (
+                  <Row label="Refunded By">{receipt.receivedBy.name}</Row>
+                )}
+                {receipt.refund?.reason && <Row label="Reason">{receipt.refund.reason}</Row>}
+              </>
+            ) : receipt.mode === 'CASH' ? (
               <>
                 <Row label="Payment Mode">Cash — at school office</Row>
                 {receipt.receivedBy?.name && (

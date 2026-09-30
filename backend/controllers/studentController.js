@@ -8,7 +8,7 @@ import { sendToParent } from "../utils/sendNotification.js";
 import { signStudentToken, STUDENT_SESSION_SECONDS } from "../utils/tokens.js";
 import { showroomStudent } from "../utils/showroomCatalogue.js";
 import { sessionOptions, withMongoTransaction } from "../utils/mongoTransaction.js";
-import { creditWallet, readWallet, walletView } from '../utils/walletAccount.js';
+import { creditWallet, debitWallet, readWallet, walletView } from '../utils/walletAccount.js';
 import { mintReceiptNumber } from '../utils/walletReceipts.js';
 import { OPEN_STATUSES } from '../src/domain/fulfillment/overdue.js';
 import { isTestAccountStudent } from '../utils/testAccount.js';
@@ -727,7 +727,11 @@ export const topUpWallet = async (req, res) => {
     const prior = await WalletAdjustment.findOne({ performedBy, idempotencyKey });
 
     if (prior) {
-      if (String(prior.studentId) !== String(studentId) || prior.amount !== amount) {
+      if (
+        prior.type === 'BALANCE_REFUND' ||
+        String(prior.studentId) !== String(studentId) ||
+        prior.amount !== amount
+      ) {
         return res.status(409).json({
           message: 'This Idempotency-Key was already used for a different top-up.',
         });
@@ -847,6 +851,7 @@ export const topUpWallet = async (req, res) => {
 
       if (prior) {
         if (
+          prior.type === 'BALANCE_REFUND' ||
           String(prior.studentId) !== String(req.params.id) ||
           prior.amount !== Number(req.body.amount)
         ) {
@@ -868,6 +873,145 @@ export const topUpWallet = async (req, res) => {
 
     console.error("❌ topUpWallet Error:", error);
     return res.status(error.status || 500).json({ message: error.message });
+  }
+};
+
+export const refundWalletBalance = async (req, res) => {
+  try {
+    const amount = Number(req.body.amount);
+    const reason = String(req.body.reason || '').trim();
+    const refundMode = String(req.body.refundMode || 'CASH').trim().toUpperCase();
+    const studentId = req.params.id;
+    const performedBy = req.staff.id;
+    const idempotencyKey = String(
+      req.get('Idempotency-Key') || req.body.idempotencyKey || ''
+    ).trim();
+
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 1_000_000 ||
+      Math.round(amount * 100) / 100 !== amount
+    ) {
+      return res.status(400).json({
+        message: 'Amount must be positive, at most ₹10,00,000, and have no more than two decimals.',
+      });
+    }
+    if (!reason || reason.length > 200) {
+      return res.status(400).json({ message: 'A refund reason of up to 200 characters is required.' });
+    }
+    if (refundMode !== 'CASH') {
+      return res.status(400).json({ message: 'Wallet balance refunds currently support cash only.' });
+    }
+    if (!idempotencyKey || idempotencyKey.length > 100) {
+      return res.status(400).json({ message: 'A valid Idempotency-Key is required for a wallet refund.' });
+    }
+
+    const prior = await WalletAdjustment.findOne({ performedBy, idempotencyKey });
+    if (prior) {
+      if (
+        prior.type !== 'BALANCE_REFUND' ||
+        String(prior.studentId) !== String(studentId) ||
+        prior.amount !== amount ||
+        prior.reason !== reason ||
+        (prior.refundMode || 'CASH') !== refundMode
+      ) {
+        return res.status(409).json({
+          message: 'This Idempotency-Key was already used for a different refund.',
+        });
+      }
+      const wallet = await readWallet(studentId);
+      return res.json({
+        message: 'Wallet refund already applied.',
+        newBalance: prior.newBalance,
+        wallet,
+        refund: prior,
+        replayed: true,
+      });
+    }
+
+    const result = await withMongoTransaction(async (session) => {
+      const student = await debitWallet(studentId, amount, { session });
+      if (!student) {
+        const existsQuery = Student.exists({ _id: studentId, active: { $ne: false } });
+        const exists = session ? await existsQuery.session(session) : await existsQuery;
+        const failure = new Error(exists ? 'Refund amount exceeds the available wallet balance.' : 'Student not found');
+        failure.status = exists ? 409 : 404;
+        throw failure;
+      }
+
+      const newBalance = Number(student.pocketMoney);
+      const previousBalance = newBalance + amount;
+      const receiptNumber = await mintReceiptNumber({
+        studentId,
+        admissionNumber: student.admissionNumber,
+      });
+      const document = {
+        studentId,
+        performedBy,
+        type: 'BALANCE_REFUND',
+        amount,
+        previousBalance,
+        newBalance,
+        reason,
+        refundMode,
+        idempotencyKey,
+        ...(receiptNumber ? { receiptNumber } : {}),
+      };
+      const [refund] = session
+        ? await WalletAdjustment.create([document], { session })
+        : [await WalletAdjustment.create(document)];
+      return { student, refund, newBalance };
+    });
+
+    const parent = await Parent.findOne({ studentIds: studentId });
+    if (parent) {
+      sendToParent(
+        parent,
+        'Wallet Balance Refunded',
+        `₹${amount} refunded by the school. New wallet balance ₹${result.newBalance}`,
+        { studentId: studentId.toString(), type: 'BALANCE_REFUND' }
+      );
+    }
+
+    return res.json({
+      message: 'Wallet balance refunded successfully',
+      newBalance: result.newBalance,
+      wallet: walletView(result.student),
+      refund: result.refund,
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const prior = await WalletAdjustment.findOne({
+        performedBy: req.staff.id,
+        idempotencyKey: String(req.get('Idempotency-Key') || req.body.idempotencyKey || '').trim(),
+      });
+      if (prior) {
+        const requestedReason = String(req.body.reason || '').trim();
+        if (
+          prior.type !== 'BALANCE_REFUND' ||
+          String(prior.studentId) !== String(req.params.id) ||
+          prior.amount !== Number(req.body.amount) ||
+          prior.reason !== requestedReason ||
+          (prior.refundMode || 'CASH') !== String(req.body.refundMode || 'CASH').trim().toUpperCase()
+        ) {
+          return res.status(409).json({
+            message: 'This Idempotency-Key was already used for a different refund.',
+          });
+        }
+        const wallet = await readWallet(req.params.id);
+        return res.json({
+          message: 'Wallet refund already applied.',
+          newBalance: prior.newBalance,
+          wallet,
+          refund: prior,
+          replayed: true,
+        });
+      }
+    }
+    const status = error.status || 500;
+    if (status >= 500) console.error('❌ refundWalletBalance Error:', error);
+    return res.status(status).json({ message: error.message });
   }
 };
 

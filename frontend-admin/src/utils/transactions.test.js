@@ -80,10 +80,10 @@ test('filters by tab, kinds, modes, amount, staff and a search over the things a
 test('each tab offers only the kinds and modes its rows can carry', () => {
   assert.deepEqual(availableFilters('deposits'), { kinds: ['CASH_DEPOSIT', 'UPI_DEPOSIT'], modes: ['Cash', 'UPI'] });
   assert.deepEqual(availableFilters('deductions'), {
-    kinds: ['WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT', 'REFUND'],
-    modes: ['UPI', 'Wallet', 'Refund'],
+    kinds: ['WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT', 'REFUND', 'BALANCE_REFUND'],
+    modes: ['Cash', 'UPI', 'Wallet', 'Refund'],
   });
-  assert.equal(availableFilters('all').kinds.length, 5);
+  assert.equal(availableFilters('all').kinds.length, 6);
 });
 
 test('counts the filter groups in use, not the boxes ticked', () => {

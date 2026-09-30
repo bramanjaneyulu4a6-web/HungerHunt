@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { describeEntry, exportableEntries } from './ledgerEntry.js';
+import {
+  describeEntry,
+  exportableEntries,
+  receiptEntryFromBalanceRefund,
+} from './ledgerEntry.js';
 
 const deposit = { _id: 'd', kind: 'TOP_UP', mode: 'Cash', amount: 500 };
 const walletOrder = { _id: 'w', kind: 'ORDER_PAYMENT', amount: 120, items: [{ name: 'Chips' }] };
@@ -36,4 +40,16 @@ test('lists a cancelled UPI order as the UPI deposit it became', () => {
   assert.deepEqual(row.items, []);
   assert.equal(describeEntry(row).label, 'UPI Deposit');
   assert.equal(describeEntry(row).direction, 'in');
+});
+
+test('a wallet balance refund is money out and opens its own receipt', () => {
+  const refund = {
+    _id: 'wr', kind: 'BALANCE_REFUND', amount: 250, receiptNumber: 'GMS3009A1001004',
+  };
+  assert.equal(describeEntry(refund).direction, 'out');
+  assert.equal(describeEntry(refund).label, 'Balance Refund');
+  assert.deepEqual(receiptEntryFromBalanceRefund({ refund }), {
+    balanceRefundId: 'wr',
+    receiptNumber: 'GMS3009A1001004',
+  });
 });

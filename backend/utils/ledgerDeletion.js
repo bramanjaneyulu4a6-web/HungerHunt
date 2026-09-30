@@ -49,7 +49,7 @@ const KINDS = {
     Model: WalletAdjustment,
     // Anything not PARENT_UPI is cash, as the ledger reads it: rows older
     // than the source field carry none.
-    match: { source: { $ne: 'PARENT_UPI' } },
+    match: { source: { $ne: 'PARENT_UPI' }, type: { $ne: 'BALANCE_REFUND' } },
     amountOf: (row) => row.amount,
     sign: -1,
     madeBy: async (row, session) => {

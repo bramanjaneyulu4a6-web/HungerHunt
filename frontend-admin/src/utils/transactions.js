@@ -29,6 +29,7 @@ export const KIND_LABELS = {
   WALLET_DEDUCTION: 'Wallet Payment',
   UPI_ORDER_PAYMENT: 'UPI Order Payment',
   REFUND: 'Refund',
+  BALANCE_REFUND: 'Wallet Balance Refund',
 };
 
 export const MODES = ['Cash', 'UPI', 'Wallet', 'Refund'];
@@ -39,6 +40,7 @@ const KIND_GROUP = {
   WALLET_DEDUCTION: 'DEDUCTION',
   UPI_ORDER_PAYMENT: 'DEDUCTION',
   REFUND: 'DEDUCTION',
+  BALANCE_REFUND: 'DEDUCTION',
 };
 
 const KIND_MODE = {
@@ -47,6 +49,7 @@ const KIND_MODE = {
   WALLET_DEDUCTION: 'Wallet',
   UPI_ORDER_PAYMENT: 'UPI',
   REFUND: 'Refund',
+  BALANCE_REFUND: 'Cash',
 };
 
 /* What the Filters panel offers on a given tab. The Deposits tab has no

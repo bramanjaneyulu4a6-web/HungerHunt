@@ -117,6 +117,10 @@ const REFUND = movement({
   mode: 'Refund', detail: 'Refund', voucherType: 'Credit Note', negative: true,
 });
 
+const BALANCE_REFUND = movement({
+  mode: 'Cash', detail: 'Wallet Balance Refund', voucherType: 'Payment', negative: true,
+});
+
 /* The order a charge or a refund belongs to, appended to the detail so the
    accountant querying a line has the same handle the storeroom and the family
    use. A deposit has no order, and a charge whose package was purged has none
@@ -130,7 +134,7 @@ const rowsFrom = ({ transactions, adjustments, reversals }) => [
     receiptNumber: entry.receiptNumber,
     studentId: entry.studentId,
     rupees: entry.amount,
-    kind: TOP_UP[entry.source] || TOP_UP.ADMIN,
+    kind: entry.type === 'BALANCE_REFUND' ? BALANCE_REFUND : TOP_UP[entry.source] || TOP_UP.ADMIN,
     orderReference: null,
   })),
   ...transactions.map((entry) => ({

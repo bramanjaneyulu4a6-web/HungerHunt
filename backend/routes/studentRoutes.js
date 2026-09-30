@@ -11,6 +11,7 @@ import {
   getStudentCount,
   getActiveStudentCount,
   topUpWallet,
+  refundWalletBalance,
   restoreStudent,
   createKioskSession,
   setStudentPurchaseCode
@@ -66,6 +67,7 @@ router.post('/bulk', protectAdmin, bulkImportStudents);
 router.post('/:id/restore', protectAdmin, restoreStudent);
 
 router.put('/:id/topup', protectAdmin, requireFeature('students.recharge'), topUpWallet);
+router.put('/:id/refund', protectAdmin, requireFeature('students.refund'), refundWalletBalance);
 
 /* Named on its own rather than added to the student edit form's writable
    fields: a child's purchase code cannot be set as a side effect of editing

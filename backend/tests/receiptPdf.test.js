@@ -87,6 +87,12 @@ describe('itemDescription', () => {
   });
 });
 
+test('a balance refund receipt says cash left the school office', () => {
+  const receipt = { kind: 'BALANCE_REFUND', mode: 'REFUND' };
+  assert.equal(paymentModeLine(receipt), 'Cash — paid by school office');
+  assert.equal(itemDescription(receipt), 'Wallet Balance Refund');
+});
+
 /* The sheet the receipt prints on. The office wants the document in the top
  * half of an A4 page so the rest can be torn or folded off, which is a claim
  * about geometry — so it is checked as geometry here, and the rendered page

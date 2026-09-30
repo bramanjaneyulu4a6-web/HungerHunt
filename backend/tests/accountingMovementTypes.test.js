@@ -64,12 +64,14 @@ describe('what each selection asks of each collection', () => {
   test('cash deposits claim every row the ledger calls cash', () => {
     assert.deepEqual(collectionFilters(['CASH_DEPOSIT']).adjustments, {
       source: { $ne: 'PARENT_UPI' },
+      type: { $ne: 'BALANCE_REFUND' },
     });
   });
 
   test('UPI deposits ask for exactly the gateway rows', () => {
     assert.deepEqual(collectionFilters(['UPI_DEPOSIT']).adjustments, {
       source: 'PARENT_UPI',
+      type: { $ne: 'BALANCE_REFUND' },
     });
   });
 
@@ -86,9 +88,21 @@ describe('what each selection asks of each collection', () => {
   });
 
   test('both halves of a collection selected drops the discriminator', () => {
-    assert.deepEqual(collectionFilters(['CASH_DEPOSIT', 'UPI_DEPOSIT']).adjustments, {});
+    assert.deepEqual(collectionFilters(['CASH_DEPOSIT', 'UPI_DEPOSIT']).adjustments, {
+      type: { $ne: 'BALANCE_REFUND' },
+    });
     assert.deepEqual(
       collectionFilters(['WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT']).transactions,
+      {}
+    );
+  });
+
+  test('balance refunds select only their audited adjustment rows', () => {
+    assert.deepEqual(collectionFilters(['BALANCE_REFUND']).adjustments, {
+      type: 'BALANCE_REFUND',
+    });
+    assert.deepEqual(
+      collectionFilters(['CASH_DEPOSIT', 'UPI_DEPOSIT', 'BALANCE_REFUND']).adjustments,
       {}
     );
   });

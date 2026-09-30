@@ -27,6 +27,7 @@ const ledgers = {
   salesVoucherType: 'Sales',
   receiptVoucherType: 'Receipt',
   refundVoucherType: 'Credit Note',
+  paymentVoucherType: 'Payment',
 };
 let base;
 
@@ -80,6 +81,20 @@ describe('TallyPrime accounting export', () => {
       }],
       adjustments: [], ledgers, timeZone: 'Asia/Kolkata',
     }), /two decimal places/);
+  });
+
+  test('exports a balance refund as a payment out of wallet liability', () => {
+    const xml = buildTallyVoucherXml({
+      transactions: [],
+      adjustments: [{
+        _id: TOPUP_ID, studentId: STUDENT_ID, type: 'BALANCE_REFUND', amount: 75,
+        createdAt: new Date('2026-08-12T18:00:00.000Z'),
+      }],
+      reversals: [], ledgers, timeZone: 'Asia/Kolkata',
+    });
+    assert.match(xml, new RegExp(`HH-WR-${TOPUP_ID}`));
+    assert.match(xml, /<VOUCHERTYPENAME>Payment<\/VOUCHERTYPENAME>/);
+    assert.match(xml, /Student Wallet &amp; Liability[\s\S]*<AMOUNT>-75\.00<\/AMOUNT>/);
   });
 
   test('is admin-only, bounded, and downloads native XML', async () => {

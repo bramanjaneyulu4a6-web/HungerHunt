@@ -64,6 +64,7 @@ const call = (path, token, init = {}) =>
 const ADMIN_ROUTES = [
   ['GET', '/api/students'],
   ['PUT', `/api/students/${ADMIN_ID}/topup`],
+  ['PUT', `/api/students/${ADMIN_ID}/refund`],
   ['PUT', `/api/students/${ADMIN_ID}`],
   ['DELETE', `/api/students/${ADMIN_ID}`],
   ['POST', '/api/students/bulk'],

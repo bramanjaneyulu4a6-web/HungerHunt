@@ -1878,9 +1878,32 @@
   gap: 8px;
 }
 
+/* Student actions follow the two decisions the office makes: money first,
+   then record access. Keeping each pair on its own row also gives the four
+   controls stable positions as permissions change. */
+.cell-actions--student {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.student-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.student-action-row .btn {
+  width: 100%;
+}
+
 @media (max-width: 768px) {
   .cell-actions {
     justify-content: flex-start;
+  }
+
+  .cell-actions--student {
+    align-items: flex-start;
   }
 
   .th-actions {
@@ -1946,6 +1969,27 @@
 .modal-note strong {
   color: var(--ink-soft);
   font-weight: 600;
+}
+
+.refund-confirmation-note {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border));
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.refund-confirmation-note strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--danger);
+}
+
+.refund-confirmation-note p {
+  margin: 0;
 }
 
 /* The receipt popup (components/ReceiptButton.jsx): the header carries the

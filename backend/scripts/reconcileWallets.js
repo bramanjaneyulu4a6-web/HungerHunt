@@ -45,7 +45,9 @@ try {
         pipeline: [{
           $project: {
             studentId: 1,
-            kind: { $literal: 'TOP_UP' },
+            kind: {
+              $cond: [{ $eq: ['$type', 'BALANCE_REFUND'] }, 'BALANCE_REFUND', 'TOP_UP'],
+            },
             amount: 1,
             previousBalance: 1,
             resultingBalance: '$newBalance',
@@ -79,7 +81,10 @@ try {
       $unionWith: {
         coll: Model.collection.name,
         pipeline: [
-          { $match: { 'deletion.at': { $type: 'date' } } },
+          { $match: {
+            'deletion.at': { $type: 'date' },
+            ...(Model === WalletAdjustment ? { type: { $ne: 'BALANCE_REFUND' } } : {}),
+          } },
           {
             $project: {
               studentId: 1,

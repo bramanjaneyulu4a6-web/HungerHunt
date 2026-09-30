@@ -25,7 +25,7 @@ import WalletControlIcons from '../components/WalletControlIcons';
 import { PurchaseCodeDialog } from '../components/PurchaseCodeDialog';
 import { ReceiptModal } from '../components/Receipt';
 import { useReceipt } from '../utils/walletActivity';
-import { receiptEntryFromTopUp } from '../utils/ledgerEntry';
+import { receiptEntryFromBalanceRefund, receiptEntryFromTopUp } from '../utils/ledgerEntry';
 import { useDismissableOverlay } from '../utils/overlay';
 import { useCurrentStaff, useFeature } from '../utils/currentStaff';
 
@@ -136,6 +136,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const canEdit = useFeature('students.edit');
   const canArchive = useFeature('students.archive');
   const canRecharge = useFeature('students.recharge');
+  const canRefund = useFeature('students.refund');
   const canOpenActivity = useFeature('students.activity');
   // The student whose orders and receipts are open, if any.
   const [activityStudent, setActivityStudent] = useState(null);
@@ -186,6 +187,12 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
   const [topupAmount, setTopupAmount] = useState('');
   const [topupKey, setTopupKey] = useState('');
   const [topupSaving, setTopupSaving] = useState(false);
+  const [refundStudent, setRefundStudent] = useState(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [refundKey, setRefundKey] = useState('');
+  const [refundSaving, setRefundSaving] = useState(false);
+  const [receiptTitle, setReceiptTitle] = useState('Receipt');
   /* The receipt for the deposit just taken. The desk's next move after
      recharging is handing over the paper, so the popup opens itself rather
      than waiting to be found again in the wallet ledger. */
@@ -302,12 +309,13 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
      Only one of the four is ever open, so they share one entry on the stack.
      The receipt popup and any confirmation are entries of their own, and being
      in front they answer Escape first. */
-  const dialogOpen = editorOpen || importOpen || Boolean(topupStudent) || Boolean(codeStudent);
-  const busy = saving || archiving || uploading || topupSaving;
+  const dialogOpen = editorOpen || importOpen || Boolean(topupStudent) || Boolean(refundStudent) || Boolean(codeStudent);
+  const busy = saving || archiving || uploading || topupSaving || refundSaving;
 
   useDismissableOverlay(() => {
     if (busy) return;
     if (topupStudent) setTopupStudent(null);
+    else if (refundStudent) setRefundStudent(null);
     else if (codeStudent) setCodeStudent(null);
     else if (importOpen) setImportOpen(false);
     else {
@@ -460,12 +468,80 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
          from fetchReceipt and a Receipt button still waiting in the wallet
          ledger — never a recharge that looks like it failed. */
       const entry = receiptEntryFromTopUp(response.data);
-      if (entry) openReceipt(studentId, entry);
+      if (entry) {
+        setReceiptTitle('Recharge receipt');
+        openReceipt(studentId, entry);
+      }
     } catch (error) {
       console.error(error);
       toast.error(error?.response?.data?.message || 'Top-up failed');
     } finally {
       setTopupSaving(false);
+    }
+  };
+
+  const openRefund = async (student) => {
+    try {
+      const { data } = await api.get(`/students/${student._id}/wallet`);
+      const balance = Number(data.wallet.balance || 0);
+      setStudents((current) => current.map((item) =>
+        item._id === student._id ? { ...item, pocketMoney: balance } : item
+      ));
+      if (balance <= 0) {
+        toast.error('This wallet has no balance to refund');
+        return;
+      }
+      setRefundStudent({ ...student, pocketMoney: balance });
+      setRefundAmount(String(balance));
+      setRefundReason('');
+      setRefundKey(newIdempotencyKey());
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not load the current wallet balance');
+    }
+  };
+
+  const handleRefund = async (event) => {
+    event.preventDefault();
+    if (!refundStudent || refundSaving) return;
+    const amount = Number(refundAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > refundStudent.pocketMoney) {
+      toast.error('Enter an amount within the available wallet balance');
+      return;
+    }
+    if (!refundReason.trim()) {
+      toast.error('Enter a refund reason');
+      return;
+    }
+
+    setRefundSaving(true);
+    try {
+      const response = await api.put(
+        `/students/${refundStudent._id}/refund`,
+        { amount, reason: refundReason.trim(), refundMode: 'CASH' },
+        { headers: { 'Idempotency-Key': refundKey } }
+      );
+      const newBalance = response.data.wallet?.balance ?? response.data.newBalance;
+      const studentId = refundStudent._id;
+      setStudents((current) => current.map((student) =>
+        student._id === studentId ? { ...student, pocketMoney: newBalance } : student
+      ));
+      toast.success(`Refund recorded — new balance ${formatINR(newBalance)}`);
+      setRefundStudent(null);
+      setRefundAmount('');
+      setRefundReason('');
+      setRefundKey('');
+      fetchStudents(page);
+      const entry = receiptEntryFromBalanceRefund(response.data);
+      if (entry) {
+        setReceiptTitle('Wallet refund receipt');
+        openReceipt(studentId, entry);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.response?.data?.message || 'Wallet refund failed');
+    } finally {
+      setRefundSaving(false);
     }
   };
 
@@ -784,34 +860,47 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
                     );
                   })()}</td>
                   <td data-label="Actions">
-                    <div className="cell-actions">
-                      {canRecharge && (
-                        <Button
-                          variant="success"
-                          className="btn--sm"
-                          onClick={() => openTopUp(student)}
-                        >
-                          Recharge
-                        </Button>
-                      )}
-                      {canEdit && (
-                        <Button
-                          variant="ghost"
-                          className="btn--sm"
-                          onClick={() => openEdit(student)}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                      {showPurchaseCode && (
-                        <Button
-                          variant="ghost"
-                          className="btn--sm"
-                          onClick={() => setCodeStudent(student)}
-                        >
-                          Purchase code
-                        </Button>
-                      )}
+                    <div className="cell-actions cell-actions--student">
+                      <div className="student-action-row">
+                        {canRecharge && (
+                          <Button
+                            variant="success"
+                            className="btn--sm"
+                            onClick={() => openTopUp(student)}
+                          >
+                            Recharge
+                          </Button>
+                        )}
+                        {canRefund && student.pocketMoney > 0 && (
+                          <Button
+                            variant="danger"
+                            className="btn--sm"
+                            onClick={() => openRefund(student)}
+                          >
+                            Refund
+                          </Button>
+                        )}
+                      </div>
+                      <div className="student-action-row">
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            className="btn--sm"
+                            onClick={() => openEdit(student)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        {showPurchaseCode && (
+                          <Button
+                            variant="ghost"
+                            className="btn--sm"
+                            onClick={() => setCodeStudent(student)}
+                          >
+                            Purchase code
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1021,6 +1110,89 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
           </form>
         </div>
       )}
+      {refundStudent && (
+        <div className="modal-backdrop" onClick={() => !refundSaving && setRefundStudent(null)}>
+          <form
+            className="modal"
+            style={{ maxWidth: 420 }}
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={handleRefund}
+          >
+            <ModalHead
+              title="Refund Wallet Balance"
+              subtitle={refundStudent.name}
+              onClose={() => !refundSaving && setRefundStudent(null)}
+            />
+
+            <div className="balance-readout">
+              <span>Available balance</span>
+              <strong>{formatINR(refundStudent.pocketMoney)}</strong>
+            </div>
+
+            <label className="field-label" htmlFor="refund-amount">Refund amount (₹)</label>
+            <input
+              id="refund-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={refundStudent.pocketMoney}
+              className="input"
+              autoFocus
+              required
+              value={refundAmount}
+              onChange={(event) => setRefundAmount(event.target.value)}
+            />
+
+            <label className="field-label" htmlFor="refund-reason">Reason</label>
+            <textarea
+              id="refund-reason"
+              className="input"
+              rows="3"
+              maxLength="200"
+              required
+              placeholder="e.g. Student leaving school"
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+            />
+
+            <label className="field-label" htmlFor="refund-mode">Refund mode</label>
+            <input
+              id="refund-mode"
+              className="input"
+              value="Cash from wallet balance"
+              readOnly
+            />
+
+            <div className="balance-readout" style={{ marginTop: 14 }}>
+              <span>Balance after refund</span>
+              <strong>{formatINR(Math.max(0, refundStudent.pocketMoney - (Number(refundAmount) || 0)))}</strong>
+            </div>
+
+            <div id="refund-confirmation-note" className="refund-confirmation-note" role="note">
+              <strong>This refund is permanent</strong>
+              <p>
+                Confirming will permanently deduct {formatINR(Number(refundAmount) || 0)} from the
+                student&apos;s wallet and record it as cash paid by the school office. This cannot be
+                undone. A numbered receipt will open automatically.
+              </p>
+            </div>
+
+            <div className="modal-actions" style={{ justifyContent: 'flex-end' }}>
+              <Button variant="ghost" disabled={refundSaving} onClick={() => setRefundStudent(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={refundSaving || !refundReason.trim()}
+                aria-describedby="refund-confirmation-note"
+              >
+                {refundSaving ? 'Confirming…' : 'Confirm'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
       {codeStudent && (
         <PurchaseCodeDialog
           student={codeStudent}
@@ -1034,7 +1206,7 @@ const Students = ({ embedded = false, parentByStudent = new Map(), onUsersChange
         />
       )}
       {receipt && (
-        <ReceiptModal receipt={receipt} onClose={closeReceipt} title="Recharge receipt" />
+        <ReceiptModal receipt={receipt} onClose={closeReceipt} title={receiptTitle} />
       )}
       {confirming && (
         <ConfirmDialog

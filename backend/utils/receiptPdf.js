@@ -29,6 +29,7 @@ export const paymentModeLine = (receipt) => {
   // Money going back does not have a payment mode; it has a destination, and
   // there is only one — the wallet it was taken from.
   if (receipt.kind === 'REFUND') return "Student's wallet";
+  if (receipt.kind === 'BALANCE_REFUND') return 'Cash — paid by school office';
   if (receipt.mode === 'CASH') return 'Cash — at school office';
   const label = receipt.payment?.upiLabel;
   return label ? `UPI (${label})` : 'UPI';
@@ -42,6 +43,7 @@ export const itemDescription = (receipt) => {
     const order = receipt.refund?.orderReference;
     return order ? `Refund — Cancelled Order ${order}` : 'Refund — Cancelled Order';
   }
+  if (receipt.kind === 'BALANCE_REFUND') return 'Wallet Balance Refund';
   if (receipt.kind === 'ORDER_PAYMENT') {
     const order = receipt.order?.orderReference;
     return order ? `Order ${order}` : 'Order';
@@ -178,12 +180,14 @@ const drawBasketContinuation = (doc, receipt, { M, contentW, H }) => {
 const TITLES = {
   RECHARGE: 'WALLET RECHARGE RECEIPT',
   REFUND: 'WALLET REFUND RECEIPT',
+  BALANCE_REFUND: 'WALLET BALANCE REFUND RECEIPT',
   ORDER_PAYMENT: 'ORDER PAYMENT RECEIPT',
 };
 
 const FOOTERS = {
   RECHARGE: 'Wallet recharges are non-refundable and non-transferable',
   REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+  BALANCE_REFUND: 'Paid out from the student wallet balance and recorded by the school',
   ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
 };
 
@@ -228,7 +232,9 @@ export const renderReceiptPdf = (receipt, stream) => {
     for (const line of extras) doc.text(line, M, doc.y + 2, { width: contentW, align: 'center' });
   }
 
-  const isRefund = receipt.kind === 'REFUND';
+  const isOrderRefund = receipt.kind === 'REFUND';
+  const isBalanceRefund = receipt.kind === 'BALANCE_REFUND';
+  const isRefund = isOrderRefund || isBalanceRefund;
   const isOrder = receipt.kind === 'ORDER_PAYMENT';
 
   doc.moveDown(1.2);
@@ -271,7 +277,7 @@ export const renderReceiptPdf = (receipt, stream) => {
   });
 
   const paymentMode = paymentModeLine(receipt);
-  const rightDetail = receipt.kind === 'REFUND'
+  const rightDetail = isRefund
     ? ['Refunded By', receipt.receivedBy?.name || '—']
     : receipt.mode === 'CASH'
       ? ['Received By', receipt.receivedBy?.name || '—']
@@ -317,16 +323,19 @@ export const renderReceiptPdf = (receipt, stream) => {
   y += gap + 4;
   heading(isRefund ? 'Refund Info' : 'Payment Info', y);
   y += 16;
-  field(isRefund ? 'Refunded To' : 'Payment Mode', paymentMode, M, y, colW);
+  field(isRefund ? (isBalanceRefund ? 'Refund Method' : 'Refunded To') : 'Payment Mode', paymentMode, M, y, colW);
   field(rightDetail[0], rightDetail[1], M + colW, y, colW);
 
   /* What was refunded and why. The order is the handle the storeroom, the
      family and this document all share; the reason is the note whoever
      cancelled it left, which is the whole point of the piece of paper. */
-  if (isRefund) {
+  if (isOrderRefund) {
     y += gap;
     field('Order', receipt.refund?.orderReference || '—', M, y, colW);
     field('Reason', receipt.refund?.reason || '—', M + colW, y, colW);
+  } else if (isBalanceRefund) {
+    y += gap;
+    field('Reason', receipt.refund?.reason || '—', M, y, contentW);
   }
 
   /* The bank's reference, on its own row because it is the one identifier

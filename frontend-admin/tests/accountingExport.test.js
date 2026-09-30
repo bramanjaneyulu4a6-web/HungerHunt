@@ -47,10 +47,10 @@ const { MOVEMENT_TYPES, quickRange, quickRangeLabel, includeParam } = await impo
 );
 
 describe('the movement types an export can be narrowed to', () => {
-  test('offers the four that move money, and not refunds, which an export never files', () => {
+  test('offers real money movements, including balance payouts but not order reversals', () => {
     assert.deepEqual(
       MOVEMENT_TYPES.map((type) => type.key),
-      ['CASH_DEPOSIT', 'UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT']
+      ['CASH_DEPOSIT', 'UPI_DEPOSIT', 'WALLET_DEDUCTION', 'UPI_ORDER_PAYMENT', 'BALANCE_REFUND']
     );
   });
 

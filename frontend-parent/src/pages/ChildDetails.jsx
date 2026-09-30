@@ -1211,6 +1211,8 @@ export default function ChildDetails() {
                     ? 'UPI Payment'
                     : r.kind === 'ORDER_CANCELLATION_REFUND'
                       ? 'Refund'
+                      : r.kind === 'BALANCE_REFUND'
+                        ? 'Wallet Balance Refund'
                       : failed
                         ? 'Failed Transaction'
                         : r.mode === 'UPI'
@@ -1218,7 +1220,9 @@ export default function ChildDetails() {
                           : 'Cash Deposit';
               const label = deleted ? `Deleted ${kindLabel}` : kindLabel;
               const moneyOut =
-                r.kind === 'ORDER_PAYMENT' || r.kind === 'UPI_ORDER_PAYMENT';
+                r.kind === 'ORDER_PAYMENT' ||
+                r.kind === 'UPI_ORDER_PAYMENT' ||
+                r.kind === 'BALANCE_REFUND';
               /* Refunds sometimes carry no note and no references — such a
                  card has nothing folded away, so it does not invite a tap. */
               const hasDetails = Boolean(
@@ -1355,13 +1359,14 @@ export default function ChildDetails() {
                                 a top-up, at the desk or over UPI, and an
                                 order paid straight over UPI. */}
                             {((r.kind === 'TOP_UP' && r.adjustmentId) ||
+                              (r.kind === 'BALANCE_REFUND' && r.balanceRefundId) ||
                               (r.kind === 'UPI_ORDER_PAYMENT' && r.chargeId)) && (
                               <Button
                                 variant="ghost"
                                 block
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setReceiptFor(r.adjustmentId || r.chargeId);
+                                  setReceiptFor(r.adjustmentId || r.balanceRefundId || r.chargeId);
                                 }}
                                 style={{ marginTop: 12 }}
                               >

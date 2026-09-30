@@ -35,6 +35,7 @@ export const FEATURES = [
   { key: '/users/archived', label: 'Archived users', group: 'Users', roles: ['admin'] },
   { key: 'students.purchaseCode', label: 'Purchase code button (Students)', group: 'Users', roles: ['admin'] },
   { key: 'students.recharge', label: 'Recharge wallet (Students) (also blocked on the server)', group: 'Users', roles: ['admin'] },
+  { key: 'students.refund', label: 'Refund wallet balance (Students) (also blocked on the server)', group: 'Users', roles: ['admin'] },
   { key: 'students.add', label: 'Add student (Students)', group: 'Users', roles: ['admin'] },
   { key: 'students.import', label: 'Import students from Excel (Students)', group: 'Users', roles: ['admin'] },
   { key: 'students.edit', label: 'Edit student (Students)', group: 'Users', roles: ['admin'] },

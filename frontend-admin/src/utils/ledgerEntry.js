@@ -19,6 +19,7 @@ import { fulfillmentStatusLabel } from './fulfillmentStatus.js';
 const ENTRY_KINDS = {
   TOP_UP: { direction: 'in', label: 'Deposit', variant: 'success' },
   ORDER_CANCELLATION_REFUND: { direction: 'in', label: 'Refund', variant: 'success' },
+  BALANCE_REFUND: { direction: 'out', label: 'Balance Refund', variant: 'alert' },
   ORDER_PAYMENT: { direction: 'out', label: 'Student Wallet Payment', variant: 'neutral' },
   UPI_ORDER_PAYMENT: { direction: 'out', label: 'UPI Payment', variant: 'neutral' },
   // Money that never moved. It is here because a parent sees it too, and the
@@ -136,7 +137,7 @@ const CHANNELS = { ADMIN_DESK: 'Admin desk', PARENT_APP: 'Parent app', KIOSK: 'K
 const channelOf = (entry) => {
   if (entry.via) return entry.via;
   if (entry.kind === 'TOP_UP') return entry.mode === 'UPI' ? 'PARENT_APP' : 'ADMIN_DESK';
-  if (entry.kind === 'ORDER_CANCELLATION_REFUND') return 'ADMIN_DESK';
+  if (entry.kind === 'ORDER_CANCELLATION_REFUND' || entry.kind === 'BALANCE_REFUND') return 'ADMIN_DESK';
   if (entry.kind === 'TOPUP_FAILED') return 'PARENT_APP';
   return null;
 };
@@ -231,6 +232,15 @@ export const receiptEntryFromTopUp = (response) => {
   return {
     adjustmentId: String(adjustment._id),
     receiptNumber: adjustment.receiptNumber || null,
+  };
+};
+
+export const receiptEntryFromBalanceRefund = (response) => {
+  const refund = response?.refund;
+  if (!refund?._id) return null;
+  return {
+    balanceRefundId: String(refund._id),
+    receiptNumber: refund.receiptNumber || null,
   };
 };
 

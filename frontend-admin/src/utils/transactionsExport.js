@@ -24,7 +24,7 @@ export const EXPORT_KINDS = Object.keys(KIND_LABELS);
 /* The kinds no member of staff ever makes — a parent's UPI top-up and a UPI
    order payment. With "No staff" unticked neither can match, so the popup and
    the Exports page grey them out rather than offer a tick that exports
-   nothing. Cash deposits and refunds always carry the admin who made them
+   nothing. Cash deposits, order refunds and balance refunds always carry the admin who made them
    (performedBy is required on a refund, and set on every desk deposit). A
    wallet payment is either: nobody's at the kiosk or on a parent's own yes,
    the caretaker's when they approved it for the parent, so it stays offered. */

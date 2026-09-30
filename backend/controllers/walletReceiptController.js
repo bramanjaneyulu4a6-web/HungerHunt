@@ -75,7 +75,13 @@ const findAdjustment = async (adjustmentId, res) => {
     res.status(410).json({ message: 'This deposit was deleted, so its receipt is no longer available.' });
     return null;
   }
-  if (adjustment) return { row: adjustment, Model: WalletAdjustment, kind: 'RECHARGE' };
+  if (adjustment) {
+    return {
+      row: adjustment,
+      Model: WalletAdjustment,
+      kind: adjustment.type === 'BALANCE_REFUND' ? 'BALANCE_REFUND' : 'RECHARGE',
+    };
+  }
 
   const reversal = await WalletReversal.findById(adjustmentId).lean();
   if (reversal) return { row: reversal, Model: WalletReversal, kind: 'REFUND' };
@@ -143,7 +149,9 @@ const loadReceipt = async (req, res) => {
  * parent route reads off the signed-in account and the staff route off the
  * student's registered parent — the receipt says the same thing either way. */
 const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, res) => {
-  const refund = kind === 'REFUND';
+  const orderRefund = kind === 'REFUND';
+  const balanceRefund = kind === 'BALANCE_REFUND';
+  const refund = orderRefund || balanceRefund;
   const orderPayment = kind === 'ORDER_PAYMENT';
   const adjustmentId = String(adjustment._id);
 
@@ -188,7 +196,7 @@ const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, re
     // balance. The renderer titles and words each accordingly.
     kind,
     mode: refund
-      ? 'REFUND'
+      ? balanceRefund ? adjustment.refundMode || 'CASH' : 'REFUND'
       : orderPayment || adjustment.source === 'PARENT_UPI' ? 'UPI' : 'CASH',
     student: {
       name: student.name,
@@ -204,7 +212,7 @@ const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, re
     company: companyDetails(),
   };
 
-  if (refund) {
+  if (orderRefund) {
     /* What the refund undid. The order is the handle the family and the
        storeroom both use, and the reason is the note whoever cancelled it
        wrote — the two things this document exists to record.
@@ -234,6 +242,12 @@ const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, re
       originalOrderRef: intent?.merchantOrderId || '',
     };
 
+    if (adjustment.performedBy) {
+      const admin = await Admin.findById(adjustment.performedBy).select('name').lean();
+      if (admin) receipt.receivedBy = { name: admin.name };
+    }
+  } else if (balanceRefund) {
+    receipt.refund = { reason: adjustment.reason || '' };
     if (adjustment.performedBy) {
       const admin = await Admin.findById(adjustment.performedBy).select('name').lean();
       if (admin) receipt.receivedBy = { name: admin.name };

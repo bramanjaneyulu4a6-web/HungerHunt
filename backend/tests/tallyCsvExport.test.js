@@ -88,6 +88,24 @@ describe('TallyPrime CSV export', () => {
     assert.equal(cells[11], 'Receipt');
   });
 
+  test('books a wallet balance refund as a negative Payment', () => {
+    const csv = buildTallyCsv({
+      transactions: [],
+      adjustments: [{
+        _id: '507f191e810c19729de860ef', studentId: student, type: 'BALANCE_REFUND',
+        amount: 300, receiptNumber: 'GMS1408N24068003',
+        createdAt: new Date('2026-08-14T06:00:00.000Z'),
+      }],
+      reversals: [], paidTo: PAID_TO, timeZone: TIME_ZONE,
+    });
+
+    const cells = csvRows(csv)[1].split(',');
+    assert.equal(cells[6], '-300.00');
+    assert.equal(cells[8], 'Cash');
+    assert.equal(cells[9], 'Wallet Balance Refund');
+    assert.equal(cells[11], 'Payment');
+  });
+
   test('books a wallet purchase as a negative Wallet sale naming its order', () => {
     const csv = buildTallyCsv({
       transactions: [{

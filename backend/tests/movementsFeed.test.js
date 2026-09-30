@@ -42,11 +42,12 @@ const student = {
 const at = (iso) => new Date(iso);
 
 describe('movement rows', () => {
-  test('classify each collection into the five kinds with the CSV sign convention', () => {
+  test('classify each collection into the wallet movement kinds with the CSV sign convention', () => {
     const rows = buildMovementRows({
       adjustments: [
         { _id: 'a1', studentId: student, source: 'ADMIN', amount: 1000, receiptNumber: 'GMS1', createdAt: at('2026-08-14T06:00:00Z'), newBalance: 1500, performedBy: ADMIN_ID },
         { _id: 'a2', studentId: student, source: 'PARENT_UPI', amount: 500, receiptNumber: 'GMS2', createdAt: at('2026-08-14T07:00:00Z'), newBalance: 2000 },
+        { _id: 'a3', studentId: student, type: 'BALANCE_REFUND', amount: 100, receiptNumber: 'GMSR', createdAt: at('2026-08-14T07:30:00Z'), previousBalance: 2000, newBalance: 1900, performedBy: ADMIN_ID, reason: 'Leaving school' },
       ],
       transactions: [
         { _id: 't1', studentId: student, sourceType: 'DIRECT_CHECKOUT', totalAmount: 250, createdAt: at('2026-08-14T08:00:00Z'), remainingBalance: 1750, orderReference: '#DE8608' },
@@ -63,6 +64,7 @@ describe('movement rows', () => {
       [
         ['CASH_DEPOSIT', 'DEPOSIT', 'Cash', 1000],
         ['UPI_DEPOSIT', 'DEPOSIT', 'UPI', 500],
+        ['BALANCE_REFUND', 'DEDUCTION', 'Cash', -100],
         ['WALLET_DEDUCTION', 'DEDUCTION', 'Wallet', -250],
         ['UPI_ORDER_PAYMENT', 'DEDUCTION', 'UPI', 120],
         ['REFUND', 'DEDUCTION', 'Refund', -250],
@@ -70,16 +72,18 @@ describe('movement rows', () => {
     );
     assert.equal(rows[0].processedBy, 'Bharat');
     assert.equal(rows[1].processedBy, null);
-    assert.equal(rows[2].reference, '#DE8608');
-    assert.equal(rows[2].balanceAfter, 1750);
-    assert.equal(rows[4].note, 'Out of stock');
+    assert.equal(rows[2].balanceRefundId, 'a3');
+    assert.equal(rows[2].note, 'Leaving school');
+    assert.equal(rows[3].reference, '#DE8608');
+    assert.equal(rows[3].balanceAfter, 1750);
+    assert.equal(rows[5].note, 'Out of stock');
     // What the receipt route can print: a deposit by its adjustment, a
     // refund by its reversal, and nothing for a charge.
     assert.equal(rows[0].adjustmentId, 'a1');
-    assert.equal(rows[4].reversalId, 'r1');
-    assert.equal(rows[2].adjustmentId, null);
-    assert.equal(rows[2].reversalId, null);
-    assert.equal(rows[2].transactionId, 't1');
+    assert.equal(rows[5].reversalId, 'r1');
+    assert.equal(rows[3].adjustmentId, null);
+    assert.equal(rows[3].reversalId, null);
+    assert.equal(rows[3].transactionId, 't1');
     assert.deepEqual(rows[0].student, {
       id: STUDENT_ID, name: student.name, admissionNumber: 'N24068',
       className: 'PREP-II', section: 'B', roomNumber: 'A-12',

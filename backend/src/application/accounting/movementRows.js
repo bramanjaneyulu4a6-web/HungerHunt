@@ -30,6 +30,9 @@ export const MOVEMENT_KINDS = Object.freeze({
   REFUND: Object.freeze({
     group: 'DEDUCTION', mode: 'Refund', detail: 'Refund', sign: -1,
   }),
+  BALANCE_REFUND: Object.freeze({
+    group: 'DEDUCTION', mode: 'Cash', detail: 'Wallet Balance Refund', sign: -1,
+  }),
 });
 
 /* A movement's student, flattened. A row whose student record has been hard
@@ -84,7 +87,7 @@ const itemsOf = (items) =>
    charge spent money already receipted on its way in, and has none. */
 const row = ({
   id, kind, at, amount, receiptNumber, reference, studentId, processedBy,
-  balanceBefore, balanceAfter, note, items, gateway, adjustmentId, reversalId, transactionId,
+  balanceBefore, balanceAfter, note, items, gateway, adjustmentId, reversalId, balanceRefundId, transactionId,
   deletion, refunded = false,
 }) => {
   const meta = MOVEMENT_KINDS[kind];
@@ -111,6 +114,7 @@ const row = ({
       : null,
     adjustmentId: adjustmentId ? String(adjustmentId) : null,
     reversalId: reversalId ? String(reversalId) : null,
+    balanceRefundId: balanceRefundId ? String(balanceRefundId) : null,
     transactionId: transactionId ? String(transactionId) : null,
     chargeId: kind === 'UPI_ORDER_PAYMENT' && transactionId ? String(transactionId) : null,
     deleted: Boolean(deletion),
@@ -139,7 +143,9 @@ export const buildMovementRows = ({
     ...adjustments.map((entry) =>
       row({
         id: entry._id,
-        kind: entry.source === 'PARENT_UPI' ? 'UPI_DEPOSIT' : 'CASH_DEPOSIT',
+        kind: entry.type === 'BALANCE_REFUND'
+          ? 'BALANCE_REFUND'
+          : entry.source === 'PARENT_UPI' ? 'UPI_DEPOSIT' : 'CASH_DEPOSIT',
         at: entry.createdAt,
         amount: entry.amount,
         receiptNumber: entry.receiptNumber,
@@ -148,8 +154,10 @@ export const buildMovementRows = ({
         processedBy: named(staffNames, entry.performedBy),
         balanceBefore: entry.previousBalance,
         balanceAfter: entry.newBalance,
-        gateway: entry.gateway,
-        adjustmentId: entry._id,
+        gateway: entry.type === 'BALANCE_REFUND' ? null : entry.gateway,
+        adjustmentId: entry.type === 'BALANCE_REFUND' ? null : entry._id,
+        balanceRefundId: entry.type === 'BALANCE_REFUND' ? entry._id : null,
+        note: entry.reason,
         deletion: entry.deletion,
       })
     ),

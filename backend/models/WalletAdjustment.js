@@ -37,19 +37,33 @@ const walletAdjustmentSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['TOP_UP'],
+      enum: ['TOP_UP', 'BALANCE_REFUND'],
       default: 'TOP_UP',
       required: true,
     },
     amount: { type: Number, required: true, min: 0.01 },
     previousBalance: { type: Number, required: true },
     newBalance: { type: Number, required: true },
+    reason: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      required: function () { return this.type === 'BALANCE_REFUND'; },
+      default: null,
+    },
+    refundMode: {
+      type: String,
+      enum: ['CASH'],
+      required: function () { return this.type === 'BALANCE_REFUND'; },
+      default: undefined,
+    },
     idempotencyKey: { type: String, required: true, maxlength: 100 },
     // The quotable receipt number (GMS + ddmm + admission number + sequence),
     // minted lazily the first time any receipt for the student is opened —
     // utils/walletReceipts.js numbers a student's rows oldest first.
     receiptNumber: { type: String, default: null, maxlength: 40 },
-    // Set when the office deleted this deposit — see ledgerDeletion.js.
+    // Set when the office deleted a deposit — balance refunds are permanent
+    // audit rows and are never offered to the deletion flow.
     deletion: { type: deletionSchema, default: null },
   },
   { timestamps: true }

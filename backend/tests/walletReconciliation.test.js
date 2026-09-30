@@ -60,6 +60,17 @@ test('treats cancellation refunds as wallet credits', () => {
   assert.deepEqual(result.issues, []);
 });
 
+test('treats a wallet balance refund as money leaving the wallet', () => {
+  const result = reconcileWallet(
+    { _id: 's1', pocketMoney: 25 },
+    [{
+      _id: 'wr1', kind: 'BALANCE_REFUND', amount: 75,
+      previousBalance: 100, resultingBalance: 25,
+    }]
+  );
+  assert.deepEqual(result.issues, []);
+});
+
 test('replays a deletion as the wallet moving back', () => {
   const result = reconcileWallet(student(20), [
     topUp(0, 100, 100),

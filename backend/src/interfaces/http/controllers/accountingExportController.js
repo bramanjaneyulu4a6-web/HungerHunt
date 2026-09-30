@@ -40,6 +40,7 @@ const ledgers = () => ({
   salesVoucherType: process.env.TALLY_SALES_VOUCHER_TYPE?.trim() || 'Sales',
   receiptVoucherType: process.env.TALLY_RECEIPT_VOUCHER_TYPE?.trim() || 'Receipt',
   refundVoucherType: process.env.TALLY_REFUND_VOUCHER_TYPE?.trim() || 'Credit Note',
+  paymentVoucherType: process.env.TALLY_PAYMENT_VOUCHER_TYPE?.trim() || 'Payment',
 });
 
 /* The period and the selection, read from one request.
@@ -123,7 +124,7 @@ export const tallyXml = async (req, res) => {
     select: {
       // sourceType and receiptNumber: a cancelled UPI order is filed as a deposit.
       transactions: '_id studentId totalAmount sourceType receiptNumber createdAt',
-      adjustments: '_id studentId amount createdAt',
+      adjustments: '_id studentId type amount createdAt',
       reversals: '_id studentId amount createdAt',
     },
   });
@@ -150,7 +151,7 @@ export const tallyCsv = async (req, res) => {
     realOnly: true,
     select: {
       transactions: '_id studentId totalAmount sourceType receiptNumber createdAt',
-      adjustments: '_id studentId source amount receiptNumber createdAt',
+      adjustments: '_id studentId source type amount receiptNumber createdAt',
       reversals: '_id studentId amount receiptNumber fulfillmentOrderId createdAt',
     },
   });
@@ -215,7 +216,7 @@ export const movements = async (req, res) => {
         transactions:
           '_id studentId totalAmount sourceType receiptNumber idempotencyKey items previousBalance remainingBalance performedBy deletion createdAt',
         adjustments:
-          '_id studentId source amount receiptNumber performedBy paymentIntentId previousBalance newBalance deletion createdAt',
+          '_id studentId source type amount receiptNumber performedBy paymentIntentId previousBalance newBalance reason deletion createdAt',
         reversals:
           '_id studentId amount receiptNumber fulfillmentOrderId transactionId performedBy previousBalance newBalance reason createdAt',
       },

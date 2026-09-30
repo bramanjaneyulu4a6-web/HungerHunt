@@ -50,7 +50,8 @@ export const buildTallyVoucherXml = ({ transactions, adjustments, reversals = []
       date: new Date(row.createdAt), paise: rupeesToPaise(row.totalAmount),
     })),
     ...adjustments.map((row) => ({
-      kind: 'TOP_UP', id: String(row._id), studentId: String(row.studentId),
+      kind: row.type === 'BALANCE_REFUND' ? 'BALANCE_REFUND' : 'TOP_UP',
+      id: String(row._id), studentId: String(row.studentId),
       date: new Date(row.createdAt), paise: rupeesToPaise(row.amount),
     })),
     ...reversals.map((row) => ({
@@ -70,6 +71,12 @@ export const buildTallyVoucherXml = ({ transactions, adjustments, reversals = []
       type: ledgers.refundVoucherType, number: `HH-CN-${entry.id}`, date: entry.date,
       narration: `HungerHunt order cancellation ${entry.id}; student ref ${entry.studentId}`,
       debitLedger: ledgers.sales, creditLedger: ledgers.walletLiability,
+      paise: entry.paise, timeZone,
+    });
+    if (entry.kind === 'BALANCE_REFUND') return voucher({
+      type: ledgers.paymentVoucherType || 'Payment', number: `HH-WR-${entry.id}`, date: entry.date,
+      narration: `HungerHunt wallet balance refund ${entry.id}; student ref ${entry.studentId}`,
+      debitLedger: ledgers.walletLiability, creditLedger: ledgers.fundingClearing,
       paise: entry.paise, timeZone,
     });
     return voucher({

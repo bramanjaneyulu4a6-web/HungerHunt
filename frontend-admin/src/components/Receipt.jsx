@@ -54,7 +54,7 @@ export const ReceiptModal = ({ receipt, onClose, title = 'Receipt' }) => {
         className="modal modal--receipt"
         role="dialog"
         aria-modal="true"
-        aria-label="Wallet recharge receipt"
+        aria-label={title}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="modal-head">
@@ -100,7 +100,7 @@ export const ReceiptModal = ({ receipt, onClose, title = 'Receipt' }) => {
           ref={frameRef}
           className="receipt-frame"
           src={`${receipt.url}#toolbar=0&navpanes=0`}
-          title="Receipt PDF"
+          title={`${title} PDF`}
         />
       </div>
     </div>

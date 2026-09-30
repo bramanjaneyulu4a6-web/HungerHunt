@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { allowanceCeiling, limitLine, limitMessage } from './purchaseCaps';
+import { allowanceCeiling, limitLine, limitMessage, subCategoryLimitLabel } from './purchaseCaps';
 
 const salty = { key: 'subcategory:g1:Salty Snacks', type: 'SUBCATEGORY', name: 'Salty Snacks', quantity: 2, period: 'WEEKLY', purchased: 0, pending: 0, remaining: 2 };
 
@@ -55,5 +55,37 @@ describe('a shared category cap in the cart', () => {
 
   test('no allowance means no ceiling', () => {
     expect(allowanceCeiling({ _id: 'y', purchaseAllowance: null }, [])).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe('subcategory heading labels', () => {
+  const products = (limit) => [{
+    stockGroup: {
+      subCategoryLimits: [{ name: 'Biscuits & Cookies', ...limit }],
+    },
+  }];
+
+  test.each([
+    ['DAILY', 'Max 2 per day'],
+    ['WEEKLY', 'Max 3 per week'],
+    ['MONTHLY', 'Max 4 per month'],
+    ['TOTAL', 'Max 5 in total'],
+  ])('shows the configured maximum for a %s cap', (period, text) => {
+    expect(subCategoryLimitLabel(
+      products({ enabled: true, quantity: Number(text.match(/\d+/)[0]), period }),
+      'Biscuits & Cookies'
+    )).toEqual({ text, limited: true });
+  });
+
+  test('labels an absent or disabled cap instead of leaving the heading ambiguous', () => {
+    expect(subCategoryLimitLabel(products({ enabled: false, quantity: 3, period: 'WEEKLY' }), 'Biscuits & Cookies'))
+      .toEqual({ text: 'No subcategory limit', limited: false });
+    expect(subCategoryLimitLabel([], 'Stationery'))
+      .toEqual({ text: 'No subcategory limit', limited: false });
+  });
+
+  test('matches subcategory names without case sensitivity', () => {
+    expect(subCategoryLimitLabel(products({ enabled: true, quantity: 2, period: 'DAILY' }), 'biscuits & cookies').text)
+      .toBe('Max 2 per day');
   });
 });

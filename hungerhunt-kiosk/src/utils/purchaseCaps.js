@@ -50,6 +50,38 @@ export const allowancePeriod = (period) => ({
   TOTAL: "total",
 }[period] || "purchase");
 
+const subCategoryPeriod = (period) => ({
+  DAILY: "per day",
+  WEEKLY: "per week",
+  MONTHLY: "per month",
+  TOTAL: "in total",
+}[period] || "per day");
+
+/* The heading describes the configured shared cap, not whichever product cap
+ * happens to bind first for one tile. Stock groups already travel with every
+ * inventory product, so the kiosk can label the shelf even before a student
+ * taps an item. Disabled or absent caps are stated explicitly: every
+ * sub-category gets a label and silence cannot be mistaken for missing UI. */
+export const subCategoryLimitLabel = (products = [], subCategory = "") => {
+  const wanted = String(subCategory).trim().toLocaleLowerCase();
+  const limits = products
+    .map((product) => product?.stockGroup?.subCategoryLimits)
+    .find(Array.isArray) || [];
+  const limit = limits.find((entry) =>
+    String(entry?.name).trim().toLocaleLowerCase() === wanted
+  );
+  const quantity = Number(limit?.quantity);
+
+  if (!limit?.enabled || !Number.isInteger(quantity) || quantity < 1) {
+    return { text: "No subcategory limit", limited: false };
+  }
+
+  return {
+    text: `Max ${quantity} ${subCategoryPeriod(limit.period)}`,
+    limited: true,
+  };
+};
+
 export const limitMessage = (product, cart = []) => {
   const cap = bindingCap(product, cart);
   if (!cap) return "This item cannot be added.";

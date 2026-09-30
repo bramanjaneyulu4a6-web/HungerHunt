@@ -16,7 +16,7 @@ import SessionClock from "../components/SessionClock";
 import { TECHNICAL_DIFFICULTIES_SCREEN } from "../constants/kioskScreens";
 import { BalanceMeter, ErrorFeedback, LimitMeter, StockMeter } from "../components/error/ErrorFeedback";
 import { presentError } from "../utils/errorPresentation";
-import { allowanceCeiling, allowancePeriod, limitLine, limitMessage } from "../utils/purchaseCaps";
+import { allowanceCeiling, allowancePeriod, limitLine, limitMessage, subCategoryLimitLabel } from "../utils/purchaseCaps";
 import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
 import { notifyParent } from "../utils/notifyParent";
 
@@ -669,10 +669,17 @@ const KioskBilling = ({ student, onLogout }) => {
       }
       return (a === "Others") - (b === "Others") || a.localeCompare(b);
     });
-  const subCategorySections = subCategoryNames.map((name) => ({
-    name,
-    products: filteredProducts.filter((product) => (product.subCategory || "Others") === name),
-  }));
+  const subCategorySections = subCategoryNames.map((name) => {
+    const sectionProducts = filteredProducts.filter(
+      (product) => (product.subCategory || "Others") === name
+    );
+
+    return {
+      name,
+      products: sectionProducts,
+      limit: subCategoryLimitLabel(sectionProducts, name),
+    };
+  });
 
   useEffect(() => {
     if (!searchOpen) return undefined;
@@ -1323,8 +1330,13 @@ const KioskBilling = ({ student, onLogout }) => {
                 {subCategorySections.map((subCategory, sectionIndex) => (
                   <section className="kiosk-subcategory" key={subCategory.name} aria-labelledby={`subcategory-${sectionIndex}`}>
                     <header className="kiosk-subcategory__heading">
-                      <div>
+                      <div className="kiosk-subcategory__title">
                         <h3 id={`subcategory-${sectionIndex}`}>{subCategory.name}</h3>
+                        <span
+                          className={`kiosk-subcategory__limit${subCategory.limit.limited ? "" : " kiosk-subcategory__limit--none"}`}
+                        >
+                          {subCategory.limit.text}
+                        </span>
                       </div>
                       <p>{subCategory.products.length} {subCategory.products.length === 1 ? 'item' : 'items'} <b aria-hidden="true">→</b></p>
                     </header>

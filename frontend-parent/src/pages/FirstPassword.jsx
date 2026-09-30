@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../components/ui';
 import { useAuth } from '../context/auth';
@@ -7,6 +7,7 @@ import API from '../services/api';
 import {
   clearPhoneVerification,
   confirmPhoneVerification,
+  friendlyFirebaseError,
   startPhoneVerification,
 } from '../services/phoneVerification';
 import { passwordProblem } from '../utils/validation';
@@ -16,14 +17,11 @@ import {
   pendingFirstPasswordPhone,
 } from '../utils/pendingFirstPassword';
 
-const friendlyFirebaseError = (error) => {
-  const code = error?.code || '';
-  if (code.includes('invalid-verification-code')) return 'That verification code is not correct.';
-  if (code.includes('code-expired') || code.includes('session-expired')) return 'That code has expired. Send a new one.';
-  if (code.includes('too-many-requests') || code.includes('quota-exceeded')) return 'Too many attempts. Please wait before trying again.';
-  if (code.includes('invalid-phone-number')) return 'The registered phone number is not valid.';
-  return error?.message || 'Phone verification could not be completed.';
-};
+/* The sign-in screen sends the first code before navigating here, and this
+   screen's unmount clears that verification. StrictMode runs a mount's cleanup
+   and effect back to back, which would throw the just-sent code away before
+   the parent could type it; deferring the clear lets the remount cancel it. */
+let pendingClear;
 
 export default function FirstPassword() {
   /* Held in memory by the sign-in screen, so a reload arrives here with
@@ -32,9 +30,12 @@ export default function FirstPassword() {
      reloaded page and the account still has no password, so there is no
      half-finished setup to resume — see utils/pendingFirstPassword. */
   const phone = pendingFirstPasswordPhone();
-  const [step, setStep] = useState('send');
+  // Android can verify the number itself while the code is being sent, in
+  // which case sign-in hands the token over and there is no code to type.
+  const handedToken = useLocation().state?.idToken || '';
+  const [step, setStep] = useState(handedToken ? 'password' : 'code');
   const [code, setCode] = useState('');
-  const [idToken, setIdToken] = useState('');
+  const [idToken, setIdToken] = useState(handedToken);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -43,8 +44,11 @@ export default function FirstPassword() {
   const navigate = useNavigate();
   const cooldown = useRetryCooldown();
 
-  useEffect(() => () => {
-    clearPhoneVerification();
+  useEffect(() => {
+    clearTimeout(pendingClear);
+    return () => {
+      pendingClear = setTimeout(clearPhoneVerification, 0);
+    };
   }, []);
 
   if (!/^\d{10}$/.test(phone)) return <Navigate to="/login" replace />;
@@ -54,7 +58,7 @@ export default function FirstPassword() {
     setCode('');
     setSubmitting(true);
     try {
-      const result = await startPhoneVerification(phone, 'send-phone-code');
+      const result = await startPhoneVerification(phone, 'phone-code-recaptcha');
       if (result.automaticallyVerified) {
         setIdToken(result.idToken);
         setStep('password');
@@ -124,7 +128,7 @@ export default function FirstPassword() {
         return;
       }
       /* 503: the server is merely busy, and this branch must come before the
-         one below. That one sends the parent back to 'send' and throws the
+         one below. That one sends the parent back to 'code' and throws the
          verified token away — a fresh SMS, and another wait, for a request
          that was never wrong. The phone is still verified; only the timing
          was bad, so keep the step and let them press the button again. */
@@ -133,8 +137,9 @@ export default function FirstPassword() {
         return;
       }
 
-      setError(createError.response?.data?.message || 'Could not create your password. Please verify your phone again.');
-      setStep('send');
+      setError(createError.response?.data?.message || 'Could not create your password. Send a new code to verify your phone again.');
+      setStep('code');
+      setCode('');
       setIdToken('');
     } finally {
       setSubmitting(false);
@@ -146,7 +151,7 @@ export default function FirstPassword() {
       logo="/Logo.jpeg"
       eyebrow="Hunger Hunt Parent"
       title="Create your password"
-      subtitle={`First, verify the registered number ending in ${phone.slice(-4)}.`}
+      subtitle={`Enter the code we texted to the registered number ending in ${phone.slice(-4)}.`}
       footer={<>Wrong number? <Link to="/login">Return to sign in</Link></>}
     >
       {error && (
@@ -157,15 +162,6 @@ export default function FirstPassword() {
         >
           {error}
         </Banner>
-      )}
-
-      {step === 'send' && (
-        <div className="auth-form">
-          <p className="auth-step-copy">We’ll text a one-time verification code to +91 ••••••{phone.slice(-4)}.</p>
-          <Button id="send-phone-code" type="button" variant="dark" block className="auth-submit" disabled={submitting} onClick={sendCode}>
-            {submitting ? 'Sending code…' : 'Send verification code'}
-          </Button>
-        </div>
       )}
 
       {step === 'code' && (
@@ -185,7 +181,7 @@ export default function FirstPassword() {
           <Button type="submit" variant="dark" block className="auth-submit" disabled={submitting || code.length !== 6}>
             {submitting ? 'Verifying…' : 'Verify code'}
           </Button>
-          <button id="send-phone-code" className="auth-text-button" type="button" disabled={submitting} onClick={sendCode}>
+          <button className="auth-text-button" type="button" disabled={submitting} onClick={sendCode}>
             Send a new code
           </button>
         </form>
@@ -220,6 +216,8 @@ export default function FirstPassword() {
           </Button>
         </form>
       )}
+
+      <div id="phone-code-recaptcha" />
     </AuthLayout>
   );
 }

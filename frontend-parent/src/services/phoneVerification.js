@@ -9,6 +9,15 @@ let nativeRequestStarted = false;
 
 const internationalPhone = (phone) => `+91${phone}`;
 
+export const friendlyFirebaseError = (error) => {
+  const code = error?.code || '';
+  if (code.includes('invalid-verification-code')) return 'That verification code is not correct.';
+  if (code.includes('code-expired') || code.includes('session-expired')) return 'That code has expired. Send a new one.';
+  if (code.includes('too-many-requests') || code.includes('quota-exceeded')) return 'Too many attempts. Please wait before trying again.';
+  if (code.includes('invalid-phone-number')) return 'The registered phone number is not valid.';
+  return error?.message || 'Phone verification could not be completed.';
+};
+
 const requireWebFirebase = () => {
   if (!firebaseConfigured || !firebaseConfig.authDomain) {
     throw new Error('Phone verification is not configured for this app.');
@@ -73,9 +82,9 @@ const startWebVerification = async (phone, recaptchaButtonId) => {
   const auth = getAuth(app);
 
   try {
-    // On a resend the previous verifier is bound to a button that has since
-    // unmounted (the send screen's), and clear() can throw over the missing
-    // element. A fresh verifier is being made either way.
+    // On a resend the previous verifier is bound to an element that has since
+    // unmounted (the sign-in screen's, which sent the first code), and clear()
+    // can throw over the missing element. A fresh verifier is being made either way.
     webVerifier?.clear();
   } catch {
     // Nothing left to clear.

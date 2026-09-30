@@ -6,6 +6,7 @@ import { AuthField, AuthLayout, Banner, Button, PasswordField } from '../compone
 import { phoneProblem } from '../utils/validation';
 import { BUSY_MESSAGE, useRetryCooldown } from '../utils/retryCooldown';
 import { setPendingFirstPasswordPhone } from '../utils/pendingFirstPassword';
+import { friendlyFirebaseError, startPhoneVerification } from '../services/phoneVerification';
 
 export default function Login() {
   const [stage, setStage] = useState('phone');
@@ -15,6 +16,7 @@ export default function Login() {
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -54,9 +56,24 @@ export default function Login() {
           parentPhoneNumber: formData.parentPhoneNumber,
         });
 
+        /* No password yet: text the code from here, so Continue lands the
+           parent on the box to type it into rather than on a screen whose
+           only job is a second button that sends it. */
         if (response.data.next === 'VERIFY_PHONE') {
+          setSendingCode(true);
+          let result;
+          try {
+            result = await startPhoneVerification(formData.parentPhoneNumber, 'login-recaptcha');
+          } catch (sendError) {
+            setError(friendlyFirebaseError(sendError));
+            setSendingCode(false);
+            setSubmitting(false);
+            return;
+          }
           setPendingFirstPasswordPhone(formData.parentPhoneNumber);
-          navigate('/create-password');
+          navigate('/create-password', {
+            state: result.automaticallyVerified ? { idToken: result.idToken } : undefined,
+          });
           return;
         }
 
@@ -199,10 +216,12 @@ export default function Login() {
           {cooldown.waiting
             ? `Try again in ${cooldown.secondsLeft}s`
             : submitting
-              ? (stage === 'phone' ? 'Checking…' : 'Signing in…')
+              ? (stage === 'phone' ? (sendingCode ? 'Sending code…' : 'Checking…') : 'Signing in…')
               : (stage === 'phone' ? 'Continue' : 'Sign in securely')}
         </Button>
       </form>
+
+      <div id="login-recaptcha" />
     </AuthLayout>
   );
 }

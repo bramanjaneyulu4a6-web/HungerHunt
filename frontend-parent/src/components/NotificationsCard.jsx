@@ -58,17 +58,24 @@ export default function NotificationsCard() {
   useEffect(() => {
     let ignore = false;
     const check = () => pushStatus().then((next) => { if (!ignore) setStatus(next); });
+    const checkWhenShown = () => { if (document.visibilityState === 'visible') check(); };
 
     check();
-    // Coming back from the settings app is how a blocked parent unblocks.
+    // Coming back from the settings app is how a blocked parent unblocks. The
+    // native apps' web view does not reliably fire focus on resume, but it
+    // does report the page becoming visible again.
     window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', checkWhenShown);
     return () => {
       ignore = true;
       window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', checkWhenShown);
     };
   }, []);
 
-  if (!status || hidden) return null;
+  const canEnable = status?.state === 'off' || status?.state === 'on';
+
+  if (!status || (hidden && !canEnable)) return null;
   // Permission alone is not enough: hide this only after the backend has the
   // token for the parent who is signed in on this device.
   if (status.state === 'on' && status.registered && !failed) return null;
@@ -114,7 +121,10 @@ export default function NotificationsCard() {
         {(failed || (status.state === 'on' && !status.registered)) && (
           <Button onClick={enable} disabled={busy}>Try again</Button>
         )}
-        <Button variant="ghost" onClick={dismiss}>Not now</Button>
+        {/* No way to wave the card off while notifications can still be
+            turned on here: it stays until they are. Blocked and unsupported
+            devices have nothing to tap, so those can put it away. */}
+        {!canEnable && <Button variant="ghost" onClick={dismiss}>Not now</Button>}
       </div>
     </Card>
   );

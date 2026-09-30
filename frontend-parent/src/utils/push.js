@@ -210,6 +210,25 @@ const initWeb = async ({ prompt }) => {
 
 /* ------------------------------------------------------------------ public */
 
+/* Called once when the app opens, signed in or not. A native app is expected
+   to ask for notifications on its first launch, so the OS dialog shows then —
+   but only while the OS still reports 'prompt', meaning this install has never
+   been asked. A parent who said no is not asked again on every launch; the
+   Dashboard card is their way back. Registering the device still waits for a
+   sign-in (startPush), since a token needs a parent to belong to. The web gets
+   nothing here: a browser prompt nobody tapped for is refused or muted. */
+export const askPushPermissionOnFirstLaunch = async () => {
+  if (!isNative()) return;
+
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const { receive } = await PushNotifications.checkPermissions();
+    if (receive === 'prompt') await PushNotifications.requestPermissions();
+  } catch (err) {
+    console.error('Could not ask for notification permission:', err);
+  }
+};
+
 /* Called whenever a parent is signed in — at login, and at each later start
    that restores a session. Repeat calls only refresh the handler; the setup
    itself runs once per sign-in. */

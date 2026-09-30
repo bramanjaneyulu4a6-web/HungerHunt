@@ -33,7 +33,7 @@ const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"));
 import Navbar from "./components/Navbar";
 import ProductFooter from "./components/ProductFooter";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { startPush } from "./utils/push";
+import { askPushPermissionOnFirstLaunch, startPush } from "./utils/push";
 import { PUSH_EVENT } from "./utils/events";
 import API from "./services/api";
 import { startDataAutoRefresh } from "./utils/dataAutoRefresh";
@@ -127,11 +127,16 @@ function AppContent() {
   // reloads; this one reloads onto a newer deploy of the app itself.
   useEffect(() => startDeployWatch({ bakedStamp: import.meta.env.VITE_BUILD_STAMP }), []);
 
+  // The native apps ask for notifications on first launch, before sign-in;
+  // see askPushPermissionOnFirstLaunch for why that is only the OS dialog.
   useEffect(() => {
-    // Starting push before login would ask for notification permission on a
-    // screen that cannot explain why, and would have no account to attach the
-    // device to. This runs once a parent is signed in — on login, and on every
-    // later start that restores their session.
+    askPushPermissionOnFirstLaunch();
+  }, []);
+
+  useEffect(() => {
+    // Registering the device waits for a sign-in, since there is no account
+    // to attach it to before one. This runs on login, and on every later
+    // start that restores a session.
     if (!parent) return;
 
     startPush(({ data, tapped }) => {

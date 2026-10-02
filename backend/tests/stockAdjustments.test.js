@@ -14,6 +14,7 @@ const mongoose = (await import('mongoose')).default;
 const Admin = (await import('../models/Admin.js')).default;
 const FeatureVisibility = (await import('../models/FeatureVisibility.js')).default;
 const { featuresOpen } = await import('./helpers/featuresOpen.js');
+const GoodsReceipt = (await import('../models/GoodsReceipt.js')).default;
 const Inventory = (await import('../models/Inventory.js')).default;
 const StockAdjustment = (await import('../models/StockAdjustment.js')).default;
 const Student = (await import('../models/Student.js')).default;
@@ -174,6 +175,20 @@ describe('adjusting stock', () => {
 });
 
 describe('reading the ledger', () => {
+  const receiptsReturning = (rows, calls = {}) => {
+    const chain = {
+      populate: (path, fields) => {
+        (calls.populate ||= []).push([path, fields]);
+        return chain;
+      },
+      sort: (sort) => { calls.sort = sort; return chain; },
+      limit: (limit) => { calls.limit = limit; return chain; },
+      lean: () => chain,
+      then: (resolve, reject) => Promise.resolve(rows).then(resolve, reject),
+    };
+    mock.method(GoodsReceipt, 'find', (filter) => { calls.filter = filter; return chain; });
+  };
+
   test('answers newest first with who, capped', async () => {
     accountIs('admin');
     const calls = {};
@@ -186,6 +201,7 @@ describe('reading the ledger', () => {
     };
     mock.method(StockAdjustment, 'find', (f) => { calls.filter = f; return chain; });
     mock.method(Transaction, 'aggregate', async () => []);
+    receiptsReturning([]);
 
     const res = await fetch(`${base}/api/inventory/${PRODUCT_ID}/adjustments`, {
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -210,6 +226,7 @@ describe('reading the ledger', () => {
       then: (resolve, reject) => Promise.resolve([manual]).then(resolve, reject),
     };
     mock.method(StockAdjustment, 'find', () => chain);
+    receiptsReturning([]);
     const demoId = new mongoose.Types.ObjectId();
     mock.method(Student, 'find', (f) => {
       assert.deepEqual(f, { parentPhoneNumber: { $in: ['7995601391'] } });
@@ -246,5 +263,69 @@ describe('reading the ledger', () => {
     } finally {
       delete process.env.DEMO_PARENT_PHONES;
     }
+  });
+
+  test('shows inventory-order receipts as additions and skips rows that did not move stock', async () => {
+    accountIs('admin');
+    const emptyAdjustments = {
+      populate: () => emptyAdjustments,
+      sort: () => emptyAdjustments,
+      limit: () => emptyAdjustments,
+      lean: () => emptyAdjustments,
+      then: (resolve, reject) => Promise.resolve([]).then(resolve, reject),
+    };
+    mock.method(StockAdjustment, 'find', () => emptyAdjustments);
+    mock.method(Transaction, 'aggregate', async () => []);
+
+    const receiptCalls = {};
+    receiptsReturning([
+      {
+        _id: 'receipt-live',
+        createdAt: '2026-09-28T11:29:28.000Z',
+        stockApplied: true,
+        invoiceNumber: 'INV-42',
+        receivedBy: { email: 'warehouse@example.com', role: 'warehouse' },
+        purchaseId: { _id: 'purchase-1', supplierId: { name: 'Sri Rama Agencies' } },
+        lines: [
+          { productId: PRODUCT_ID, received: 30, damaged: 2 },
+          { productId: PRODUCT_ID, received: 10, damaged: 0 },
+          { productId: '507f191e810c19729de860ed', received: 99, damaged: 0 },
+        ],
+      },
+      {
+        _id: 'receipt-damaged-only',
+        createdAt: '2026-09-28T11:20:00.000Z',
+        stockApplied: true,
+        lines: [{ productId: PRODUCT_ID, received: 0, damaged: 5 }],
+      },
+      {
+        _id: 'receipt-opening-backfill',
+        createdAt: '2026-09-28T11:10:00.000Z',
+        note: 'Backfilled receipt record; stock was already represented by the opening-stock reconciliation.',
+        lines: [{ productId: PRODUCT_ID, received: 100, damaged: 0 }],
+      },
+      {
+        _id: 'receipt-explicit-no-stock',
+        createdAt: '2026-09-28T11:00:00.000Z',
+        stockApplied: false,
+        lines: [{ productId: PRODUCT_ID, received: 100, damaged: 0 }],
+      },
+    ], receiptCalls);
+
+    const res = await fetch(`${base}/api/inventory/${PRODUCT_ID}/adjustments`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(res.status, 200);
+    const rows = await res.json();
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].kind, 'RECEIPT');
+    assert.equal(rows[0].delta, 40);
+    assert.equal(rows[0].adjustedBy.email, 'warehouse@example.com');
+    assert.equal(rows[0].stockAfter, null);
+    assert.match(rows[0].reason, /Inventory order received from Sri Rama Agencies/);
+    assert.match(rows[0].reason, /invoice INV-42/);
+    assert.deepEqual(receiptCalls.filter, { 'lines.productId': PRODUCT_ID });
+    assert.equal(receiptCalls.limit, 100);
   });
 });

@@ -46,6 +46,7 @@ export class ApprovePurchaseOrderIntoInventory {
       receivedBy: actor.id,
       invoiceNumber: '',
       note: 'Inventory booked automatically when Accounts approved the order.',
+      stockApplied: true,
       clientToken: `approval-${approved._id}`,
       lines: approved.items.map((item) => ({
         productId: item.productId?._id ?? item.productId,

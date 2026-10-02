@@ -297,6 +297,7 @@ export const completePurchase = async (req, res) => {
       receivedBy: req.adminId,
       invoiceNumber: "",
       note: "Closed from the back office in one step.",
+      stockApplied: true,
       clientToken: `legacy-${id}-${Date.now()}`,
       lines: items.map((i) => ({ productId: i.productId, received: i.quantity, damaged: 0 })),
     });

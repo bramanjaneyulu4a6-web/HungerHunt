@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
+import GoodsReceipt from "../models/GoodsReceipt.js";
 import Inventory from "../models/Inventory.js";
 import StockAdjustment from "../models/StockAdjustment.js";
 import { getPurchaseAllowances } from "../utils/purchaseLimits.js";
 import { availabilityOf } from "../utils/availability.js";
+import { inventoryReceiptHistoryRows } from "../utils/inventoryReceiptHistory.js";
 import { showroomProduct } from "../utils/showroomCatalogue.js";
 import { orderDeductionsByDay } from "../utils/orderStockDays.js";
 
@@ -241,18 +243,34 @@ export const getAdjustments = async (req, res) => {
   }
 
   try {
-    const [adjustments, orderDays] = await Promise.all([
+    const [adjustments, orderDays, receipts] = await Promise.all([
       StockAdjustment.find({ productId })
         .populate("adjustedBy", "email role")
         .sort({ createdAt: -1 })
         .limit(100)
         .lean(),
       orderDeductionsByDay(productId),
+      GoodsReceipt.find({ "lines.productId": productId })
+        .populate("receivedBy", "email role")
+        .populate({
+          path: "purchaseId",
+          select: "supplierId",
+          populate: { path: "supplierId", select: "name" },
+        })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
     ]);
 
-    // Manual movements and each day's orders, newest first, in one history.
+    // The opening-stock backfill minted receipt documents for auditability,
+    // but deliberately did not increment Inventory. New writes carry an
+    // explicit flag; the history helper also recognizes those legacy notes.
+    const receiptRows = inventoryReceiptHistoryRows(receipts, productId);
+
+    // Manual movements, supplier receipts and each day's student orders,
+    // newest first, in one history.
     res.json(
-      [...adjustments, ...orderDays].sort(
+      [...adjustments, ...receiptRows, ...orderDays].sort(
         (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
       )
     );

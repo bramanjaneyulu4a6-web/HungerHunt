@@ -42,6 +42,11 @@ const goodsReceiptSchema = new mongoose.Schema(
     invoiceNumber: { type: String, default: '' },
     note: { type: String, default: '' },
 
+    // Whether this receipt's usable units were added to Inventory. Older
+    // receipts predate the flag; history treats them as stock movements unless
+    // their explicit backfill note says the stock was already represented.
+    stockApplied: { type: Boolean },
+
     // Minted by the client per confirm attempt. The unique index below is what
     // makes a double-tap or a retried request book one delivery, not two.
     clientToken: { type: String, required: true },

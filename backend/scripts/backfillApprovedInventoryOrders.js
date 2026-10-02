@@ -112,6 +112,7 @@ try {
           note: addStock
             ? 'Backfilled inventory for an order approved before automatic stock booking.'
             : 'Backfilled receipt record; stock was already represented by the opening-stock reconciliation.',
+          stockApplied: addStock,
           clientToken: `approval-backfill-${order._id}`,
           lines: order.items.map((item) => ({
             productId: item.productId?._id ?? item.productId,

@@ -179,6 +179,7 @@ export const receiveDelivery = async (req, res) => {
         receivedBy: req.adminId,
         invoiceNumber: String(req.body.invoiceNumber ?? "").slice(0, 100),
         note: String(req.body.note ?? "").slice(0, 500),
+        stockApplied: true,
         clientToken,
         lines,
       });

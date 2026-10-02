@@ -412,8 +412,7 @@ const Inventory = () => {
               <Skeleton height={16} style={{ marginTop: 10 }} />
             ) : history.length === 0 ? (
               <p style={{ color: "var(--muted-soft)" }}>
-                No manual adjustments or orders recorded. Goods receipts move
-                stock without appearing here.
+                No manual adjustments, inventory receipts, or orders recorded.
               </p>
             ) : (
               <div className="table-wrap">

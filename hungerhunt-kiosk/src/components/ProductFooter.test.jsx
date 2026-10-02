@@ -15,12 +15,12 @@ describe('ProductFooter', () => {
     expect(screen.getByText('A product of GRAARR Management Services Pvt. Ltd.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Contact Us' }));
 
-    expect(screen.getByRole('dialog', { name: 'Anand Kamma' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Stephen B' })).toBeTruthy();
     expect(screen.getByText('HungerHunt – Head of Operations')).toBeTruthy();
-    expect(screen.getByRole('link', { name: '6304519244' }).getAttribute('href'))
-      .toBe('tel:+916304519244');
-    expect(screen.getByRole('link', { name: 'dev.kamma04@gmail.com' }).getAttribute('href'))
-      .toBe('mailto:dev.kamma04@gmail.com');
+    expect(screen.getByRole('link', { name: '9160161816' }).getAttribute('href'))
+      .toBe('tel:+919160161816');
+    expect(screen.getByRole('link', { name: 'bramanjaneyulu4a6@gmail.com' }).getAttribute('href'))
+      .toBe('mailto:bramanjaneyulu4a6@gmail.com');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();

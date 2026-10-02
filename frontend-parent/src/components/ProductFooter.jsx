@@ -70,7 +70,7 @@ export default function ProductFooter() {
               &times;
             </button>
             <p className="product-contact-eyebrow">Contact Us</p>
-            <h2 id="product-contact-title">Stephen</h2>
+            <h2 id="product-contact-title">Stephen B</h2>
             <p className="product-contact-role">HungerHunt – Head of Operations</p>
             <address>
               <a href="tel:+919160161816">

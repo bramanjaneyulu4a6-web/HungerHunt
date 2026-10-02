@@ -8,6 +8,8 @@ import ParentApprovalPicker from '../components/ParentApprovalPicker';
 import { formatINR } from '../utils/format';
 import { requestNumber } from '../utils/fulfillmentStatus';
 import { openActiveOrdersExport } from '../utils/activeOrdersExport';
+import { activeOrderItemTotals } from '../utils/activeOrderItemTotals';
+import { useDismissableOverlay } from '../utils/overlay';
 
 const HISTORY_PAGE_SIZE = 50;
 
@@ -40,6 +42,88 @@ const asAwaitingRow = (order) => ({
 
 const itemCount = (order) =>
   order.items.reduce((total, item) => total + Number(item.quantity || 0), 0);
+
+const ItemTotalsDialog = ({ summary, generatedAt, loading, error, onRefresh, onClose }) => {
+  useDismissableOverlay(onClose);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal active-order-totals-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="active-order-totals-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div>
+            <h2 className="modal-title" id="active-order-totals-title">Active order item totals</h2>
+            <p className="modal-sub">
+              {generatedAt
+                ? `Live snapshot refreshed ${generatedAt.toLocaleString()}`
+                : 'Fetching the current Active Orders list…'}
+            </p>
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog">×</button>
+        </header>
+
+        {loading ? (
+          <Skeleton height={260} radius={16} />
+        ) : error ? (
+          <Banner variant="alert" icon="⚠️">Could not load live item totals. No orders were changed.</Banner>
+        ) : summary?.rows.length ? (
+          <>
+            <div className="active-order-totals-summary">
+              <div><strong>{summary.activeOrders}</strong><span>active orders</span></div>
+              <div><strong>{summary.totalUnits}</strong><span>total units</span></div>
+              <div><strong>{summary.statusCounts.AWAITING_PARENT ?? 0}</strong><span>awaiting parent</span></div>
+              <div><strong>{summary.statusCounts.PENDING ?? 0}</strong><span>to pack</span></div>
+            </div>
+            <div className="table-wrap active-order-totals-table">
+              <table className="table table--stack">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Awaiting parent</th>
+                    <th>Paid / to pack</th>
+                    <th>Packed</th>
+                    <th>Out for delivery</th>
+                    <th>Total units</th>
+                    <th>Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.rows.map((row) => (
+                    <tr key={row.product}>
+                      <td data-label="Item"><strong>{row.product}</strong></td>
+                      <td data-label="Awaiting parent">{row.awaitingParent}</td>
+                      <td data-label="Paid / to pack">{row.pending}</td>
+                      <td data-label="Packed">{row.packed}</td>
+                      <td data-label="Out for delivery">{row.outForDelivery}</td>
+                      <td data-label="Total units"><strong>{row.totalUnits}</strong></td>
+                      <td data-label="Orders">{row.orders}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <EmptyState icon="✓" title="No active order items" variant="success">
+            There are no valid parent requests or open packages right now.
+          </EmptyState>
+        )}
+
+        <div className="modal-actions active-order-totals-actions">
+          <Button variant="ghost" disabled={loading} onClick={onRefresh}>
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OrdersLedger = ({ orders, expanded, onExpand, onChanged, onAnswered, history = false }) => (
   <Card className="warehouse-ledger-card fulfillment-ledger">
@@ -147,6 +231,11 @@ export default function FulfillmentOrders() {
   const [loadError, setLoadError] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [itemTotalsOpen, setItemTotalsOpen] = useState(false);
+  const [itemTotalsLoading, setItemTotalsLoading] = useState(false);
+  const [itemTotalsError, setItemTotalsError] = useState(false);
+  const [itemTotalsSummary, setItemTotalsSummary] = useState(null);
+  const [itemTotalsGeneratedAt, setItemTotalsGeneratedAt] = useState(null);
 
   const loadActive = useCallback(async () => {
     setLoading(true);
@@ -230,15 +319,48 @@ export default function FulfillmentOrders() {
     }
   };
 
+  const refreshItemTotals = async () => {
+    setItemTotalsLoading(true);
+    setItemTotalsError(false);
+    try {
+      const [packages, awaiting] = await Promise.all([
+        api.get('/v1/fulfillment-orders'),
+        api.get('/pending-orders/admin'),
+      ]);
+      const liveOrders = [
+        ...(awaiting.data.orders || []).map(asAwaitingRow),
+        ...(packages.data.data || []),
+      ];
+      setOrders(liveOrders);
+      setItemTotalsSummary(activeOrderItemTotals(liveOrders));
+      setItemTotalsGeneratedAt(new Date());
+    } catch (error) {
+      console.error(error);
+      setItemTotalsError(true);
+    } finally {
+      setItemTotalsLoading(false);
+    }
+  };
+
+  const openItemTotals = () => {
+    setItemTotalsOpen(true);
+    refreshItemTotals();
+  };
+
   return (
     <div className="page warehouse-page">
       <PageHeader
         title="Student Orders"
         subtitle="Review every active order, from those sent to the parent through delivery, and the complete history of delivered and cancelled orders."
         actions={view === 'active' ? (
-          <Button disabled={loading || exporting || !orders.length} onClick={exportOrders}>
-            {exporting ? 'Preparing…' : 'Export orders'}
-          </Button>
+          <div className="warehouse-page-actions">
+            <Button variant="ghost" disabled={loading || itemTotalsLoading} onClick={openItemTotals}>
+              {itemTotalsLoading ? 'Loading totals…' : 'Item totals'}
+            </Button>
+            <Button disabled={loading || exporting || !orders.length} onClick={exportOrders}>
+              {exporting ? 'Preparing…' : 'Export orders'}
+            </Button>
+          </div>
         ) : null}
       />
 
@@ -284,6 +406,17 @@ export default function FulfillmentOrders() {
           )}
         </>
       ) : null}
+
+      {itemTotalsOpen && (
+        <ItemTotalsDialog
+          summary={itemTotalsSummary}
+          generatedAt={itemTotalsGeneratedAt}
+          loading={itemTotalsLoading}
+          error={itemTotalsError}
+          onRefresh={refreshItemTotals}
+          onClose={() => setItemTotalsOpen(false)}
+        />
+      )}
     </div>
   );
 }

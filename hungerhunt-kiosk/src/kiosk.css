@@ -1937,36 +1937,14 @@
   box-shadow: 0 3px 8px -2px rgba(90, 40, 10, 0.5);
 }
 
-/* Discounted products keep the kiosk's orange-and-white price language, but
-   use a wider hand-lettered ticket: MRP gets an imperfect double stroke and
-   the payable price gets the loudest type. It remains one accessible label so
-   a screen reader does not announce either figure twice. */
+/* A discounted product uses the exact same orange rectangle as every other
+   price. The payable price keeps the normal type size; the only addition is a
+   deliberately smaller MRP line with an imperfect double stroke. */
 .tile-price--sale {
-  top: 9px;
-  right: 9px;
   display: grid;
-  min-width: 92px;
-  padding: 7px 10px 6px;
-  border: 1px solid rgba(126, 47, 17, 0.3);
-  border-radius: 7px 11px 6px 9px;
-  background: var(--brand);
-  color: var(--on-dark);
-  transform: rotate(2.5deg);
-  box-shadow: 2px 3px 0 rgba(126, 47, 17, 0.8), 0 8px 14px -7px rgba(77, 35, 13, 0.72);
-  text-align: left;
-}
-
-.tile-price--sale::after {
-  position: absolute;
-  right: 13px;
-  bottom: -7px;
-  width: 14px;
-  height: 14px;
-  border-right: 1px solid rgba(126, 47, 17, 0.3);
-  border-bottom: 1px solid rgba(126, 47, 17, 0.3);
-  background: var(--brand);
-  content: "";
-  transform: rotate(45deg);
+  min-width: 64px;
+  padding-block: 5px;
+  line-height: 1;
 }
 
 .tile-price__mrp {
@@ -1974,7 +1952,7 @@
   z-index: 1;
   justify-self: start;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 900;
   letter-spacing: 0.045em;
   line-height: 1.15;
@@ -2014,11 +1992,10 @@
   position: relative;
   z-index: 1;
   color: var(--on-dark);
-  font-size: 21px;
-  font-weight: 950;
-  letter-spacing: -0.055em;
-  line-height: 1.05;
-  text-shadow: 1px 1px 0 rgba(126, 47, 17, 0.55);
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: 1.1;
 }
 
 /* Nutrition sits in the corner opposite the price, so neither is guarding the
@@ -4747,12 +4724,8 @@
   }
 
   .tile-price--sale {
-    min-width: 88px;
-    padding: 6px 9px 5px;
-  }
-
-  .tile-price__now {
-    font-size: 19px;
+    min-width: 60px;
+    padding-block: 5px;
   }
 
 

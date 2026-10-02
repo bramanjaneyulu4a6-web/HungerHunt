@@ -19,6 +19,7 @@ import { presentError } from "../utils/errorPresentation";
 import { allowanceCeiling, allowancePeriod, limitLine, limitMessage, subCategoryLimitLabel } from "../utils/purchaseCaps";
 import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
 import { notifyParent } from "../utils/notifyParent";
+import { formatPercentOff, priceTag } from "../utils/priceTag";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
@@ -73,6 +74,31 @@ const StudentSummary = ({ student, walletBalance, className = "" }) => (
   </div>
 );
 
+const ProductPriceTag = ({ product }) => {
+  const tag = priceTag(product);
+
+  if (!tag.discounted) {
+    return <span className="tile-price money">{formatINR(tag.sellingPrice)}</span>;
+  }
+
+  return (
+    <span
+      className="tile-price tile-price--sale"
+      aria-label={`MRP ${formatINR(tag.mrp)}, now ${formatINR(tag.sellingPrice)}, ${formatPercentOff(tag.percentOff)}`}
+    >
+      <span className="tile-price__off" aria-hidden="true">
+        {formatPercentOff(tag.percentOff)}
+      </span>
+      <span className="tile-price__mrp" aria-hidden="true">
+        MRP <span className="tile-price__mrp-value">{formatINR(tag.mrp)}</span>
+      </span>
+      <strong className="tile-price__now money" aria-hidden="true">
+        {formatINR(tag.sellingPrice)}
+      </strong>
+    </span>
+  );
+};
+
 // Nutrition is transcribed off a packet by hand, so it is routinely partial.
 // Whatever the office entered is shown and the rest reads as a dash; only a
 // product with nothing at all goes without the strip entirely.
@@ -114,6 +140,8 @@ const toProduct = (item) => ({
   _id: item.productId?._id,
   name: item.productId?.name,
   price: item.productId?.price,
+  mrp: item.productId?.mrp,
+  discountRate: item.productId?.discountRate,
   image: item.productId?.image,
   stock: item.stock,
   stockGroup: item.productId?.stockGroup,
@@ -1379,9 +1407,7 @@ const KioskBilling = ({ student, onLogout }) => {
                         </Button>
                       )}
 
-                      <span className="tile-price money">
-                        {formatINR(p.price)}
-                      </span>
+                      <ProductPriceTag product={p} />
 
                       <div className="tile-body">
                         <h3 className="tile-name" title={p.name}>{p.name}</h3>

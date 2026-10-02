@@ -1921,6 +1921,7 @@
 
 .tile-price {
   position: absolute;
+  z-index: 2;
   top: 8px;
   right: 8px;
   min-width: 52px;
@@ -1934,6 +1935,112 @@
   border-radius: 9px;
   transform: rotate(4deg);
   box-shadow: 0 3px 8px -2px rgba(90, 40, 10, 0.5);
+}
+
+/* Discounted products get a tiny hand-lettered sale ticket: the MRP is crossed
+   out with an imperfect double stroke, the payable price gets the loudest
+   type, and the percentage sits in a comic-book burst. It remains a single
+   accessible label so a screen reader does not announce the same price twice. */
+.tile-price--sale {
+  top: 9px;
+  right: 9px;
+  display: grid;
+  min-width: 104px;
+  padding: 7px 10px 6px;
+  border: 2px solid #2d1a12;
+  border-radius: 7px 11px 6px 9px;
+  background: #fff2a6;
+  color: #2d1a12;
+  transform: rotate(2.5deg);
+  box-shadow: 3px 3px 0 #2d1a12, 0 8px 14px -7px rgba(77, 35, 13, 0.72);
+  text-align: left;
+}
+
+.tile-price--sale::after {
+  position: absolute;
+  right: 13px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  border-right: 2px solid #2d1a12;
+  border-bottom: 2px solid #2d1a12;
+  background: #fff2a6;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.tile-price__mrp {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  color: #725d49;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.tile-price__mrp-value {
+  position: relative;
+  display: inline-block;
+  margin-left: 1px;
+  color: #553d2e;
+}
+
+.tile-price__mrp-value::before,
+.tile-price__mrp-value::after {
+  position: absolute;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: 2px;
+  border-radius: 999px;
+  background: #e03131;
+  content: "";
+  transform: rotate(-8deg);
+}
+
+.tile-price__mrp-value::before {
+  top: 45%;
+}
+
+.tile-price__mrp-value::after {
+  top: 58%;
+  opacity: 0.65;
+  transform: rotate(-3deg);
+}
+
+.tile-price__now {
+  position: relative;
+  z-index: 1;
+  color: #e34b20;
+  font-size: 21px;
+  font-weight: 950;
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+  text-shadow: 1px 1px 0 #fff9d9;
+}
+
+.tile-price__off {
+  position: absolute;
+  z-index: 2;
+  top: -13px;
+  right: -12px;
+  display: grid;
+  width: 45px;
+  height: 45px;
+  padding: 7px;
+  place-items: center;
+  background: #e63b2e;
+  clip-path: polygon(50% 0%, 61% 16%, 78% 7%, 81% 27%, 100% 29%, 88% 45%, 100% 60%, 80% 66%, 80% 86%, 61% 78%, 49% 100%, 39% 80%, 19% 90%, 19% 69%, 0% 63%, 13% 47%, 1% 31%, 22% 27%, 25% 7%, 41% 17%);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(95, 17, 13, 0.45);
+  transform: rotate(9deg);
 }
 
 /* Nutrition sits in the corner opposite the price, so neither is guarding the
@@ -4659,6 +4766,21 @@
   .tile-price {
     min-width: 48px;
     font-size: 14px;
+  }
+
+  .tile-price--sale {
+    min-width: 96px;
+    padding: 6px 9px 5px;
+  }
+
+  .tile-price__now {
+    font-size: 19px;
+  }
+
+  .tile-price__off {
+    width: 41px;
+    height: 41px;
+    font-size: 7.5px;
   }
 
   .ticket-col {

@@ -1939,7 +1939,7 @@
 
 /* A discounted product uses the exact same orange rectangle as every other
    price. The payable price keeps the normal type size; the only addition is a
-   deliberately smaller MRP line with an imperfect double stroke. */
+   deliberately smaller old-price line with an imperfect double stroke. */
 .tile-price--sale {
   display: grid;
   min-width: 64px;
@@ -1947,7 +1947,7 @@
   line-height: 1;
 }
 
-.tile-price__mrp {
+.tile-price__old {
   position: relative;
   z-index: 1;
   justify-self: start;
@@ -1959,15 +1959,15 @@
   text-transform: uppercase;
 }
 
-.tile-price__mrp-value {
+.tile-price__old-value {
   position: relative;
   display: inline-block;
   margin-left: 1px;
   color: rgba(255, 255, 255, 0.88);
 }
 
-.tile-price__mrp-value::before,
-.tile-price__mrp-value::after {
+.tile-price__old-value::before,
+.tile-price__old-value::after {
   position: absolute;
   left: -2px;
   width: calc(100% + 4px);
@@ -1978,11 +1978,11 @@
   transform: rotate(-8deg);
 }
 
-.tile-price__mrp-value::before {
+.tile-price__old-value::before {
   top: 45%;
 }
 
-.tile-price__mrp-value::after {
+.tile-price__old-value::after {
   top: 58%;
   opacity: 0.65;
   transform: rotate(-3deg);

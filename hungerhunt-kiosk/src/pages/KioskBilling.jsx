@@ -84,10 +84,10 @@ const ProductPriceTag = ({ product }) => {
   return (
     <span
       className="tile-price tile-price--sale"
-      aria-label={`MRP ${formatINR(tag.mrp)}, now ${formatINR(tag.sellingPrice)}`}
+      aria-label={`Old price ${formatINR(tag.oldPrice)}, now ${formatINR(tag.sellingPrice)}`}
     >
-      <span className="tile-price__mrp" aria-hidden="true">
-        MRP <span className="tile-price__mrp-value">{formatINR(tag.mrp)}</span>
+      <span className="tile-price__old" aria-hidden="true">
+        <span className="tile-price__old-value">{formatINR(tag.oldPrice)}</span>
       </span>
       <strong className="tile-price__now money" aria-hidden="true">
         {formatINR(tag.sellingPrice)}
@@ -137,7 +137,7 @@ const toProduct = (item) => ({
   _id: item.productId?._id,
   name: item.productId?.name,
   price: item.productId?.price,
-  mrp: item.productId?.mrp,
+  oldPrice: item.productId?.mrp,
   image: item.productId?.image,
   stock: item.stock,
   stockGroup: item.productId?.stockGroup,

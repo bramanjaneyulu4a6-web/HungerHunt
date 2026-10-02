@@ -19,7 +19,7 @@ import { presentError } from "../utils/errorPresentation";
 import { allowanceCeiling, allowancePeriod, limitLine, limitMessage, subCategoryLimitLabel } from "../utils/purchaseCaps";
 import { approvalWhatsAppLink, openWhatsApp } from "../utils/parentWhatsApp";
 import { notifyParent } from "../utils/notifyParent";
-import { formatPercentOff, priceTag } from "../utils/priceTag";
+import { priceTag } from "../utils/priceTag";
 
 const PLACEHOLDER = "https://placehold.co/400x300?text=No+Image";
 
@@ -84,11 +84,8 @@ const ProductPriceTag = ({ product }) => {
   return (
     <span
       className="tile-price tile-price--sale"
-      aria-label={`MRP ${formatINR(tag.mrp)}, now ${formatINR(tag.sellingPrice)}, ${formatPercentOff(tag.percentOff)}`}
+      aria-label={`MRP ${formatINR(tag.mrp)}, now ${formatINR(tag.sellingPrice)}`}
     >
-      <span className="tile-price__off" aria-hidden="true">
-        {formatPercentOff(tag.percentOff)}
-      </span>
       <span className="tile-price__mrp" aria-hidden="true">
         MRP <span className="tile-price__mrp-value">{formatINR(tag.mrp)}</span>
       </span>
@@ -141,7 +138,6 @@ const toProduct = (item) => ({
   name: item.productId?.name,
   price: item.productId?.price,
   mrp: item.productId?.mrp,
-  discountRate: item.productId?.discountRate,
   image: item.productId?.image,
   stock: item.stock,
   stockGroup: item.productId?.stockGroup,

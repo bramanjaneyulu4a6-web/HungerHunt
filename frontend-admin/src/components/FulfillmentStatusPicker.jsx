@@ -35,6 +35,11 @@ const cancellationKey = (orderId) => {
   return `admin-cancel-${orderId}-${nonce}`;
 };
 
+const itemRefundKey = (orderId) => {
+  const nonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `admin-item-refund-${orderId}-${nonce}`;
+};
+
 const errorMessage = (error, fallback) =>
   error.response?.data?.message || error.response?.data?.error?.message || fallback;
 
@@ -44,16 +49,19 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
   const [receivedBy, setReceivedBy] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
   const [reason, setReason] = useState('');
+  const [refundQuantities, setRefundQuantities] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const rootRef = useRef(null);
   const cancellationKeyRef = useRef('');
+  const itemRefundKeyRef = useRef('');
 
   // Either half of the menu can be switched off on /features.
   const canMove = useFeature('orders.changeStatus');
   const canCancel = useFeature('orders.cancelRefund');
   const statuses = canMove ? availableFulfillmentStatuses(order) : [];
   const cancellable = canCancel && isCancellableFulfillment(order);
+  const itemRefundable = cancellable && Array.isArray(order.items) && order.items.length > 0;
   const badge = (
     <Badge variant={variant || fulfillmentBadgeVariant(order?.status)}>
       {label || fulfillmentStatusDisplay(order)}
@@ -85,7 +93,9 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
     setReceivedBy('');
     setReceiverPhone('');
     setReason('');
+    setRefundQuantities({});
     if (choice.cancel) cancellationKeyRef.current = cancellationKey(order.id);
+    if (choice.itemRefund) itemRefundKeyRef.current = itemRefundKey(order.id);
   };
 
   const close = () => {
@@ -115,6 +125,25 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
         return;
       }
 
+      if (pending.itemRefund) {
+        const items = order.items
+          .map((item) => ({
+            productId: item.productId,
+            quantity: Number(refundQuantities[String(item.productId)] || 0),
+          }))
+          .filter((item) => item.quantity > 0);
+        const response = await api.post(
+          `/v1/fulfillment-orders/${order.id}/item-refunds`,
+          { items, reason: reason.trim() },
+          { headers: { 'Idempotency-Key': itemRefundKeyRef.current } },
+        );
+        const refund = response.data.data?.refund?.amount;
+        toast.success(`${formatINR(refund)} refunded from ${orderNumber(order)}.`);
+        setPending(null);
+        onChanged?.(response.data.data?.order, response.data.data?.order?.status, { refund });
+        return;
+      }
+
       const body = { status: pending.status };
       if (pending.status === 'DELIVERED' && (receivedBy.trim() || receiverPhone.trim())) {
         body.receivedBy = receivedBy.trim();
@@ -128,7 +157,7 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
       console.error(requestError);
       setError(errorMessage(
         requestError,
-        pending.cancel
+        pending.cancel || pending.itemRefund
           ? 'This order could not be cancelled. It may have moved to another status.'
           : 'The status could not be changed. It may have already been updated.',
       ));
@@ -166,6 +195,11 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
               Cancel order and refund
             </button>
           )}
+          {itemRefundable && (
+            <button type="button" role="menuitem" onClick={() => choose({ itemRefund: true })}>
+              Refund unavailable items
+            </button>
+          )}
         </div>
       )}
 
@@ -178,7 +212,55 @@ export default function FulfillmentStatusPicker({ order, label, variant, onChang
             onSubmit={submit}
             onClick={stop}
           >
-            {pending.cancel ? (
+            {pending.itemRefund ? (
+              <>
+                <h2 className="modal-title">Refund items from {orderNumber(order)}</h2>
+                <p className="fulfillment-cancel-copy">
+                  Select only items that will not be supplied. Their value returns to the student wallet and the rest of the package stays active.
+                </p>
+                <div className="fulfillment-delivery-fields">
+                  {order.items.map((item) => (
+                    <label key={String(item.productId)}>
+                      <span className="field-label">{item.name} (max {item.quantity})</span>
+                      <input
+                        className="input"
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        max={item.quantity}
+                        step="1"
+                        value={refundQuantities[String(item.productId)] || ''}
+                        onChange={(event) => setRefundQuantities((current) => ({
+                          ...current,
+                          [String(item.productId)]: event.target.value,
+                        }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label className="fulfillment-cancel-label" htmlFor={`item-refund-reason-${order.id}`}>Refund reason</label>
+                <textarea
+                  id={`item-refund-reason-${order.id}`}
+                  className="input"
+                  rows="3"
+                  maxLength="200"
+                  value={reason}
+                  placeholder="Explain why these items are unavailable."
+                  onChange={(event) => setReason(event.target.value)}
+                />
+                {error && <Banner variant="alert" icon="⚠️">{error}</Banner>}
+                <div className="modal-actions fulfillment-cancel-actions">
+                  <Button variant="ghost" disabled={saving} onClick={close}>Keep items</Button>
+                  <Button
+                    type="submit"
+                    variant="danger"
+                    disabled={saving || !reason.trim() || !Object.values(refundQuantities).some((value) => Number(value) > 0)}
+                  >
+                    {saving ? 'Refunding…' : 'Refund selected items'}
+                  </Button>
+                </div>
+              </>
+            ) : pending.cancel ? (
               <>
                 <h2 className="modal-title">Cancel {orderNumber(order)}?</h2>
                 <p className="fulfillment-cancel-copy">

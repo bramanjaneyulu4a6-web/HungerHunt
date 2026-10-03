@@ -1209,7 +1209,7 @@ export default function ChildDetails() {
                   ? 'Student Wallet Payment'
                   : r.kind === 'UPI_ORDER_PAYMENT'
                     ? 'UPI Payment'
-                    : r.kind === 'ORDER_CANCELLATION_REFUND'
+                    : r.kind === 'ORDER_CANCELLATION_REFUND' || r.kind === 'ITEM_REFUND'
                       ? 'Refund'
                       : r.kind === 'BALANCE_REFUND'
                         ? 'Wallet Balance Refund'

@@ -8,6 +8,7 @@ import PaymentIntent from '../models/PaymentIntent.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
 import WalletReversal from '../models/WalletReversal.js';
+import ItemRefund from '../models/ItemRefund.js';
 import phonepe from '../src/domain/payments/providers/phonepe.js';
 import { amountInWords, ensureReceiptNumbers } from '../utils/walletReceipts.js';
 import { renderReceiptPdf } from '../utils/receiptPdf.js';
@@ -86,6 +87,9 @@ const findAdjustment = async (adjustmentId, res) => {
   const reversal = await WalletReversal.findById(adjustmentId).lean();
   if (reversal) return { row: reversal, Model: WalletReversal, kind: 'REFUND' };
 
+  const itemRefund = await ItemRefund.findById(adjustmentId).lean();
+  if (itemRefund) return { row: itemRefund, Model: ItemRefund, kind: 'ITEM_REFUND' };
+
   /* An order paid straight over UPI is money that entered the school's books
      like a top-up, and it is numbered from the same series — so it gets the
      same piece of paper. A wallet-funded charge spent money already
@@ -149,7 +153,7 @@ const loadReceipt = async (req, res) => {
  * parent route reads off the signed-in account and the staff route off the
  * student's registered parent — the receipt says the same thing either way. */
 const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, res) => {
-  const orderRefund = kind === 'REFUND';
+  const orderRefund = kind === 'REFUND' || kind === 'ITEM_REFUND';
   const balanceRefund = kind === 'BALANCE_REFUND';
   const refund = orderRefund || balanceRefund;
   const orderPayment = kind === 'ORDER_PAYMENT';
@@ -240,6 +244,7 @@ const composeReceipt = async ({ row: adjustment, Model, kind }, receivedFrom, re
       reason: adjustment.reason || '',
       originalUtr: intent?.utr || '',
       originalOrderRef: intent?.merchantOrderId || '',
+      ...(kind === 'ITEM_REFUND' ? { items: adjustment.items || [] } : {}),
     };
 
     if (adjustment.performedBy) {

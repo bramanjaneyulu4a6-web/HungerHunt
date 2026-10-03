@@ -2,6 +2,7 @@ import Counter from '../models/Counter.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
 import WalletReversal from '../models/WalletReversal.js';
+import ItemRefund from '../models/ItemRefund.js';
 
 /* The receipt number a parent can quote to the office:
  *
@@ -107,7 +108,7 @@ export const amountInWords = (amount) => {
  * race simply wastes its counter value, leaving a gap, never a duplicate.
  * Returns a map of row id -> number for the rows this call numbered. */
 export const ensureReceiptNumbers = async (studentId, admissionNumber) => {
-  const [adjustments, upiCharges, reversals] = await Promise.all([
+  const [adjustments, upiCharges, reversals, itemRefunds] = await Promise.all([
     WalletAdjustment.find({ studentId, receiptNumber: null })
       .sort({ createdAt: 1 })
       .lean(),
@@ -117,12 +118,16 @@ export const ensureReceiptNumbers = async (studentId, admissionNumber) => {
     WalletReversal.find({ studentId, receiptNumber: null })
       .sort({ createdAt: 1 })
       .lean(),
+    ItemRefund.find({ studentId, receiptNumber: null })
+      .sort({ createdAt: 1 })
+      .lean(),
   ]);
 
   const unnumbered = [
     ...adjustments.map((row) => ({ row, Model: WalletAdjustment })),
     ...upiCharges.map((row) => ({ row, Model: Transaction })),
     ...reversals.map((row) => ({ row, Model: WalletReversal })),
+    ...itemRefunds.map((row) => ({ row, Model: ItemRefund })),
   ].sort((left, right) => new Date(left.row.createdAt) - new Date(right.row.createdAt));
 
   const assigned = new Map();

@@ -21,6 +21,7 @@ const Counter = (await import('../models/Counter.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const ItemRefund = (await import('../models/ItemRefund.js')).default;
 const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const phonepe = (await import('../src/domain/payments/providers/phonepe.js')).default;
@@ -59,6 +60,10 @@ beforeEach(() => {
   mock.method(WalletReversal, 'find', () => ({
     sort: () => ({ lean: async () => [] }),
   }));
+  mock.method(ItemRefund, 'find', () => ({
+    sort: () => ({ lean: async () => [] }),
+  }));
+  mock.method(ItemRefund, 'findById', () => ({ lean: async () => null }));
   for (const key of ['127.0.0.1', '::ffff:127.0.0.1', '::1']) {
     authLimiter.resetKey(key);
   }

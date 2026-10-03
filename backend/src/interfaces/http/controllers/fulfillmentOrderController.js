@@ -41,6 +41,7 @@ import {
 } from '../../../shared/errors/applicationError.js';
 import { parseBusinessDateRange } from '../../../shared/http/businessDateRange.js';
 import { cancelAndRefundFulfillment } from '../../../../utils/refunds.js';
+import { refundFulfillmentItems } from '../../../../utils/itemRefunds.js';
 import { renderCaretakerReceivingSheet } from '../../../../utils/caretakerReceivingSheetPdf.js';
 import { renderActiveOrdersExport } from '../../../../utils/activeOrdersExportPdf.js';
 import { buildRoomUnits } from '../../../../utils/roomUnits.js';
@@ -122,6 +123,44 @@ const readPaging = (query) => {
     MAX_HISTORY_PAGE_SIZE
   );
   return { page, limit, skip: (page - 1) * limit };
+};
+
+export const refundItems = async (req, res) => {
+  const idempotencyKey = String(req.get('Idempotency-Key') || '').trim();
+  const reason = String(req.body?.reason || '').trim();
+  const details = [];
+  if (!idempotencyKey || idempotencyKey.length > 100) {
+    details.push({ field: 'Idempotency-Key', message: 'Required, maximum 100 characters.' });
+  }
+  if (!reason || reason.length > 200) {
+    details.push({ field: 'reason', message: 'Required, maximum 200 characters.' });
+  }
+  if (!Array.isArray(req.body?.items) || req.body.items.length === 0) {
+    details.push({ field: 'items', message: 'Choose at least one item to refund.' });
+  }
+  if (details.length) throw new ValidationError(details);
+
+  const result = await refundFulfillmentItems({
+    orderId: req.params.id,
+    actorId: req.staff.id,
+    idempotencyKey,
+    reason,
+    items: req.body.items,
+  });
+  res.json({
+    data: {
+      order: serialize(result.order),
+      refund: {
+        id: String(result.refund._id),
+        amount: result.refund.amount,
+        items: result.refund.items,
+        previousBalance: result.refund.previousBalance,
+        newBalance: result.refund.newBalance,
+        receiptNumber: result.refund.receiptNumber || null,
+      },
+    },
+    meta: { requestId: req.context.requestId, replayed: result.replayed },
+  });
 };
 
 const readStatus = (query) => {

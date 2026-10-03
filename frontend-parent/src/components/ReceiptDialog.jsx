@@ -24,12 +24,14 @@ const formatReceiptDate = (value) =>
 const TITLES = {
   ORDER_PAYMENT: 'Order Payment Receipt',
   REFUND: 'Wallet Refund Receipt',
+  ITEM_REFUND: 'Item Refund Receipt',
   BALANCE_REFUND: 'Wallet Balance Refund Receipt',
 };
 
 const FOOTNOTES = {
   ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
   REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+  ITEM_REFUND: 'Refunded to the student wallet for unavailable order items',
   BALANCE_REFUND: 'Paid out from the student wallet balance and recorded by the school',
 };
 
@@ -86,6 +88,7 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
 
   const company = receipt?.company;
   const isOrder = receipt?.kind === 'ORDER_PAYMENT';
+  const isOrderRefund = ['REFUND', 'ITEM_REFUND'].includes(receipt?.kind);
   const isBalanceRefund = receipt?.kind === 'BALANCE_REFUND';
 
   return (
@@ -194,7 +197,25 @@ export default function ReceiptDialog({ adjustmentId, onClose }) {
               <em>{receipt.amountInWords}</em>
             </div>
 
-            {isBalanceRefund ? (
+            {isOrderRefund ? (
+              <>
+                <Row label="Refund Method">Student wallet</Row>
+                {receipt.receivedBy?.name && (
+                  <Row label="Refunded By">{receipt.receivedBy.name}</Row>
+                )}
+                {receipt.refund?.reason && <Row label="Reason">{receipt.refund.reason}</Row>}
+                {receipt.kind === 'ITEM_REFUND' && receipt.refund?.items?.length > 0 && (
+                  <ul className="receipt-items">
+                    {receipt.refund.items.map((item, index) => (
+                      <li key={`${item.name}-${index}`}>
+                        <span>{item.name}<small>{item.quantity} × {formatINR(item.price)}</small></span>
+                        <strong>{formatINR(item.quantity * item.price)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : isBalanceRefund ? (
               <>
                 <Row label="Refund Method">Cash — paid by school office</Row>
                 {receipt.receivedBy?.name && (

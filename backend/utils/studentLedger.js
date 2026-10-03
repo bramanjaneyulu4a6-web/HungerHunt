@@ -16,6 +16,7 @@ import Student from '../models/Student.js';
 import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
 import WalletReversal from '../models/WalletReversal.js';
+import ItemRefund from '../models/ItemRefund.js';
 import { deletionView } from '../models/ledgerDeletion.js';
 import { paiseToRupees } from '../src/domain/payments/money.js';
 import { ensureReceiptNumbers } from './walletReceipts.js';
@@ -69,8 +70,12 @@ export const deletionFields = (entry, { staffView }) =>
     : { deleted: false };
 
 export const buildStudentLedger = async (studentId, { staffView = false } = {}) => {
-  const [refunds, walletRows, charges, failedTopups, student] = await Promise.all([
+  const [refunds, itemRefunds, walletRows, charges, failedTopups, student] = await Promise.all([
     WalletReversal.find({ studentId: studentId })
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean(),
+    ItemRefund.find({ studentId: studentId })
       .sort({ createdAt: -1 })
       .limit(500)
       .lean(),
@@ -174,6 +179,7 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
       (entry) => entry.sourceType === 'UPI_ORDER_PAYMENT' && !entry.receiptNumber
     ) ||
     refunds.some((entry) => !entry.receiptNumber) ||
+    itemRefunds.some((entry) => !entry.receiptNumber) ||
     balanceRefunds.some((entry) => !entry.receiptNumber);
   let assigned = new Map();
   if (unnumbered && student?.admissionNumber) {
@@ -293,6 +299,19 @@ export const buildStudentLedger = async (studentId, { staffView = false } = {}) 
             };
           })()
         : {}),
+    })),
+    ...itemRefunds.map((entry) => ({
+      _id: entry._id,
+      kind: 'ITEM_REFUND',
+      amount: entry.amount,
+      previousBalance: entry.previousBalance,
+      newBalance: entry.newBalance,
+      date: entry.createdAt,
+      reason: entry.reason,
+      items: entry.items || [],
+      receiptNumber: entry.receiptNumber || assigned.get(String(entry._id)) || null,
+      reversalId: String(entry._id),
+      ...(staffView ? { processedBy: depositorOf(entry), via: 'ADMIN_DESK' } : {}),
     })),
     ...balanceRefunds.map((entry) => ({
       _id: entry._id,

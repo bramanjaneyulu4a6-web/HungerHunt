@@ -28,7 +28,7 @@ const money = (n) => Number(n).toFixed(2);
 export const paymentModeLine = (receipt) => {
   // Money going back does not have a payment mode; it has a destination, and
   // there is only one — the wallet it was taken from.
-  if (receipt.kind === 'REFUND') return "Student's wallet";
+  if (receipt.kind === 'REFUND' || receipt.kind === 'ITEM_REFUND') return "Student's wallet";
   if (receipt.kind === 'BALANCE_REFUND') return 'Cash — paid by school office';
   if (receipt.mode === 'CASH') return 'Cash — at school office';
   const label = receipt.payment?.upiLabel;
@@ -39,6 +39,11 @@ export const paymentModeLine = (receipt) => {
  * a payment up by, so it wins; the app name is the consolation when a receipt
  * predates references, and naming nothing beats naming the wrong app. */
 export const itemDescription = (receipt) => {
+  if (receipt.kind === 'ITEM_REFUND') {
+    const order = receipt.refund?.orderReference;
+    const names = (receipt.refund?.items || []).map((item) => item.name).filter(Boolean).join(', ');
+    return [order ? `Item refund — Order ${order}` : 'Item refund', names].filter(Boolean).join(': ');
+  }
   if (receipt.kind === 'REFUND') {
     const order = receipt.refund?.orderReference;
     return order ? `Refund — Cancelled Order ${order}` : 'Refund — Cancelled Order';
@@ -180,6 +185,7 @@ const drawBasketContinuation = (doc, receipt, { M, contentW, H }) => {
 const TITLES = {
   RECHARGE: 'WALLET RECHARGE RECEIPT',
   REFUND: 'WALLET REFUND RECEIPT',
+  ITEM_REFUND: 'ITEM REFUND RECEIPT',
   BALANCE_REFUND: 'WALLET BALANCE REFUND RECEIPT',
   ORDER_PAYMENT: 'ORDER PAYMENT RECEIPT',
 };
@@ -187,6 +193,7 @@ const TITLES = {
 const FOOTERS = {
   RECHARGE: 'Wallet recharges are non-refundable and non-transferable',
   REFUND: 'Refunded to the student wallet; not payable in cash or transferable',
+  ITEM_REFUND: 'Refunded to the student wallet for unavailable order items',
   BALANCE_REFUND: 'Paid out from the student wallet balance and recorded by the school',
   ORDER_PAYMENT: 'A cancelled order is refunded to the student wallet, not in cash',
 };
@@ -232,7 +239,7 @@ export const renderReceiptPdf = (receipt, stream) => {
     for (const line of extras) doc.text(line, M, doc.y + 2, { width: contentW, align: 'center' });
   }
 
-  const isOrderRefund = receipt.kind === 'REFUND';
+  const isOrderRefund = receipt.kind === 'REFUND' || receipt.kind === 'ITEM_REFUND';
   const isBalanceRefund = receipt.kind === 'BALANCE_REFUND';
   const isRefund = isOrderRefund || isBalanceRefund;
   const isOrder = receipt.kind === 'ORDER_PAYMENT';

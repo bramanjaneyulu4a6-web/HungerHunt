@@ -43,6 +43,9 @@ frontend-parent/plugins/*/android/.gradle/
 # parents' phone numbers. This repository is public, so the roll stays on
 # the machine that runs the importer and never in history.
 backend/scripts/data/
+# Production correction snapshots contain student and wallet data. Keep them
+# on the operator's machine for rollback, never in source control.
+backend/private-snapshots/
 
 # Editor state. The Java extension writes settings here the moment anyone
 # opens frontend-parent/android, so this appears untracked on a clean checkout

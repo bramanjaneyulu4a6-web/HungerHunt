@@ -18,6 +18,12 @@ router.get('/report', protectWarehouse, asyncHandler(controller.report));
 router.get('/print', protectWarehouse, asyncHandler(controller.print));
 router.get('/admin-export', protectAdmin, asyncHandler(controller.exportActive));
 router.post('/warehouse-reports', protectWarehouse, asyncHandler(createWarehouseOrderIssue));
+router.post(
+  '/:id/item-refunds',
+  protectAdmin,
+  requireFeature('orders.cancelRefund'),
+  asyncHandler(controller.refundItems)
+);
 // A cancellation refunds the wallet, so switching it off refuses it too.
 router.post(
   '/:id/transition',

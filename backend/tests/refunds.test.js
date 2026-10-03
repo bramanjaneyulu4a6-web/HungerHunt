@@ -18,7 +18,10 @@ afterEach(() => mock.restoreAll());
 
 describe('paid package cancellation', () => {
   test('atomically records a reversal, restores wallet and stock, and replays safely', async () => {
-    const current = { _id: ORDER_ID, status: 'PACKED', transactionId: TRANSACTION_ID, studentId: STUDENT_ID };
+    const current = {
+      _id: ORDER_ID, status: 'PACKED', transactionId: TRANSACTION_ID, studentId: STUDENT_ID,
+      totalAmount: 40, items: [{ productId: PRODUCT_ID, quantity: 2 }],
+    };
     const cancelled = { ...current, status: 'CANCELLED' };
     let storedReversal = null;
     mock.method(WalletReversal, 'findOne', async () => storedReversal);
@@ -67,4 +70,3 @@ describe('paid package cancellation', () => {
     assert.equal(wallet.mock.callCount(), 0);
   });
 });
-

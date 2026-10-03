@@ -4,7 +4,7 @@
  * No database: the parser and the narrowing are pure, and the routes' model
  * calls are stubbed.
  */
-import test, { afterEach, before, describe, mock } from 'node:test';
+import test, { afterEach, before, beforeEach, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -16,6 +16,7 @@ const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const ItemRefund = (await import('../models/ItemRefund.js')).default;
 const { NO_STAFF, narrowByProcessedBy, parseProcessedBy } = await import(
   '../src/application/accounting/processedBy.js'
 );
@@ -94,6 +95,11 @@ const query = (rows) => ({
   sort() { return this; },
   limit() { return this; },
   async lean() { return rows; },
+});
+
+beforeEach(() => {
+  mock.method(ItemRefund, 'find', () => query([]));
+  mock.method(ItemRefund, 'distinct', async () => []);
 });
 
 describe('the routes', () => {

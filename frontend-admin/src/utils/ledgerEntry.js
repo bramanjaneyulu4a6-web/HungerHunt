@@ -19,6 +19,7 @@ import { fulfillmentStatusLabel } from './fulfillmentStatus.js';
 const ENTRY_KINDS = {
   TOP_UP: { direction: 'in', label: 'Deposit', variant: 'success' },
   ORDER_CANCELLATION_REFUND: { direction: 'in', label: 'Refund', variant: 'success' },
+  ITEM_REFUND: { direction: 'in', label: 'Item Refund', variant: 'success' },
   BALANCE_REFUND: { direction: 'out', label: 'Balance Refund', variant: 'alert' },
   ORDER_PAYMENT: { direction: 'out', label: 'Student Wallet Payment', variant: 'neutral' },
   UPI_ORDER_PAYMENT: { direction: 'out', label: 'UPI Payment', variant: 'neutral' },
@@ -66,7 +67,7 @@ export const isTransaction = (entry) => !isOrder(entry);
  * paid straight over UPI: that money reached the bank and the cancellation put
  * it in the wallet, so it is listed as the UPI deposit it became. The same
  * rule as the TallyPrime exports (backend realMovements.js). */
-const NOT_MONEY = new Set(['TOPUP_FAILED', 'ORDER_CANCELLATION_REFUND']);
+const NOT_MONEY = new Set(['TOPUP_FAILED', 'ORDER_CANCELLATION_REFUND', 'ITEM_REFUND']);
 
 export const exportableEntries = (entries) => entries.flatMap((entry) => {
   if (isDeleted(entry) || NOT_MONEY.has(entry.kind)) return [];
@@ -95,7 +96,7 @@ export const exportableEntries = (entries) => entries.flatMap((entry) => {
  * bare number. */
 export const entryReference = (entry) => {
   const reference =
-    isOrder(entry) || entry.kind === 'ORDER_CANCELLATION_REFUND'
+    isOrder(entry) || entry.kind === 'ORDER_CANCELLATION_REFUND' || entry.kind === 'ITEM_REFUND'
       ? entry.orderId || entry.order?.reference || null
       : entry.receiptNumber || entry.transactionId || null;
   return reference ? String(reference).replace(/^#/, '') : null;
@@ -137,7 +138,7 @@ const CHANNELS = { ADMIN_DESK: 'Admin desk', PARENT_APP: 'Parent app', KIOSK: 'K
 const channelOf = (entry) => {
   if (entry.via) return entry.via;
   if (entry.kind === 'TOP_UP') return entry.mode === 'UPI' ? 'PARENT_APP' : 'ADMIN_DESK';
-  if (entry.kind === 'ORDER_CANCELLATION_REFUND' || entry.kind === 'BALANCE_REFUND') return 'ADMIN_DESK';
+  if (['ORDER_CANCELLATION_REFUND', 'ITEM_REFUND', 'BALANCE_REFUND'].includes(entry.kind)) return 'ADMIN_DESK';
   if (entry.kind === 'TOPUP_FAILED') return 'PARENT_APP';
   return null;
 };

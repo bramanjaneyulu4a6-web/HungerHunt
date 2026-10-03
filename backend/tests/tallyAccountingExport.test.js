@@ -1,4 +1,4 @@
-import test, { afterEach, before, describe, mock } from 'node:test';
+import test, { afterEach, before, beforeEach, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.JWT_SECRET ||= 'test-secret';
@@ -10,6 +10,7 @@ const Admin = (await import('../models/Admin.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const ItemRefund = (await import('../models/ItemRefund.js')).default;
 const { buildTallyVoucherXml } = await import('../src/application/accounting/tallyXml.js');
 const { signAdminToken, signStaffToken } = await import('../utils/tokens.js');
 const app = (await import('../app.js')).default;
@@ -43,6 +44,8 @@ afterEach(() => mock.restoreAll());
 const query = (rows) => ({
   select() { return this; }, sort() { return this; }, limit() { return this; }, async lean() { return rows; },
 });
+
+beforeEach(() => mock.method(ItemRefund, 'find', () => query([])));
 
 describe('TallyPrime accounting export', () => {
   test('emits balanced, escaped vouchers in business-date order', () => {

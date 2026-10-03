@@ -15,6 +15,7 @@ import Transaction from '../models/Transaction.js';
 import WalletAdjustment from '../models/WalletAdjustment.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import WalletReversal from '../models/WalletReversal.js';
+import ItemRefund from '../models/ItemRefund.js';
 import { paiseToRupees } from '../src/domain/payments/money.js';
 import { businessDateStart } from '../utils/businessTime.js';
 import {
@@ -127,7 +128,7 @@ export const getLedgerFeed = async (req, res) => {
 
     const filter = range ? { createdAt: range } : {};
 
-    const [walletRows, charges, refunds, failedTopups] = await Promise.all([
+    const [walletRows, charges, refunds, itemRefunds, failedTopups] = await Promise.all([
       WalletAdjustment.find(filter)
         .populate('studentId', 'name admissionNumber roomNumber')
         .sort({ createdAt: -1 })
@@ -139,6 +140,11 @@ export const getLedgerFeed = async (req, res) => {
         .limit(FEED_DEPTH)
         .lean(),
       WalletReversal.find(filter)
+        .populate('studentId', 'name admissionNumber roomNumber')
+        .sort({ createdAt: -1 })
+        .limit(FEED_DEPTH)
+        .lean(),
+      ItemRefund.find(filter)
         .populate('studentId', 'name admissionNumber roomNumber')
         .sort({ createdAt: -1 })
         .limit(FEED_DEPTH)
@@ -159,6 +165,9 @@ export const getLedgerFeed = async (req, res) => {
       ...(charges.length ? [{ transactionId: { $in: charges.map((charge) => charge._id) } }] : []),
       ...(refunds.length
         ? [{ _id: { $in: refunds.map((refund) => refund.fulfillmentOrderId).filter(Boolean) } }]
+        : []),
+      ...(itemRefunds.length
+        ? [{ _id: { $in: itemRefunds.map((refund) => refund.fulfillmentOrderId).filter(Boolean) } }]
         : []),
     ];
     const orders = orderQuery.length
@@ -222,7 +231,7 @@ export const getLedgerFeed = async (req, res) => {
     const orderByTransaction = new Map(
       orders.map((order) => [String(order.transactionId), order])
     );
-    const staffNames = await staffNamesFor([...topups, ...charges, ...refunds, ...balanceRefunds]);
+    const staffNames = await staffNamesFor([...topups, ...charges, ...refunds, ...itemRefunds, ...balanceRefunds]);
 
     const all = [
       ...topups.map((entry) => ({
@@ -296,6 +305,28 @@ export const getLedgerFeed = async (req, res) => {
         })(),
         student: studentOf(entry),
       })),
+      ...itemRefunds.map((entry) => {
+        const order = fulfillmentDetail(orderById.get(String(entry.fulfillmentOrderId)));
+        return {
+          _id: entry._id,
+          kind: 'ITEM_REFUND',
+          via: 'ADMIN_DESK',
+          processedBy: processedBy(entry, staffNames),
+          amount: entry.amount,
+          previousBalance: entry.previousBalance,
+          newBalance: entry.newBalance,
+          date: entry.createdAt,
+          reason: entry.reason,
+          items: entry.items || [],
+          receiptNumber: entry.receiptNumber || null,
+          order,
+          orderId: order?.reference || null,
+          reversalId: String(entry._id),
+          transactionId: String(entry._id),
+          reversedTransactionId: entry.transactionId ? String(entry.transactionId) : null,
+          student: studentOf(entry),
+        };
+      }),
       ...balanceRefunds.map((entry) => ({
         _id: entry._id,
         kind: 'BALANCE_REFUND',

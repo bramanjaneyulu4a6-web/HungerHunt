@@ -72,18 +72,18 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
         transactionId: transaction._id,
         fulfillmentOrderId: order._id,
         performedBy: actorId,
-        amount: transaction.totalAmount,
+        amount: order.totalAmount,
         previousBalance: 0,
         newBalance: 0,
         reason,
         idempotencyKey,
-        restoredItems: transaction.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        restoredItems: order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
       };
       const reversal = session
         ? (await WalletReversal.create([reversalDocument], { session }))[0]
         : await WalletReversal.create(reversalDocument);
 
-      const student = await creditWallet(order.studentId, transaction.totalAmount, { session });
+      const student = await creditWallet(order.studentId, order.totalAmount, { session });
       if (!student) {
         const error = new Error('Student record not found.');
         error.status = 409;
@@ -98,7 +98,7 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
          already in hand. */
       const demoOrder = isDemoParentPhone(student.parentPhoneNumber);
 
-      for (const item of demoOrder ? [] : transaction.items) {
+      for (const item of demoOrder ? [] : order.items) {
         await Inventory.updateOne(
           { productId: item.productId },
           { $inc: { stock: item.quantity } },
@@ -106,7 +106,7 @@ export const cancelAndRefundFulfillment = async ({ orderId, actorId, idempotency
         );
       }
 
-      reversal.previousBalance = student.pocketMoney - transaction.totalAmount;
+      reversal.previousBalance = student.pocketMoney - order.totalAmount;
       reversal.newBalance = student.pocketMoney;
       /* Numbered here because the admission number the receipt is built from
          arrives with the credited student, and the balances are being written

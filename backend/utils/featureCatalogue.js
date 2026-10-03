@@ -25,7 +25,7 @@ export const FEATURES = [
   { key: 'transactions.export', label: 'Export button (Transactions)', group: 'Operations', roles: ['admin'] },
   { key: 'ledger.receipt', label: 'Receipt button (every ledger)', group: 'Operations', roles: ['admin'] },
   { key: 'orders.changeStatus', label: 'Change order status (status badge menu)', group: 'Operations', roles: ['admin'] },
-  { key: 'orders.cancelRefund', label: 'Cancel order and refund (status badge menu) (also blocked on the server)', group: 'Operations', roles: ['admin'] },
+  { key: 'orders.cancelRefund', label: 'Cancel orders or refund unavailable items (also blocked on the server)', group: 'Operations', roles: ['admin'] },
   { key: 'dashboard.export', label: 'Export sheet (Dashboard)', group: 'Operations', roles: ['admin'] },
   { key: 'walletLedger.export', label: 'CSV exports (Wallet Ledger)', group: 'Operations', roles: ['admin'] },
   { key: 'reports.respond', label: 'Acknowledge and answer issues (Issues)', group: 'Operations', roles: ['admin'] },

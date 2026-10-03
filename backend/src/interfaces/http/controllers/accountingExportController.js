@@ -4,6 +4,7 @@ import PaymentIntent from '../../../../models/PaymentIntent.js';
 import Transaction from '../../../../models/Transaction.js';
 import WalletAdjustment from '../../../../models/WalletAdjustment.js';
 import WalletReversal from '../../../../models/WalletReversal.js';
+import ItemRefund from '../../../../models/ItemRefund.js';
 import { deletionView } from '../../../../models/ledgerDeletion.js';
 import { deleteLedgerEntry } from '../../../../utils/ledgerDeletion.js';
 import { collectionFilters, parseIncluded } from '../../../application/accounting/movementTypes.js';
@@ -67,6 +68,7 @@ const readMovements = async (req, { select, withStudents = false, realOnly = fal
   const included = parseIncluded(req.query.include);
   const processedBy = parseProcessedBy(req.query.processedBy);
   const selected = collectionFilters(included);
+  const itemRefundSelection = selected.reversals;
   const range = { createdAt: { $gte: from, $lt: to } };
 
   const standing = realOnly ? { deletion: null } : {};
@@ -75,6 +77,10 @@ const readMovements = async (req, { select, withStudents = false, realOnly = fal
     selected.reversals = null;
   }
   const filters = narrowByProcessedBy(selected, processedBy);
+  const itemRefundFilter = narrowByProcessedBy(
+    { adjustments: null, transactions: null, reversals: itemRefundSelection },
+    processedBy
+  ).reversals;
 
   const read = (Model, filter, fields) => {
     if (!filter) return [];
@@ -85,10 +91,11 @@ const readMovements = async (req, { select, withStudents = false, realOnly = fal
       .lean();
   };
 
-  let [transactions, adjustments, reversals] = await Promise.all([
+  let [transactions, adjustments, reversals, itemRefunds] = await Promise.all([
     read(Transaction, filters.transactions && { ...filters.transactions, ...standing }, select.transactions),
     read(WalletAdjustment, filters.adjustments && { ...filters.adjustments, ...standing }, select.adjustments),
     read(WalletReversal, filters.reversals, select.reversals),
+    read(ItemRefund, itemRefundFilter, select.reversals),
   ]);
 
   if (realOnly) {
@@ -107,6 +114,9 @@ const readMovements = async (req, { select, withStudents = false, realOnly = fal
     }));
   }
 
+  reversals = [...reversals, ...itemRefunds].sort(
+    (left, right) => new Date(left.createdAt) - new Date(right.createdAt)
+  );
   const rowCount = transactions.length + adjustments.length + reversals.length;
   if (rowCount > MAX_VOUCHERS) {
     throw new ApplicationError(
@@ -218,7 +228,7 @@ export const movements = async (req, res) => {
         adjustments:
           '_id studentId source type amount receiptNumber performedBy paymentIntentId previousBalance newBalance reason deletion createdAt',
         reversals:
-          '_id studentId amount receiptNumber fulfillmentOrderId transactionId performedBy previousBalance newBalance reason createdAt',
+          '_id studentId amount receiptNumber fulfillmentOrderId transactionId performedBy previousBalance newBalance reason items createdAt',
       },
     });
 
@@ -297,7 +307,7 @@ export const movements = async (req, res) => {
     reversals: reversals.map((entry) => ({
       ...entry,
       orderReference: orderReference(entry.fulfillmentOrderId),
-      items: itemsByTransaction.get(String(entry.transactionId)) || [],
+      items: entry.items?.length ? entry.items : itemsByTransaction.get(String(entry.transactionId)) || [],
     })),
     staffNames,
     refundedIds: new Set(refundedCharges.map((entry) => String(entry.transactionId))),
@@ -321,12 +331,13 @@ export const movements = async (req, res) => {
  * offered, and one who has since left is still there to be asked about —
  * as "Former staff", the same name the Transactions page gives their rows. */
 export const staff = async (req, res) => {
-  const [deposits, refunds, approvals] = await Promise.all([
+  const [deposits, refunds, itemRefunds, approvals] = await Promise.all([
     WalletAdjustment.distinct('performedBy'),
     WalletReversal.distinct('performedBy'),
+    ItemRefund.distinct('performedBy'),
     Transaction.distinct('performedBy'),
   ]);
-  const ids = [...new Set([...deposits, ...refunds, ...approvals].filter(Boolean).map(String))];
+  const ids = [...new Set([...deposits, ...refunds, ...itemRefunds, ...approvals].filter(Boolean).map(String))];
   const admins = ids.length ? await Admin.find({ _id: { $in: ids } }).select('name role').lean() : [];
   const names = new Map(admins.map((admin) => [String(admin._id), staffLabel(admin)]));
 

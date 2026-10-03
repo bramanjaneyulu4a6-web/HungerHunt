@@ -4,7 +4,7 @@
 // No database. Every model call is stubbed, because what is under test is who
 // may ask, what the merge produces, and how it is paged — none of which needs
 // a row to exist anywhere.
-import test, { after, afterEach, before, describe } from 'node:test';
+import test, { after, afterEach, before, beforeEach, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 
@@ -20,6 +20,7 @@ const Student = (await import('../models/Student.js')).default;
 const Transaction = (await import('../models/Transaction.js')).default;
 const WalletAdjustment = (await import('../models/WalletAdjustment.js')).default;
 const WalletReversal = (await import('../models/WalletReversal.js')).default;
+const ItemRefund = (await import('../models/ItemRefund.js')).default;
 const FulfillmentOrder = (await import('../models/FulfillmentOrder.js')).default;
 const PaymentIntent = (await import('../models/PaymentIntent.js')).default;
 const { signAdminToken, signStaffToken } = await import('../utils/tokens.js');
@@ -69,6 +70,16 @@ const chain = (rows) => ({
     lean: async () => rows,
     sort: () => ({ limit: () => ({ lean: async () => rows }), lean: async () => rows }),
   }),
+});
+
+beforeEach(() => {
+  mock.method(ItemRefund, 'find', () => ({
+    populate() { return this; },
+    sort() { return this; },
+    limit() { return this; },
+    async lean() { return []; },
+  }));
+  mock.method(ItemRefund, 'findById', () => ({ lean: async () => null }));
 });
 
 /* The receipt sweep asks each ledger for its unnumbered rows with

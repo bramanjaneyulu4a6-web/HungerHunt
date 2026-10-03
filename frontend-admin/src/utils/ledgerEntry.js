@@ -153,8 +153,15 @@ export const entryActor = (entry) => {
   // A caretaker approving for a parent is said outright, so the row is not
   // read as the office's own doing.
   if (entry.processedBy?.name) {
-    const caretaker = entry.processedBy.role === 'caretaker';
-    return { name: caretaker ? `${entry.processedBy.name} (caretaker)` : entry.processedBy.name, muted: false };
+    const caretakerRole = ['caretaker', 'warden'].includes(entry.processedBy.role)
+      ? entry.processedBy.role
+      : null;
+    return {
+      name: caretakerRole
+        ? `${entry.processedBy.name} (${caretakerRole})`
+        : entry.processedBy.name,
+      muted: false,
+    };
   }
 
   const channel = channelOf(entry);

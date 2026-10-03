@@ -77,6 +77,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
     account.email,
     account.role,
     ...(account.rooms || []).flatMap((room) => [room.code, room.name]),
+    ...(account.assignedCaretakers || []).map((caretaker) => caretaker.name),
   ], search)), [search, staff]);
 
   const showStudents = type === 'all' || type === 'student';
@@ -129,6 +130,9 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
         active: true,
         role: account.role,
         roomIds: account.role === 'caretaker' ? (account.rooms || []).map((room) => room.id) : [],
+        caretakerIds: account.role === 'warden'
+          ? (account.assignedCaretakers || []).map((caretaker) => caretaker.id)
+          : [],
       });
       toast.success(`${account.name} restored`);
       await onChanged?.();
@@ -202,7 +206,7 @@ export default function ArchivedUsersTab({ parents, staff, loadingAccounts, onCh
                 <tr key={`staff-${account.id}`}>
                   <td data-label="User"><strong>{account.name}</strong><small>{account.email}</small></td>
                   <td data-label="Type">Staff</td>
-                  <td data-label="Details">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : 'Caretaker'}{(account.rooms || []).length ? ` · ${(account.rooms || []).map((room) => room.code).join(' · ')}` : ''}</td>
+                  <td data-label="Details">{account.role === 'admin' ? 'Admin' : account.role === 'warehouse' ? 'Warehouse' : account.role === 'warden' ? 'Warden' : 'Caretaker'}{account.role === 'warden' && (account.assignedCaretakers || []).length ? ` · ${(account.assignedCaretakers || []).map((caretaker) => caretaker.name).join(' · ')}` : (account.rooms || []).length ? ` · ${(account.rooms || []).map((room) => room.code).join(' · ')}` : ''}</td>
                   <td data-label="Status"><Badge variant="neutral">Archived</Badge></td>
                   <td data-label="Action">{canRestore ? <Button className="btn--sm" disabled={workingId === account.id} onClick={() => restoreStaff(account)}>{workingId === account.id ? 'Restoring…' : 'Restore'}</Button> : '—'}</td>
                 </tr>

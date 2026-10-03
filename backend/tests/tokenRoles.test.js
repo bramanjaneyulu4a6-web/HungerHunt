@@ -87,7 +87,7 @@ describe('student sessions and staff roles', () => {
   });
 
   test('staff verification accepts every current staff role', () => {
-    for (const role of ['admin', 'warehouse', 'caretaker']) {
+    for (const role of ['admin', 'warehouse', 'caretaker', 'warden']) {
       assert.equal(verifyToken(signStaffToken(ADMIN_ID, role), 'staff')?.role, role);
     }
   });

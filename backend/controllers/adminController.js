@@ -1,4 +1,5 @@
 import Admin, { FULL_ADMIN } from '../models/Admin.js';
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { signStaffToken, STAFF_ROLES } from '../utils/tokens.js';
 import { sendPasswordResetMail } from '../utils/mailer.js';
@@ -8,6 +9,7 @@ import Student from '../models/Student.js';
 import FulfillmentOrder from '../models/FulfillmentOrder.js';
 import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
 import { hiddenFeaturesOf } from '../middleware/featureGate.js';
+import { caretakerAppScope, isCaretakerAppRole, loadAssignedCaretakers, uniqueObjectIds } from '../utils/wardenScope.js';
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -41,6 +43,7 @@ export const registerAdmin = async (req, res) => {
       admin: parseInt(process.env.MAX_ADMIN_ACCOUNTS) || 3,
       warehouse: parseInt(process.env.MAX_WAREHOUSE_ACCOUNTS) || 5,
       caretaker: parseInt(process.env.MAX_CARETAKER_ACCOUNTS) || 20,
+      warden: parseInt(process.env.MAX_WARDEN_ACCOUNTS) || 10,
     };
 
     const requested = req.body?.role;
@@ -66,6 +69,7 @@ export const registerAdmin = async (req, res) => {
     }
 
     let roomIds = [];
+    let caretakerIds = [];
     if (role === 'caretaker') {
       const requestedRoomIds = [...new Set(
         (Array.isArray(req.body?.roomIds) ? req.body.roomIds : []).map(String)
@@ -87,8 +91,18 @@ export const registerAdmin = async (req, res) => {
           message: 'Run and verify the room backfill before creating a caretaker account.',
         });
       }
-    } else if (req.body?.roomIds?.length) {
-      return res.status(400).json({ message: 'Only caretaker accounts may be assigned rooms.' });
+    } else if (role === 'warden') {
+      const requestedCaretakerIds = uniqueObjectIds(req.body?.caretakerIds);
+      if (!requestedCaretakerIds.length || requestedCaretakerIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+        return res.status(400).json({ message: 'Choose at least one active caretaker for the warden.' });
+      }
+      const caretakers = await loadAssignedCaretakers(requestedCaretakerIds);
+      if (caretakers.length !== requestedCaretakerIds.length) {
+        return res.status(400).json({ message: 'Choose only active caretaker accounts for the warden.' });
+      }
+      caretakerIds = caretakers.map((caretaker) => caretaker._id);
+    } else if (req.body?.roomIds?.length || req.body?.caretakerIds?.length) {
+      return res.status(400).json({ message: 'Room and caretaker assignments are only allowed on their matching roles.' });
     }
 
     const existingAdmin = await Admin.findOne({
@@ -100,7 +114,16 @@ export const registerAdmin = async (req, res) => {
       });
     }
 
-    const admin = new Admin({ name, phone, email: email || undefined, password, role, roomIds, isSuperAdmin });
+    const admin = new Admin({
+      name,
+      phone,
+      email: email || undefined,
+      password,
+      role,
+      roomIds,
+      caretakerIds,
+      isSuperAdmin,
+    });
     await admin.save();
 
     return res.status(201).json({
@@ -152,7 +175,7 @@ export const loginAdmin = async (req, res) => {
     const password = req.body?.password;
     if (!password) return res.status(401).json({ message: 'Invalid credentials' });
     const admin = phone
-      ? await Admin.findOne({ phone, role: { $in: ['warehouse', 'caretaker'] } })
+      ? await Admin.findOne({ phone, role: { $in: ['warehouse', 'caretaker', 'warden'] } })
       : email
         ? await Admin.findOne({ email, ...FULL_ADMIN })
         : null;
@@ -185,15 +208,21 @@ export const loginAdmin = async (req, res) => {
     // away an account that belongs at a different one, rather than signing it
     // in to a console where every screen answers 403.
     let rooms = [];
-    if (role === 'caretaker') {
-      if (!admin.roomIds?.length) {
-        return res.status(403).json({ message: 'This caretaker account has no room assignment.' });
+    let assignedCaretakers = [];
+    if (isCaretakerAppRole(role)) {
+      const scope = await caretakerAppScope(admin);
+      if (!scope.complete) {
+        return res.status(403).json({
+          message: role === 'warden'
+            ? 'This warden account needs at least one active caretaker with assigned rooms.'
+            : 'This caretaker account has no valid room assignment.',
+        });
       }
-
-      rooms = await Room.find({ _id: { $in: admin.roomIds } }).select('code name').lean();
-      if (rooms.length !== admin.roomIds.length) {
-        return res.status(403).json({ message: 'This caretaker account is assigned to missing rooms.' });
+      rooms = await Room.find({ _id: { $in: scope.roomIds } }).select('code name').lean();
+      if (rooms.length !== scope.roomIds.length) {
+        return res.status(403).json({ message: 'This account is assigned to missing rooms.' });
       }
+      assignedCaretakers = scope.caretakers;
     }
 
     const roomList = rooms.map((room) => ({ id: String(room._id), code: room.code, name: room.name }));
@@ -207,7 +236,14 @@ export const loginAdmin = async (req, res) => {
       email: admin.email || '',
       role,
       ...superFlag,
-      ...(role === 'caretaker' ? { rooms: roomList } : {}),
+      ...(isCaretakerAppRole(role) ? { rooms: roomList } : {}),
+      ...(role === 'warden' ? {
+        caretakers: assignedCaretakers.map((caretaker) => ({
+          id: String(caretaker._id),
+          name: caretaker.name,
+          phone: caretaker.phone,
+        })),
+      } : {}),
     };
 
     res.json({
@@ -218,7 +254,8 @@ export const loginAdmin = async (req, res) => {
       name: admin.name,
       phone: admin.phone,
       staff,
-      ...(role === 'caretaker' ? { rooms: roomList } : {}),
+      ...(isCaretakerAppRole(role) ? { rooms: roomList } : {}),
+      ...(role === 'warden' ? { caretakers: staff.caretakers } : {}),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

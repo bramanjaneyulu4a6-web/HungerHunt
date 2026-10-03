@@ -13,14 +13,16 @@ const { loginAdmin } = await import('../controllers/adminController.js');
 const STAFF_ID = '507f1f77bcf86cd799439011';
 const ROOM_ID = '507f191e810c19729de860e1';
 const SECOND_ROOM_ID = '507f191e810c19729de860e2';
+const CARETAKER_ID = '507f1f77bcf86cd799439012';
 
 afterEach(() => mock.restoreAll());
 
 test('every staff role requires a name and phone number', () => {
-  for (const role of ['admin', 'warehouse', 'caretaker']) {
+  for (const role of ['admin', 'warehouse', 'caretaker', 'warden']) {
     const account = new Admin({
       email: `${role}@example.com`, password: 'password', role,
       ...(role === 'caretaker' ? { roomIds: [ROOM_ID] } : {}),
+      ...(role === 'warden' ? { caretakerIds: [CARETAKER_ID] } : {}),
     });
     const errors = account.validateSync().errors;
     assert.match(errors.name.message, /required/i);
@@ -39,6 +41,12 @@ test('email is required only for administrators', () => {
     roomIds: [ROOM_ID],
   });
   assert.equal(caretaker.validateSync(), undefined);
+
+  const warden = new Admin({
+    name: 'Leela Das', phone: '9876543214', password: 'password', role: 'warden',
+    caretakerIds: [CARETAKER_ID],
+  });
+  assert.equal(warden.validateSync(), undefined);
 
   const admin = new Admin({
     name: 'Asha Rao', phone: '9876543213', password: 'password', role: 'admin',
@@ -63,11 +71,12 @@ test('a caretaker account cannot be saved with no rooms', () => {
 });
 
 test('a non-caretaker account cannot be saved with rooms', () => {
-  for (const role of ['admin', 'warehouse']) {
+  for (const role of ['admin', 'warehouse', 'warden']) {
     const account = new Admin({
       name: 'Ravi Kumar', phone: '9876543211',
       email: `${role}.rooms@example.com`, password: 'password', role,
       roomIds: [ROOM_ID],
+      ...(role === 'warden' ? { caretakerIds: [CARETAKER_ID] } : {}),
     });
     const errors = account.validateSync().errors;
     assert.match(errors.roomIds.message, /not allowed for other roles/i);
@@ -87,6 +96,19 @@ test('a caretaker holding rooms and a warehouse account holding none both valida
     email: 'store@example.com', password: 'password', role: 'warehouse',
   });
   assert.equal(warehouse.validateSync(), undefined);
+});
+
+test('a warden requires caretakers and other roles cannot carry them', () => {
+  const noTeam = new Admin({
+    name: 'Leela Das', phone: '9876543214', password: 'password', role: 'warden',
+  });
+  assert.match(noTeam.validateSync().errors.caretakerIds.message, /at least one caretaker/i);
+
+  const wrongRole = new Admin({
+    name: 'Meera Nair', phone: '9876543212', password: 'password', role: 'caretaker',
+    roomIds: [ROOM_ID], caretakerIds: [CARETAKER_ID],
+  });
+  assert.match(wrongRole.validateSync().errors.caretakerIds.message, /not allowed for other roles/i);
 });
 
 test('caretaker login returns identity and every readable room', async () => {
@@ -125,7 +147,7 @@ test('caretaker login returns identity and every readable room', async () => {
   assert.equal(status, 200);
   assert.deepEqual(loginFilter, {
     phone: '9876543210',
-    role: { $in: ['warehouse', 'caretaker'] },
+    role: { $in: ['warehouse', 'caretaker', 'warden'] },
   });
   const rooms = [
     { id: ROOM_ID, code: 'D-4', name: 'East Residence' },
@@ -142,8 +164,54 @@ test('caretaker login returns identity and every readable room', async () => {
   assert.equal(typeof body.token, 'string');
 });
 
-/* Rooms belong to caretakers and nobody else, so the key is absent rather than
-   empty on every other login — the same shape the singular field had. */
+test('warden login derives rooms from every assigned active caretaker', async () => {
+  const password = 'warden-password';
+  const hash = await bcrypt.hash(password, 4);
+  mock.method(Admin, 'findOne', async () => ({
+    _id: STAFF_ID,
+    name: 'Leela Das',
+    phone: '9876543214',
+    password: hash,
+    role: 'warden',
+    caretakerIds: [CARETAKER_ID],
+  }));
+  mock.method(Admin, 'find', () => ({
+    select() { return this; },
+    lean: async () => [{
+      _id: CARETAKER_ID,
+      name: 'Meera Nair',
+      phone: '9876543210',
+      role: 'caretaker',
+      active: true,
+      roomIds: [ROOM_ID, SECOND_ROOM_ID],
+    }],
+  }));
+  mock.method(Room, 'find', () => ({
+    select: () => ({
+      lean: async () => [
+        { _id: ROOM_ID, code: 'D-4', name: 'East Residence' },
+        { _id: SECOND_ROOM_ID, code: 'D-5', name: 'West Residence' },
+      ],
+    }),
+  }));
+
+  let status = 200;
+  let body;
+  const res = {
+    status(value) { status = value; return this; },
+    json(value) { body = value; return this; },
+  };
+  await loginAdmin({ body: { phone: '9876543214', password } }, res);
+
+  assert.equal(status, 200);
+  assert.equal(body.role, 'warden');
+  assert.deepEqual(body.caretakers, [{ id: CARETAKER_ID, name: 'Meera Nair', phone: '9876543210' }]);
+  assert.deepEqual(body.rooms.map((room) => room.id), [ROOM_ID, SECOND_ROOM_ID]);
+  assert.deepEqual(body.staff.caretakers, body.caretakers);
+});
+
+/* Direct or derived rooms belong only to caretaker-app roles, so the key is
+   absent rather than empty on a warehouse login. */
 test('a warehouse login carries no rooms key at all', async () => {
   const password = 'warehouse-password';
   const hash = await bcrypt.hash(password, 4);

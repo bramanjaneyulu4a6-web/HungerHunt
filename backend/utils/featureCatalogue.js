@@ -83,10 +83,10 @@ export const FEATURES = [
 
   // Warehouse app, caretaker accounts. Collecting a package is the job
   // itself and is not hideable.
-  { key: 'caretaker.reports', label: 'Reports page', group: 'Screens', roles: ['caretaker'] },
-  { key: 'caretaker.history', label: 'History view (Room packages)', group: 'Screens', roles: ['caretaker'] },
-  { key: 'caretaker.reportPackage', label: 'Issue with this package (card and collect screen)', group: 'Actions', roles: ['caretaker'] },
-  { key: 'caretaker.newReport', label: 'New report (Reports page)', group: 'Actions', roles: ['caretaker'] },
+  { key: 'caretaker.reports', label: 'Reports page', group: 'Screens', roles: ['caretaker', 'warden'] },
+  { key: 'caretaker.history', label: 'History view (Room packages)', group: 'Screens', roles: ['caretaker', 'warden'] },
+  { key: 'caretaker.reportPackage', label: 'Issue with this package (card and collect screen)', group: 'Actions', roles: ['caretaker', 'warden'] },
+  { key: 'caretaker.newReport', label: 'New report (Reports page)', group: 'Actions', roles: ['caretaker', 'warden'] },
 ];
 
 export const FEATURE_KEYS = new Set(FEATURES.map((feature) => feature.key));
@@ -100,6 +100,7 @@ export const featuresForRole = (role) => FEATURES.filter((feature) => feature.ro
 export const DEFAULT_HIDDEN = {
   warehouse: [],
   caretaker: [],
+  warden: [],
   admin: [
     '/billing',
     '/reports',
@@ -116,7 +117,7 @@ export const DEFAULT_HIDDEN = {
 };
 
 // The roles that can carry a setting: one per app audience.
-export const SETTABLE_ROLES = ['admin', 'warehouse', 'caretaker'];
+export const SETTABLE_ROLES = ['admin', 'warehouse', 'caretaker', 'warden'];
 
 export const OVERRIDE_VALUES = ['hidden', 'shown'];
 

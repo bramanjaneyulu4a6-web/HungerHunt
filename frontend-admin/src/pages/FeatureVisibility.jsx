@@ -17,6 +17,7 @@ const ROLE_TABS = [
   { role: 'admin', label: 'Admin console', noun: 'admin' },
   { role: 'warehouse', label: 'Warehouse app', noun: 'warehouse' },
   { role: 'caretaker', label: 'Caretaker app', noun: 'caretaker' },
+  { role: 'warden', label: 'Warden app', noun: 'warden' },
 ];
 
 const OVERRIDE_OPTIONS = [

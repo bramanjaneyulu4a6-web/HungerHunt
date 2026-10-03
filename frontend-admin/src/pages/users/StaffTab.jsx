@@ -5,11 +5,14 @@ import api from '../../utils/api';
 import { refreshCurrentStaff } from '../../utils/currentStaff';
 import { Badge, Button, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 
-const EMPTY = { name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [], isSuperAdmin: false };
+const EMPTY = {
+  name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [], caretakerIds: [], isSuperAdmin: false,
+};
 
 const roleLabel = (account) => {
   if (account.role === 'warehouse') return 'Warehouse';
   if (account.role === 'caretaker') return 'Caretaker';
+  if (account.role === 'warden') return 'Warden';
   return account.isSuperAdmin ? 'Super admin' : 'Admin';
 };
 
@@ -26,6 +29,9 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
     setForm({
       name: account.name || '', phone: account.phone || '', email: account.email || '', password: '',
       role: account.role || 'admin', roomIds: (account.rooms || []).map((room) => room.id),
+      caretakerIds: (account.assignedCaretakers || [])
+        .filter((caretaker) => caretaker.active)
+        .map((caretaker) => caretaker.id),
       isSuperAdmin: account.isSuperAdmin === true,
     });
   };
@@ -37,10 +43,15 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
       toast.error('Choose at least one room');
       return;
     }
+    if (form.role === 'warden' && !form.caretakerIds.length) {
+      toast.error('Choose at least one caretaker');
+      return;
+    }
     setSaving(true);
     const payload = {
       ...form,
       roomIds: form.role === 'caretaker' ? form.roomIds : [],
+      caretakerIds: form.role === 'warden' ? form.caretakerIds : [],
       isSuperAdmin: form.role === 'admin' && form.isSuperAdmin,
     };
     try {
@@ -78,7 +89,14 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
   const applyActive = async (account, active) => {
     setWorkingId(account.id);
     try {
-      if (active) await api.put(`/admin/users/staff/${account.id}`, { active: true, role: account.role, roomIds: (account.rooms || []).map((room) => room.id) });
+      if (active) await api.put(`/admin/users/staff/${account.id}`, {
+        active: true,
+        role: account.role,
+        roomIds: account.role === 'caretaker' ? (account.rooms || []).map((room) => room.id) : [],
+        caretakerIds: account.role === 'warden'
+          ? (account.assignedCaretakers || []).map((caretaker) => caretaker.id)
+          : [],
+      });
       else await api.delete(`/admin/users/staff/${account.id}`);
       toast.success(active ? 'Staff account restored' : 'Staff account archived');
       await onChanged();
@@ -93,7 +111,7 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
 
   return (
     <section>
-      <div className="users-tab-head"><div><h2>Staff accounts</h2><p>Admins, warehouse staff, and room caretakers.</p></div><Button onClick={openCreate}>Add staff account</Button></div>
+      <div className="users-tab-head"><div><h2>Staff accounts</h2><p>Admins, warehouse staff, room caretakers, and wardens.</p></div><Button onClick={openCreate}>Add staff account</Button></div>
       {!staff.length ? (
         <EmptyState icon="♙" title="No staff accounts" action={<Button onClick={openCreate}>Add staff</Button>} />
       ) : (
@@ -104,7 +122,14 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
               <td data-label="Name"><strong>{account.name}</strong></td>
               <td data-label="Contact"><div>{account.phone}</div><small>{account.email || 'No email'}</small></td>
               <td data-label="Role">{roleLabel(account)}{account.id === me?.id && <small> · you</small>}</td>
-              <td data-label="Assignment">{(account.rooms || []).map((room) => room.code).join(' · ') || '—'}</td>
+              <td data-label="Assignment">
+                {account.role === 'warden'
+                  ? (account.assignedCaretakers || []).map((caretaker) => caretaker.name).join(' · ') || '—'
+                  : (account.rooms || []).map((room) => room.code).join(' · ') || '—'}
+                {account.role === 'warden' && (account.rooms || []).length > 0 && (
+                  <small> · {(account.rooms || []).map((room) => room.code).join(' · ')}</small>
+                )}
+              </td>
               <td data-label="Status"><Badge variant={account.active ? 'success' : 'neutral'}>{account.active ? 'Active' : 'Inactive'}</Badge></td>
               <td data-label="Actions"><div className="cell-actions">
                 <Button className="btn--sm" variant="ghost" onClick={() => openEdit(account)}>Edit</Button>
@@ -124,8 +149,8 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
               <label><span className="field-label">Phone</span><input className="input" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} /></label>
               <label><span className="field-label">Email{form.role === 'admin' ? '' : ' (optional)'}</span><input className="input" type="email" required={form.role === 'admin'} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
               {!editing && <label><span className="field-label">Temporary password</span><input className="input" type="password" minLength={8} required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>}
-              <label><span className="field-label">Role</span><select className="input" value={form.role} disabled={editing?.id === me?.id} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [], isSuperAdmin: event.target.value === 'admin' ? form.isSuperAdmin : false })}>
-                <option value="admin">Admin — full back office</option><option value="warehouse">Warehouse</option><option value="caretaker">Caretaker</option>
+              <label><span className="field-label">Role</span><select className="input" value={form.role} disabled={editing?.id === me?.id} onChange={(event) => setForm({ ...form, role: event.target.value, roomIds: event.target.value === 'caretaker' ? form.roomIds : [], caretakerIds: event.target.value === 'warden' ? form.caretakerIds : [], isSuperAdmin: event.target.value === 'admin' ? form.isSuperAdmin : false })}>
+                <option value="admin">Admin — full back office</option><option value="warehouse">Warehouse</option><option value="caretaker">Caretaker</option><option value="warden">Warden — assigned caretaker teams</option>
               </select></label>
               {form.role === 'admin' && (
                 <label className="student-picker__row">
@@ -155,8 +180,28 @@ export default function StaffTab({ staff, rooms, loading, onChanged, me }) {
                   </label>
                 ))}
               </fieldset>}
+              {form.role === 'warden' && <fieldset className="student-picker"><legend>Assigned caretakers</legend>
+                {staff.filter((account) => account.role === 'caretaker' && account.active).map((caretaker) => (
+                  <label key={caretaker.id} className="student-picker__row">
+                    <input
+                      type="checkbox"
+                      checked={form.caretakerIds.includes(caretaker.id)}
+                      onChange={() => setForm({
+                        ...form,
+                        caretakerIds: form.caretakerIds.includes(caretaker.id)
+                          ? form.caretakerIds.filter((id) => id !== caretaker.id)
+                          : [...form.caretakerIds, caretaker.id],
+                      })}
+                    />
+                    <span><strong>{caretaker.name}</strong><small>{(caretaker.rooms || []).map((room) => room.code).join(' · ') || 'No rooms'}</small></span>
+                  </label>
+                ))}
+                {!staff.some((account) => account.role === 'caretaker' && account.active) && (
+                  <p>Create an active caretaker account before creating a warden.</p>
+                )}
+              </fieldset>}
             </div>
-            <div className="modal-actions"><Button variant="ghost" disabled={saving} onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (form.role === 'caretaker' && !form.roomIds.length)}>{saving ? 'Saving…' : 'Save staff account'}</Button></div>
+            <div className="modal-actions"><Button variant="ghost" disabled={saving} onClick={close}>Cancel</Button><Button type="submit" disabled={saving || (form.role === 'caretaker' && !form.roomIds.length) || (form.role === 'warden' && !form.caretakerIds.length)}>{saving ? 'Saving…' : 'Save staff account'}</Button></div>
           </form>
         </div>
       )}

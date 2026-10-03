@@ -46,6 +46,7 @@ import { renderCaretakerReceivingSheet } from '../../../../utils/caretakerReceiv
 import { renderActiveOrdersExport } from '../../../../utils/activeOrdersExportPdf.js';
 import { buildRoomUnits } from '../../../../utils/roomUnits.js';
 import { resetDemoOrder } from '../../../../utils/demoParentReset.js';
+import { isCaretakerAppRole } from '../../../../utils/wardenScope.js';
 
 const transitionFields = Object.freeze({
   [OrderStatus.PACKED]: ['packedAt', 'packedBy'],
@@ -191,7 +192,7 @@ const CARETAKER_LIVE_STATUSES = Object.freeze([...OPEN_STATUSES, OrderStatus.DEL
    file. Getting one of them wrong does not fail loudly — it silently hides half
    their work, or shows them somebody else's. */
 export const list = async (req, res) => {
-  const caretaker = req.staff.role === 'caretaker';
+  const caretaker = isCaretakerAppRole(req.staff.role);
   const status = caretaker ? null : readStatus(req.query);
 
   const filter = {
@@ -237,7 +238,7 @@ export const list = async (req, res) => {
    the stages named; no filter prints the whole board. A plain read —
    printing moves nothing. */
 export const print = async (req, res) => {
-  if (req.staff.role === 'caretaker') {
+  if (isCaretakerAppRole(req.staff.role)) {
     throw new ApplicationError('The orders list is storeroom work.', {
       status: 403,
       code: 'FORBIDDEN',

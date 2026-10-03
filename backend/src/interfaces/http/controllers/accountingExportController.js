@@ -216,7 +216,7 @@ export const tallyCsv = async (req, res) => {
    parent never reads as the office's own doing — in the Transactions page,
    its filters, the CSVs and the Processed by picker alike. */
 const staffLabel = (admin) =>
-  admin.role === 'caretaker' ? `${admin.name} (caretaker)` : admin.name;
+  ['caretaker', 'warden'].includes(admin.role) ? `${admin.name} (${admin.role})` : admin.name;
 
 export const movements = async (req, res) => {
   const { transactions, adjustments, reversals, rowCount, timeZone, from, to } =

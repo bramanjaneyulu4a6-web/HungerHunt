@@ -23,8 +23,9 @@ const Login = () => {
       setLoading(true);
       const res = await api.post("/admin/login", { phone, password });
 
-      // Warehouse staff and caretakers share this front door, then get separate
-      // route trees. The caretaker tree never mounts procurement screens.
+      // Warehouse staff, caretakers and wardens share this front door, then
+      // get separate route trees. Caretaker-like roles never mount procurement
+      // screens.
       localStorage.setItem("warehouseToken", res.data.token);
       localStorage.setItem("staffRole", res.data.role || "admin");
       localStorage.setItem("staffProfile", JSON.stringify(res.data.staff || {

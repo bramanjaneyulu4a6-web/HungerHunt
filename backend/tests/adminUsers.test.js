@@ -167,6 +167,7 @@ test('the final active admin cannot be demoted or deactivated', async () => {
 const STAFF_ID = '507f1f77bcf86cd799439013';
 const ROOM_ID = '507f191e810c19729de860e1';
 const MISSING_ROOM_ID = '507f191e810c19729de860e9';
+const CARETAKER_ID = '507f1f77bcf86cd799439014';
 const PASSWORD_HASH = '$2a$10$YQiiz3n1z3n1z3n1z3n1zOmZ0m1qZ0m1qZ0m1qZ0m1qZ0m1qZ0m1q';
 
 const caretakerAccount = (overrides = {}) => ({
@@ -250,6 +251,47 @@ test('an explicitly supplied room that is missing or inactive is still rejected'
   assert.equal(response.status, 400);
   assert.match((await response.json()).message, /at least one active room/i);
   assert.deepEqual(account.roomIds.map(String), [ROOM_ID]);
+});
+
+test('a super admin can assign a warden to active caretakers and sees the derived rooms', async () => {
+  authenticate();
+  const account = caretakerAccount({
+    role: 'warden',
+    roomIds: [],
+    caretakerIds: [],
+  });
+  const caretaker = {
+    _id: CARETAKER_ID,
+    name: 'Meera Nair',
+    phone: '9876500022',
+    role: 'caretaker',
+    active: true,
+    roomIds: [ROOM_ID],
+  };
+  mock.method(Admin, 'findById', async () => account);
+  mock.method(Admin, 'find', () => ({
+    select() { return this; },
+    lean: async () => [caretaker],
+  }));
+  mock.method(Room, 'find', () => ({
+    lean: async () => [{ _id: ROOM_ID, code: 'D-4', name: 'Block D' }],
+  }));
+
+  const response = await request(`/api/admin/users/staff/${STAFF_ID}`, {
+    method: 'PUT', body: JSON.stringify({ role: 'warden', caretakerIds: [CARETAKER_ID] }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(account.caretakerIds.map(String), [CARETAKER_ID]);
+  assert.deepEqual(account.roomIds, []);
+  assert.deepEqual(body.staff.assignedCaretakers, [{
+    id: CARETAKER_ID,
+    name: 'Meera Nair',
+    phone: '9876500022',
+    active: true,
+  }]);
+  assert.deepEqual(body.staff.rooms, [{ id: ROOM_ID, code: 'D-4', name: 'Block D' }]);
 });
 
 /* The update endpoint answered with the raw Mongoose document, so every admin

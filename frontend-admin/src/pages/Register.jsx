@@ -9,9 +9,10 @@ const Register = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [],
+    name: '', phone: '', email: '', password: '', role: 'admin', roomIds: [], caretakerIds: [],
   });
   const [rooms, setRooms] = useState([]);
+  const [caretakers, setCaretakers] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -29,8 +30,11 @@ const Register = () => {
 
   useEffect(() => {
     if (!canChooseRole) return;
-    api.get('/rooms?active=1')
-      .then((response) => setRooms(response.data))
+    Promise.all([api.get('/rooms?active=1'), api.get('/admin/users/staff')])
+      .then(([roomResponse, staffResponse]) => {
+        setRooms(roomResponse.data);
+        setCaretakers((staffResponse.data || []).filter((account) => account.active && account.role === 'caretaker'));
+      })
       .catch(() => setError('Could not load rooms.'));
   }, [canChooseRole]);
 
@@ -43,6 +47,7 @@ const Register = () => {
       : e.target.value;
     const next = { ...formData, [e.target.name]: value };
     if (e.target.name === 'role' && e.target.value !== 'caretaker') next.roomIds = [];
+    if (e.target.name === 'role' && e.target.value !== 'warden') next.caretakerIds = [];
     setFormData(next);
   };
 
@@ -52,6 +57,15 @@ const Register = () => {
       roomIds: current.roomIds.includes(roomId)
         ? current.roomIds.filter((id) => id !== roomId)
         : [...current.roomIds, roomId],
+    }));
+  };
+
+  const toggleCaretaker = (caretakerId) => {
+    setFormData((current) => ({
+      ...current,
+      caretakerIds: current.caretakerIds.includes(caretakerId)
+        ? current.caretakerIds.filter((id) => id !== caretakerId)
+        : [...current.caretakerIds, caretakerId],
     }));
   };
 
@@ -68,6 +82,10 @@ const Register = () => {
 
     if (canChooseRole && formData.role === 'caretaker' && !formData.roomIds.length) {
       setError('Choose at least one room.');
+      return;
+    }
+    if (canChooseRole && formData.role === 'warden' && !formData.caretakerIds.length) {
+      setError('Choose at least one caretaker.');
       return;
     }
 
@@ -177,6 +195,7 @@ const Register = () => {
               <option value="admin">Admin — full back office</option>
               <option value="warehouse">Warehouse — goods in only</option>
               <option value="caretaker">Caretaker — assigned room deliveries</option>
+              <option value="warden">Warden — assigned caretaker teams</option>
             </select>
 
             <p className="auth-hint">
@@ -184,6 +203,8 @@ const Register = () => {
                 ? 'Can raise purchase orders and receive deliveries in the warehouse app. Cannot touch students, wallets or prices.'
                 : formData.role === 'caretaker'
                   ? 'Can see packages on the way to assigned rooms and confirm delivery. Cannot access stock, suppliers, orders or prices.'
+                  : formData.role === 'warden'
+                    ? 'Can do caretaker work for every room held by the assigned caretakers.'
                 : 'Full access, including student records, wallet top-ups, billing and creating other accounts.'}
             </p>
           </div>
@@ -205,12 +226,28 @@ const Register = () => {
           </fieldset>
         )}
 
+        {canChooseRole && formData.role === 'warden' && (
+          <fieldset className="student-picker">
+            <legend>Assigned caretakers</legend>
+            {caretakers.map((caretaker) => (
+              <label key={caretaker.id} className="student-picker__row">
+                <input
+                  type="checkbox"
+                  checked={formData.caretakerIds.includes(caretaker.id)}
+                  onChange={() => toggleCaretaker(caretaker.id)}
+                />
+                <span><strong>{caretaker.name}</strong><small>{(caretaker.rooms || []).map((room) => room.code).join(' · ')}</small></span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+
         <Button
           type="submit"
           variant="dark"
           block
           className="auth-submit"
-          disabled={submitting || (canChooseRole && formData.role === 'caretaker' && !formData.roomIds.length)}
+          disabled={submitting || (canChooseRole && formData.role === 'caretaker' && !formData.roomIds.length) || (canChooseRole && formData.role === 'warden' && !formData.caretakerIds.length)}
         >
           {submitting ? 'Creating account…' : 'Create Account'}
         </Button>

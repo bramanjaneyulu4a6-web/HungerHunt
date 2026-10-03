@@ -112,6 +112,7 @@ const ReportsButton = () => {
 
 const CaretakerShell = ({ children, identity = true }) => {
   const profile = readStaffProfile();
+  const warden = profile.role === 'warden';
   const reportsAllowed = useFeature("caretaker.reports");
   /* Devices already in the field hold the single-room profile written by the
      old login and will keep it until the caretaker signs in again, so the one
@@ -129,7 +130,7 @@ const CaretakerShell = ({ children, identity = true }) => {
       <header className="caretaker-header">
         <div className="caretaker-header__brand">
           <img src="/Logo.jpeg" alt="" className="caretaker-header__logo" />
-          <span><strong>Hunger Hunt</strong><small>Caretaker</small></span>
+          <span><strong>Hunger Hunt</strong><small>{warden ? 'Warden' : 'Caretaker'}</small></span>
         </div>
         <div className="caretaker-header__actions">
           {reportsAllowed && <ReportsButton />}
@@ -138,13 +139,13 @@ const CaretakerShell = ({ children, identity = true }) => {
       </header>
 
       {identity && (
-      <section className="caretaker-identity" aria-label="Signed-in caretaker">
+      <section className="caretaker-identity" aria-label={`Signed-in ${warden ? 'warden' : 'caretaker'}`}>
         <div className="caretaker-identity__avatar" aria-hidden="true">
-          {(profile.name || "C").trim().charAt(0).toUpperCase()}
+          {(profile.name || (warden ? "W" : "C")).trim().charAt(0).toUpperCase()}
         </div>
         <div className="caretaker-identity__details">
           <p className="caretaker-identity__eyebrow">Signed in as</p>
-          <h1>{profile.name || "Caretaker"}</h1>
+          <h1>{profile.name || (warden ? "Warden" : "Caretaker")}</h1>
           <a href={profile.phone ? `tel:${profile.phone.replace(/[^+\d]/g, "")}` : undefined}>
             {profile.phone || "Phone unavailable"}
           </a>
@@ -152,7 +153,7 @@ const CaretakerShell = ({ children, identity = true }) => {
         <div className="caretaker-identity__rooms">
           <Icon name="home" size={20} />
           <span>
-            <small>{profileRooms.length === 1 ? "Your room" : "Your rooms"}</small>
+            <small>{warden ? 'Managed rooms' : profileRooms.length === 1 ? "Your room" : "Your rooms"}</small>
             {roomCodes.length ? (
               <ul className="caretaker-identity__room-list">
                 {roomCodes.map((code) => <li key={code}>{code}</li>)}
@@ -218,7 +219,7 @@ const StaffRoutes = () => {
   // mutable companion value in localStorage. The backend remains the security
   // boundary; this prevents ordinary local state drift from showing one role
   // the other role's interface.
-  const caretaker = roleFromToken() === 'caretaker';
+  const caretaker = ['caretaker', 'warden'].includes(roleFromToken());
 
   if (caretaker) {
     return (

@@ -71,9 +71,14 @@ describe('the catalogue arithmetic', () => {
     }
   });
 
-  test('the warehouse and caretaker roles hide nothing until told to', () => {
+  test('the warehouse, caretaker and warden roles hide nothing until told to', () => {
     assert.deepEqual(effectiveHidden({ role: 'warehouse' }), []);
     assert.deepEqual(effectiveHidden({ role: 'caretaker' }), []);
+    assert.deepEqual(effectiveHidden({ role: 'warden' }), []);
+    assert.deepEqual(
+      featuresForRole('warden').map((feature) => feature.key),
+      featuresForRole('caretaker').map((feature) => feature.key),
+    );
   });
 
   test('a role only ever receives its own features, even when handed another role\'s keys', () => {

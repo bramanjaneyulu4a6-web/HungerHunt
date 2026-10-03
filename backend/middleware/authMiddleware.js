@@ -2,6 +2,7 @@ import Admin from '../models/Admin.js';
 import Parent from '../models/Parent.js';
 import Student from '../models/Student.js';
 import { verifyToken } from '../utils/tokens.js';
+import { caretakerAppScope, isCaretakerAppRole } from '../utils/wardenScope.js';
 
 const readToken = (req) => req.headers.authorization?.split(' ')[1];
 
@@ -49,11 +50,18 @@ const staffGate = (allowed, needsMessage) => async (req, res, next) => {
     req.adminId = payload.id;
     req.staff = { id: payload.id, role };
 
-    if (role === 'caretaker') {
-      const account = await Admin.findById(payload.id).select('email roomIds').lean();
-      if (!account?.roomIds?.length) return denied(res, 'Not authorized');
+    if (isCaretakerAppRole(role)) {
+      const account = await Admin.findById(payload.id).select('email role roomIds caretakerIds').lean();
+      // The token role has just been matched against the stored row above.
+      // Pass that proven value explicitly; it also keeps pre-role test/legacy
+      // projections that omit the field from being mistaken for an admin.
+      const scope = await caretakerAppScope({ ...account, role });
+      if (!scope.complete) return denied(res, 'Not authorized');
       req.staff.email = account.email;
-      req.staff.roomIds = account.roomIds.map(String);
+      req.staff.roomIds = scope.roomIds;
+      if (role === 'warden') {
+        req.staff.caretakerIds = scope.caretakers.map((caretaker) => String(caretaker._id));
+      }
     }
     next();
   } catch (_error) {
@@ -107,8 +115,8 @@ export const protectWarehouse = staffGate(['admin', 'warehouse'], 'This action n
 // separate from protectWarehouse: adding the role here cannot open inventory,
 // suppliers, receipts or purchase orders.
 export const protectCaretaker = staffGate(
-  ['caretaker'],
-  'This action needs a caretaker account.'
+  ['caretaker', 'warden'],
+  'This action needs a caretaker or warden account.'
 );
 
 /* Read-only surfaces every kind of staff needs (live stock).
@@ -127,7 +135,7 @@ export const protectAnyStaff = staffGate(
    hidden from it. Nothing else should sit here — a route that means to admit
    everybody should say so on one of the narrower gates above. */
 export const protectEveryStaff = staffGate(
-  ['admin', 'warehouse', 'caretaker'],
+  ['admin', 'warehouse', 'caretaker', 'warden'],
   'This action needs a staff account.'
 );
 

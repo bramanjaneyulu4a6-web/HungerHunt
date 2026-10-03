@@ -17,6 +17,7 @@ const app = (await import('../app.js')).default;
 mongoose.set('bufferTimeoutMS', 200);
 const STAFF_ID = '507f1f77bcf86cd799439011';
 const ROOM_ID = '507f191e810c19729de860e1';
+const CARETAKER_ID = '507f1f77bcf86cd799439012';
 const token = signStaffToken(STAFF_ID, 'admin');
 let server;
 let base;
@@ -51,10 +52,11 @@ test('caretaker accounts require at least one room and other roles reject any', 
 });
 
 test('every staff role requires a name and phone number', () => {
-  for (const role of ['admin', 'warehouse', 'caretaker']) {
+  for (const role of ['admin', 'warehouse', 'caretaker', 'warden']) {
     const account = new Admin({
       email: `${role}@example.com`, password: 'password', role,
       ...(role === 'caretaker' ? { roomIds: [ROOM_ID] } : {}),
+      ...(role === 'warden' ? { caretakerIds: [CARETAKER_ID] } : {}),
     });
     const errors = account.validateSync().errors;
     assert.match(errors.name.message, /required/i);
@@ -117,6 +119,34 @@ test('caretaker registration is blocked until the room backfill is complete', as
   });
   assert.equal(response.status, 409);
   assert.match((await response.json()).message, /backfill/i);
+});
+
+test('a super admin can create a warden assigned to active caretaker accounts', async () => {
+  authenticate();
+  mock.method(Admin, 'countDocuments', async (filter) => filter?.role === 'warden' ? 0 : 1);
+  mock.method(Admin, 'find', () => ({
+    select() { return this; },
+    lean: async () => [{
+      _id: CARETAKER_ID,
+      name: 'Meera Nair',
+      role: 'caretaker',
+      active: true,
+      roomIds: [ROOM_ID],
+    }],
+  }));
+  mock.method(Admin, 'findOne', async () => null);
+  let saved;
+  mock.method(Admin.prototype, 'save', async function () { saved = this; return this; });
+
+  const response = await post('/api/admin/register', {
+    name: 'Leela Das', phone: '9876543214', password: 'longenough1', role: 'warden',
+    caretakerIds: [CARETAKER_ID],
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal((await response.json()).role, 'warden');
+  assert.deepEqual(saved.caretakerIds.map(String), [CARETAKER_ID]);
+  assert.deepEqual(saved.roomIds, []);
 });
 
 test('a student write refuses an unknown room rather than inventing one', async () => {

@@ -30,7 +30,7 @@ import { buildRoomUnits } from '../../../../utils/roomUnits.js';
 
 const PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
-const REPORT_SOURCES = Object.freeze(['student', 'caretaker', 'warehouse', 'parent']);
+const REPORT_SOURCES = Object.freeze(['student', 'caretaker', 'warden', 'warehouse', 'parent']);
 
 /* One staff account may have this many reports outstanding before they are asked to
    wait for an answer. Not a rate limit by the clock — a staff member having a bad

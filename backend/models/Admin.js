@@ -27,7 +27,7 @@ const adminSchema = new mongoose.Schema({
   // the account should be deleted or made an admin.
   role: {
     type: String,
-    enum: ['admin', 'warehouse', 'caretaker'],
+    enum: ['admin', 'warehouse', 'caretaker', 'warden'],
     default: 'admin',
   },
 
@@ -57,6 +57,21 @@ const adminSchema = new mongoose.Schema({
         return this.role === 'caretaker' ? count > 0 : count === 0;
       },
       message: 'At least one room is required for caretaker accounts and rooms are not allowed for other roles.',
+    },
+  },
+
+  // A warden receives no rooms directly. Their scope is the live union of the
+  // rooms held by these caretaker accounts, resolved for every request so a
+  // caretaker's room reassignment takes effect without editing the warden.
+  caretakerIds: {
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }],
+    default: [],
+    validate: {
+      validator(value) {
+        const count = Array.isArray(value) ? value.length : 0;
+        return this.role === 'warden' ? count > 0 : count === 0;
+      },
+      message: 'At least one caretaker is required for warden accounts and caretaker assignments are not allowed for other roles.',
     },
   },
 

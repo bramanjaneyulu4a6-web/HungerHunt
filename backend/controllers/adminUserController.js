@@ -7,8 +7,9 @@ import PendingOrder from '../models/PendingOrder.js';
 import Student from '../models/Student.js';
 import { syncStudentRegistration } from '../utils/studentRegistration.js';
 import { emailProblem, optionalEmailProblem, phoneProblem } from '../utils/validation.js';
+import { loadAssignedCaretakers, uniqueObjectIds } from '../utils/wardenScope.js';
 
-const STAFF_ROLES = ['admin', 'warehouse', 'caretaker'];
+const STAFF_ROLES = ['admin', 'warehouse', 'caretaker', 'warden'];
 
 const validId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -224,7 +225,18 @@ export const requireParentPasswordSetup = async (req, res) => {
  * are not documents already. Half-shaped rooms are never emitted.
  */
 const staffView = async (account) => {
-  const roomIds = (account.roomIds || []).filter(Boolean);
+  const caretakerIds = (account.caretakerIds || []).filter(Boolean);
+  const assignedCaretakers = (account.role === 'warden' && caretakerIds.length)
+    ? await Admin.find({ _id: { $in: caretakerIds.map((row) => row?._id ?? row) } })
+      .select('name phone active role roomIds')
+      .lean()
+    : [];
+  const activeAssignedCaretakers = assignedCaretakers.filter(
+    (caretaker) => caretaker.active !== false && caretaker.role === 'caretaker'
+  );
+  const roomIds = account.role === 'warden'
+    ? uniqueObjectIds(activeAssignedCaretakers.flatMap((caretaker) => caretaker.roomIds || []))
+    : (account.roomIds || []).filter(Boolean);
   const rooms = roomIds.every((room) => room?.code !== undefined)
     ? roomIds
     : await Room.find({ _id: { $in: roomIds.map(String) } }, 'code name').lean();
@@ -240,6 +252,12 @@ const staffView = async (account) => {
       id: String(room._id),
       code: room.code,
       name: room.name || '',
+    })),
+    assignedCaretakers: assignedCaretakers.map((caretaker) => ({
+      id: String(caretaker._id),
+      name: caretaker.name,
+      phone: caretaker.phone,
+      active: caretaker.active !== false && caretaker.role === 'caretaker',
     })),
     createdAt: account.createdAt,
   };
@@ -311,8 +329,25 @@ export const updateStaff = async (req, res) => {
     } else if (!(account.roomIds || []).length) {
       return res.status(400).json({ message: 'Choose at least one active room for the caretaker.' });
     }
+    update.caretakerIds = [];
+  } else if (role === 'warden') {
+    if (req.body?.caretakerIds !== undefined) {
+      const requestedCaretakerIds = uniqueObjectIds(req.body.caretakerIds);
+      if (!requestedCaretakerIds.length || requestedCaretakerIds.some((id) => !validId(id))) {
+        return res.status(400).json({ message: 'Choose at least one active caretaker for the warden.' });
+      }
+      const caretakers = await loadAssignedCaretakers(requestedCaretakerIds);
+      if (caretakers.length !== requestedCaretakerIds.length) {
+        return res.status(400).json({ message: 'Choose only active caretaker accounts for the warden.' });
+      }
+      update.caretakerIds = caretakers.map((caretaker) => caretaker._id);
+    } else if (!(account.caretakerIds || []).length) {
+      return res.status(400).json({ message: 'Choose at least one active caretaker for the warden.' });
+    }
+    update.roomIds = [];
   } else {
     update.roomIds = [];
+    update.caretakerIds = [];
   }
   if (req.body?.active !== undefined) {
     if (String(account._id) === String(req.staff.id) && req.body.active === false) {

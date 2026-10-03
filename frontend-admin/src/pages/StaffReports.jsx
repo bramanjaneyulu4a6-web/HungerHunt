@@ -27,6 +27,7 @@ const VIEWS = [
 const SOURCES = [
   ['student', 'Students'],
   ['caretaker', 'Caretakers'],
+  ['warden', 'Wardens'],
   ['warehouse', 'Warehouse'],
   ['parent', 'Parents'],
 ];
@@ -34,6 +35,7 @@ const SOURCES = [
 const SOURCE_COPY = {
   student: 'Issues raised by students while collecting a package.',
   caretaker: 'Package issues and complaints raised by room caretakers.',
+  warden: 'Package issues and complaints raised by wardens for their assigned caretaker teams.',
   warehouse: 'Issues raised by warehouse staff.',
   parent: 'Issues raised by parents.',
 };
